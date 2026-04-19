@@ -12,6 +12,7 @@
 #include <QWheelEvent>
 
 #include "app/bridge/AppController.h"
+#include "core/tools/ToolType.h"
 #include "platform/qt/QtImageConverter.h"
 
 namespace app::canvasview {
@@ -25,9 +26,6 @@ struct CanvasInteractionState {
   QPoint lastPanPos {0, 0};
   QPoint lastMousePos {0, 0};
   bool hasMousePos {false};
-  bool straightMode {false};
-  core::Point straightStart {0, 0};
-  std::optional<core::Point> straightEnd;
 };
 
 std::unordered_map<const CanvasWidget*, CanvasInteractionState> g_canvasStates;
@@ -145,24 +143,70 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   painter.fillRect(target, QColor(32, 32, 32));
   painter.drawImage(target, m_image);
 
-  if (state.straightMode && state.straightEnd.has_value()) {
+  if (m_controller != nullptr) {
+    const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
+    const core::ToolKind activeTool = m_controller->currentTool();
     painter.setRenderHint(QPainter::Antialiasing, true);
-    const QPointF p1(target.x() + static_cast<double>(state.straightStart.x) * state.zoom,
-                     target.y() + static_cast<double>(state.straightStart.y) * state.zoom);
-    const QPointF p2(target.x() + static_cast<double>(state.straightEnd->x) * state.zoom,
-                     target.y() + static_cast<double>(state.straightEnd->y) * state.zoom);
-    painter.setPen(QPen(QColor(0, 0, 0, 180), 3.0, Qt::SolidLine, Qt::RoundCap));
-    painter.drawLine(p1, p2);
-    painter.setPen(QPen(QColor(255, 255, 255, 230), 1.8, Qt::DashLine, Qt::RoundCap));
-    painter.drawLine(p1, p2);
-    painter.setBrush(QBrush(QColor(255, 255, 255, 230)));
-    painter.setPen(QPen(QColor(0, 0, 0, 180), 1.0));
-    painter.drawEllipse(p2, 4.0, 4.0);
+
+    if (overlay.toolOverlay.hasLine) {
+      const QPointF p1(
+          target.x() + (static_cast<double>(overlay.toolOverlay.lineStart.x) + 0.5) * state.zoom,
+          target.y() + (static_cast<double>(overlay.toolOverlay.lineStart.y) + 0.5) * state.zoom);
+      const QPointF p2(
+          target.x() + (static_cast<double>(overlay.toolOverlay.lineEnd.x) + 0.5) * state.zoom,
+          target.y() + (static_cast<double>(overlay.toolOverlay.lineEnd.y) + 0.5) * state.zoom);
+      const QColor accent = activeTool == core::ToolKind::MoveLayer ? QColor(72, 195, 255, 230) : QColor(255, 255, 255, 230);
+      painter.setPen(QPen(QColor(0, 0, 0, 180), 3.0, Qt::SolidLine, Qt::RoundCap));
+      painter.drawLine(p1, p2);
+      painter.setPen(QPen(accent, 1.8, Qt::DashLine, Qt::RoundCap));
+      painter.drawLine(p1, p2);
+      painter.setBrush(QBrush(accent));
+      painter.setPen(QPen(QColor(0, 0, 0, 180), 1.0));
+      painter.drawEllipse(p2, 4.0, 4.0);
+    }
+
+    if (overlay.toolOverlay.hasRect) {
+      const QRectF previewRect(
+          target.x() + static_cast<double>(overlay.toolOverlay.rect.x) * state.zoom,
+          target.y() + static_cast<double>(overlay.toolOverlay.rect.y) * state.zoom,
+          std::max(1.0, static_cast<double>(overlay.toolOverlay.rect.width) * state.zoom),
+          std::max(1.0, static_cast<double>(overlay.toolOverlay.rect.height) * state.zoom));
+      painter.setBrush(Qt::NoBrush);
+      painter.setPen(QPen(QColor(88, 188, 255, 220), 1.6, Qt::DashLine));
+      painter.drawRect(previewRect);
+    }
+
+    if (overlay.selectionRect.has_value()) {
+      const core::Rect rect = *overlay.selectionRect;
+      const QRectF selectionRect(
+          target.x() + static_cast<double>(rect.x) * state.zoom,
+          target.y() + static_cast<double>(rect.y) * state.zoom,
+          std::max(1.0, static_cast<double>(rect.width) * state.zoom),
+          std::max(1.0, static_cast<double>(rect.height) * state.zoom));
+      painter.setBrush(Qt::NoBrush);
+      painter.setPen(QPen(QColor(255, 210, 80, 230), 1.4, Qt::SolidLine));
+      painter.drawRect(selectionRect);
+      painter.setBrush(QColor(255, 210, 80, 210));
+      painter.setPen(Qt::NoPen);
+      constexpr double handle = 4.0;
+      painter.drawRect(QRectF(selectionRect.topLeft().x() - handle / 2.0, selectionRect.topLeft().y() - handle / 2.0, handle, handle));
+      painter.drawRect(QRectF(selectionRect.topRight().x() - handle / 2.0, selectionRect.topRight().y() - handle / 2.0, handle, handle));
+      painter.drawRect(QRectF(selectionRect.bottomLeft().x() - handle / 2.0, selectionRect.bottomLeft().y() - handle / 2.0, handle, handle));
+      painter.drawRect(QRectF(selectionRect.bottomRight().x() - handle / 2.0, selectionRect.bottomRight().y() - handle / 2.0, handle, handle));
+    }
+
+    const QString activeToolText = QString::fromStdString(m_controller->currentToolDisplayName());
+    const QRect badgeRect(target.x() + 10, target.y() + 10, 180, 24);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0, 0, 0, 145));
+    painter.drawRoundedRect(badgeRect, 4.0, 4.0);
+    painter.setPen(QColor(255, 255, 255, 235));
+    painter.drawText(badgeRect.adjusted(8, 0, -6, 0), Qt::AlignVCenter | Qt::AlignLeft, activeToolText);
   }
 
   if (!state.panning && !g_spacePressed && state.hasMousePos && m_controller != nullptr) {
     const auto point = mapToCanvas(state.lastMousePos);
-    if (point.has_value()) {
+    if (point.has_value() && m_controller->currentToolSupportsSize()) {
       const double radiusPx = std::max(1.0, (m_controller->toolState().size * state.zoom) / 2.0);
       const QPointF center(
           target.x() + (static_cast<double>(point->x) + 0.5) * state.zoom,
@@ -201,7 +245,8 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     return;
   }
 
-  if (g_spacePressed) {
+  const bool handPan = g_spacePressed || m_controller->currentTool() == core::ToolKind::Hand;
+  if (handPan) {
     state.panning = true;
     state.lastPanPos = event->position().toPoint();
     updateCursorForState(this, std::nullopt);
@@ -213,18 +258,6 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     return;
   }
 
-  if (event->modifiers() & Qt::ShiftModifier) {
-    state.straightMode = true;
-    state.straightStart = *point;
-    state.straightEnd = *point;
-    m_mouseDrawing = false;
-    updateCursorForState(this, point);
-    update();
-    return;
-  }
-
-  state.straightMode = false;
-  state.straightEnd.reset();
   m_mouseDrawing = true;
   m_controller->beginStroke(point->x, point->y);
   updateCursorForState(this, point);
@@ -248,15 +281,6 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
     state.lastPanPos = current;
     updateCursorForState(this, std::nullopt);
     update();
-    return;
-  }
-
-  if (state.straightMode && (event->buttons() & Qt::LeftButton)) {
-    const auto point = canvasPoint;
-    if (point.has_value()) {
-      state.straightEnd = point;
-      update();
-    }
     return;
   }
 
@@ -285,19 +309,6 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
   state.hasMousePos = true;
   if (state.panning) {
     state.panning = false;
-    updateCursorForState(this, mapToCanvas(state.lastMousePos));
-    update();
-    return;
-  }
-
-  if (state.straightMode) {
-    if (state.straightEnd.has_value()) {
-      m_controller->beginStroke(state.straightStart.x, state.straightStart.y);
-      m_controller->continueStroke(state.straightEnd->x, state.straightEnd->y);
-      m_controller->endStroke();
-    }
-    state.straightMode = false;
-    state.straightEnd.reset();
     updateCursorForState(this, mapToCanvas(state.lastMousePos));
     update();
     return;
@@ -352,12 +363,14 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
     return;
   }
 
-  const int delta = steps > 0.0 ? static_cast<int>(std::ceil(steps)) : static_cast<int>(std::floor(steps));
-  const int currentSize = m_controller->toolState().size;
-  const int nextSize = std::clamp(currentSize + delta, 1, 128);
-  if (nextSize != currentSize) {
-    m_controller->setBrushSize(nextSize);
-    update();
+  if (m_controller->currentToolSupportsSize()) {
+    const int delta = steps > 0.0 ? static_cast<int>(std::ceil(steps)) : static_cast<int>(std::floor(steps));
+    const int currentSize = m_controller->toolState().size;
+    const int nextSize = std::clamp(currentSize + delta, 1, 128);
+    if (nextSize != currentSize) {
+      m_controller->setBrushSize(nextSize);
+      update();
+    }
   }
   event->accept();
 }

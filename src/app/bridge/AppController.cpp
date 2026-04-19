@@ -51,6 +51,13 @@ AppController::AppController(QObject* parent)
   rerender();
 }
 
+CanvasOverlayViewModel AppController::canvasOverlay() const {
+  CanvasOverlayViewModel view;
+  view.toolOverlay = m_toolManager.overlay();
+  view.selectionRect = m_document.selection().boundingRect();
+  return view;
+}
+
 std::vector<LayerViewModel> AppController::layerViewModels() const {
   std::vector<LayerViewModel> models;
   models.reserve(m_document.layerCount());

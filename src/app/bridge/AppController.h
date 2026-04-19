@@ -34,6 +34,11 @@ struct ToolStateViewModel {
   int size {8};
 };
 
+struct CanvasOverlayViewModel {
+  core::ToolOverlayState toolOverlay;
+  std::optional<core::Rect> selectionRect;
+};
+
 class AppController : public QObject {
   Q_OBJECT
 
@@ -42,6 +47,7 @@ public:
 
   const core::Document& document() const noexcept { return m_document; }
   const core::PixelBuffer& compositedBuffer() const noexcept { return m_composited; }
+  CanvasOverlayViewModel canvasOverlay() const;
 
   std::vector<LayerViewModel> layerViewModels() const;
   ToolStateViewModel toolState() const noexcept;
