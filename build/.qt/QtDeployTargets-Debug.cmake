@@ -1,0 +1,7 @@
+set(__QT_DEPLOY_TARGET_paint_core_FILE C:/ポートフォリオ/自作イラストアプリ/build/src/Debug/paint_core.lib)
+set(__QT_DEPLOY_TARGET_paint_core_TYPE STATIC_LIBRARY)
+set(__QT_DEPLOY_TARGET_paint_qt_platform_FILE C:/ポートフォリオ/自作イラストアプリ/build/src/Debug/paint_qt_platform.lib)
+set(__QT_DEPLOY_TARGET_paint_qt_platform_TYPE STATIC_LIBRARY)
+set(__QT_DEPLOY_TARGET_paint_app_FILE C:/ポートフォリオ/自作イラストアプリ/build/src/Debug/LayeredPaintApp.exe)
+set(__QT_DEPLOY_TARGET_paint_app_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_paint_app_RUNTIME_DLLS C:/CraftRoot_KF6/bin/Qt6Widgets.dll;C:/CraftRoot_KF6/bin/Qt6Gui.dll;C:/CraftRoot_KF6/bin/Qt6Core.dll)

@@ -1,0 +1,10 @@
+^C:\ポートフォリオ\自作イラストアプリ\SRC\CMAKELISTS.TXT
+setlocal
+C:\temp\cmake_versions\cmake-4.3.1\bin\cmake.exe -SC:/ポートフォリオ/自作イラストアプリ -BC:/ポートフォリオ/自作イラストアプリ/build --check-stamp-file C:/ポートフォリオ/自作イラストアプリ/build/src/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

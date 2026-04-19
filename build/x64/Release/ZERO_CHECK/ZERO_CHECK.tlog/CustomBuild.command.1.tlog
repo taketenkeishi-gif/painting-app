@@ -1,0 +1,10 @@
+^C:\ポートフォリオ\自作イラストアプリ\BUILD\CMAKEFILES\CA5C291567166E1A3DCA2E0E9C9BE826\GENERATE.STAMP.RULE
+setlocal
+C:\temp\cmake_versions\cmake-4.3.1\bin\cmake.exe -SC:/ポートフォリオ/自作イラストアプリ -BC:/ポートフォリオ/自作イラストアプリ/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/ポートフォリオ/自作イラストアプリ/build/LayeredPaintApp.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\ポートフォリオ\自作イラストアプリ\build\CMakeFiles\ca5c291567166e1a3dca2e0e9c9be826\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{F979CB87-3C29-3C55-A0D0-0434DFFDF1C3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

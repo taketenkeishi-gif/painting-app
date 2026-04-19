@@ -1,0 +1,35 @@
+Start testing: Apr 19 22:19 ���� (�W����)
+----------------------------------------------------------
+1/2 Testing: core_tests
+1/2 Test: core_tests
+Command: "C:/ポートフォリオ/自作イラストアプリ/build-tests/tests/Debug/core_tests.exe"
+Directory: C:/ポートフォリオ/自作イラストアプリ/build-tests/tests
+"core_tests" start time: Apr 19 22:19 ���� (�W����)
+Output:
+----------------------------------------------------------
+All core tests passed.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"core_tests" end time: Apr 19 22:19 ���� (�W����)
+"core_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: app_smoke_tests
+2/2 Test: app_smoke_tests
+Command: "C:/ポートフォリオ/自作イラストアプリ/build-tests/tests/Debug/app_smoke_tests.exe"
+Directory: C:/ポートフォリオ/自作イラストアプリ/build-tests/tests
+"app_smoke_tests" start time: Apr 19 22:19 ���� (�W����)
+Output:
+----------------------------------------------------------
+App smoke tests passed.
+<end of output>
+Test time =   0.30 sec
+----------------------------------------------------------
+Test Passed.
+"app_smoke_tests" end time: Apr 19 22:19 ���� (�W����)
+"app_smoke_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Apr 19 22:19 ���� (�W����)
