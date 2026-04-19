@@ -1,5 +1,0 @@
-C:/ポートフォリオ/自作イラストアプリ/build/CMakeFiles/ALL_BUILD.dir
-C:/ポートフォリオ/自作イラストアプリ/build/CMakeFiles/ZERO_CHECK.dir
-C:/ポートフォリオ/自作イラストアプリ/build/src/CMakeFiles/paint_core.dir
-C:/ポートフォリオ/自作イラストアプリ/build/src/CMakeFiles/paint_qt_platform.dir
-C:/ポートフォリオ/自作イラストアプリ/build/src/CMakeFiles/paint_app.dir

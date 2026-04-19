@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"C:/\u30dd\u30fc\u30c8\u30d5\u30a9\u30ea\u30aa/\u81ea\u4f5c\u30a4\u30e9\u30b9\u30c8\u30a2\u30d7\u30ea/build/cmake_install.cmake",
-		"C:/\u30dd\u30fc\u30c8\u30d5\u30a9\u30ea\u30aa/\u81ea\u4f5c\u30a4\u30e9\u30b9\u30c8\u30a2\u30d7\u30ea/build/src/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

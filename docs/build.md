@@ -62,17 +62,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-tests.ps1
 
 After build, run `LayeredPaintApp.exe` and verify:
 
-1. Window opens with canvas and layer panel.
+1. Window opens with `left tool panel / top bar / right panel stack / center canvas / bottom status`.
 2. New Canvas changes width and height.
 3. Add Layer creates a new selectable layer.
 4. Selecting another layer changes the active highlight and draw target.
 5. Double-clicking a layer name renames it.
 6. Visibility checkbox toggles composited display.
 7. Delete removes selected layer but never removes the last remaining layer.
-8. Brush color button changes drawing color.
-9. Brush size spinner affects stroke thickness.
-10. Draw one stroke, press `Ctrl+Z`, stroke disappears.
-11. Press `Ctrl+Y`, undone stroke returns.
+8. Tool panel switches active tool and top/status labels follow it.
+9. Tool property panel shows color/size for Brush/Eraser (and guide text for other tools).
+10. Line / RectSelection / MoveLayer show stable overlay while dragging.
+11. Draw one stroke, press `Ctrl+Z`, stroke disappears.
+12. Press `Ctrl+Y`, undone stroke returns.
 
 ## Notes
 

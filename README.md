@@ -19,10 +19,22 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
 
 - New canvas creation
 - Layer add/delete/select/rename/visibility toggle
-- Brush drawing by mouse drag
-- Stroke-level Undo (`Ctrl+Z`) / Redo (`Ctrl+Y`) for drawing
-- Brush color and size controls
+- Tool system with switchable tools:
+  - Brush / Eraser / Eyedropper / Fill
+  - Line / RectSelection / MoveLayer
+  - Hand / Zoom
+- Stroke-level Undo (`Ctrl+Z`) / Redo (`Ctrl+Y`) for drawing and selection updates
+- Tool property panel (color/size for relevant tools) and tool guide display
+- Canvas overlay for line preview, selection preview/border, move preview, brush cursor
 - Composited canvas display
+
+## Current UI Shell
+
+- Left: tool selection panel
+- Top: current tool and current sub-tool bar
+- Right: layer panel + sub-tool panel + tool-property panel
+- Center: canvas viewport
+- Bottom: status bar (tool, guide, color, size, zoom, active layer)
 
 ## Build Quick Start (Windows / PowerShell)
 

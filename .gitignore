@@ -1,0 +1,10 @@
+# Build outputs
+build/
+build-tests/
+
+# IDE / temporary
+.vs/
+*.user
+*.VC.db
+*.VC.opendb
+CMakeUserPresets.json
