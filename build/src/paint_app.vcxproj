@@ -454,6 +454,9 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\mainwindow\MainWindow.cpp" />
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\canvasview\CanvasWidget.cpp" />
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\panels\LayerPanel.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\panels\ToolPanel.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\panels\SubToolPanel.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\panels\ToolPropertyPanel.cpp" />
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app_autogen\mocs_compilation_Release.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</ExcludedFromBuild>

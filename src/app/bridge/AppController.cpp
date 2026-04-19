@@ -142,6 +142,19 @@ void AppController::setLayerVisible(std::size_t index, bool visible) {
   emit documentChanged();
 }
 
+std::vector<core::ToolKind> AppController::availableTools() const {
+  return {
+      core::ToolKind::Brush,
+      core::ToolKind::Eraser,
+      core::ToolKind::Eyedropper,
+      core::ToolKind::Fill,
+      core::ToolKind::Line,
+      core::ToolKind::RectSelection,
+      core::ToolKind::MoveLayer,
+      core::ToolKind::Hand,
+      core::ToolKind::Zoom};
+}
+
 bool AppController::setCurrentTool(core::ToolKind kind) {
   if (!m_toolManager.setActiveTool(kind)) {
     return false;
@@ -152,6 +165,26 @@ bool AppController::setCurrentTool(core::ToolKind kind) {
 
 core::ToolKind AppController::currentTool() const noexcept {
   return m_toolManager.activeToolKind();
+}
+
+std::string AppController::currentToolDisplayName() const {
+  return toolDisplayName(currentTool());
+}
+
+std::string AppController::currentSubToolDisplayName() const {
+  return toolSubToolName(currentTool());
+}
+
+std::string AppController::currentToolGuide() const {
+  return toolGuideText(currentTool());
+}
+
+bool AppController::currentToolSupportsColor() const noexcept {
+  return toolSupportsColor(currentTool());
+}
+
+bool AppController::currentToolSupportsSize() const noexcept {
+  return toolSupportsSize(currentTool());
 }
 
 void AppController::beginStroke(int x, int y) {
@@ -418,6 +451,103 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
       return "Zoom";
     default:
       return "Action";
+  }
+}
+
+std::string AppController::toolDisplayName(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return "Brush";
+    case core::ToolKind::Eraser:
+      return "Eraser";
+    case core::ToolKind::Eyedropper:
+      return "Eyedropper";
+    case core::ToolKind::Fill:
+      return "Fill";
+    case core::ToolKind::Line:
+      return "Line";
+    case core::ToolKind::RectSelection:
+      return "Rect Selection";
+    case core::ToolKind::MoveLayer:
+      return "Move Layer";
+    case core::ToolKind::Hand:
+      return "Hand";
+    case core::ToolKind::Zoom:
+      return "Zoom";
+    default:
+      return "Tool";
+  }
+}
+
+std::string AppController::toolSubToolName(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return "Round Brush";
+    case core::ToolKind::Eraser:
+      return "Round Eraser";
+    case core::ToolKind::Eyedropper:
+      return "Sample Composite";
+    case core::ToolKind::Fill:
+      return "Contiguous Fill";
+    case core::ToolKind::Line:
+      return "Straight Line";
+    case core::ToolKind::RectSelection:
+      return "Rectangle";
+    case core::ToolKind::MoveLayer:
+      return "Pixel Offset";
+    case core::ToolKind::Hand:
+      return "Pan View";
+    case core::ToolKind::Zoom:
+      return "Wheel Zoom";
+    default:
+      return "Default";
+  }
+}
+
+std::string AppController::toolGuideText(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return "LMB drag to paint. Wheel adjusts size.";
+    case core::ToolKind::Eraser:
+      return "LMB drag to erase. Wheel adjusts size.";
+    case core::ToolKind::Eyedropper:
+      return "Click canvas to sample color.";
+    case core::ToolKind::Fill:
+      return "Click to fill region.";
+    case core::ToolKind::Line:
+      return "Press-drag-release to draw straight line.";
+    case core::ToolKind::RectSelection:
+      return "Drag to create rectangular selection.";
+    case core::ToolKind::MoveLayer:
+      return "Drag to move active layer pixels.";
+    case core::ToolKind::Hand:
+      return "Drag to pan canvas.";
+    case core::ToolKind::Zoom:
+      return "Use Ctrl+Wheel to zoom around cursor.";
+    default:
+      return "No guide available.";
+  }
+}
+
+bool AppController::toolSupportsColor(core::ToolKind kind) noexcept {
+  switch (kind) {
+    case core::ToolKind::Brush:
+    case core::ToolKind::Line:
+    case core::ToolKind::Fill:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool AppController::toolSupportsSize(core::ToolKind kind) noexcept {
+  switch (kind) {
+    case core::ToolKind::Brush:
+    case core::ToolKind::Eraser:
+    case core::ToolKind::Line:
+      return true;
+    default:
+      return false;
   }
 }
 

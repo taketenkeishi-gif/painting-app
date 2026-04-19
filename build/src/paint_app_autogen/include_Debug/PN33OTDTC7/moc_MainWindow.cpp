@@ -41,9 +41,6 @@ template <> constexpr inline auto app::mainwindow::MainWindow::qt_create_metaobj
         "app::mainwindow::MainWindow",
         "onNewCanvas",
         "",
-        "onChooseBrushColor",
-        "onBrushSizeChanged",
-        "size",
         "onToolStateChanged",
         "onUndoTriggered",
         "onRedoTriggered"
@@ -52,18 +49,12 @@ template <> constexpr inline auto app::mainwindow::MainWindow::qt_create_metaobj
     QtMocHelpers::UintData qt_methods {
         // Slot 'onNewCanvas'
         QtMocHelpers::SlotData<void()>(1, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onChooseBrushColor'
-        QtMocHelpers::SlotData<void()>(3, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onBrushSizeChanged'
-        QtMocHelpers::SlotData<void(int)>(4, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { QMetaType::Int, 5 },
-        }}),
         // Slot 'onToolStateChanged'
-        QtMocHelpers::SlotData<void()>(6, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(3, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'onUndoTriggered'
-        QtMocHelpers::SlotData<void()>(7, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(4, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'onRedoTriggered'
-        QtMocHelpers::SlotData<void()>(8, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(5, 2, QMC::AccessPrivate, QMetaType::Void),
     };
     QtMocHelpers::UintData qt_properties {
     };
@@ -88,14 +79,13 @@ void app::mainwindow::MainWindow::qt_static_metacall(QObject *_o, QMetaObject::C
     if (_c == QMetaObject::InvokeMetaMethod) {
         switch (_id) {
         case 0: _t->onNewCanvas(); break;
-        case 1: _t->onChooseBrushColor(); break;
-        case 2: _t->onBrushSizeChanged((*reinterpret_cast<std::add_pointer_t<int>>(_a[1]))); break;
-        case 3: _t->onToolStateChanged(); break;
-        case 4: _t->onUndoTriggered(); break;
-        case 5: _t->onRedoTriggered(); break;
+        case 1: _t->onToolStateChanged(); break;
+        case 2: _t->onUndoTriggered(); break;
+        case 3: _t->onRedoTriggered(); break;
         default: ;
         }
     }
+    (void)_a;
 }
 
 const QMetaObject *app::mainwindow::MainWindow::metaObject() const
@@ -117,14 +107,14 @@ int app::mainwindow::MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 6)
+        if (_id < 4)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 6;
+        _id -= 4;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 6)
+        if (_id < 4)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 6;
+        _id -= 4;
     }
     return _id;
 }

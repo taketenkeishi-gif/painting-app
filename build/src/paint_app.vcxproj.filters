@@ -19,6 +19,15 @@
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\panels\LayerPanel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\panels\ToolPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\panels\SubToolPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\app\panels\ToolPropertyPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app_autogen\mocs_compilation_Release.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

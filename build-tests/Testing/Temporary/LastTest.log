@@ -1,18 +1,18 @@
-Start testing: Apr 20 00:01 “Œ‹ž (•W€Žž)
+Start testing: Apr 20 00:07 “Œ‹ž (•W€Žž)
 ----------------------------------------------------------
 1/2 Testing: core_tests
 1/2 Test: core_tests
 Command: "C:/ãƒãƒ¼ãƒˆãƒ•ã‚©ãƒªã‚ª/è‡ªä½œã‚¤ãƒ©ã‚¹ãƒˆã‚¢ãƒ—ãƒª/build-tests/tests/Debug/core_tests.exe"
 Directory: C:/ãƒãƒ¼ãƒˆãƒ•ã‚©ãƒªã‚ª/è‡ªä½œã‚¤ãƒ©ã‚¹ãƒˆã‚¢ãƒ—ãƒª/build-tests/tests
-"core_tests" start time: Apr 20 00:01 “Œ‹ž (•W€Žž)
+"core_tests" start time: Apr 20 00:07 “Œ‹ž (•W€Žž)
 Output:
 ----------------------------------------------------------
 All core tests passed.
 <end of output>
-Test time =   0.03 sec
+Test time =   0.02 sec
 ----------------------------------------------------------
 Test Passed.
-"core_tests" end time: Apr 20 00:01 “Œ‹ž (•W€Žž)
+"core_tests" end time: Apr 20 00:07 “Œ‹ž (•W€Žž)
 "core_tests" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -20,16 +20,16 @@ Test Passed.
 2/2 Test: app_smoke_tests
 Command: "C:/ãƒãƒ¼ãƒˆãƒ•ã‚©ãƒªã‚ª/è‡ªä½œã‚¤ãƒ©ã‚¹ãƒˆã‚¢ãƒ—ãƒª/build-tests/tests/Debug/app_smoke_tests.exe"
 Directory: C:/ãƒãƒ¼ãƒˆãƒ•ã‚©ãƒªã‚ª/è‡ªä½œã‚¤ãƒ©ã‚¹ãƒˆã‚¢ãƒ—ãƒª/build-tests/tests
-"app_smoke_tests" start time: Apr 20 00:01 “Œ‹ž (•W€Žž)
+"app_smoke_tests" start time: Apr 20 00:07 “Œ‹ž (•W€Žž)
 Output:
 ----------------------------------------------------------
 App smoke tests passed.
 <end of output>
-Test time =   0.45 sec
+Test time =   0.39 sec
 ----------------------------------------------------------
 Test Passed.
-"app_smoke_tests" end time: Apr 20 00:01 “Œ‹ž (•W€Žž)
+"app_smoke_tests" end time: Apr 20 00:07 “Œ‹ž (•W€Žž)
 "app_smoke_tests" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Apr 20 00:01 “Œ‹ž (•W€Žž)
+End testing: Apr 20 00:07 “Œ‹ž (•W€Žž)

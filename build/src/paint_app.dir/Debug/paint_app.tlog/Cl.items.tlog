@@ -4,3 +4,6 @@ C:\ポートフォリオ\自作イラストアプリ\src\app\bridge\AppControlle
 C:\ポートフォリオ\自作イラストアプリ\src\app\mainwindow\MainWindow.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Debug\MainWindow.obj
 C:\ポートフォリオ\自作イラストアプリ\src\app\canvasview\CanvasWidget.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Debug\CanvasWidget.obj
 C:\ポートフォリオ\自作イラストアプリ\src\app\panels\LayerPanel.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Debug\LayerPanel.obj
+C:\ポートフォリオ\自作イラストアプリ\src\app\panels\ToolPanel.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Debug\ToolPanel.obj
+C:\ポートフォリオ\自作イラストアプリ\src\app\panels\SubToolPanel.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Debug\SubToolPanel.obj
+C:\ポートフォリオ\自作イラストアプリ\src\app\panels\ToolPropertyPanel.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Debug\ToolPropertyPanel.obj

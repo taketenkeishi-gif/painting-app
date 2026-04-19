@@ -53,8 +53,14 @@ public:
   void setActiveLayer(std::size_t index);
   void setLayerVisible(std::size_t index, bool visible);
 
+  std::vector<core::ToolKind> availableTools() const;
   bool setCurrentTool(core::ToolKind kind);
   core::ToolKind currentTool() const noexcept;
+  std::string currentToolDisplayName() const;
+  std::string currentSubToolDisplayName() const;
+  std::string currentToolGuide() const;
+  bool currentToolSupportsColor() const noexcept;
+  bool currentToolSupportsSize() const noexcept;
 
   void beginStroke(int x, int y);
   void continueStroke(int x, int y);
@@ -107,6 +113,11 @@ private:
   static bool toolWritesPixels(core::ToolKind kind) noexcept;
   static bool toolWritesSelection(core::ToolKind kind) noexcept;
   static std::string actionNameForTool(core::ToolKind kind);
+  static std::string toolDisplayName(core::ToolKind kind);
+  static std::string toolSubToolName(core::ToolKind kind);
+  static std::string toolGuideText(core::ToolKind kind);
+  static bool toolSupportsColor(core::ToolKind kind) noexcept;
+  static bool toolSupportsSize(core::ToolKind kind) noexcept;
 
   core::ToolContext makeToolContext();
   void applyToolResult(const core::ToolResult& result);

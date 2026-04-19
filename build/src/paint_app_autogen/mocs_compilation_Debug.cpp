@@ -3,3 +3,6 @@
 #include <VSJXUW5LD7/moc_CanvasWidget.cpp>
 #include <PN33OTDTC7/moc_MainWindow.cpp>
 #include <OIRVWDFGAB/moc_LayerPanel.cpp>
+#include <OIRVWDFGAB/moc_SubToolPanel.cpp>
+#include <OIRVWDFGAB/moc_ToolPanel.cpp>
+#include <OIRVWDFGAB/moc_ToolPropertyPanel.cpp>

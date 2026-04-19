@@ -3,4 +3,7 @@ C:\ポートフォリオ\自作イラストアプリ\src\app\bridge\AppControlle
 C:\ポートフォリオ\自作イラストアプリ\src\app\mainwindow\MainWindow.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Release\MainWindow.obj
 C:\ポートフォリオ\自作イラストアプリ\src\app\canvasview\CanvasWidget.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Release\CanvasWidget.obj
 C:\ポートフォリオ\自作イラストアプリ\src\app\panels\LayerPanel.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Release\LayerPanel.obj
+C:\ポートフォリオ\自作イラストアプリ\src\app\panels\ToolPanel.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Release\ToolPanel.obj
+C:\ポートフォリオ\自作イラストアプリ\src\app\panels\SubToolPanel.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Release\SubToolPanel.obj
+C:\ポートフォリオ\自作イラストアプリ\src\app\panels\ToolPropertyPanel.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Release\ToolPropertyPanel.obj
 C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app_autogen\mocs_compilation_Release.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_app.dir\Release\mocs_compilation_Release.obj

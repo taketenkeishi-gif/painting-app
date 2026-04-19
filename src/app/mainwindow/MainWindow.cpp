@@ -1,9 +1,6 @@
 #include "app/mainwindow/MainWindow.h"
 
-#include <cstdint>
-
 #include <QAction>
-#include <QColorDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -14,8 +11,6 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
-#include <QPushButton>
-#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QVBoxLayout>
@@ -24,22 +19,13 @@
 #include "app/bridge/AppController.h"
 #include "app/canvasview/CanvasWidget.h"
 #include "app/panels/LayerPanel.h"
+#include "app/panels/SubToolPanel.h"
+#include "app/panels/ToolPanel.h"
+#include "app/panels/ToolPropertyPanel.h"
 
 namespace app::mainwindow {
 
 namespace {
-
-core::Color toCoreColor(const QColor& color) {
-  return core::Color {
-      static_cast<std::uint8_t>(color.red()),
-      static_cast<std::uint8_t>(color.green()),
-      static_cast<std::uint8_t>(color.blue()),
-      static_cast<std::uint8_t>(color.alpha())};
-}
-
-QColor toQColor(const core::Color& color) {
-  return QColor(color.r, color.g, color.b, color.a);
-}
 
 QGroupBox* makePanelGroup(const QString& title, QWidget* child, QWidget* parent) {
   auto* box = new QGroupBox(title, parent);
@@ -55,12 +41,18 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
       m_controller(new app::bridge::AppController(this)),
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
-      m_layerPanel(new app::panels::LayerPanel(this)) {
+      m_layerPanel(new app::panels::LayerPanel(this)),
+      m_toolPanel(new app::panels::ToolPanel(this)),
+      m_subToolPanel(new app::panels::SubToolPanel(this)),
+      m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
   setWindowTitle("Layered Paint App");
   resize(1400, 860);
 
   m_canvasWidget->setController(m_controller);
   m_layerPanel->setController(m_controller);
+  m_toolPanel->setController(m_controller);
+  m_subToolPanel->setController(m_controller);
+  m_toolPropertyPanel->setController(m_controller);
 
   setupShellLayout();
   createMenus();
@@ -74,6 +66,7 @@ MainWindow::MainWindow(QWidget* parent)
   onToolStateChanged();
   updateUndoRedoState();
   updateActiveLayerStatus();
+  updateTopToolInfo();
 }
 
 void MainWindow::setupShellLayout() {
@@ -84,16 +77,15 @@ void MainWindow::setupShellLayout() {
 
   m_leftToolHost = new QFrame(root);
   m_leftToolHost->setObjectName("LeftToolHost");
-  m_leftToolHost->setMinimumWidth(96);
-  m_leftToolHost->setMaximumWidth(120);
+  m_leftToolHost->setMinimumWidth(110);
+  m_leftToolHost->setMaximumWidth(140);
   auto* leftLayout = new QVBoxLayout(m_leftToolHost);
   leftLayout->setContentsMargins(8, 8, 8, 8);
   leftLayout->setSpacing(8);
   auto* leftTitle = new QLabel("Tools", m_leftToolHost);
   leftTitle->setStyleSheet("font-weight: 700;");
   leftLayout->addWidget(leftTitle);
-  leftLayout->addWidget(new QLabel("Tool buttons\n(Phase UI2)", m_leftToolHost));
-  leftLayout->addStretch(1);
+  leftLayout->addWidget(m_toolPanel, 1);
 
   auto* centerHost = new QWidget(root);
   auto* centerLayout = new QVBoxLayout(centerHost);
@@ -104,46 +96,27 @@ void MainWindow::setupShellLayout() {
   m_topBar->setObjectName("TopBarHost");
   auto* topLayout = new QHBoxLayout(m_topBar);
   topLayout->setContentsMargins(10, 8, 10, 8);
-  topLayout->setSpacing(8);
-
-  topLayout->addWidget(new QLabel("Color", m_topBar));
-  m_brushColorButton = new QPushButton("Color", m_topBar);
-  m_brushColorButton->setMinimumWidth(120);
-  topLayout->addWidget(m_brushColorButton);
-
-  topLayout->addWidget(new QLabel("Size", m_topBar));
-  m_brushSizeSpin = new QSpinBox(m_topBar);
-  m_brushSizeSpin->setRange(1, 128);
-  m_brushSizeSpin->setSingleStep(1);
-  m_brushSizeSpin->setMinimumWidth(72);
-  topLayout->addWidget(m_brushSizeSpin);
+  topLayout->setSpacing(12);
+  m_currentToolLabel = new QLabel("Tool: Brush", m_topBar);
+  m_currentSubToolLabel = new QLabel("Sub Tool: Round Brush", m_topBar);
+  topLayout->addWidget(m_currentToolLabel);
+  topLayout->addWidget(m_currentSubToolLabel);
   topLayout->addStretch(1);
-
-  connect(m_brushColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBrushColor);
-  connect(m_brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this, &MainWindow::onBrushSizeChanged);
 
   centerLayout->addWidget(m_topBar);
   centerLayout->addWidget(m_canvasWidget, 1);
 
   m_rightPanelHost = new QFrame(root);
   m_rightPanelHost->setObjectName("RightPanelHost");
-  m_rightPanelHost->setMinimumWidth(280);
-  m_rightPanelHost->setMaximumWidth(360);
+  m_rightPanelHost->setMinimumWidth(300);
+  m_rightPanelHost->setMaximumWidth(380);
   auto* rightLayout = new QVBoxLayout(m_rightPanelHost);
   rightLayout->setContentsMargins(4, 4, 4, 4);
   rightLayout->setSpacing(8);
 
   rightLayout->addWidget(makePanelGroup("Layer", m_layerPanel, m_rightPanelHost), 2);
-
-  auto* subToolPlaceholder = new QLabel("Sub tool panel\n(Phase UI2)", m_rightPanelHost);
-  subToolPlaceholder->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-  m_subToolPlaceholderLabel = subToolPlaceholder;
-  rightLayout->addWidget(makePanelGroup("Sub Tool", subToolPlaceholder, m_rightPanelHost), 1);
-
-  auto* propertyPlaceholder = new QLabel("Tool property panel\n(Phase UI2)", m_rightPanelHost);
-  propertyPlaceholder->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-  m_propertyPlaceholderLabel = propertyPlaceholder;
-  rightLayout->addWidget(makePanelGroup("Tool Property", propertyPlaceholder, m_rightPanelHost), 1);
+  rightLayout->addWidget(makePanelGroup("Sub Tool", m_subToolPanel, m_rightPanelHost), 1);
+  rightLayout->addWidget(makePanelGroup("Tool Property", m_toolPropertyPanel, m_rightPanelHost), 2);
 
   rootLayout->addWidget(m_leftToolHost);
   rootLayout->addWidget(centerHost, 1);
@@ -232,6 +205,15 @@ void MainWindow::updateActiveLayerStatus() {
   m_activeLayerStatusLabel->setText(QString("Layer: %1").arg(QString::fromStdString(doc.layerAt(active).name())));
 }
 
+void MainWindow::updateTopToolInfo() {
+  if (m_currentToolLabel == nullptr || m_currentSubToolLabel == nullptr) {
+    return;
+  }
+
+  m_currentToolLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
+  m_currentSubToolLabel->setText(QString("Sub Tool: %1").arg(QString::fromStdString(m_controller->currentSubToolDisplayName())));
+}
+
 void MainWindow::onUndoTriggered() {
   m_controller->undo();
   updateUndoRedoState();
@@ -271,53 +253,19 @@ void MainWindow::onNewCanvas() {
   m_controller->newDocument(width, height);
 }
 
-void MainWindow::onChooseBrushColor() {
-  const app::bridge::ToolStateViewModel state = m_controller->toolState();
-  const QColor picked = QColorDialog::getColor(toQColor(state.color), this, "Brush Color", QColorDialog::ShowAlphaChannel);
-  if (!picked.isValid()) {
-    return;
-  }
-  m_controller->setBrushColor(toCoreColor(picked));
-}
-
-void MainWindow::onBrushSizeChanged(int size) {
-  m_controller->setBrushSize(size);
-}
-
 void MainWindow::onToolStateChanged() {
-  if (m_brushSizeSpin == nullptr || m_brushColorButton == nullptr) {
-    return;
-  }
-
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
-  const QSignalBlocker spinBlocker(m_brushSizeSpin);
-  m_brushSizeSpin->setValue(state.size);
-  updateBrushColorButton();
 
   if (auto* sizeLabel = findChild<QLabel*>("BrushSizeStatusLabel"); sizeLabel != nullptr) {
     sizeLabel->setText(QString("Size: %1").arg(state.size));
   }
-}
-
-void MainWindow::updateBrushColorButton() {
-  const app::bridge::ToolStateViewModel state = m_controller->toolState();
-  const QColor color = toQColor(state.color);
-  const int luminance = (299 * color.red() + 587 * color.green() + 114 * color.blue()) / 1000;
-  const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
-  const QString hex = color.name(QColor::HexRgb).toUpper();
-
-  m_brushColorButton->setText(QString("Color %1").arg(hex));
-  m_brushColorButton->setStyleSheet(
-      QString("QPushButton { background-color: rgba(%1, %2, %3, %4); color: %5; border: 2px solid #666; padding: 2px 6px; font-weight: 600; }")
-          .arg(color.red())
-          .arg(color.green())
-          .arg(color.blue())
-          .arg(color.alpha())
-          .arg(textColor));
 
   if (auto* colorLabel = findChild<QLabel*>("BrushColorStatusLabel"); colorLabel != nullptr) {
-    colorLabel->setText(QString("Color: %1").arg(hex));
+    const QColor color(state.color.r, state.color.g, state.color.b, state.color.a);
+    colorLabel->setText(QString("Color: %1").arg(color.name(QColor::HexRgb).toUpper()));
   }
+
+  updateTopToolInfo();
 }
 
 } // namespace app::mainwindow
