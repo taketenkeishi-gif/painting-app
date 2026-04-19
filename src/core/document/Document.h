@@ -6,6 +6,7 @@
 
 #include "core/common/Size.h"
 #include "core/layer/Layer.h"
+#include "core/selection/SelectionMask.h"
 
 namespace core {
 
@@ -31,12 +32,17 @@ public:
   bool setLayerVisible(std::size_t index, bool visible) noexcept;
   bool setLayerOpacity(std::size_t index, float opacity) noexcept;
 
+  SelectionMask& selection() noexcept { return m_selection; }
+  const SelectionMask& selection() const noexcept { return m_selection; }
+  void clearSelection() noexcept { m_selection.clear(); }
+
 private:
   static std::string makeDefaultLayerName(std::size_t currentLayerCount);
 
   Size m_canvasSize;
   std::vector<Layer> m_layers;
   std::size_t m_activeLayerIndex {0};
+  SelectionMask m_selection;
 };
 
 } // namespace core

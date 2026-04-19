@@ -79,24 +79,34 @@ signals:
 private:
   enum class HistoryKind {
     Stroke,
-    LayerVisibility
+    LayerVisibility,
+    Selection
   };
 
   struct StrokeHistoryEntry {
     HistoryKind kind {HistoryKind::Stroke};
+    std::string actionName {"Stroke"};
     std::size_t layerIndex {0};
     core::PixelBuffer before;
     core::PixelBuffer after;
     bool beforeVisible {true};
     bool afterVisible {true};
+    core::SelectionMask beforeSelection;
+    core::SelectionMask afterSelection;
   };
 
   struct PendingStrokeState {
+    bool trackPixels {false};
+    bool trackSelection {false};
+    std::string actionName {"Stroke"};
     std::size_t layerIndex {0};
     core::PixelBuffer before;
+    core::SelectionMask beforeSelection;
   };
 
   static bool toolWritesPixels(core::ToolKind kind) noexcept;
+  static bool toolWritesSelection(core::ToolKind kind) noexcept;
+  static std::string actionNameForTool(core::ToolKind kind);
 
   core::ToolContext makeToolContext();
   void applyToolResult(const core::ToolResult& result);

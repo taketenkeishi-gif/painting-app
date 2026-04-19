@@ -6,7 +6,8 @@
 namespace core {
 
 Document::Document(int width, int height)
-    : m_canvasSize {width, height} {
+    : m_canvasSize {width, height},
+      m_selection(width, height) {
   addLayer("Layer 1");
 }
 

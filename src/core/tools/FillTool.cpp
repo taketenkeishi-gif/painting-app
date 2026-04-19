@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include "core/selection/SelectionMask.h"
+
 namespace core {
 
 bool FillTool::isSameColor(const Color& a, const Color& b) noexcept {
@@ -16,6 +18,11 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
 
   PixelBuffer& buffer = active->buffer();
   if (!buffer.inBounds(event.point.x, event.point.y)) {
+    return {};
+  }
+  const SelectionMask& selection = context.document.selection();
+  const bool hasSelection = selection.hasSelection();
+  if (hasSelection && !selection.contains(event.point.x, event.point.y)) {
     return {};
   }
 
@@ -39,6 +46,9 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
       continue;
     }
     if (!isSameColor(buffer.pixel(p.x, p.y), target)) {
+      continue;
+    }
+    if (hasSelection && !selection.contains(p.x, p.y)) {
       continue;
     }
 

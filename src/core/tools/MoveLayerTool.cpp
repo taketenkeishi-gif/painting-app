@@ -1,5 +1,7 @@
 #include "core/tools/MoveLayerTool.h"
 
+#include "core/selection/SelectionMask.h"
+
 namespace core {
 
 ToolResult MoveLayerTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
@@ -37,18 +39,47 @@ ToolResult MoveLayerTool::onPointerRelease(ToolContext& context, const ToolPoint
   }
 
   PixelBuffer& source = active->buffer();
-  PixelBuffer moved(source.width(), source.height(), Color::Transparent());
   const int dx = m_current.x - m_start.x;
   const int dy = m_current.y - m_start.y;
+  const SelectionMask& selection = context.document.selection();
+  const bool hasSelection = selection.hasSelection();
 
-  for (int y = 0; y < source.height(); ++y) {
-    for (int x = 0; x < source.width(); ++x) {
-      const int nx = x + dx;
-      const int ny = y + dy;
-      if (!moved.inBounds(nx, ny)) {
-        continue;
+  PixelBuffer moved;
+  if (!hasSelection) {
+    moved.resize(source.width(), source.height(), Color::Transparent());
+    for (int y = 0; y < source.height(); ++y) {
+      for (int x = 0; x < source.width(); ++x) {
+        const int nx = x + dx;
+        const int ny = y + dy;
+        if (!moved.inBounds(nx, ny)) {
+          continue;
+        }
+        moved.setPixel(nx, ny, source.pixel(x, y));
       }
-      moved.setPixel(nx, ny, source.pixel(x, y));
+    }
+  } else {
+    moved = source;
+    const PixelBuffer snapshot = source;
+    for (int y = 0; y < source.height(); ++y) {
+      for (int x = 0; x < source.width(); ++x) {
+        if (!selection.contains(x, y)) {
+          continue;
+        }
+        moved.setPixel(x, y, Color::Transparent());
+      }
+    }
+    for (int y = 0; y < source.height(); ++y) {
+      for (int x = 0; x < source.width(); ++x) {
+        if (!selection.contains(x, y)) {
+          continue;
+        }
+        const int nx = x + dx;
+        const int ny = y + dy;
+        if (!moved.inBounds(nx, ny)) {
+          continue;
+        }
+        moved.setPixel(nx, ny, snapshot.pixel(x, y));
+      }
     }
   }
 

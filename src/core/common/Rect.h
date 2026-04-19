@@ -9,4 +9,13 @@ struct Rect {
   int height {0};
 };
 
+inline bool operator==(const Rect& lhs, const Rect& rhs) noexcept {
+  return lhs.x == rhs.x && lhs.y == rhs.y &&
+         lhs.width == rhs.width && lhs.height == rhs.height;
+}
+
+inline bool operator!=(const Rect& lhs, const Rect& rhs) noexcept {
+  return !(lhs == rhs);
+}
+
 } // namespace core

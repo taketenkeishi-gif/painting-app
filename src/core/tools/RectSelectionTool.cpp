@@ -26,14 +26,15 @@ ToolResult RectSelectionTool::onPointerMove(ToolContext& context, const ToolPoin
 }
 
 ToolResult RectSelectionTool::onPointerRelease(ToolContext& context, const ToolPointerEvent& event) {
-  static_cast<void>(context);
   if (!m_selecting) {
     return {};
   }
   m_selecting = false;
   m_current = event.point;
+  const Rect rect = normalizeRect(m_start, m_current);
+  const bool changed = context.document.selection().setRect(rect);
   ToolResult result;
-  result.selectionChanged = true;
+  result.selectionChanged = changed;
   result.viewportChanged = true;
   return result;
 }

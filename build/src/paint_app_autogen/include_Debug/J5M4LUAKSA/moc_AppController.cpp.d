@@ -111,6 +111,7 @@ C:/ポートフォリオ/自作イラストアプリ/build/src/paint_app_autogen
   C:/ポートフォリオ/自作イラストアプリ/src/core/document/Document.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/layer/Layer.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/render/Renderer.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/selection/SelectionMask.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/BrushTool.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/EraserTool.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/EyedropperTool.h \

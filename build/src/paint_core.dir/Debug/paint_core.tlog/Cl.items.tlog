@@ -2,6 +2,7 @@ C:\ポートフォリオ\自作イラストアプリ\src\core\buffer\PixelBuffer
 C:\ポートフォリオ\自作イラストアプリ\src\core\document\Document.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\Document.obj
 C:\ポートフォリオ\自作イラストアプリ\src\core\layer\Layer.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\Layer.obj
 C:\ポートフォリオ\自作イラストアプリ\src\core\render\Renderer.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\Renderer.obj
+C:\ポートフォリオ\自作イラストアプリ\src\core\selection\SelectionMask.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\SelectionMask.obj
 C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolType.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\ToolType.obj
 C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolManager.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\ToolManager.obj
 C:\ポートフォリオ\自作イラストアプリ\src\core\tools\BrushTool.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\BrushTool.obj

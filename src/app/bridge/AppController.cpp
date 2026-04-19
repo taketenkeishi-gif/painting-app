@@ -130,13 +130,13 @@ void AppController::setLayerVisible(std::size_t index, bool visible) {
     return;
   }
 
-  pushHistoryEntry(StrokeHistoryEntry {
-      HistoryKind::LayerVisibility,
-      index,
-      core::PixelBuffer {},
-      core::PixelBuffer {},
-      beforeVisible,
-      visible});
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::LayerVisibility;
+  entry.actionName = "Visibility";
+  entry.layerIndex = index;
+  entry.beforeVisible = beforeVisible;
+  entry.afterVisible = visible;
+  pushHistoryEntry(std::move(entry));
   rerender();
   emit layersChanged();
   emit documentChanged();
@@ -160,12 +160,25 @@ void AppController::beginStroke(int x, int y) {
   }
 
   const core::ToolKind activeKind = m_toolManager.activeToolKind();
+  PendingStrokeState pending;
+  pending.actionName = actionNameForTool(activeKind);
   if (toolWritesPixels(activeKind)) {
     core::Layer* activeLayer = m_document.activeLayer();
     if (activeLayer == nullptr) {
       return;
     }
-    m_pendingStroke = PendingStrokeState {m_document.activeLayerIndex(), activeLayer->buffer()};
+    pending.trackPixels = true;
+    pending.layerIndex = m_document.activeLayerIndex();
+    pending.before = activeLayer->buffer();
+  }
+  if (toolWritesSelection(activeKind)) {
+    pending.trackSelection = true;
+    pending.beforeSelection = m_document.selection();
+  }
+  if (pending.trackPixels || pending.trackSelection) {
+    m_pendingStroke = std::move(pending);
+  } else {
+    m_pendingStroke.reset();
   }
 
   m_stroking = true;
@@ -247,10 +260,18 @@ bool AppController::undo() {
     return false;
   }
 
-  if (entry.kind == HistoryKind::Stroke) {
-    m_document.layerAt(entry.layerIndex).buffer() = entry.before;
-  } else {
-    m_document.setLayerVisible(entry.layerIndex, entry.beforeVisible);
+  switch (entry.kind) {
+    case HistoryKind::Stroke:
+      m_document.layerAt(entry.layerIndex).buffer() = entry.before;
+      break;
+    case HistoryKind::LayerVisibility:
+      m_document.setLayerVisible(entry.layerIndex, entry.beforeVisible);
+      break;
+    case HistoryKind::Selection:
+      m_document.selection() = entry.beforeSelection;
+      break;
+    default:
+      break;
   }
 
   if (m_redoHistory.size() >= m_maxStrokeHistory) {
@@ -281,10 +302,18 @@ bool AppController::redo() {
     return false;
   }
 
-  if (entry.kind == HistoryKind::Stroke) {
-    m_document.layerAt(entry.layerIndex).buffer() = entry.after;
-  } else {
-    m_document.setLayerVisible(entry.layerIndex, entry.afterVisible);
+  switch (entry.kind) {
+    case HistoryKind::Stroke:
+      m_document.layerAt(entry.layerIndex).buffer() = entry.after;
+      break;
+    case HistoryKind::LayerVisibility:
+      m_document.setLayerVisible(entry.layerIndex, entry.afterVisible);
+      break;
+    case HistoryKind::Selection:
+      m_document.selection() = entry.afterSelection;
+      break;
+    default:
+      break;
   }
 
   if (m_undoHistory.size() >= m_maxStrokeHistory) {
@@ -311,28 +340,14 @@ std::string AppController::nextUndoActionName() const {
   if (m_undoHistory.empty()) {
     return {};
   }
-  switch (m_undoHistory.back().kind) {
-    case HistoryKind::Stroke:
-      return "Stroke";
-    case HistoryKind::LayerVisibility:
-      return "Visibility";
-    default:
-      return {};
-  }
+  return m_undoHistory.back().actionName;
 }
 
 std::string AppController::nextRedoActionName() const {
   if (m_redoHistory.empty()) {
     return {};
   }
-  switch (m_redoHistory.back().kind) {
-    case HistoryKind::Stroke:
-      return "Stroke";
-    case HistoryKind::LayerVisibility:
-      return "Visibility";
-    default:
-      return {};
-  }
+  return m_redoHistory.back().actionName;
 }
 
 void AppController::setBrushColor(const core::Color& color) {
@@ -377,6 +392,35 @@ bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
   }
 }
 
+bool AppController::toolWritesSelection(core::ToolKind kind) noexcept {
+  return kind == core::ToolKind::RectSelection;
+}
+
+std::string AppController::actionNameForTool(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return "Stroke";
+    case core::ToolKind::Eraser:
+      return "Eraser";
+    case core::ToolKind::Line:
+      return "Line";
+    case core::ToolKind::Fill:
+      return "Fill";
+    case core::ToolKind::MoveLayer:
+      return "Move Layer";
+    case core::ToolKind::RectSelection:
+      return "Selection";
+    case core::ToolKind::Eyedropper:
+      return "Eyedropper";
+    case core::ToolKind::Hand:
+      return "Hand";
+    case core::ToolKind::Zoom:
+      return "Zoom";
+    default:
+      return "Action";
+  }
+}
+
 core::ToolContext AppController::makeToolContext() {
   return core::ToolContext {
       m_document,
@@ -407,23 +451,38 @@ void AppController::finishPendingStrokeHistory() {
     return;
   }
 
-  const std::size_t layerIndex = m_pendingStroke->layerIndex;
-  if (layerIndex >= m_document.layerCount()) {
-    m_pendingStroke.reset();
-    return;
+  const PendingStrokeState pending = *m_pendingStroke;
+  m_pendingStroke.reset();
+
+  if (pending.trackPixels) {
+    const std::size_t layerIndex = pending.layerIndex;
+    if (layerIndex >= m_document.layerCount()) {
+      return;
+    }
+
+    const core::PixelBuffer after = m_document.layerAt(layerIndex).buffer();
+    if (!pixelBuffersEqual(pending.before, after)) {
+      StrokeHistoryEntry entry;
+      entry.kind = HistoryKind::Stroke;
+      entry.actionName = pending.actionName;
+      entry.layerIndex = layerIndex;
+      entry.before = pending.before;
+      entry.after = after;
+      pushHistoryEntry(std::move(entry));
+    }
   }
 
-  const core::PixelBuffer after = m_document.layerAt(layerIndex).buffer();
-  if (!pixelBuffersEqual(m_pendingStroke->before, after)) {
-    pushHistoryEntry(StrokeHistoryEntry {
-        HistoryKind::Stroke,
-        layerIndex,
-        m_pendingStroke->before,
-        after,
-        true,
-        true});
+  if (pending.trackSelection) {
+    const core::SelectionMask afterSelection = m_document.selection();
+    if (pending.beforeSelection != afterSelection) {
+      StrokeHistoryEntry entry;
+      entry.kind = HistoryKind::Selection;
+      entry.actionName = "Selection";
+      entry.beforeSelection = pending.beforeSelection;
+      entry.afterSelection = afterSelection;
+      pushHistoryEntry(std::move(entry));
+    }
   }
-  m_pendingStroke.reset();
 }
 
 void AppController::pushHistoryEntry(StrokeHistoryEntry entry) {
