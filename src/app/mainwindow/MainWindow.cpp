@@ -6,8 +6,10 @@
 #include <QColorDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
-#include <QDockWidget>
 #include <QFormLayout>
+#include <QFrame>
+#include <QGroupBox>
+#include <QHBoxLayout>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -16,7 +18,8 @@
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStatusBar>
-#include <QToolBar>
+#include <QVBoxLayout>
+#include <QWidget>
 
 #include "app/bridge/AppController.h"
 #include "app/canvasview/CanvasWidget.h"
@@ -38,6 +41,14 @@ QColor toQColor(const core::Color& color) {
   return QColor(color.r, color.g, color.b, color.a);
 }
 
+QGroupBox* makePanelGroup(const QString& title, QWidget* child, QWidget* parent) {
+  auto* box = new QGroupBox(title, parent);
+  auto* layout = new QVBoxLayout(box);
+  layout->setContentsMargins(8, 8, 8, 8);
+  layout->addWidget(child);
+  return box;
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -45,20 +56,100 @@ MainWindow::MainWindow(QWidget* parent)
       m_controller(new app::bridge::AppController(this)),
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
       m_layerPanel(new app::panels::LayerPanel(this)) {
-  setWindowTitle("Layered Paint App (MVP)");
-  resize(1200, 800);
+  setWindowTitle("Layered Paint App");
+  resize(1400, 860);
 
   m_canvasWidget->setController(m_controller);
-  setCentralWidget(m_canvasWidget);
-
-  auto* layerDock = new QDockWidget("Layers", this);
-  layerDock->setWidget(m_layerPanel);
-  addDockWidget(Qt::RightDockWidgetArea, layerDock);
-
   m_layerPanel->setController(m_controller);
+
+  setupShellLayout();
   createMenus();
+
   connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &MainWindow::onToolStateChanged);
+  connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateActiveLayerStatus);
+  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateActiveLayerStatus);
+  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateUndoRedoState);
+  connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateUndoRedoState);
+
   onToolStateChanged();
+  updateUndoRedoState();
+  updateActiveLayerStatus();
+}
+
+void MainWindow::setupShellLayout() {
+  auto* root = new QWidget(this);
+  auto* rootLayout = new QHBoxLayout(root);
+  rootLayout->setContentsMargins(6, 6, 6, 6);
+  rootLayout->setSpacing(8);
+
+  m_leftToolHost = new QFrame(root);
+  m_leftToolHost->setObjectName("LeftToolHost");
+  m_leftToolHost->setMinimumWidth(96);
+  m_leftToolHost->setMaximumWidth(120);
+  auto* leftLayout = new QVBoxLayout(m_leftToolHost);
+  leftLayout->setContentsMargins(8, 8, 8, 8);
+  leftLayout->setSpacing(8);
+  auto* leftTitle = new QLabel("Tools", m_leftToolHost);
+  leftTitle->setStyleSheet("font-weight: 700;");
+  leftLayout->addWidget(leftTitle);
+  leftLayout->addWidget(new QLabel("Tool buttons\n(Phase UI2)", m_leftToolHost));
+  leftLayout->addStretch(1);
+
+  auto* centerHost = new QWidget(root);
+  auto* centerLayout = new QVBoxLayout(centerHost);
+  centerLayout->setContentsMargins(0, 0, 0, 0);
+  centerLayout->setSpacing(6);
+
+  m_topBar = new QFrame(centerHost);
+  m_topBar->setObjectName("TopBarHost");
+  auto* topLayout = new QHBoxLayout(m_topBar);
+  topLayout->setContentsMargins(10, 8, 10, 8);
+  topLayout->setSpacing(8);
+
+  topLayout->addWidget(new QLabel("Color", m_topBar));
+  m_brushColorButton = new QPushButton("Color", m_topBar);
+  m_brushColorButton->setMinimumWidth(120);
+  topLayout->addWidget(m_brushColorButton);
+
+  topLayout->addWidget(new QLabel("Size", m_topBar));
+  m_brushSizeSpin = new QSpinBox(m_topBar);
+  m_brushSizeSpin->setRange(1, 128);
+  m_brushSizeSpin->setSingleStep(1);
+  m_brushSizeSpin->setMinimumWidth(72);
+  topLayout->addWidget(m_brushSizeSpin);
+  topLayout->addStretch(1);
+
+  connect(m_brushColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBrushColor);
+  connect(m_brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this, &MainWindow::onBrushSizeChanged);
+
+  centerLayout->addWidget(m_topBar);
+  centerLayout->addWidget(m_canvasWidget, 1);
+
+  m_rightPanelHost = new QFrame(root);
+  m_rightPanelHost->setObjectName("RightPanelHost");
+  m_rightPanelHost->setMinimumWidth(280);
+  m_rightPanelHost->setMaximumWidth(360);
+  auto* rightLayout = new QVBoxLayout(m_rightPanelHost);
+  rightLayout->setContentsMargins(4, 4, 4, 4);
+  rightLayout->setSpacing(8);
+
+  rightLayout->addWidget(makePanelGroup("Layer", m_layerPanel, m_rightPanelHost), 2);
+
+  auto* subToolPlaceholder = new QLabel("Sub tool panel\n(Phase UI2)", m_rightPanelHost);
+  subToolPlaceholder->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_subToolPlaceholderLabel = subToolPlaceholder;
+  rightLayout->addWidget(makePanelGroup("Sub Tool", subToolPlaceholder, m_rightPanelHost), 1);
+
+  auto* propertyPlaceholder = new QLabel("Tool property panel\n(Phase UI2)", m_rightPanelHost);
+  propertyPlaceholder->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_propertyPlaceholderLabel = propertyPlaceholder;
+  rightLayout->addWidget(makePanelGroup("Tool Property", propertyPlaceholder, m_rightPanelHost), 1);
+
+  rootLayout->addWidget(m_leftToolHost);
+  rootLayout->addWidget(centerHost, 1);
+  rootLayout->addWidget(m_rightPanelHost);
+
+  setCentralWidget(root);
 }
 
 void MainWindow::createMenus() {
@@ -66,106 +157,89 @@ void MainWindow::createMenus() {
   auto* editMenu = menuBar()->addMenu("&Edit");
   auto* layerMenu = menuBar()->addMenu("&Layer");
 
-  auto* newCanvasAction = new QAction("&New Canvas", this);
-  auto* undoAction = new QAction("&Undo", this);
-  auto* redoAction = new QAction("&Redo", this);
-  auto* addLayerAction = new QAction("&Add Layer", this);
-  newCanvasAction->setShortcut(QKeySequence::New);
-  undoAction->setShortcut(QKeySequence::Undo);
-  redoAction->setShortcut(QKeySequence::Redo);
-  addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+  m_newCanvasAction = new QAction("&New Canvas", this);
+  m_undoAction = new QAction("&Undo", this);
+  m_redoAction = new QAction("&Redo", this);
+  m_addLayerAction = new QAction("&Add Layer", this);
 
-  fileMenu->addAction(newCanvasAction);
-  editMenu->addAction(undoAction);
-  editMenu->addAction(redoAction);
-  layerMenu->addAction(addLayerAction);
+  m_newCanvasAction->setShortcut(QKeySequence::New);
+  m_undoAction->setShortcut(QKeySequence::Undo);
+  m_redoAction->setShortcut(QKeySequence::Redo);
+  m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
 
-  auto* quickToolbar = addToolBar("Quick Actions");
-  quickToolbar->setMovable(false);
-  quickToolbar->addAction(newCanvasAction);
-  quickToolbar->addAction(undoAction);
-  quickToolbar->addAction(redoAction);
-  quickToolbar->addAction(addLayerAction);
-  quickToolbar->addSeparator();
+  fileMenu->addAction(m_newCanvasAction);
+  editMenu->addAction(m_undoAction);
+  editMenu->addAction(m_redoAction);
+  layerMenu->addAction(m_addLayerAction);
 
-  m_brushColorButton = new QPushButton("Color", this);
-  m_brushSizeSpin = new QSpinBox(this);
-  m_brushSizeSpin->setRange(1, 128);
-  m_brushSizeSpin->setSingleStep(1);
-  m_brushSizeSpin->setMinimumWidth(64);
-  m_brushColorButton->setMinimumWidth(120);
-
-  quickToolbar->addWidget(new QLabel("Color", this));
-  quickToolbar->addWidget(m_brushColorButton);
-  quickToolbar->addSeparator();
-  quickToolbar->addWidget(new QLabel("Size", this));
-  quickToolbar->addWidget(m_brushSizeSpin);
-
-  connect(newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
-  auto updateUndoRedoState = [this, undoAction, redoAction]() {
-    const bool canUndo = m_controller->canUndo();
-    const bool canRedo = m_controller->canRedo();
-
-    if (canUndo) {
-      const QString label = QString::fromStdString(m_controller->nextUndoActionName());
-      undoAction->setText(label.isEmpty() ? "&Undo" : QString("&Undo %1").arg(label));
-    } else {
-      undoAction->setText("&Undo");
-    }
-
-    if (canRedo) {
-      const QString label = QString::fromStdString(m_controller->nextRedoActionName());
-      redoAction->setText(label.isEmpty() ? "&Redo" : QString("&Redo %1").arg(label));
-    } else {
-      redoAction->setText("&Redo");
-    }
-
-    undoAction->setEnabled(canUndo);
-    redoAction->setEnabled(canRedo);
-  };
-  undoAction->setEnabled(false);
-  redoAction->setEnabled(false);
-
-  connect(undoAction, &QAction::triggered, this, [this, updateUndoRedoState]() {
-    m_controller->undo();
-    updateUndoRedoState();
-  });
-  connect(redoAction, &QAction::triggered, this, [this, updateUndoRedoState]() {
-    m_controller->redo();
-    updateUndoRedoState();
-  });
-  connect(m_controller, &app::bridge::AppController::documentChanged, this, updateUndoRedoState);
-  connect(m_controller, &app::bridge::AppController::layersChanged, this, updateUndoRedoState);
-  connect(addLayerAction, &QAction::triggered, m_controller, &app::bridge::AppController::addLayer);
-  connect(m_brushColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBrushColor);
-  connect(m_brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this, &MainWindow::onBrushSizeChanged);
-  updateUndoRedoState();
+  connect(m_newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
+  connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndoTriggered);
+  connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedoTriggered);
+  connect(m_addLayerAction, &QAction::triggered, m_controller, &app::bridge::AppController::addLayer);
 
   auto* brushSizeStatus = new QLabel("Size: 8", this);
   brushSizeStatus->setObjectName("BrushSizeStatusLabel");
   auto* colorStatus = new QLabel("Color: #000000", this);
   colorStatus->setObjectName("BrushColorStatusLabel");
-  auto* layerStatus = new QLabel("Layer: Layer 1", this);
-  layerStatus->setObjectName("ActiveLayerStatusLabel");
+  m_activeLayerStatusLabel = new QLabel("Layer: Layer 1", this);
+  m_activeLayerStatusLabel->setObjectName("ActiveLayerStatusLabel");
   auto* zoomStatus = new QLabel("Zoom: 100%", this);
   zoomStatus->setObjectName("ZoomStatusLabel");
+
   statusBar()->addPermanentWidget(colorStatus);
   statusBar()->addPermanentWidget(brushSizeStatus);
   statusBar()->addPermanentWidget(zoomStatus);
-  statusBar()->addPermanentWidget(layerStatus);
+  statusBar()->addPermanentWidget(m_activeLayerStatusLabel);
+}
 
-  auto updateActiveLayerStatus = [this, layerStatus]() {
-    const core::Document& doc = m_controller->document();
-    if (doc.layerCount() == 0) {
-      layerStatus->setText("Layer: (none)");
-      return;
-    }
-    const std::size_t active = doc.activeLayerIndex();
-    layerStatus->setText(QString("Layer: %1").arg(QString::fromStdString(doc.layerAt(active).name())));
-  };
-  connect(m_controller, &app::bridge::AppController::layersChanged, this, updateActiveLayerStatus);
-  connect(m_controller, &app::bridge::AppController::documentChanged, this, updateActiveLayerStatus);
-  updateActiveLayerStatus();
+void MainWindow::updateUndoRedoState() {
+  if (m_undoAction == nullptr || m_redoAction == nullptr) {
+    return;
+  }
+
+  const bool canUndo = m_controller->canUndo();
+  const bool canRedo = m_controller->canRedo();
+
+  if (canUndo) {
+    const QString label = QString::fromStdString(m_controller->nextUndoActionName());
+    m_undoAction->setText(label.isEmpty() ? "&Undo" : QString("&Undo %1").arg(label));
+  } else {
+    m_undoAction->setText("&Undo");
+  }
+
+  if (canRedo) {
+    const QString label = QString::fromStdString(m_controller->nextRedoActionName());
+    m_redoAction->setText(label.isEmpty() ? "&Redo" : QString("&Redo %1").arg(label));
+  } else {
+    m_redoAction->setText("&Redo");
+  }
+
+  m_undoAction->setEnabled(canUndo);
+  m_redoAction->setEnabled(canRedo);
+}
+
+void MainWindow::updateActiveLayerStatus() {
+  if (m_activeLayerStatusLabel == nullptr) {
+    return;
+  }
+
+  const core::Document& doc = m_controller->document();
+  if (doc.layerCount() == 0) {
+    m_activeLayerStatusLabel->setText("Layer: (none)");
+    return;
+  }
+  const std::size_t active = doc.activeLayerIndex();
+  m_activeLayerStatusLabel->setText(QString("Layer: %1").arg(QString::fromStdString(doc.layerAt(active).name())));
+}
+
+void MainWindow::onUndoTriggered() {
+  m_controller->undo();
+  updateUndoRedoState();
+}
+
+void MainWindow::onRedoTriggered() {
+  m_controller->redo();
+  updateUndoRedoState();
 }
 
 void MainWindow::onNewCanvas() {
