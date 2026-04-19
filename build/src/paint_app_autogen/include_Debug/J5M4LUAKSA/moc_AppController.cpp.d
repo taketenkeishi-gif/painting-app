@@ -114,8 +114,12 @@ C:/ポートフォリオ/自作イラストアプリ/build/src/paint_app_autogen
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/BrushTool.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/EraserTool.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/EyedropperTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/FillTool.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/HandTool.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ITool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/LineTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/MoveLayerTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/RectSelectionTool.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolContext.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolManager.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolType.h \

@@ -34,6 +34,18 @@
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ZoomTool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\LineTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\RectSelectionTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\FillTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\MoveLayerTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\ポートフォリオ\自作イラストアプリ\src\CMakeLists.txt" />

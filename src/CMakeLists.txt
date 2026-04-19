@@ -10,6 +10,10 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/EyedropperTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/HandTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ZoomTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/LineTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/RectSelectionTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FillTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/MoveLayerTool.cpp
 )
 
 add_library(paint_core STATIC ${CORE_SOURCES})

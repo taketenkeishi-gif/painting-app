@@ -13,7 +13,11 @@
 #include "core/tools/BrushTool.h"
 #include "core/tools/EraserTool.h"
 #include "core/tools/EyedropperTool.h"
+#include "core/tools/FillTool.h"
 #include "core/tools/HandTool.h"
+#include "core/tools/LineTool.h"
+#include "core/tools/MoveLayerTool.h"
+#include "core/tools/RectSelectionTool.h"
 #include "core/tools/ToolManager.h"
 #include "core/tools/ZoomTool.h"
 

@@ -40,6 +40,10 @@ AppController::AppController(QObject* parent)
   m_toolManager.registerTool(std::make_unique<core::EyedropperTool>());
   m_toolManager.registerTool(std::make_unique<core::HandTool>());
   m_toolManager.registerTool(std::make_unique<core::ZoomTool>());
+  m_toolManager.registerTool(std::make_unique<core::LineTool>());
+  m_toolManager.registerTool(std::make_unique<core::RectSelectionTool>());
+  m_toolManager.registerTool(std::make_unique<core::FillTool>());
+  m_toolManager.registerTool(std::make_unique<core::MoveLayerTool>());
   m_toolManager.setActiveTool(core::ToolKind::Brush);
 
   setBrushColor(core::Color::OpaqueBlack());

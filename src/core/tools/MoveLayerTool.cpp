@@ -1,0 +1,91 @@
+#include "core/tools/MoveLayerTool.h"
+
+namespace core {
+
+ToolResult MoveLayerTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
+  static_cast<void>(context);
+  m_dragging = true;
+  m_start = event.point;
+  m_current = event.point;
+  ToolResult result;
+  result.viewportChanged = true;
+  return result;
+}
+
+ToolResult MoveLayerTool::onPointerMove(ToolContext& context, const ToolPointerEvent& event) {
+  static_cast<void>(context);
+  if (!m_dragging) {
+    return {};
+  }
+  m_current = event.point;
+  ToolResult result;
+  result.viewportChanged = true;
+  return result;
+}
+
+ToolResult MoveLayerTool::onPointerRelease(ToolContext& context, const ToolPointerEvent& event) {
+  if (!m_dragging) {
+    return {};
+  }
+
+  m_dragging = false;
+  m_current = event.point;
+
+  Layer* active = context.document.activeLayer();
+  if (active == nullptr) {
+    return {};
+  }
+
+  PixelBuffer& source = active->buffer();
+  PixelBuffer moved(source.width(), source.height(), Color::Transparent());
+  const int dx = m_current.x - m_start.x;
+  const int dy = m_current.y - m_start.y;
+
+  for (int y = 0; y < source.height(); ++y) {
+    for (int x = 0; x < source.width(); ++x) {
+      const int nx = x + dx;
+      const int ny = y + dy;
+      if (!moved.inBounds(nx, ny)) {
+        continue;
+      }
+      moved.setPixel(nx, ny, source.pixel(x, y));
+    }
+  }
+
+  source = moved;
+  ToolResult result;
+  result.pixelsChanged = true;
+  result.viewportChanged = true;
+  return result;
+}
+
+ToolResult MoveLayerTool::onCancel(ToolContext& context) {
+  static_cast<void>(context);
+  if (!m_dragging) {
+    return {};
+  }
+  m_dragging = false;
+  ToolResult result;
+  result.viewportChanged = true;
+  return result;
+}
+
+ToolResult MoveLayerTool::onWheel(ToolContext& context, int deltaSteps, const ToolPointerEvent& event) {
+  static_cast<void>(context);
+  static_cast<void>(deltaSteps);
+  static_cast<void>(event);
+  return {};
+}
+
+ToolOverlayState MoveLayerTool::overlay() const {
+  ToolOverlayState state;
+  if (!m_dragging) {
+    return state;
+  }
+  state.hasLine = true;
+  state.lineStart = m_start;
+  state.lineEnd = m_current;
+  return state;
+}
+
+} // namespace core

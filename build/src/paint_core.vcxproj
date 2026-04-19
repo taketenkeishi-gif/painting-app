@@ -311,6 +311,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\EyedropperTool.cpp" />
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\HandTool.cpp" />
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ZoomTool.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\LineTool.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\RectSelectionTool.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\FillTool.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\MoveLayerTool.cpp" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
