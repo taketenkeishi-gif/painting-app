@@ -304,6 +304,8 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\document\Document.cpp" />
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\layer\Layer.cpp" />
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\render\Renderer.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolType.cpp" />
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolManager.cpp" />
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\BrushTool.cpp" />
   </ItemGroup>
   <ItemGroup />

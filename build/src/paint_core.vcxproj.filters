@@ -13,6 +13,12 @@
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\render\Renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolType.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\BrushTool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
