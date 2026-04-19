@@ -1,3 +1,3 @@
-core_tests 14 0.00506788
-app_smoke_tests 10 0.0828043
+core_tests 15 0.00253596
+app_smoke_tests 11 0.0447678
 ---

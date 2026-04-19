@@ -51,6 +51,11 @@ private:
   QWidget* m_rightPanelHost {nullptr};
   QLabel* m_currentToolLabel {nullptr};
   QLabel* m_currentSubToolLabel {nullptr};
+  QLabel* m_toolStatusLabel {nullptr};
+  QLabel* m_guideStatusLabel {nullptr};
+  QLabel* m_colorStatusLabel {nullptr};
+  QLabel* m_sizeStatusLabel {nullptr};
+  QLabel* m_zoomStatusLabel {nullptr};
   QLabel* m_activeLayerStatusLabel {nullptr};
   QAction* m_newCanvasAction {nullptr};
   QAction* m_undoAction {nullptr};

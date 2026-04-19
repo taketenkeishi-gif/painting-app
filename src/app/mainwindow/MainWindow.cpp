@@ -150,18 +150,24 @@ void MainWindow::createMenus() {
   connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedoTriggered);
   connect(m_addLayerAction, &QAction::triggered, m_controller, &app::bridge::AppController::addLayer);
 
-  auto* brushSizeStatus = new QLabel("Size: 8", this);
-  brushSizeStatus->setObjectName("BrushSizeStatusLabel");
-  auto* colorStatus = new QLabel("Color: #000000", this);
-  colorStatus->setObjectName("BrushColorStatusLabel");
+  m_toolStatusLabel = new QLabel("Tool: Brush", this);
+  m_toolStatusLabel->setObjectName("ToolStatusLabel");
+  m_guideStatusLabel = new QLabel("Guide: LMB drag to paint. Wheel adjusts size.", this);
+  m_guideStatusLabel->setObjectName("ToolGuideStatusLabel");
+  m_colorStatusLabel = new QLabel("Color: #000000", this);
+  m_colorStatusLabel->setObjectName("BrushColorStatusLabel");
+  m_sizeStatusLabel = new QLabel("Size: 8", this);
+  m_sizeStatusLabel->setObjectName("BrushSizeStatusLabel");
   m_activeLayerStatusLabel = new QLabel("Layer: Layer 1", this);
   m_activeLayerStatusLabel->setObjectName("ActiveLayerStatusLabel");
-  auto* zoomStatus = new QLabel("Zoom: 100%", this);
-  zoomStatus->setObjectName("ZoomStatusLabel");
+  m_zoomStatusLabel = new QLabel("Zoom: 100%", this);
+  m_zoomStatusLabel->setObjectName("ZoomStatusLabel");
 
-  statusBar()->addPermanentWidget(colorStatus);
-  statusBar()->addPermanentWidget(brushSizeStatus);
-  statusBar()->addPermanentWidget(zoomStatus);
+  statusBar()->addWidget(m_toolStatusLabel);
+  statusBar()->addWidget(m_guideStatusLabel, 1);
+  statusBar()->addPermanentWidget(m_colorStatusLabel);
+  statusBar()->addPermanentWidget(m_sizeStatusLabel);
+  statusBar()->addPermanentWidget(m_zoomStatusLabel);
   statusBar()->addPermanentWidget(m_activeLayerStatusLabel);
 }
 
@@ -256,13 +262,21 @@ void MainWindow::onNewCanvas() {
 void MainWindow::onToolStateChanged() {
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
 
-  if (auto* sizeLabel = findChild<QLabel*>("BrushSizeStatusLabel"); sizeLabel != nullptr) {
-    sizeLabel->setText(QString("Size: %1").arg(state.size));
+  if (m_sizeStatusLabel != nullptr) {
+    m_sizeStatusLabel->setText(QString("Size: %1").arg(state.size));
   }
 
-  if (auto* colorLabel = findChild<QLabel*>("BrushColorStatusLabel"); colorLabel != nullptr) {
+  if (m_colorStatusLabel != nullptr) {
     const QColor color(state.color.r, state.color.g, state.color.b, state.color.a);
-    colorLabel->setText(QString("Color: %1").arg(color.name(QColor::HexRgb).toUpper()));
+    m_colorStatusLabel->setText(QString("Color: %1").arg(color.name(QColor::HexRgb).toUpper()));
+  }
+
+  if (m_toolStatusLabel != nullptr) {
+    m_toolStatusLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
+  }
+
+  if (m_guideStatusLabel != nullptr) {
+    m_guideStatusLabel->setText(QString("Guide: %1").arg(QString::fromStdString(m_controller->currentToolGuide())));
   }
 
   updateTopToolInfo();
