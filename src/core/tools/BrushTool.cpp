@@ -5,6 +5,72 @@
 
 namespace core {
 
+ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
+  Layer* active = context.document.activeLayer();
+  if (active == nullptr) {
+    return {};
+  }
+
+  m_drawing = true;
+  m_lastPoint = event.point;
+  stroke(*active, m_lastPoint, m_lastPoint);
+  ToolResult result;
+  result.pixelsChanged = true;
+  return result;
+}
+
+ToolResult BrushTool::onPointerMove(ToolContext& context, const ToolPointerEvent& event) {
+  if (!m_drawing) {
+    return {};
+  }
+
+  Layer* active = context.document.activeLayer();
+  if (active == nullptr) {
+    m_drawing = false;
+    return {};
+  }
+
+  stroke(*active, m_lastPoint, event.point);
+  m_lastPoint = event.point;
+  ToolResult result;
+  result.pixelsChanged = true;
+  return result;
+}
+
+ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEvent& event) {
+  if (!m_drawing) {
+    return {};
+  }
+
+  m_drawing = false;
+  Layer* active = context.document.activeLayer();
+  if (active == nullptr) {
+    return {};
+  }
+
+  if (m_lastPoint.x == event.point.x && m_lastPoint.y == event.point.y) {
+    return {};
+  }
+
+  stroke(*active, m_lastPoint, event.point);
+  ToolResult result;
+  result.pixelsChanged = true;
+  return result;
+}
+
+ToolResult BrushTool::onCancel(ToolContext& context) {
+  static_cast<void>(context);
+  m_drawing = false;
+  return {};
+}
+
+ToolResult BrushTool::onWheel(ToolContext& context, int deltaSteps, const ToolPointerEvent& event) {
+  static_cast<void>(context);
+  static_cast<void>(deltaSteps);
+  static_cast<void>(event);
+  return {};
+}
+
 void BrushTool::stroke(Layer& layer, const Point& from, const Point& to) const {
   PixelBuffer& buffer = layer.buffer();
   const int radius = std::max(1, m_settings.size) / 2;

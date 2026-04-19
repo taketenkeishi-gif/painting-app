@@ -191,8 +191,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     if (!point.has_value()) {
       return;
     }
-    const core::Color sampled = m_controller->compositedBuffer().pixel(point->x, point->y);
-    m_controller->setBrushColor(sampled);
+    m_controller->pickColorAt(point->x, point->y);
     updateCursorForState(this, point);
     update();
     return;

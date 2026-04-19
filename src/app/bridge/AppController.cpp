@@ -1,6 +1,7 @@
 #include "app/bridge/AppController.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 namespace app::bridge {
@@ -28,8 +29,21 @@ bool pixelBuffersEqual(const core::PixelBuffer& lhs, const core::PixelBuffer& rh
 AppController::AppController(QObject* parent)
     : QObject(parent),
       m_document(800, 600) {
-  m_brushTool.setColor(core::Color::OpaqueBlack());
-  m_brushTool.setSize(8);
+  auto brush = std::make_unique<core::BrushTool>();
+  m_brushTool = brush.get();
+  m_toolManager.registerTool(std::move(brush));
+
+  auto eraser = std::make_unique<core::EraserTool>();
+  m_eraserTool = eraser.get();
+  m_toolManager.registerTool(std::move(eraser));
+
+  m_toolManager.registerTool(std::make_unique<core::EyedropperTool>());
+  m_toolManager.registerTool(std::make_unique<core::HandTool>());
+  m_toolManager.registerTool(std::make_unique<core::ZoomTool>());
+  m_toolManager.setActiveTool(core::ToolKind::Brush);
+
+  setBrushColor(core::Color::OpaqueBlack());
+  setBrushSize(8);
   rerender();
 }
 
@@ -47,8 +61,7 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
 }
 
 ToolStateViewModel AppController::toolState() const noexcept {
-  const core::BrushSettings& brush = m_brushTool.settings();
-  return ToolStateViewModel {brush.color, brush.size};
+  return ToolStateViewModel {m_currentColor, m_brushSize};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -125,37 +138,56 @@ void AppController::setLayerVisible(std::size_t index, bool visible) {
   emit documentChanged();
 }
 
+bool AppController::setCurrentTool(core::ToolKind kind) {
+  if (!m_toolManager.setActiveTool(kind)) {
+    return false;
+  }
+  emit toolStateChanged();
+  return true;
+}
+
+core::ToolKind AppController::currentTool() const noexcept {
+  return m_toolManager.activeToolKind();
+}
+
 void AppController::beginStroke(int x, int y) {
   if (m_stroking) {
     return;
   }
 
-  core::Layer* active = m_document.activeLayer();
-  if (active == nullptr) {
-    return;
+  const core::ToolKind activeKind = m_toolManager.activeToolKind();
+  if (toolWritesPixels(activeKind)) {
+    core::Layer* activeLayer = m_document.activeLayer();
+    if (activeLayer == nullptr) {
+      return;
+    }
+    m_pendingStroke = PendingStrokeState {m_document.activeLayerIndex(), activeLayer->buffer()};
   }
 
-  m_pendingStroke = PendingStrokeState {m_document.activeLayerIndex(), active->buffer()};
   m_stroking = true;
-  m_lastPoint = core::Point {x, y};
-  m_brushTool.stroke(*active, m_lastPoint, m_lastPoint);
-  rerender();
-  emit documentChanged();
+  m_lastPointer = core::Point {x, y};
+  core::ToolPointerEvent pressEvent;
+  pressEvent.point = m_lastPointer;
+  core::ToolContext context = makeToolContext();
+  const core::ToolResult result = m_toolManager.pointerPress(
+      context,
+      pressEvent);
+  applyToolResult(result);
 }
 
 void AppController::continueStroke(int x, int y) {
   if (!m_stroking) {
     return;
   }
-  core::Layer* active = m_document.activeLayer();
-  if (active == nullptr) {
-    return;
-  }
-  const core::Point nextPoint {x, y};
-  m_brushTool.stroke(*active, m_lastPoint, nextPoint);
-  m_lastPoint = nextPoint;
-  rerender();
-  emit documentChanged();
+
+  m_lastPointer = core::Point {x, y};
+  core::ToolPointerEvent moveEvent;
+  moveEvent.point = m_lastPointer;
+  core::ToolContext context = makeToolContext();
+  const core::ToolResult result = m_toolManager.pointerMove(
+      context,
+      moveEvent);
+  applyToolResult(result);
 }
 
 void AppController::endStroke() {
@@ -164,27 +196,35 @@ void AppController::endStroke() {
   }
 
   m_stroking = false;
-  if (!m_pendingStroke.has_value()) {
-    return;
+  core::ToolPointerEvent releaseEvent;
+  releaseEvent.point = m_lastPointer;
+  core::ToolContext context = makeToolContext();
+  const core::ToolResult result = m_toolManager.pointerRelease(
+      context,
+      releaseEvent);
+  applyToolResult(result);
+  finishPendingStrokeHistory();
+}
+
+bool AppController::pickColorAt(int x, int y) {
+  const core::ToolKind previous = m_toolManager.activeToolKind();
+  if (!m_toolManager.setActiveTool(core::ToolKind::Eyedropper)) {
+    return false;
   }
 
-  const std::size_t layerIndex = m_pendingStroke->layerIndex;
-  if (layerIndex >= m_document.layerCount()) {
-    m_pendingStroke.reset();
-    return;
-  }
+  core::ToolPointerEvent event;
+  event.point = core::Point {x, y};
+  core::ToolContext context = makeToolContext();
+  const core::ToolResult result = m_toolManager.pointerPress(
+      context, event);
+  m_toolManager.pointerRelease(context, event);
+  m_toolManager.setActiveTool(previous);
 
-  const core::PixelBuffer after = m_document.layerAt(layerIndex).buffer();
-  if (!pixelBuffersEqual(m_pendingStroke->before, after)) {
-    pushHistoryEntry(StrokeHistoryEntry {
-        HistoryKind::Stroke,
-        layerIndex,
-        m_pendingStroke->before,
-        after,
-        true,
-        true});
+  if (!result.sampledColor.has_value()) {
+    return false;
   }
-  m_pendingStroke.reset();
+  setBrushColor(*result.sampledColor);
+  return true;
 }
 
 bool AppController::undo() {
@@ -292,21 +332,94 @@ std::string AppController::nextRedoActionName() const {
 }
 
 void AppController::setBrushColor(const core::Color& color) {
-  const core::Color current = m_brushTool.settings().color;
-  if (current.r == color.r && current.g == color.g && current.b == color.b && current.a == color.a) {
+  if (m_currentColor.r == color.r && m_currentColor.g == color.g &&
+      m_currentColor.b == color.b && m_currentColor.a == color.a) {
     return;
   }
-  m_brushTool.setColor(color);
+
+  m_currentColor = color;
+  if (m_brushTool != nullptr) {
+    m_brushTool->setColor(color);
+  }
   emit toolStateChanged();
 }
 
 void AppController::setBrushSize(int size) {
   const int normalized = size < 1 ? 1 : size;
-  if (m_brushTool.settings().size == normalized) {
+  if (m_brushSize == normalized) {
     return;
   }
-  m_brushTool.setSize(normalized);
+
+  m_brushSize = normalized;
+  if (m_brushTool != nullptr) {
+    m_brushTool->setSize(normalized);
+  }
+  if (m_eraserTool != nullptr) {
+    m_eraserTool->setSize(normalized);
+  }
   emit toolStateChanged();
+}
+
+bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
+  switch (kind) {
+    case core::ToolKind::Brush:
+    case core::ToolKind::Eraser:
+    case core::ToolKind::Line:
+    case core::ToolKind::Fill:
+    case core::ToolKind::MoveLayer:
+      return true;
+    default:
+      return false;
+  }
+}
+
+core::ToolContext AppController::makeToolContext() {
+  return core::ToolContext {
+      m_document,
+      m_composited,
+      m_currentColor,
+      m_brushSize};
+}
+
+void AppController::applyToolResult(const core::ToolResult& result) {
+  bool changed = false;
+  if (result.sampledColor.has_value()) {
+    setBrushColor(*result.sampledColor);
+  }
+  if (result.pixelsChanged) {
+    rerender();
+    changed = true;
+  }
+  if (result.selectionChanged) {
+    changed = true;
+  }
+  if (changed || result.viewportChanged) {
+    emit documentChanged();
+  }
+}
+
+void AppController::finishPendingStrokeHistory() {
+  if (!m_pendingStroke.has_value()) {
+    return;
+  }
+
+  const std::size_t layerIndex = m_pendingStroke->layerIndex;
+  if (layerIndex >= m_document.layerCount()) {
+    m_pendingStroke.reset();
+    return;
+  }
+
+  const core::PixelBuffer after = m_document.layerAt(layerIndex).buffer();
+  if (!pixelBuffersEqual(m_pendingStroke->before, after)) {
+    pushHistoryEntry(StrokeHistoryEntry {
+        HistoryKind::Stroke,
+        layerIndex,
+        m_pendingStroke->before,
+        after,
+        true,
+        true});
+  }
+  m_pendingStroke.reset();
 }
 
 void AppController::pushHistoryEntry(StrokeHistoryEntry entry) {

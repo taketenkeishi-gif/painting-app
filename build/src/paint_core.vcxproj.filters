@@ -22,6 +22,18 @@
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\BrushTool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\EraserTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\EyedropperTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\HandTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ZoomTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\ポートフォリオ\自作イラストアプリ\src\CMakeLists.txt" />

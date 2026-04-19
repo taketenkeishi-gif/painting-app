@@ -5,3 +5,7 @@ C:\ポートフォリオ\自作イラストアプリ\src\core\render\Renderer.cp
 C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolType.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\ToolType.obj
 C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolManager.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\ToolManager.obj
 C:\ポートフォリオ\自作イラストアプリ\src\core\tools\BrushTool.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\BrushTool.obj
+C:\ポートフォリオ\自作イラストアプリ\src\core\tools\EraserTool.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\EraserTool.obj
+C:\ポートフォリオ\自作イラストアプリ\src\core\tools\EyedropperTool.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\EyedropperTool.obj
+C:\ポートフォリオ\自作イラストアプリ\src\core\tools\HandTool.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\HandTool.obj
+C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ZoomTool.cpp;C:\ポートフォリオ\自作イラストアプリ\build\src\paint_core.dir\Debug\ZoomTool.obj

@@ -6,6 +6,10 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolType.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/BrushTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/EraserTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/EyedropperTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/HandTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ZoomTool.cpp
 )
 
 add_library(paint_core STATIC ${CORE_SOURCES})
