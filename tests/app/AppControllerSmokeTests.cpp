@@ -3,6 +3,7 @@
 
 #include "app/bridge/AppController.h"
 #include "core/color/Color.h"
+#include "core/tools/ToolType.h"
 #include "TestHelpers.h"
 
 int main() {
@@ -75,6 +76,69 @@ int main() {
     expectTrue(controller.undo(), "First stroke should be undoable.");
     const core::Color multiUndo = controller.document().layerAt(1).buffer().pixel(110, 30);
     expectTrue(multiUndo.a == 0, "Multiple undo operations should revert multiple strokes.");
+
+    // Tool switching + Brush / Eraser / Fill / MoveLayer / RectSelection + Undo/Redo
+    controller.newDocument(64, 64);
+    controller.setActiveLayer(0);
+
+    expectTrue(controller.setCurrentTool(core::ToolKind::Brush), "Brush tool should be selectable.");
+    controller.setBrushColor(core::Color {255, 0, 0, 255});
+    controller.setBrushSize(4);
+    controller.beginStroke(8, 8);
+    controller.continueStroke(10, 8);
+    controller.endStroke();
+    const core::Color brushPixel = controller.document().layerAt(0).buffer().pixel(9, 8);
+    expectTrue(brushPixel.r > 0 && brushPixel.a > 0, "Brush tool should paint pixels.");
+
+    expectTrue(controller.setCurrentTool(core::ToolKind::Eraser), "Eraser tool should be selectable.");
+    controller.beginStroke(8, 8);
+    controller.continueStroke(10, 8);
+    controller.endStroke();
+    const core::Color erasedPixel = controller.document().layerAt(0).buffer().pixel(9, 8);
+    expectTrue(erasedPixel.a == 0, "Eraser tool should clear alpha on painted pixels.");
+
+    expectTrue(controller.setCurrentTool(core::ToolKind::Fill), "Fill tool should be selectable.");
+    controller.setBrushColor(core::Color {0, 0, 255, 255});
+    controller.beginStroke(0, 0);
+    controller.endStroke();
+    const core::Color fillPixel = controller.document().layerAt(0).buffer().pixel(0, 0);
+    expectTrue(fillPixel.b > 0 && fillPixel.a > 0, "Fill tool should change pixels.");
+    expectTrue(controller.undo(), "Fill should be undoable.");
+    expectTrue(controller.document().layerAt(0).buffer().pixel(0, 0).a == 0, "Fill undo should restore previous pixel state.");
+    expectTrue(controller.redo(), "Fill should be redoable.");
+    expectTrue(controller.document().layerAt(0).buffer().pixel(0, 0).b > 0, "Fill redo should restore filled state.");
+
+    expectTrue(controller.setCurrentTool(core::ToolKind::RectSelection), "RectSelection tool should be selectable.");
+    controller.beginStroke(4, 4);
+    controller.continueStroke(12, 12);
+    controller.endStroke();
+    expectTrue(controller.document().selection().hasSelection(), "RectSelection should set an active selection.");
+    expectTrue(controller.document().selection().contains(8, 8), "Selection mask should include points inside the dragged rect.");
+    expectTrue(controller.undo(), "Selection change should be undoable.");
+    expectTrue(!controller.document().selection().hasSelection(), "Undo should clear selection to previous state.");
+    expectTrue(controller.redo(), "Selection change should be redoable.");
+    expectTrue(controller.document().selection().contains(8, 8), "Redo should restore selection.");
+    expectTrue(controller.undo(), "Selection should be clearable again before move-layer test.");
+
+    expectTrue(controller.setCurrentTool(core::ToolKind::Brush), "Switching back to Brush should succeed.");
+    controller.setBrushColor(core::Color {0, 255, 0, 255});
+    controller.beginStroke(20, 20);
+    controller.endStroke();
+
+    expectTrue(controller.setCurrentTool(core::ToolKind::MoveLayer), "MoveLayer tool should be selectable.");
+    controller.beginStroke(0, 0);
+    controller.continueStroke(3, 2);
+    controller.endStroke();
+    const core::Color movedPixel = controller.document().layerAt(0).buffer().pixel(23, 22);
+    expectTrue(movedPixel.g > 0, "MoveLayer should shift painted pixels by drag delta.");
+
+    expectTrue(controller.setCurrentTool(core::ToolKind::Line), "Line tool should be selectable.");
+    controller.setBrushColor(core::Color {255, 255, 0, 255});
+    controller.beginStroke(30, 30);
+    controller.continueStroke(36, 36);
+    controller.endStroke();
+    const core::Color linePixel = controller.document().layerAt(0).buffer().pixel(33, 33);
+    expectTrue(linePixel.r > 0 && linePixel.g > 0, "Line tool should draw between press/release points.");
 
     std::cout << "App smoke tests passed.\n";
     return 0;

@@ -13,7 +13,40 @@
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\render\Renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\selection\SelectionMask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolType.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ToolManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\BrushTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\EraserTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\EyedropperTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\HandTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\ZoomTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\LineTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\RectSelectionTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\FillTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\ポートフォリオ\自作イラストアプリ\src\core\tools\MoveLayerTool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

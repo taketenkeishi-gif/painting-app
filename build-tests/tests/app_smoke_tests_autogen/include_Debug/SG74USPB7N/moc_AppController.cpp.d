@@ -106,9 +106,23 @@ C:/ポートフォリオ/自作イラストアプリ/build-tests/tests/app_smoke
   C:/ポートフォリオ/自作イラストアプリ/src/core/buffer/PixelBuffer.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/color/Color.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/common/Point.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/common/Rect.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/common/Size.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/document/Document.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/layer/Layer.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/render/Renderer.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/selection/SelectionMask.h \
   C:/ポートフォリオ/自作イラストアプリ/src/core/tools/BrushTool.h \
-  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolTypes.h
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/EraserTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/EyedropperTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/FillTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/HandTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ITool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/LineTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/MoveLayerTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/RectSelectionTool.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolContext.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolManager.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolType.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolTypes.h \
+  C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ZoomTool.h

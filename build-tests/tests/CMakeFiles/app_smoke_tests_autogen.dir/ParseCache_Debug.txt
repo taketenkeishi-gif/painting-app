@@ -109,11 +109,25 @@ C:/ポートフォリオ/自作イラストアプリ/src/app/bridge/AppControlle
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/buffer/PixelBuffer.h
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/color/Color.h
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/common/Point.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/common/Rect.h
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/common/Size.h
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/document/Document.h
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/layer/Layer.h
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/render/Renderer.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/selection/SelectionMask.h
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/BrushTool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/EraserTool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/EyedropperTool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/FillTool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/HandTool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ITool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/LineTool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/MoveLayerTool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/RectSelectionTool.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolContext.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolManager.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolType.h
  mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ToolTypes.h
+ mdp:C:/ポートフォリオ/自作イラストアプリ/src/core/tools/ZoomTool.h
 C:/ポートフォリオ/自作イラストアプリ/tests/app/AppControllerSmokeTests.cpp
 C:/ポートフォリオ/自作イラストアプリ/src/app/bridge/AppController.cpp
