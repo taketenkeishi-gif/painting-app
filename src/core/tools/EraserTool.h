@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string_view>
 
 #include "core/common/Point.h"
@@ -11,6 +12,9 @@ namespace core {
 class EraserTool : public ITool {
 public:
   void setSize(int size) noexcept { m_size = size < 1 ? 1 : size; }
+  void setOpacity(float opacity) noexcept { m_opacity = std::clamp(opacity, 0.0F, 1.0F); }
+  void setHardness(float hardness) noexcept { m_hardness = std::clamp(hardness, 0.0F, 1.0F); }
+  void setSpacing(float spacing) noexcept { m_spacing = std::clamp(spacing, 0.01F, 3.0F); }
   int size() const noexcept { return m_size; }
 
   ToolKind kind() const noexcept override { return ToolKind::Eraser; }
@@ -25,8 +29,12 @@ public:
 private:
   void eraseStroke(Layer& layer, const Point& from, const Point& to) const;
   void eraseCircle(PixelBuffer& buffer, const Point& center, int radius) const;
+  void erasePixel(PixelBuffer& buffer, int x, int y, float strength) const;
 
   int m_size {8};
+  float m_opacity {1.0F};
+  float m_hardness {1.0F};
+  float m_spacing {0.25F};
   bool m_erasing {false};
   Point m_lastPoint {0, 0};
 };

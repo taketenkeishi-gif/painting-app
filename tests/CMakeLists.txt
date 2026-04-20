@@ -14,6 +14,8 @@ add_test(NAME core_tests COMMAND core_tests)
 add_executable(app_smoke_tests
   ${CMAKE_CURRENT_SOURCE_DIR}/app/AppControllerSmokeTests.cpp
   ${PROJECT_SOURCE_DIR}/src/app/bridge/AppController.cpp
+  ${PROJECT_SOURCE_DIR}/src/app/ui/ToolDescriptor.cpp
+  ${PROJECT_SOURCE_DIR}/src/app/ui/UiState.cpp
 )
 set_target_properties(app_smoke_tests PROPERTIES
   AUTOMOC ON

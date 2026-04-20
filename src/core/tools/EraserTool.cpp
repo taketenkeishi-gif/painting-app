@@ -76,9 +76,11 @@ void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) c
   const int radius = std::max(1, m_size) / 2;
   const int dx = to.x - from.x;
   const int dy = to.y - from.y;
-  const int steps = std::max(std::abs(dx), std::abs(dy));
+  const float distance = std::hypot(static_cast<float>(dx), static_cast<float>(dy));
+  const float spacingPixels = std::max(1.0F, m_spacing * static_cast<float>(std::max(1, m_size)));
+  const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacingPixels)));
 
-  if (steps == 0) {
+  if (distance <= 0.001F) {
     eraseCircle(buffer, from, radius);
     return;
   }
@@ -94,17 +96,46 @@ void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) c
 
 void EraserTool::eraseCircle(PixelBuffer& buffer, const Point& center, int radius) const {
   const int r2 = radius * radius;
+  const float radiusF = static_cast<float>(std::max(1, radius));
+  const float hardEdge = std::clamp(m_hardness, 0.0F, 1.0F);
   for (int y = center.y - radius; y <= center.y + radius; ++y) {
     for (int x = center.x - radius; x <= center.x + radius; ++x) {
       const int dx = x - center.x;
       const int dy = y - center.y;
       if ((dx * dx + dy * dy) <= r2) {
-        if (buffer.inBounds(x, y)) {
-          buffer.setPixel(x, y, Color::Transparent());
+        const float distance = std::sqrt(static_cast<float>(dx * dx + dy * dy)) / radiusF;
+        if (distance > 1.0F) {
+          continue;
+        }
+        float strength = 1.0F;
+        if (hardEdge < 0.999F && distance > hardEdge) {
+          strength = 1.0F - (distance - hardEdge) / (1.0F - hardEdge);
+        }
+        strength *= std::clamp(m_opacity, 0.0F, 1.0F);
+        if (strength > 0.001F) {
+          erasePixel(buffer, x, y, strength);
         }
       }
     }
   }
+}
+
+void EraserTool::erasePixel(PixelBuffer& buffer, int x, int y, float strength) const {
+  if (!buffer.inBounds(x, y)) {
+    return;
+  }
+
+  const float s = std::clamp(strength, 0.0F, 1.0F);
+  const Color dst = buffer.pixel(x, y);
+  const float keep = 1.0F - s;
+  buffer.setPixel(
+      x,
+      y,
+      Color {
+          static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.r) * keep)),
+          static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.g) * keep)),
+          static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.b) * keep)),
+          static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))});
 }
 
 } // namespace core

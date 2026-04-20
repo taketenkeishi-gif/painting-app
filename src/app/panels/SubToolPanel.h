@@ -20,8 +20,10 @@ public:
 
 private slots:
   void refreshFromController();
+  void onCurrentSubToolChanged(int row);
 
 private:
+  bool m_refreshing {false};
   app::bridge::AppController* m_controller {nullptr};
   QLabel* m_toolNameLabel {nullptr};
   QListWidget* m_subToolList {nullptr};

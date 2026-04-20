@@ -21,6 +21,7 @@ public:
 
   void clear() noexcept;
   bool setRect(const Rect& rect);
+  bool invert();
 
   bool hasSelection() const noexcept { return m_hasSelection; }
   bool contains(int x, int y) const noexcept;

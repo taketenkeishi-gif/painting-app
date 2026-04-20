@@ -76,9 +76,11 @@ void BrushTool::stroke(Layer& layer, const Point& from, const Point& to) const {
   const int radius = std::max(1, m_settings.size) / 2;
   const int dx = to.x - from.x;
   const int dy = to.y - from.y;
-  const int steps = std::max(std::abs(dx), std::abs(dy));
+  const float distance = std::hypot(static_cast<float>(dx), static_cast<float>(dy));
+  const float spacingPixels = std::max(1.0F, m_settings.spacing * static_cast<float>(std::max(1, m_settings.size)));
+  const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacingPixels)));
 
-  if (steps == 0) {
+  if (distance <= 0.001F) {
     stampCircle(buffer, from, radius, m_settings.color);
     return;
   }
@@ -94,24 +96,47 @@ void BrushTool::stroke(Layer& layer, const Point& from, const Point& to) const {
 
 void BrushTool::stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const {
   const int r2 = radius * radius;
+  const float radiusF = static_cast<float>(std::max(1, radius));
+  const float hardEdge = std::clamp(m_settings.hardness, 0.0F, 1.0F);
   for (int y = center.y - radius; y <= center.y + radius; ++y) {
     for (int x = center.x - radius; x <= center.x + radius; ++x) {
       const int dx = x - center.x;
       const int dy = y - center.y;
       if ((dx * dx + dy * dy) <= r2) {
-        blendPixel(buffer, x, y, color);
+        const float distance = std::sqrt(static_cast<float>(dx * dx + dy * dy)) / radiusF;
+        if (distance > 1.0F) {
+          continue;
+        }
+        float strength = 1.0F;
+        if (hardEdge < 0.999F && distance > hardEdge) {
+          strength = 1.0F - (distance - hardEdge) / (1.0F - hardEdge);
+        }
+        strength *= std::clamp(m_settings.opacity * m_settings.flow, 0.0F, 1.0F);
+        if (strength > 0.001F) {
+          blendPixel(buffer, x, y, color, strength);
+        }
       }
     }
   }
 }
 
-void BrushTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src) const {
+void BrushTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, float strength) const {
   if (!buffer.inBounds(x, y)) {
     return;
   }
 
+  const float alphaScale = std::clamp(strength, 0.0F, 1.0F);
+  const Color effectiveSrc {
+      src.r,
+      src.g,
+      src.b,
+      static_cast<std::uint8_t>(std::lround(static_cast<float>(src.a) * alphaScale))};
+  if (effectiveSrc.a == 0) {
+    return;
+  }
+
   const Color dst = buffer.pixel(x, y);
-  const float srcA = static_cast<float>(src.a) / 255.0F;
+  const float srcA = static_cast<float>(effectiveSrc.a) / 255.0F;
   const float dstA = static_cast<float>(dst.a) / 255.0F;
   const float outA = srcA + dstA * (1.0F - srcA);
   if (outA <= 0.0F) {
@@ -119,9 +144,9 @@ void BrushTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src) 
     return;
   }
 
-  const float srcR = static_cast<float>(src.r) / 255.0F;
-  const float srcG = static_cast<float>(src.g) / 255.0F;
-  const float srcB = static_cast<float>(src.b) / 255.0F;
+  const float srcR = static_cast<float>(effectiveSrc.r) / 255.0F;
+  const float srcG = static_cast<float>(effectiveSrc.g) / 255.0F;
+  const float srcB = static_cast<float>(effectiveSrc.b) / 255.0F;
   const float dstR = static_cast<float>(dst.r) / 255.0F;
   const float dstG = static_cast<float>(dst.g) / 255.0F;
   const float dstB = static_cast<float>(dst.b) / 255.0F;

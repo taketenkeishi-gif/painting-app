@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string_view>
 
 #include "core/common/Point.h"
@@ -13,6 +14,10 @@ class BrushTool : public ITool {
 public:
   void setColor(const Color& color) noexcept { m_settings.color = color; }
   void setSize(int size) noexcept { m_settings.size = size < 1 ? 1 : size; }
+  void setOpacity(float opacity) noexcept { m_settings.opacity = std::clamp(opacity, 0.0F, 1.0F); }
+  void setHardness(float hardness) noexcept { m_settings.hardness = std::clamp(hardness, 0.0F, 1.0F); }
+  void setFlow(float flow) noexcept { m_settings.flow = std::clamp(flow, 0.0F, 1.0F); }
+  void setSpacing(float spacing) noexcept { m_settings.spacing = std::clamp(spacing, 0.01F, 3.0F); }
 
   const BrushSettings& settings() const noexcept { return m_settings; }
 
@@ -29,7 +34,7 @@ public:
 
 private:
   void stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const;
-  void blendPixel(PixelBuffer& buffer, int x, int y, const Color& src) const;
+  void blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, float strength) const;
 
   BrushSettings m_settings;
   bool m_drawing {false};

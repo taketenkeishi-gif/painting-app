@@ -24,6 +24,27 @@ bool pixelBuffersEqual(const core::PixelBuffer& lhs, const core::PixelBuffer& rh
   return true;
 }
 
+bool containsProperty(const std::vector<app::ui::ToolPropertyKey>& properties, app::ui::ToolPropertyKey key) {
+  return std::find(properties.begin(), properties.end(), key) != properties.end();
+}
+
+bool containsProperty(
+    const app::ui::ToolDescriptor* descriptor,
+    const app::ui::SubToolDescriptor* subTool,
+    app::ui::ToolPropertyKey key) {
+  if (subTool != nullptr && !subTool->editableProperties.empty()) {
+    return containsProperty(subTool->editableProperties, key);
+  }
+  if (descriptor == nullptr) {
+    return false;
+  }
+  return containsProperty(descriptor->availableProperties, key);
+}
+
+int clampPercent(int value) {
+  return std::clamp(value, 0, 100);
+}
+
 } // namespace
 
 AppController::AppController(QObject* parent)
@@ -44,10 +65,22 @@ AppController::AppController(QObject* parent)
   m_toolManager.registerTool(std::make_unique<core::RectSelectionTool>());
   m_toolManager.registerTool(std::make_unique<core::FillTool>());
   m_toolManager.registerTool(std::make_unique<core::MoveLayerTool>());
+
+  for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
+    if (!tool.subTools.empty()) {
+      m_selectedSubToolByTool[tool.kind] = tool.subTools.front().id;
+    }
+  }
+
+  m_uiState.toolKind = core::ToolKind::Brush;
   m_toolManager.setActiveTool(core::ToolKind::Brush);
+  const app::ui::SubToolDescriptor* defaultSubTool = m_toolCatalog.defaultSubTool(core::ToolKind::Brush);
+  if (defaultSubTool != nullptr) {
+    resetToolStateFromDescriptor(*defaultSubTool);
+  }
 
   setBrushColor(core::Color::OpaqueBlack());
-  setBrushSize(8);
+  applyUiStateToTools();
   rerender();
 }
 
@@ -71,8 +104,23 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
   return models;
 }
 
+std::vector<SubToolViewModel> AppController::subToolViewModels() const {
+  std::vector<SubToolViewModel> models;
+  const app::ui::ToolDescriptor* descriptor = currentToolDescriptor();
+  if (descriptor == nullptr) {
+    return models;
+  }
+
+  const std::string selectedId = currentSubToolId();
+  models.reserve(descriptor->subTools.size());
+  for (const app::ui::SubToolDescriptor& sub : descriptor->subTools) {
+    models.push_back(SubToolViewModel {sub.id, sub.displayName, sub.id == selectedId});
+  }
+  return models;
+}
+
 ToolStateViewModel AppController::toolState() const noexcept {
-  return ToolStateViewModel {m_currentColor, m_brushSize};
+  return ToolStateViewModel {m_currentColor, m_uiState.size, m_uiState.opacity, m_uiState.hardness};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -149,24 +197,70 @@ void AppController::setLayerVisible(std::size_t index, bool visible) {
   emit documentChanged();
 }
 
+bool AppController::toggleActiveLayerVisible() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  const std::size_t active = m_document.activeLayerIndex();
+  const bool nextVisible = !m_document.layerAt(active).visible();
+  setLayerVisible(active, nextVisible);
+  return true;
+}
+
+bool AppController::clearSelection() {
+  const core::SelectionMask before = m_document.selection();
+  if (!before.hasSelection()) {
+    return false;
+  }
+  m_document.clearSelection();
+  pushSelectionHistoryIfChanged(before, "Selection");
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::invertSelection() {
+  const core::SelectionMask before = m_document.selection();
+  if (!m_document.selection().invert()) {
+    return false;
+  }
+  pushSelectionHistoryIfChanged(before, "Selection");
+  emit documentChanged();
+  return true;
+}
+
 std::vector<core::ToolKind> AppController::availableTools() const {
-  return {
-      core::ToolKind::Brush,
-      core::ToolKind::Eraser,
-      core::ToolKind::Eyedropper,
-      core::ToolKind::Fill,
-      core::ToolKind::Line,
-      core::ToolKind::RectSelection,
-      core::ToolKind::MoveLayer,
-      core::ToolKind::Hand,
-      core::ToolKind::Zoom};
+  std::vector<core::ToolKind> tools;
+  tools.reserve(m_toolCatalog.tools().size());
+  for (const app::ui::ToolDescriptor& descriptor : m_toolCatalog.tools()) {
+    tools.push_back(descriptor.kind);
+  }
+  return tools;
+}
+
+std::string AppController::toolDisplayName(core::ToolKind kind) const {
+  const app::ui::ToolDescriptor* descriptor = m_toolCatalog.findTool(kind);
+  if (descriptor != nullptr && !descriptor->displayName.empty()) {
+    return descriptor->displayName;
+  }
+  return std::string {core::toolKindDisplayName(kind)};
 }
 
 bool AppController::setCurrentTool(core::ToolKind kind) {
   if (!m_toolManager.setActiveTool(kind)) {
     return false;
   }
+
+  m_uiState.toolKind = kind;
+  if (m_selectedSubToolByTool.find(kind) == m_selectedSubToolByTool.end()) {
+    const app::ui::SubToolDescriptor* defaultSub = m_toolCatalog.defaultSubTool(kind);
+    if (defaultSub != nullptr) {
+      m_selectedSubToolByTool[kind] = defaultSub->id;
+    }
+  }
+
+  selectSubToolInternal(currentSubToolId(), false);
   emit toolStateChanged();
+  emit documentChanged();
   return true;
 }
 
@@ -174,24 +268,62 @@ core::ToolKind AppController::currentTool() const noexcept {
   return m_toolManager.activeToolKind();
 }
 
+bool AppController::setCurrentSubTool(const std::string& subToolId) {
+  if (!selectSubToolInternal(subToolId, true)) {
+    return false;
+  }
+  emit documentChanged();
+  return true;
+}
+
+std::string AppController::currentSubToolId() const {
+  const auto it = m_selectedSubToolByTool.find(currentTool());
+  if (it != m_selectedSubToolByTool.end()) {
+    return it->second;
+  }
+  const app::ui::SubToolDescriptor* sub = m_toolCatalog.defaultSubTool(currentTool());
+  return sub == nullptr ? std::string {} : sub->id;
+}
+
 std::string AppController::currentToolDisplayName() const {
-  return toolDisplayName(currentTool());
+  const app::ui::ToolDescriptor* descriptor = currentToolDescriptor();
+  if (descriptor != nullptr) {
+    return descriptor->displayName;
+  }
+  return std::string {core::toolKindDisplayName(currentTool())};
 }
 
 std::string AppController::currentSubToolDisplayName() const {
-  return toolSubToolName(currentTool());
+  const app::ui::SubToolDescriptor* sub = currentSubToolDescriptor();
+  return sub == nullptr ? std::string {"-"} : sub->displayName;
 }
 
 std::string AppController::currentToolGuide() const {
-  return toolGuideText(currentTool());
+  const app::ui::SubToolDescriptor* sub = currentSubToolDescriptor();
+  if (sub != nullptr && !sub->guide.empty()) {
+    return sub->guide;
+  }
+  const app::ui::ToolDescriptor* descriptor = currentToolDescriptor();
+  if (descriptor != nullptr) {
+    return descriptor->guide;
+  }
+  return "";
 }
 
 bool AppController::currentToolSupportsColor() const noexcept {
-  return toolSupportsColor(currentTool());
+  return !m_uiState.eraseMode && containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Color);
 }
 
 bool AppController::currentToolSupportsSize() const noexcept {
-  return toolSupportsSize(currentTool());
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Size);
+}
+
+bool AppController::currentToolSupportsOpacity() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Opacity);
+}
+
+bool AppController::currentToolSupportsHardness() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Hardness);
 }
 
 void AppController::beginStroke(int x, int y) {
@@ -226,9 +358,7 @@ void AppController::beginStroke(int x, int y) {
   core::ToolPointerEvent pressEvent;
   pressEvent.point = m_lastPointer;
   core::ToolContext context = makeToolContext();
-  const core::ToolResult result = m_toolManager.pointerPress(
-      context,
-      pressEvent);
+  const core::ToolResult result = m_toolManager.pointerPress(context, pressEvent);
   applyToolResult(result);
 }
 
@@ -241,9 +371,7 @@ void AppController::continueStroke(int x, int y) {
   core::ToolPointerEvent moveEvent;
   moveEvent.point = m_lastPointer;
   core::ToolContext context = makeToolContext();
-  const core::ToolResult result = m_toolManager.pointerMove(
-      context,
-      moveEvent);
+  const core::ToolResult result = m_toolManager.pointerMove(context, moveEvent);
   applyToolResult(result);
 }
 
@@ -256,9 +384,7 @@ void AppController::endStroke() {
   core::ToolPointerEvent releaseEvent;
   releaseEvent.point = m_lastPointer;
   core::ToolContext context = makeToolContext();
-  const core::ToolResult result = m_toolManager.pointerRelease(
-      context,
-      releaseEvent);
+  const core::ToolResult result = m_toolManager.pointerRelease(context, releaseEvent);
   applyToolResult(result);
   finishPendingStrokeHistory();
 }
@@ -272,8 +398,7 @@ bool AppController::pickColorAt(int x, int y) {
   core::ToolPointerEvent event;
   event.point = core::Point {x, y};
   core::ToolContext context = makeToolContext();
-  const core::ToolResult result = m_toolManager.pointerPress(
-      context, event);
+  const core::ToolResult result = m_toolManager.pointerPress(context, event);
   m_toolManager.pointerRelease(context, event);
   m_toolManager.setActiveTool(previous);
 
@@ -295,7 +420,8 @@ bool AppController::undo() {
   StrokeHistoryEntry entry = std::move(m_undoHistory.back());
   m_undoHistory.pop_back();
 
-  if (entry.layerIndex >= m_document.layerCount()) {
+  if ((entry.kind == HistoryKind::Stroke || entry.kind == HistoryKind::LayerVisibility) &&
+      entry.layerIndex >= m_document.layerCount()) {
     clearStrokeHistory();
     return false;
   }
@@ -337,7 +463,8 @@ bool AppController::redo() {
   StrokeHistoryEntry entry = std::move(m_redoHistory.back());
   m_redoHistory.pop_back();
 
-  if (entry.layerIndex >= m_document.layerCount()) {
+  if ((entry.kind == HistoryKind::Stroke || entry.kind == HistoryKind::LayerVisibility) &&
+      entry.layerIndex >= m_document.layerCount()) {
     clearStrokeHistory();
     return false;
   }
@@ -404,18 +531,39 @@ void AppController::setBrushColor(const core::Color& color) {
 }
 
 void AppController::setBrushSize(int size) {
-  const int normalized = size < 1 ? 1 : size;
-  if (m_brushSize == normalized) {
+  const int normalized = std::max(1, size);
+  if (m_uiState.size == normalized) {
     return;
   }
 
-  m_brushSize = normalized;
-  if (m_brushTool != nullptr) {
-    m_brushTool->setSize(normalized);
+  m_uiState.size = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::adjustBrushSize(int delta) {
+  setBrushSize(m_uiState.size + delta);
+}
+
+void AppController::setBrushOpacity(int opacity) {
+  const int normalized = clampPercent(opacity);
+  if (m_uiState.opacity == normalized) {
+    return;
   }
-  if (m_eraserTool != nullptr) {
-    m_eraserTool->setSize(normalized);
+
+  m_uiState.opacity = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushHardness(int hardness) {
+  const int normalized = clampPercent(hardness);
+  if (m_uiState.hardness == normalized) {
+    return;
   }
+
+  m_uiState.hardness = normalized;
+  applyUiStateToTools();
   emit toolStateChanged();
 }
 
@@ -461,101 +609,61 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
   }
 }
 
-std::string AppController::toolDisplayName(core::ToolKind kind) {
-  switch (kind) {
-    case core::ToolKind::Brush:
-      return "Brush";
-    case core::ToolKind::Eraser:
-      return "Eraser";
-    case core::ToolKind::Eyedropper:
-      return "Eyedropper";
-    case core::ToolKind::Fill:
-      return "Fill";
-    case core::ToolKind::Line:
-      return "Line";
-    case core::ToolKind::RectSelection:
-      return "Rect Selection";
-    case core::ToolKind::MoveLayer:
-      return "Move Layer";
-    case core::ToolKind::Hand:
-      return "Hand";
-    case core::ToolKind::Zoom:
-      return "Zoom";
-    default:
-      return "Tool";
+const app::ui::ToolDescriptor* AppController::currentToolDescriptor() const noexcept {
+  return m_toolCatalog.findTool(currentTool());
+}
+
+const app::ui::SubToolDescriptor* AppController::currentSubToolDescriptor() const noexcept {
+  return m_toolCatalog.findSubTool(currentTool(), currentSubToolId());
+}
+
+bool AppController::selectSubToolInternal(std::string_view subToolId, bool emitSignal) {
+  const app::ui::SubToolDescriptor* sub = m_toolCatalog.findSubTool(currentTool(), subToolId);
+  if (sub == nullptr) {
+    return false;
+  }
+
+  m_selectedSubToolByTool[currentTool()] = sub->id;
+  resetToolStateFromDescriptor(*sub);
+  applyUiStateToTools();
+
+  if (emitSignal) {
+    emit toolStateChanged();
+  }
+  return true;
+}
+
+void AppController::applyUiStateToTools() {
+  const float opacity = static_cast<float>(m_uiState.opacity) / 100.0F;
+  const float hardness = static_cast<float>(m_uiState.hardness) / 100.0F;
+  const float flow = static_cast<float>(m_uiState.flow) / 100.0F;
+  const float spacing = static_cast<float>(std::max(1, m_uiState.spacing)) / 100.0F;
+
+  if (m_brushTool != nullptr) {
+    m_brushTool->setSize(m_uiState.size);
+    m_brushTool->setOpacity(opacity);
+    m_brushTool->setHardness(hardness);
+    m_brushTool->setFlow(flow);
+    m_brushTool->setSpacing(spacing);
+    m_brushTool->setColor(m_currentColor);
+  }
+
+  if (m_eraserTool != nullptr) {
+    m_eraserTool->setSize(m_uiState.size);
+    m_eraserTool->setOpacity(opacity);
+    m_eraserTool->setHardness(hardness);
+    m_eraserTool->setSpacing(spacing);
   }
 }
 
-std::string AppController::toolSubToolName(core::ToolKind kind) {
-  switch (kind) {
-    case core::ToolKind::Brush:
-      return "Round Brush";
-    case core::ToolKind::Eraser:
-      return "Round Eraser";
-    case core::ToolKind::Eyedropper:
-      return "Sample Composite";
-    case core::ToolKind::Fill:
-      return "Contiguous Fill";
-    case core::ToolKind::Line:
-      return "Straight Line";
-    case core::ToolKind::RectSelection:
-      return "Rectangle";
-    case core::ToolKind::MoveLayer:
-      return "Pixel Offset";
-    case core::ToolKind::Hand:
-      return "Pan View";
-    case core::ToolKind::Zoom:
-      return "Wheel Zoom";
-    default:
-      return "Default";
-  }
-}
-
-std::string AppController::toolGuideText(core::ToolKind kind) {
-  switch (kind) {
-    case core::ToolKind::Brush:
-      return "LMB drag to paint. Wheel adjusts size.";
-    case core::ToolKind::Eraser:
-      return "LMB drag to erase. Wheel adjusts size.";
-    case core::ToolKind::Eyedropper:
-      return "Click canvas to sample color.";
-    case core::ToolKind::Fill:
-      return "Click to fill region.";
-    case core::ToolKind::Line:
-      return "Press-drag-release to draw straight line.";
-    case core::ToolKind::RectSelection:
-      return "Drag to create rectangular selection.";
-    case core::ToolKind::MoveLayer:
-      return "Drag to move active layer pixels.";
-    case core::ToolKind::Hand:
-      return "Drag to pan canvas.";
-    case core::ToolKind::Zoom:
-      return "Use Ctrl+Wheel to zoom around cursor.";
-    default:
-      return "No guide available.";
-  }
-}
-
-bool AppController::toolSupportsColor(core::ToolKind kind) noexcept {
-  switch (kind) {
-    case core::ToolKind::Brush:
-    case core::ToolKind::Line:
-    case core::ToolKind::Fill:
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool AppController::toolSupportsSize(core::ToolKind kind) noexcept {
-  switch (kind) {
-    case core::ToolKind::Brush:
-    case core::ToolKind::Eraser:
-    case core::ToolKind::Line:
-      return true;
-    default:
-      return false;
-  }
+void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescriptor& subTool) {
+  m_uiState.subToolId = subTool.id;
+  m_uiState.size = std::max(1, subTool.preset.size);
+  m_uiState.opacity = clampPercent(subTool.preset.opacity);
+  m_uiState.hardness = clampPercent(subTool.preset.hardness);
+  m_uiState.flow = clampPercent(subTool.preset.flow);
+  m_uiState.spacing = std::clamp(subTool.preset.spacing, 1, 300);
+  m_uiState.eraseMode = subTool.preset.eraseMode;
 }
 
 core::ToolContext AppController::makeToolContext() {
@@ -563,7 +671,7 @@ core::ToolContext AppController::makeToolContext() {
       m_document,
       m_composited,
       m_currentColor,
-      m_brushSize};
+      m_uiState.size};
 }
 
 void AppController::applyToolResult(const core::ToolResult& result) {
@@ -642,6 +750,19 @@ void AppController::pushHistoryEntry(StrokeHistoryEntry entry) {
   }
   m_undoHistory.push_back(std::move(entry));
   m_redoHistory.clear();
+}
+
+void AppController::pushSelectionHistoryIfChanged(const core::SelectionMask& before, const std::string& actionName) {
+  const core::SelectionMask after = m_document.selection();
+  if (before == after) {
+    return;
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Selection;
+  entry.actionName = actionName;
+  entry.beforeSelection = before;
+  entry.afterSelection = after;
+  pushHistoryEntry(std::move(entry));
 }
 
 void AppController::clearStrokeHistory() noexcept {

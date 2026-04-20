@@ -3,6 +3,7 @@
 #include <QAbstractItemView>
 #include <QLabel>
 #include <QListWidget>
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 
 #include "app/bridge/AppController.h"
@@ -22,6 +23,8 @@ SubToolPanel::SubToolPanel(QWidget* parent)
 
   layout->addWidget(m_toolNameLabel);
   layout->addWidget(m_subToolList);
+
+  connect(m_subToolList, &QListWidget::currentRowChanged, this, &SubToolPanel::onCurrentSubToolChanged);
 }
 
 void SubToolPanel::setController(app::bridge::AppController* controller) {
@@ -43,10 +46,37 @@ void SubToolPanel::refreshFromController() {
     return;
   }
 
+  const QSignalBlocker blocker(m_subToolList);
+  m_refreshing = true;
   m_toolNameLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
   m_subToolList->clear();
-  m_subToolList->addItem(QString::fromStdString(m_controller->currentSubToolDisplayName()));
-  m_subToolList->setCurrentRow(0);
+  const auto items = m_controller->subToolViewModels();
+  for (const auto& item : items) {
+    auto* row = new QListWidgetItem(QString::fromStdString(item.name), m_subToolList);
+    row->setData(Qt::UserRole, QString::fromStdString(item.id));
+    if (item.active) {
+      m_subToolList->setCurrentItem(row);
+    }
+  }
+  if (m_subToolList->count() > 0 && m_subToolList->currentRow() < 0) {
+    m_subToolList->setCurrentRow(0);
+  }
+  m_refreshing = false;
+}
+
+void SubToolPanel::onCurrentSubToolChanged(int row) {
+  if (m_controller == nullptr || m_refreshing || row < 0) {
+    return;
+  }
+  auto* item = m_subToolList->item(row);
+  if (item == nullptr) {
+    return;
+  }
+  const QString id = item->data(Qt::UserRole).toString();
+  if (id.isEmpty()) {
+    return;
+  }
+  m_controller->setCurrentSubTool(id.toStdString());
 }
 
 } // namespace app::panels

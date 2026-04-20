@@ -36,6 +36,8 @@ endif()
 set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AppController.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/ToolDescriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/UiState.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/mainwindow/MainWindow.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/CanvasWidget.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/LayerPanel.cpp
