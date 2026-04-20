@@ -1,9 +1,15 @@
 #pragma once
 
+#include <map>
+
 #include <QMainWindow>
+
+#include "core/tools/ToolType.h"
 
 class QAction;
 class QLabel;
+class QMenu;
+class QKeySequence;
 class QWidget;
 
 namespace app::bridge {
@@ -32,6 +38,12 @@ private slots:
   void onToolStateChanged();
   void onUndoTriggered();
   void onRedoTriggered();
+  void onSetToolTriggered();
+  void onClearSelectionTriggered();
+  void onInvertSelectionTriggered();
+  void onToggleLayerVisibilityTriggered();
+  void onDecreaseBrushSizeTriggered();
+  void onIncreaseBrushSizeTriggered();
 
 private:
   void setupShellLayout();
@@ -39,6 +51,8 @@ private:
   void updateUndoRedoState();
   void updateActiveLayerStatus();
   void updateTopToolInfo();
+  void updateToolActionState();
+  QAction* createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut);
 
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
@@ -61,6 +75,12 @@ private:
   QAction* m_undoAction {nullptr};
   QAction* m_redoAction {nullptr};
   QAction* m_addLayerAction {nullptr};
+  QAction* m_toggleLayerVisibilityAction {nullptr};
+  QAction* m_clearSelectionAction {nullptr};
+  QAction* m_invertSelectionAction {nullptr};
+  QAction* m_brushSizeDownAction {nullptr};
+  QAction* m_brushSizeUpAction {nullptr};
+  std::map<core::ToolKind, QAction*> m_toolActions;
   int m_lastCanvasWidth {800};
   int m_lastCanvasHeight {600};
 };

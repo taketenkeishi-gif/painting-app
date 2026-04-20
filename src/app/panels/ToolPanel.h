@@ -26,6 +26,8 @@ private slots:
   void onToolButtonClicked();
 
 private:
+  void rebuildButtons();
+
   app::bridge::AppController* m_controller {nullptr};
   std::map<core::ToolKind, QToolButton*> m_buttons;
 };

@@ -1,6 +1,7 @@
 #include "app/mainwindow/MainWindow.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -128,26 +129,67 @@ void MainWindow::setupShellLayout() {
 void MainWindow::createMenus() {
   auto* fileMenu = menuBar()->addMenu("&File");
   auto* editMenu = menuBar()->addMenu("&Edit");
+  auto* toolMenu = menuBar()->addMenu("&Tool");
+  auto* selectMenu = menuBar()->addMenu("&Select");
   auto* layerMenu = menuBar()->addMenu("&Layer");
 
   m_newCanvasAction = new QAction("&New Canvas", this);
   m_undoAction = new QAction("&Undo", this);
   m_redoAction = new QAction("&Redo", this);
   m_addLayerAction = new QAction("&Add Layer", this);
+  m_toggleLayerVisibilityAction = new QAction("&Toggle Visibility", this);
+  m_clearSelectionAction = new QAction("&Clear Selection", this);
+  m_invertSelectionAction = new QAction("&Invert Selection", this);
+  m_brushSizeDownAction = new QAction("Brush Size &Down", this);
+  m_brushSizeUpAction = new QAction("Brush Size &Up", this);
 
   m_newCanvasAction->setShortcut(QKeySequence::New);
   m_undoAction->setShortcut(QKeySequence::Undo);
-  m_redoAction->setShortcut(QKeySequence::Redo);
+  m_redoAction->setShortcuts({QKeySequence::Redo, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
   m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+  m_toggleLayerVisibilityAction->setShortcut(QKeySequence(Qt::Key_V));
+  m_clearSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+  m_invertSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
+  m_brushSizeDownAction->setShortcut(QKeySequence(Qt::Key_BracketLeft));
+  m_brushSizeUpAction->setShortcut(QKeySequence(Qt::Key_BracketRight));
 
   fileMenu->addAction(m_newCanvasAction);
   editMenu->addAction(m_undoAction);
   editMenu->addAction(m_redoAction);
+  editMenu->addSeparator();
+  editMenu->addAction(m_brushSizeDownAction);
+  editMenu->addAction(m_brushSizeUpAction);
+
+  auto* toolGroup = new QActionGroup(this);
+  toolGroup->setExclusive(true);
+  auto bindTool = [&](core::ToolKind kind, const QString& text, const QKeySequence& shortcut) {
+    QAction* action = createToolAction(toolMenu, kind, text, shortcut);
+    action->setActionGroup(toolGroup);
+  };
+  bindTool(core::ToolKind::Brush, "&Brush", QKeySequence(Qt::Key_B));
+  bindTool(core::ToolKind::Eraser, "&Eraser", QKeySequence(Qt::Key_E));
+  bindTool(core::ToolKind::Eyedropper, "&Eyedropper", QKeySequence(Qt::Key_I));
+  bindTool(core::ToolKind::Fill, "&Fill", QKeySequence(Qt::Key_G));
+  bindTool(core::ToolKind::Line, "&Line", QKeySequence(Qt::Key_U));
+  bindTool(core::ToolKind::RectSelection, "&Rect Selection", QKeySequence(Qt::Key_R));
+  bindTool(core::ToolKind::MoveLayer, "&Move Layer", QKeySequence(Qt::Key_M));
+  bindTool(core::ToolKind::Hand, "&Hand", QKeySequence(Qt::Key_H));
+  bindTool(core::ToolKind::Zoom, "&Zoom", QKeySequence(Qt::Key_Z));
+
+  selectMenu->addAction(m_clearSelectionAction);
+  selectMenu->addAction(m_invertSelectionAction);
+
   layerMenu->addAction(m_addLayerAction);
+  layerMenu->addAction(m_toggleLayerVisibilityAction);
 
   connect(m_newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
   connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndoTriggered);
   connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedoTriggered);
+  connect(m_clearSelectionAction, &QAction::triggered, this, &MainWindow::onClearSelectionTriggered);
+  connect(m_invertSelectionAction, &QAction::triggered, this, &MainWindow::onInvertSelectionTriggered);
+  connect(m_toggleLayerVisibilityAction, &QAction::triggered, this, &MainWindow::onToggleLayerVisibilityTriggered);
+  connect(m_brushSizeDownAction, &QAction::triggered, this, &MainWindow::onDecreaseBrushSizeTriggered);
+  connect(m_brushSizeUpAction, &QAction::triggered, this, &MainWindow::onIncreaseBrushSizeTriggered);
   connect(m_addLayerAction, &QAction::triggered, m_controller, &app::bridge::AppController::addLayer);
 
   m_toolStatusLabel = new QLabel("Tool: Brush", this);
@@ -218,6 +260,7 @@ void MainWindow::updateTopToolInfo() {
 
   m_currentToolLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
   m_currentSubToolLabel->setText(QString("Sub Tool: %1").arg(QString::fromStdString(m_controller->currentSubToolDisplayName())));
+  updateToolActionState();
 }
 
 void MainWindow::onUndoTriggered() {
@@ -280,6 +323,66 @@ void MainWindow::onToolStateChanged() {
   }
 
   updateTopToolInfo();
+}
+
+void MainWindow::onSetToolTriggered() {
+  auto* action = qobject_cast<QAction*>(sender());
+  if (action == nullptr || m_controller == nullptr) {
+    return;
+  }
+
+  const QVariant kindValue = action->data();
+  if (!kindValue.isValid()) {
+    return;
+  }
+  m_controller->setCurrentTool(static_cast<core::ToolKind>(kindValue.toInt()));
+}
+
+void MainWindow::onClearSelectionTriggered() {
+  if (m_controller->clearSelection()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onInvertSelectionTriggered() {
+  if (m_controller->invertSelection()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onToggleLayerVisibilityTriggered() {
+  if (m_controller->toggleActiveLayerVisible()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onDecreaseBrushSizeTriggered() {
+  m_controller->adjustBrushSize(-1);
+}
+
+void MainWindow::onIncreaseBrushSizeTriggered() {
+  m_controller->adjustBrushSize(1);
+}
+
+void MainWindow::updateToolActionState() {
+  const core::ToolKind current = m_controller->currentTool();
+  for (const auto& [kind, action] : m_toolActions) {
+    if (action != nullptr) {
+      action->setChecked(kind == current);
+    }
+  }
+}
+
+QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut) {
+  auto* action = new QAction(text, this);
+  action->setCheckable(true);
+  action->setShortcut(shortcut);
+  action->setData(static_cast<int>(kind));
+  action->setToolTip(QString::fromLatin1(core::toolKindDisplayName(kind)));
+  connect(action, &QAction::triggered, this, &MainWindow::onSetToolTriggered);
+  toolMenu->addAction(action);
+  m_toolActions[kind] = action;
+  return action;
 }
 
 } // namespace app::mainwindow
