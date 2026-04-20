@@ -24,9 +24,11 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
   - Line / RectSelection / MoveLayer
   - Hand / Zoom
 - Stroke-level Undo (`Ctrl+Z`) / Redo (`Ctrl+Y`) for drawing and selection updates
-- Tool property panel (color/size for relevant tools) and tool guide display
+- Sub-tool presets for Brush/Eraser (Normal/Hard/Soft/Airbrush etc.)
+- Tool property panel with immediate apply (`size`, `opacity`, `hardness`)
 - Canvas overlay for line preview, selection preview/border, move preview, brush cursor
 - Composited canvas display
+- Tool/selection/layer menu + keyboard shortcuts for core actions
 
 ## Current UI Shell
 
@@ -72,3 +74,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-tests.ps1
 ```
 
 Detailed operational notes are in `docs/build.md`.
+
+## Key Shortcuts
+
+- `B` Brush
+- `E` Eraser
+- `I` Eyedropper
+- `G` Fill
+- `U` Line
+- `R` Rect Selection
+- `M` Move Layer
+- `H` Hand
+- `Z` Zoom
+- `[` / `]` Brush size down/up
+- `Ctrl+Z` Undo
+- `Ctrl+Y` or `Ctrl+Shift+Z` Redo

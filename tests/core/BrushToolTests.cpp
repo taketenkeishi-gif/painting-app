@@ -24,4 +24,16 @@ void runBrushToolTests() {
 
   tool.setSize(0);
   expectTrue(tool.settings().size == 1, "Brush size should clamp to at least 1.");
+
+  core::Layer opacityLayer("Brush Opacity", 16, 16);
+  tool.setOpacity(0.25F);
+  tool.stroke(opacityLayer, core::Point {8, 8}, core::Point {8, 8});
+  const core::Color lowOpacity = opacityLayer.buffer().pixel(8, 8);
+  expectTrue(lowOpacity.a < 255, "Brush opacity setting should reduce resulting alpha.");
+
+  tool.setOpacity(1.0F);
+  core::Layer fullOpacityLayer("Brush Opacity Full", 16, 16);
+  tool.stroke(fullOpacityLayer, core::Point {8, 8}, core::Point {8, 8});
+  const core::Color fullOpacity = fullOpacityLayer.buffer().pixel(8, 8);
+  expectTrue(fullOpacity.a >= lowOpacity.a, "Higher brush opacity should not produce weaker alpha than lower opacity.");
 }

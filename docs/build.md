@@ -75,6 +75,14 @@ After build, run `LayeredPaintApp.exe` and verify:
 11. Draw one stroke, press `Ctrl+Z`, stroke disappears.
 12. Press `Ctrl+Y`, undone stroke returns.
 
+Helper launch script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run.ps1 -Config Debug
+```
+
+Note: In this environment, `windeployqt` may fail under non-ASCII workspace paths. The script falls back to PATH-based Qt runtime and still launches the app.
+
 ## Notes
 
 - `PAINT_BUILD_TESTS=ON` now hard-fails for CMake `< 4.3.1` to avoid a known crash path in this environment.

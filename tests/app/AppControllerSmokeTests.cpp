@@ -77,6 +77,51 @@ int main() {
     const core::Color multiUndo = controller.document().layerAt(1).buffer().pixel(110, 30);
     expectTrue(multiUndo.a == 0, "Multiple undo operations should revert multiple strokes.");
 
+    // Sub-tool presets + descriptor-driven defaults
+    expectTrue(!controller.subToolViewModels().empty(), "Current tool should expose at least one sub-tool.");
+    expectTrue(controller.currentSubToolId() == "brush_normal", "Brush should start with the default sub-tool.");
+    expectTrue(controller.setCurrentSubTool("brush_airbrush"), "Airbrush sub-tool should be selectable.");
+    expectTrue(controller.toolState().size == 24, "Sub-tool default size should be applied.");
+    expectTrue(controller.toolState().opacity == 28, "Sub-tool default opacity should be applied.");
+    expectTrue(controller.toolState().hardness == 10, "Sub-tool default hardness should be applied.");
+    expectTrue(!controller.setCurrentSubTool("invalid_subtool"), "Unknown sub-tool id should be rejected.");
+
+    controller.newDocument(64, 64);
+    controller.setActiveLayer(0);
+    controller.setCurrentTool(core::ToolKind::Brush);
+    controller.setCurrentSubTool("brush_airbrush");
+    controller.setBrushColor(core::Color {255, 0, 0, 255});
+    controller.beginStroke(10, 10);
+    controller.endStroke();
+    const core::Color airbrushPixel = controller.document().layerAt(0).buffer().pixel(10, 10);
+    expectTrue(airbrushPixel.a > 0 && airbrushPixel.a < 200, "Airbrush preset should produce lower opacity than hard brush.");
+
+    controller.newDocument(64, 64);
+    controller.setActiveLayer(0);
+    controller.setCurrentTool(core::ToolKind::Brush);
+    controller.setCurrentSubTool("brush_hard");
+    controller.setBrushColor(core::Color {255, 0, 0, 255});
+    controller.beginStroke(10, 10);
+    controller.endStroke();
+    const core::Color hardBrushPixel = controller.document().layerAt(0).buffer().pixel(10, 10);
+    expectTrue(hardBrushPixel.a > airbrushPixel.a, "Hard brush preset should produce stronger alpha than airbrush.");
+
+    // Property update should reflect immediately in brush behavior.
+    controller.newDocument(64, 64);
+    controller.setActiveLayer(0);
+    controller.setCurrentTool(core::ToolKind::Brush);
+    controller.setCurrentSubTool("brush_normal");
+    controller.setBrushColor(core::Color {0, 0, 255, 255});
+    controller.setBrushOpacity(20);
+    controller.beginStroke(14, 14);
+    controller.endStroke();
+    const core::Color lowOpacityPixel = controller.document().layerAt(0).buffer().pixel(14, 14);
+    controller.setBrushOpacity(100);
+    controller.beginStroke(18, 14);
+    controller.endStroke();
+    const core::Color highOpacityPixel = controller.document().layerAt(0).buffer().pixel(18, 14);
+    expectTrue(highOpacityPixel.a > lowOpacityPixel.a, "Changing opacity via controller should immediately affect stroke result.");
+
     // Tool switching + Brush / Eraser / Fill / MoveLayer / RectSelection + Undo/Redo
     controller.newDocument(64, 64);
     controller.setActiveLayer(0);
@@ -119,6 +164,27 @@ int main() {
     expectTrue(controller.redo(), "Selection change should be redoable.");
     expectTrue(controller.document().selection().contains(8, 8), "Redo should restore selection.");
     expectTrue(controller.undo(), "Selection should be clearable again before move-layer test.");
+
+    controller.beginStroke(6, 6);
+    controller.continueStroke(10, 10);
+    controller.endStroke();
+    expectTrue(controller.clearSelection(), "Clear Selection should clear current selection.");
+    expectTrue(!controller.document().selection().hasSelection(), "Selection should be empty after clear.");
+    expectTrue(controller.undo(), "Clear Selection should be undoable.");
+    expectTrue(controller.document().selection().hasSelection(), "Undo after clear should restore selection.");
+    expectTrue(controller.redo(), "Clear Selection should be redoable.");
+    expectTrue(!controller.document().selection().hasSelection(), "Redo after clear should clear selection again.");
+
+    controller.beginStroke(6, 6);
+    controller.continueStroke(10, 10);
+    controller.endStroke();
+    expectTrue(controller.invertSelection(), "Invert Selection should succeed when mask exists.");
+    expectTrue(controller.document().selection().contains(0, 0), "Invert Selection should select outside area.");
+    expectTrue(controller.undo(), "Invert Selection should be undoable.");
+    expectTrue(!controller.document().selection().contains(0, 0), "Undo should restore original selection mask.");
+    expectTrue(controller.redo(), "Invert Selection should be redoable.");
+    expectTrue(controller.document().selection().contains(0, 0), "Redo should re-apply inverted selection mask.");
+    expectTrue(controller.clearSelection(), "Clear selection should work after invert redo.");
 
     expectTrue(controller.setCurrentTool(core::ToolKind::Brush), "Switching back to Brush should succeed.");
     controller.setBrushColor(core::Color {0, 255, 0, 255});

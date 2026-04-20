@@ -1,31 +1,45 @@
-# Architecture (Phase 1 MVP)
+# Architecture (Current MVP Core)
 
-## 目的
+## Layering
 
-レイヤー付きキャンバス基盤を、UI とコアを分離した状態で成立させる。
+- `src/core`: Qt-independent document/layer/pixel/render/tool logic
+- `src/app`: Qt Widgets shell, input handling, panel wiring
+- `src/platform/qt`: conversion boundary (`PixelBuffer <-> QImage`)
 
-## 層構造
+## App Boundary
 
-- `app` (Qt依存):
-  - `MainWindow`: メニュー・レイアウト
-  - `CanvasWidget`: 表示とマウス入力
-  - `LayerPanel`: レイヤー一覧と操作
-  - `AppController`: UIイベントをコア操作へ変換
-- `core` (Qt非依存):
-  - `PixelBuffer`, `Layer`, `Document`, `Renderer`, `BrushTool`
-- `platform/qt`:
-  - `QtImageConverter`: `PixelBuffer` -> `QImage`
+- `AppController` is the bridge between UI and core.
+- Panels and `CanvasWidget` call `AppController` APIs only.
+- Core types remain Qt-free.
 
-## データフロー
+## Tool System
 
-1. UI が入力を受ける
-2. `AppController` がコア操作へ変換
-3. `Renderer` が全レイヤー合成
-4. `QtImageConverter` が表示用画像へ変換
-5. `CanvasWidget` が再描画
+- Runtime tool switching is handled by `ToolManager` (`core`).
+- UI-facing definitions are data-driven in `app/ui`:
+  - `ToolDescriptor`
+  - `SubToolDescriptor`
+  - `ToolCatalog`
+  - `UiState`
+- Brush/Eraser behavior is driven by sub-tool presets (`size/opacity/hardness/flow/spacing`).
 
-## 設計ルール
+## History Scope
 
-- `core` に Qt 型を入れない
-- `app` から `core` の内部配列を直接触らない
-- 将来の UI 差し替えを想定し、変換は `platform/qt` に限定する
+- Undo/Redo currently covers:
+  - pixel-changing operations (`Brush`, `Eraser`, `Line`, `Fill`, `MoveLayer`)
+  - layer visibility toggle
+  - selection changes (`RectSelection`, clear, invert)
+- History payload is currently snapshot-based (`before/after`) for safety and simplicity.
+
+## UI Shell
+
+- Left: tool selection panel
+- Top: current tool/sub-tool info bar
+- Right: layer + sub-tool + tool-property panels
+- Center: canvas
+- Bottom: status bar (tool, guide, color, size, zoom, active layer)
+
+## Extensibility Direction
+
+- Add new sub-tools through `ToolCatalog` without touching deep UI logic.
+- Add new property controls by extending descriptor keys and `ToolPropertyPanel` bindings.
+- Current structure is prepared for future external definition loading (JSON) without changing core behavior contracts.

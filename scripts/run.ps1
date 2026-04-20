@@ -17,6 +17,9 @@ if (!(Test-Path $WinDeployQtPath)) {
   throw "windeployqt not found: $WinDeployQtPath"
 }
 
+$env:PATH = "$QtPrefix/bin;$env:PATH"
+$env:QT_PLUGIN_PATH = "$QtPrefix/plugins"
+
 & powershell -ExecutionPolicy Bypass -File $buildScript -CMakePath $CMakePath -QtPrefix $QtPrefix -BuildDir $BuildDir -Config $Config
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -36,10 +39,14 @@ if (-not $exePath) {
 }
 
 $deployMode = if ($Config -ieq "Debug") { "--debug" } else { "--release" }
-& $WinDeployQtPath $deployMode --no-translations --compiler-runtime $exePath
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$prevErrorPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $WinDeployQtPath $deployMode --no-translations --compiler-runtime $exePath 2>$null | Out-Null
+$windeployExit = $LASTEXITCODE
+$ErrorActionPreference = $prevErrorPreference
+if ($windeployExit -ne 0) {
+  Write-Warning "windeployqt failed (exit=$windeployExit). Continuing with Qt runtime from PATH."
+}
 
-$env:PATH = "$QtPrefix/bin;$env:PATH"
-$env:QT_PLUGIN_PATH = "$QtPrefix/plugins"
 Start-Process -FilePath $exePath -WorkingDirectory (Split-Path -Parent $exePath) | Out-Null
 Write-Host "Application launched: $exePath"
