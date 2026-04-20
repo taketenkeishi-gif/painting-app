@@ -31,6 +31,7 @@ public:
   LayerKind kind() const noexcept { return m_kind; }
   bool isRaster() const noexcept { return m_kind == LayerKind::Raster; }
   bool isVector() const noexcept { return m_kind == LayerKind::Vector; }
+  void setKind(LayerKind kind) noexcept { m_kind = kind; }
 
   bool visible() const noexcept { return m_visible; }
   void setVisible(bool visible) noexcept { m_visible = visible; }
@@ -46,6 +47,7 @@ public:
   void addVectorPath(VectorPath path);
   void clearVectorPaths() noexcept;
   void moveVectorPathsBy(int dx, int dy) noexcept;
+  void resetRasterBuffer(Color fill = Color::Transparent()) noexcept;
 
 private:
   std::string m_name;

@@ -4,15 +4,19 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QClipboard>
 #include <QColorDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QFrame>
+#include <QGuiApplication>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QImage>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -180,10 +184,18 @@ void MainWindow::createMenus() {
   auto* helpMenu = menuBar()->addMenu("&Help");
 
   m_newCanvasAction = new QAction("&New Canvas", this);
-  auto* exportPngAction = new QAction("Export &PNG...", this);
+  m_openAction = new QAction("&Open...", this);
+  m_saveAction = new QAction("&Save", this);
+  m_saveAsAction = new QAction("Save &As...", this);
+  m_exportPngAction = new QAction("Export &PNG...", this);
   auto* closeAction = new QAction("&Close", this);
   m_undoAction = new QAction("&Undo", this);
   m_redoAction = new QAction("&Redo", this);
+  m_cutAction = new QAction("Cu&t", this);
+  m_copyAction = new QAction("&Copy", this);
+  m_pasteAction = new QAction("&Paste", this);
+  m_deletePixelsAction = new QAction("&Delete Pixels", this);
+  m_fillAction = new QAction("&Fill", this);
   m_addLayerAction = new QAction("&New Raster Layer", this);
   m_addRasterLayerAction = m_addLayerAction;
   m_addVectorLayerAction = new QAction("New &Vector Layer", this);
@@ -192,6 +204,11 @@ void MainWindow::createMenus() {
   m_moveLayerUpAction = new QAction("Move Layer &Up", this);
   m_moveLayerDownAction = new QAction("Move Layer &Down", this);
   m_toggleLayerVisibilityAction = new QAction("&Toggle Visibility", this);
+  m_mergeDownAction = new QAction("&Merge Down", this);
+  m_rasterizeLayerAction = new QAction("&Rasterize Layer", this);
+
+  m_selectAllAction = new QAction("Select &All", this);
+  m_deselectAction = new QAction("&Deselect", this);
   m_clearSelectionAction = new QAction("&Clear Selection", this);
   m_invertSelectionAction = new QAction("&Invert Selection", this);
   m_brushSizeDownAction = new QAction("Brush Size &Down", this);
@@ -203,11 +220,21 @@ void MainWindow::createMenus() {
   m_resetWorkspaceAction = new QAction("&Reset Workspace", this);
   auto* aboutAction = new QAction("&About", this);
 
+  m_recentFilesMenu = fileMenu->addMenu("Recent Files");
+
   m_newCanvasAction->setShortcut(QKeySequence::New);
-  exportPngAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
+  m_openAction->setShortcut(QKeySequence::Open);
+  m_saveAction->setShortcut(QKeySequence::Save);
+  m_saveAsAction->setShortcut(QKeySequence::SaveAs);
+  m_exportPngAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
   closeAction->setShortcut(QKeySequence::Close);
   m_undoAction->setShortcut(QKeySequence::Undo);
   m_redoAction->setShortcuts({QKeySequence::Redo, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
+  m_cutAction->setShortcut(QKeySequence::Cut);
+  m_copyAction->setShortcut(QKeySequence::Copy);
+  m_pasteAction->setShortcut(QKeySequence::Paste);
+  m_deletePixelsAction->setShortcut(QKeySequence(Qt::Key_Delete));
+  m_fillAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Backspace));
   m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
   m_addVectorLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_N));
   m_duplicateLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
@@ -215,6 +242,10 @@ void MainWindow::createMenus() {
   m_moveLayerUpAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Up));
   m_moveLayerDownAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Down));
   m_toggleLayerVisibilityAction->setShortcut(QKeySequence(Qt::Key_V));
+  m_mergeDownAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+  m_rasterizeLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_R));
+  m_selectAllAction->setShortcut(QKeySequence::SelectAll);
+  m_deselectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
   m_clearSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
   m_invertSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
   m_brushSizeDownAction->setShortcut(QKeySequence(Qt::Key_BracketLeft));
@@ -226,11 +257,25 @@ void MainWindow::createMenus() {
   m_resetWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
 
   fileMenu->addAction(m_newCanvasAction);
-  fileMenu->addAction(exportPngAction);
+  fileMenu->addAction(m_openAction);
+  fileMenu->addAction(m_saveAction);
+  fileMenu->addAction(m_saveAsAction);
+  fileMenu->addSeparator();
+  fileMenu->addAction(m_exportPngAction);
+  if (m_recentFilesMenu != nullptr) {
+    rebuildRecentFilesMenu();
+    fileMenu->addMenu(m_recentFilesMenu);
+  }
   fileMenu->addSeparator();
   fileMenu->addAction(closeAction);
   editMenu->addAction(m_undoAction);
   editMenu->addAction(m_redoAction);
+  editMenu->addSeparator();
+  editMenu->addAction(m_cutAction);
+  editMenu->addAction(m_copyAction);
+  editMenu->addAction(m_pasteAction);
+  editMenu->addAction(m_deletePixelsAction);
+  editMenu->addAction(m_fillAction);
   editMenu->addSeparator();
   editMenu->addAction(m_brushSizeDownAction);
   editMenu->addAction(m_brushSizeUpAction);
@@ -252,12 +297,16 @@ void MainWindow::createMenus() {
   bindTool(core::ToolKind::Zoom, "&Zoom", QKeySequence(Qt::Key_Z));
 
   selectMenu->addAction(m_clearSelectionAction);
+  selectMenu->addAction(m_selectAllAction);
+  selectMenu->addAction(m_deselectAction);
   selectMenu->addAction(m_invertSelectionAction);
 
   layerMenu->addAction(m_addRasterLayerAction);
   layerMenu->addAction(m_addVectorLayerAction);
   layerMenu->addAction(m_duplicateLayerAction);
   layerMenu->addAction(m_deleteLayerAction);
+  layerMenu->addAction(m_mergeDownAction);
+  layerMenu->addAction(m_rasterizeLayerAction);
   layerMenu->addSeparator();
   layerMenu->addAction(m_moveLayerUpAction);
   layerMenu->addAction(m_moveLayerDownAction);
@@ -292,18 +341,21 @@ void MainWindow::createMenus() {
   helpMenu->addAction(aboutAction);
 
   connect(m_newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
-  connect(exportPngAction, &QAction::triggered, this, [this]() {
-    const QString path = QFileDialog::getSaveFileName(this, "Export PNG", QString(), "PNG Image (*.png)");
-    if (path.isEmpty()) {
-      return;
-    }
-    const QImage image = platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
-    image.save(path, "PNG");
-  });
+  connect(m_openAction, &QAction::triggered, this, &MainWindow::onOpenTriggered);
+  connect(m_saveAction, &QAction::triggered, this, &MainWindow::onSaveTriggered);
+  connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::onSaveAsTriggered);
+  connect(m_exportPngAction, &QAction::triggered, this, &MainWindow::onExportPngTriggered);
   connect(closeAction, &QAction::triggered, this, &QWidget::close);
   connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndoTriggered);
   connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedoTriggered);
+  connect(m_cutAction, &QAction::triggered, this, &MainWindow::onCutTriggered);
+  connect(m_copyAction, &QAction::triggered, this, &MainWindow::onCopyTriggered);
+  connect(m_pasteAction, &QAction::triggered, this, &MainWindow::onPasteTriggered);
+  connect(m_deletePixelsAction, &QAction::triggered, this, &MainWindow::onDeletePixelsTriggered);
+  connect(m_fillAction, &QAction::triggered, this, &MainWindow::onFillTriggered);
   connect(m_clearSelectionAction, &QAction::triggered, this, &MainWindow::onClearSelectionTriggered);
+  connect(m_selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllTriggered);
+  connect(m_deselectAction, &QAction::triggered, this, &MainWindow::onDeselectTriggered);
   connect(m_invertSelectionAction, &QAction::triggered, this, &MainWindow::onInvertSelectionTriggered);
   connect(m_toggleLayerVisibilityAction, &QAction::triggered, this, &MainWindow::onToggleLayerVisibilityTriggered);
   connect(m_moveLayerUpAction, &QAction::triggered, this, &MainWindow::onMoveLayerUpTriggered);
@@ -314,6 +366,8 @@ void MainWindow::createMenus() {
   connect(m_addVectorLayerAction, &QAction::triggered, this, &MainWindow::onAddVectorLayerTriggered);
   connect(m_duplicateLayerAction, &QAction::triggered, this, &MainWindow::onDuplicateLayerTriggered);
   connect(m_deleteLayerAction, &QAction::triggered, this, &MainWindow::onDeleteLayerTriggered);
+  connect(m_mergeDownAction, &QAction::triggered, this, &MainWindow::onMergeDownTriggered);
+  connect(m_rasterizeLayerAction, &QAction::triggered, this, &MainWindow::onRasterizeLayerTriggered);
   connect(m_zoomInAction, &QAction::triggered, this, &MainWindow::onZoomInTriggered);
   connect(m_zoomOutAction, &QAction::triggered, this, &MainWindow::onZoomOutTriggered);
   connect(m_resetZoomAction, &QAction::triggered, this, &MainWindow::onResetZoomTriggered);
@@ -356,6 +410,8 @@ void MainWindow::createToolBar() {
   m_quickToolBar->setIconSize(QSize(18, 18));
 
   m_newCanvasAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
+  m_openAction->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
+  m_saveAction->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
   m_undoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
   m_redoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
   m_addRasterLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
@@ -369,6 +425,8 @@ void MainWindow::createToolBar() {
   m_zoomOutAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
 
   m_quickToolBar->addAction(m_newCanvasAction);
+  m_quickToolBar->addAction(m_openAction);
+  m_quickToolBar->addAction(m_saveAction);
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_undoAction);
   m_quickToolBar->addAction(m_redoAction);
@@ -526,6 +584,54 @@ void MainWindow::onToolStateChanged() {
   updateTopToolInfo();
 }
 
+void MainWindow::onOpenTriggered() {
+  const QString path = QFileDialog::getOpenFileName(
+      this,
+      "Open Image",
+      m_currentFilePath.isEmpty() ? QString() : QFileInfo(m_currentFilePath).absolutePath(),
+      "Image Files (*.png *.jpg *.jpeg *.bmp)");
+  if (path.isEmpty()) {
+    return;
+  }
+  openImageFile(path);
+}
+
+void MainWindow::onSaveTriggered() {
+  if (m_currentFilePath.isEmpty()) {
+    onSaveAsTriggered();
+    return;
+  }
+  if (saveImageFile(m_currentFilePath)) {
+    statusBar()->showMessage(QString("Saved: %1").arg(m_currentFilePath), 2500);
+  }
+}
+
+void MainWindow::onSaveAsTriggered() {
+  const QString path = QFileDialog::getSaveFileName(
+      this,
+      "Save Image",
+      m_currentFilePath,
+      "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg);;BMP Image (*.bmp)");
+  if (path.isEmpty()) {
+    return;
+  }
+  if (saveImageFile(path)) {
+    m_currentFilePath = path;
+    pushRecentFile(path);
+    statusBar()->showMessage(QString("Saved: %1").arg(path), 2500);
+  }
+}
+
+void MainWindow::onExportPngTriggered() {
+  const QString path = QFileDialog::getSaveFileName(this, "Export PNG", QString(), "PNG Image (*.png)");
+  if (path.isEmpty()) {
+    return;
+  }
+  if (saveImageFile(path)) {
+    statusBar()->showMessage(QString("Exported: %1").arg(path), 2500);
+  }
+}
+
 void MainWindow::onSetToolTriggered() {
   auto* action = qobject_cast<QAction*>(sender());
   if (action == nullptr || m_controller == nullptr) {
@@ -537,6 +643,56 @@ void MainWindow::onSetToolTriggered() {
     return;
   }
   m_controller->setCurrentTool(static_cast<core::ToolKind>(kindValue.toInt()));
+}
+
+void MainWindow::onCutTriggered() {
+  onCopyTriggered();
+  onDeletePixelsTriggered();
+}
+
+void MainWindow::onCopyTriggered() {
+  const core::PixelBuffer copied = m_controller->exportSelectionOrCanvasFromComposite();
+  if (copied.width() <= 0 || copied.height() <= 0) {
+    return;
+  }
+  QGuiApplication::clipboard()->setImage(platform::qt::QtImageConverter::toQImage(copied));
+  statusBar()->showMessage("Copied to clipboard", 1500);
+}
+
+void MainWindow::onPasteTriggered() {
+  const QImage image = QGuiApplication::clipboard()->image();
+  if (image.isNull()) {
+    statusBar()->showMessage("Clipboard has no image", 1500);
+    return;
+  }
+  const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
+  if (m_controller->pasteBufferAsNewRasterLayer(buffer, "Pasted Layer")) {
+    statusBar()->showMessage("Pasted as new raster layer", 1500);
+  }
+}
+
+void MainWindow::onDeletePixelsTriggered() {
+  if (m_controller->deleteSelectionPixels()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onFillTriggered() {
+  if (m_controller->fillSelectionOrCanvas()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onSelectAllTriggered() {
+  if (m_controller->selectAll()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onDeselectTriggered() {
+  if (m_controller->deselect()) {
+    updateUndoRedoState();
+  }
 }
 
 void MainWindow::onClearSelectionTriggered() {
@@ -586,6 +742,18 @@ void MainWindow::onDeleteLayerTriggered() {
     return;
   }
   m_controller->removeLayer(m_controller->document().activeLayerIndex());
+}
+
+void MainWindow::onMergeDownTriggered() {
+  if (m_controller->mergeActiveLayerDown()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onRasterizeLayerTriggered() {
+  if (m_controller->rasterizeActiveLayer()) {
+    updateUndoRedoState();
+  }
 }
 
 void MainWindow::onDecreaseBrushSizeTriggered() {
@@ -676,6 +844,64 @@ void MainWindow::updateToolActionState() {
       action->setChecked(kind == current);
       action->setEnabled(m_controller->canUseToolOnActiveLayer(kind));
     }
+  }
+}
+
+bool MainWindow::openImageFile(const QString& path) {
+  QImage image(path);
+  if (image.isNull()) {
+    statusBar()->showMessage(QString("Open failed: %1").arg(path), 2500);
+    return false;
+  }
+  const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
+  const QFileInfo info(path);
+  m_controller->importFlattenedBuffer(buffer, info.completeBaseName().toStdString());
+  m_currentFilePath = path;
+  pushRecentFile(path);
+  statusBar()->showMessage(QString("Opened: %1").arg(path), 2500);
+  return true;
+}
+
+bool MainWindow::saveImageFile(const QString& path) {
+  if (path.isEmpty()) {
+    return false;
+  }
+  const QImage image = platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
+  const bool ok = image.save(path);
+  if (!ok) {
+    statusBar()->showMessage(QString("Save failed: %1").arg(path), 2500);
+    return false;
+  }
+  return true;
+}
+
+void MainWindow::pushRecentFile(const QString& path) {
+  if (path.isEmpty()) {
+    return;
+  }
+  m_recentFiles.removeAll(path);
+  m_recentFiles.prepend(path);
+  while (m_recentFiles.size() > 8) {
+    m_recentFiles.removeLast();
+  }
+  rebuildRecentFilesMenu();
+}
+
+void MainWindow::rebuildRecentFilesMenu() {
+  if (m_recentFilesMenu == nullptr) {
+    return;
+  }
+  m_recentFilesMenu->clear();
+  if (m_recentFiles.isEmpty()) {
+    QAction* empty = m_recentFilesMenu->addAction("(No recent files)");
+    empty->setEnabled(false);
+    return;
+  }
+  for (const QString& path : m_recentFiles) {
+    QAction* action = m_recentFilesMenu->addAction(path);
+    connect(action, &QAction::triggered, this, [this, path]() {
+      openImageFile(path);
+    });
   }
 }
 

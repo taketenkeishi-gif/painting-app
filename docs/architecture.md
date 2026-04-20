@@ -31,6 +31,7 @@
   - `Vector`: path list (`VectorPath`) rendered at composite time
 - `LineTool` writes vector paths on vector layers and raster pixels on raster layers.
 - `Renderer` rasterizes vector paths into a temporary buffer and composites it with standard alpha blending.
+- Layer order changes are centralized in `Document::moveLayer` and consumed by both button moves and LayerPanel drag/drop reorder.
 
 ## History Scope
 
@@ -48,6 +49,8 @@
   - Center: Canvas
   - Bottom: status bar
 - `Window` menu controls panel visibility and supports reset workspace.
+- File/Edit menus are wired to controller-level operations (selection fill/delete, merge/rasterize, clipboard image import/export as raster layer).
+- Tool/sub-tool/property panels surface layer-kind compatibility through enabled/disabled state, so raster/vector mismatches are visible before execution.
 
 ## Extensibility Direction
 

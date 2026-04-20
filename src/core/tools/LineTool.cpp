@@ -21,7 +21,7 @@ ToolResult LineTool::onPointerMove(ToolContext& context, const ToolPointerEvent&
   if (!m_drawing) {
     return {};
   }
-  m_current = event.point;
+  m_current = snappedPoint(m_start, event.point);
   ToolResult result;
   result.viewportChanged = true;
   return result;
@@ -32,7 +32,7 @@ ToolResult LineTool::onPointerRelease(ToolContext& context, const ToolPointerEve
     return {};
   }
   m_drawing = false;
-  m_current = event.point;
+  m_current = snappedPoint(m_start, event.point);
 
   Layer* active = context.document.activeLayer();
   if (active == nullptr) {
@@ -48,6 +48,25 @@ ToolResult LineTool::onPointerRelease(ToolContext& context, const ToolPointerEve
   result.pixelsChanged = true;
   result.viewportChanged = true;
   return result;
+}
+
+Point LineTool::snappedPoint(const Point& start, const Point& rawEnd) const {
+  if (m_snapAngleDegrees <= 0 || m_snapAngleDegrees >= 180) {
+    return rawEnd;
+  }
+  const float dx = static_cast<float>(rawEnd.x - start.x);
+  const float dy = static_cast<float>(rawEnd.y - start.y);
+  if (std::abs(dx) < 0.001F && std::abs(dy) < 0.001F) {
+    return rawEnd;
+  }
+  const float distance = std::hypot(dx, dy);
+  const float angle = std::atan2(dy, dx);
+  constexpr float kPi = 3.14159265358979323846F;
+  const float step = static_cast<float>(m_snapAngleDegrees) * kPi / 180.0F;
+  const float snapped = std::round(angle / step) * step;
+  return Point {
+      static_cast<int>(std::lround(static_cast<float>(start.x) + std::cos(snapped) * distance)),
+      static_cast<int>(std::lround(static_cast<float>(start.y) + std::sin(snapped) * distance))};
 }
 
 ToolResult LineTool::onCancel(ToolContext& context) {

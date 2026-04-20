@@ -65,15 +65,16 @@ After build, run `LayeredPaintApp.exe` and verify:
 1. Window opens with `left/right dock panels + center canvas + bottom status`.
 2. Window menu can hide/show docks and `Reset Workspace` restores default layout.
 3. New Canvas changes width and height.
-4. Layer panel can add Raster/Vector layers, duplicate, delete, and reorder.
+4. Layer panel can add Raster/Vector layers, duplicate, delete, and reorder (buttons + drag/drop).
 5. Selecting another layer changes active highlight and draw target; row prefix shows `[R]` or `[V]`.
 6. Visibility checkbox toggles composited display.
 7. Brush on Vector layer is blocked (status guide shows compatibility hint).
 8. Line tool on Vector layer creates vector path and appears in composited canvas.
 9. Sub-tool panel supports duplicate/rename/delete/reset.
-10. Tool property panel applies changes immediately.
+10. Tool property panel applies changes immediately (including angle/roundness/taper and line snap/simplify where supported).
 11. Draw one stroke, press `Ctrl+Z`, stroke disappears.
 12. Press `Ctrl+Y`, undone stroke returns.
+13. File/Edit menus work for implemented operations (`Open`, `Save`, `Save As`, `Copy/Paste image`, `Fill`, `Delete Pixels`, `Merge Down`, `Rasterize Layer`).
 
 Helper launch script:
 

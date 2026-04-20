@@ -248,6 +248,20 @@ int main() {
     expectTrue(controller.document().layerAt(1).vectorPaths().empty(), "Undo should remove vector path.");
     expectTrue(controller.redo(), "Vector line stroke should be redoable.");
     expectTrue(!controller.document().layerAt(1).vectorPaths().empty(), "Redo should restore vector path.");
+    expectTrue(controller.setCurrentSubTool("line_vector_snap"), "Vector snap preset should be selectable.");
+    controller.setLineSnapAngle(45);
+    controller.beginStroke(10, 10);
+    controller.continueStroke(20, 12);
+    controller.endStroke();
+    const auto& snappedPath = controller.document().layerAt(1).vectorPaths().back();
+    expectTrue(snappedPath.points.size() >= 2, "Vector snap stroke should produce at least two points.");
+    expectTrue(snappedPath.points[0].y == snappedPath.points[1].y || snappedPath.points[0].x == snappedPath.points[1].x ||
+                   std::abs(snappedPath.points[1].x - snappedPath.points[0].x) ==
+                       std::abs(snappedPath.points[1].y - snappedPath.points[0].y),
+               "Snap angle should quantize vector line direction.");
+
+    const auto brushSubToolsOnVector = controller.subToolViewModels();
+    expectTrue(!brushSubToolsOnVector.empty(), "Sub tool list should remain available on vector layer.");
 
     // Sub-tool management operations
     controller.setCurrentTool(core::ToolKind::Brush);
@@ -263,6 +277,25 @@ int main() {
     controller.setBrushSize(77);
     expectTrue(controller.resetCurrentSubTool(), "Reset sub-tool should restore default descriptor values.");
     expectTrue(controller.toolState().size == 6, "Reset hard brush should restore default size.");
+
+    controller.newDocument(40, 30);
+    expectTrue(controller.selectAll(), "Select All should create a full-canvas selection.");
+    expectTrue(controller.document().selection().contains(0, 0), "Select All should include origin pixel.");
+    expectTrue(controller.deselect(), "Deselect should clear active selection.");
+    expectTrue(!controller.document().selection().hasSelection(), "Selection should be cleared after deselect.");
+
+    controller.addVectorLayer();
+    controller.setActiveLayer(1);
+    controller.setCurrentTool(core::ToolKind::Line);
+    controller.setCurrentSubTool("line_vector");
+    controller.beginStroke(2, 2);
+    controller.continueStroke(20, 2);
+    controller.endStroke();
+    expectTrue(controller.document().layerAt(1).kind() == core::LayerKind::Vector, "Vector layer should keep vector kind before rasterize.");
+    expectTrue(controller.rasterizeActiveLayer(), "Rasterize active layer should convert vector to raster.");
+    expectTrue(controller.document().layerAt(1).kind() == core::LayerKind::Raster, "Rasterize should switch layer kind to raster.");
+    expectTrue(controller.mergeActiveLayerDown(), "Merge down should succeed for non-bottom layer.");
+    expectTrue(controller.document().layerCount() == 1, "Merge down should reduce layer count by one.");
 
     std::cout << "App smoke tests passed.\n";
     return 0;

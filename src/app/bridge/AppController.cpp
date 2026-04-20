@@ -93,7 +93,9 @@ AppController::AppController(QObject* parent)
   m_toolManager.registerTool(std::make_unique<core::EyedropperTool>());
   m_toolManager.registerTool(std::make_unique<core::HandTool>());
   m_toolManager.registerTool(std::make_unique<core::ZoomTool>());
-  m_toolManager.registerTool(std::make_unique<core::LineTool>());
+  auto line = std::make_unique<core::LineTool>();
+  m_lineTool = line.get();
+  m_toolManager.registerTool(std::move(line));
   m_toolManager.registerTool(std::make_unique<core::RectSelectionTool>());
   m_toolManager.registerTool(std::make_unique<core::FillTool>());
   m_toolManager.registerTool(std::make_unique<core::MoveLayerTool>());
@@ -146,9 +148,17 @@ std::vector<SubToolViewModel> AppController::subToolViewModels() const {
   }
 
   const std::string selectedId = currentSubToolId();
+  const core::Layer* active = m_document.activeLayer();
+  const core::LayerKind activeKind = active == nullptr ? core::LayerKind::Raster : active->kind();
   models.reserve(descriptor->subTools.size());
   for (const app::ui::SubToolDescriptor& sub : descriptor->subTools) {
-    models.push_back(SubToolViewModel {sub.id, sub.displayName, sub.id == selectedId});
+    const bool enabled = isSubToolCompatibleWithLayerKind(sub, activeKind);
+    models.push_back(SubToolViewModel {
+        sub.id,
+        sub.displayName,
+        sub.id == selectedId,
+        enabled,
+        enabled ? std::string {} : std::string {"Layer kind mismatch"}});
   }
   return models;
 }
@@ -157,12 +167,19 @@ ToolStateViewModel AppController::toolState() const noexcept {
   return ToolStateViewModel {
       m_currentColor,
       m_uiState.size,
+      m_uiState.size,
       m_uiState.opacity,
       m_uiState.hardness,
       m_uiState.flow,
       m_uiState.spacing,
+      m_uiState.angle,
+      m_uiState.roundness,
+      m_uiState.taperStart,
+      m_uiState.taperEnd,
       m_uiState.antiAlias,
       m_uiState.stabilization,
+      m_uiState.snapAngle,
+      m_uiState.simplifyLevel,
       m_uiState.postCorrection,
       m_uiState.velocityBasedCorrection,
       m_uiState.shapeType,
@@ -229,6 +246,93 @@ bool AppController::duplicateActiveLayer() {
     return false;
   }
   return duplicateLayer(m_document.activeLayerIndex());
+}
+
+bool AppController::mergeLayerDown(std::size_t index) {
+  if (index == 0 || index >= m_document.layerCount()) {
+    return false;
+  }
+
+  const core::Size size = m_document.canvasSize();
+  core::Document temp(size.width, size.height);
+  temp.layerAt(0) = m_document.layerAt(index - 1);
+  temp.layerAt(0).setVisible(true);
+  temp.addLayer("MergeTop", m_document.layerAt(index).kind());
+  temp.layerAt(1) = m_document.layerAt(index);
+  temp.layerAt(1).setVisible(true);
+
+  core::PixelBuffer merged = m_renderer.composite(temp);
+  core::Layer& dst = m_document.layerAt(index - 1);
+  dst.setKind(core::LayerKind::Raster);
+  dst.clearVectorPaths();
+  dst.buffer() = std::move(merged);
+  dst.setOpacity(1.0F);
+  dst.setVisible(true);
+
+  m_document.removeLayer(index);
+  m_document.setActiveLayer(index - 1);
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::mergeActiveLayerDown() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  return mergeLayerDown(m_document.activeLayerIndex());
+}
+
+bool AppController::rasterizeLayer(std::size_t index) {
+  if (index >= m_document.layerCount()) {
+    return false;
+  }
+  core::Layer& layer = m_document.layerAt(index);
+  if (layer.kind() == core::LayerKind::Raster) {
+    return false;
+  }
+
+  const core::Layer before = layer;
+  const core::Size size = m_document.canvasSize();
+  core::Document temp(size.width, size.height);
+  temp.layerAt(0) = layer;
+  temp.layerAt(0).setVisible(true);
+  temp.layerAt(0).setOpacity(1.0F);
+  const core::PixelBuffer raster = m_renderer.composite(temp);
+
+  layer.setKind(core::LayerKind::Raster);
+  layer.clearVectorPaths();
+  layer.buffer() = raster;
+
+  const core::Layer after = layer;
+  if (!layersEqual(before, after)) {
+    StrokeHistoryEntry entry;
+    entry.kind = HistoryKind::Stroke;
+    entry.actionName = "Rasterize";
+    entry.layerIndex = index;
+    entry.beforeLayer = before;
+    entry.afterLayer = after;
+    pushHistoryEntry(std::move(entry));
+  }
+
+  ensureCurrentSubToolCompatibility();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::rasterizeActiveLayer() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  return rasterizeLayer(m_document.activeLayerIndex());
 }
 
 bool AppController::removeLayer(std::size_t index) {
@@ -382,12 +486,178 @@ bool AppController::clearSelection() {
   return true;
 }
 
+bool AppController::selectAll() {
+  const core::SelectionMask before = m_document.selection();
+  const core::Size size = m_document.canvasSize();
+  const bool changed = m_document.selection().setRect(core::Rect {0, 0, size.width, size.height});
+  if (!changed) {
+    return false;
+  }
+  pushSelectionHistoryIfChanged(before, "Selection");
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::deselect() {
+  return clearSelection();
+}
+
 bool AppController::invertSelection() {
   const core::SelectionMask before = m_document.selection();
   if (!m_document.selection().invert()) {
     return false;
   }
   pushSelectionHistoryIfChanged(before, "Selection");
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::fillSelectionOrCanvas() {
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || active->kind() != core::LayerKind::Raster) {
+    return false;
+  }
+
+  const core::Layer before = *active;
+  const core::SelectionMask& selection = m_document.selection();
+  if (selection.hasSelection()) {
+    for (int y = 0; y < active->buffer().height(); ++y) {
+      for (int x = 0; x < active->buffer().width(); ++x) {
+        if (selection.contains(x, y)) {
+          active->buffer().setPixel(x, y, m_currentColor);
+        }
+      }
+    }
+  } else {
+    active->buffer().fill(m_currentColor);
+  }
+
+  const core::Layer after = *active;
+  if (layersEqual(before, after)) {
+    return false;
+  }
+
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Fill";
+  entry.layerIndex = m_document.activeLayerIndex();
+  entry.beforeLayer = before;
+  entry.afterLayer = after;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::deleteSelectionPixels() {
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || active->kind() != core::LayerKind::Raster) {
+    return false;
+  }
+
+  const core::Layer before = *active;
+  const core::SelectionMask& selection = m_document.selection();
+  if (selection.hasSelection()) {
+    for (int y = 0; y < active->buffer().height(); ++y) {
+      for (int x = 0; x < active->buffer().width(); ++x) {
+        if (selection.contains(x, y)) {
+          active->buffer().setPixel(x, y, core::Color::Transparent());
+        }
+      }
+    }
+  } else {
+    active->buffer().fill(core::Color::Transparent());
+  }
+
+  const core::Layer after = *active;
+  if (layersEqual(before, after)) {
+    return false;
+  }
+
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Delete";
+  entry.layerIndex = m_document.activeLayerIndex();
+  entry.beforeLayer = before;
+  entry.afterLayer = after;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit documentChanged();
+  return true;
+}
+
+core::PixelBuffer AppController::exportSelectionOrCanvasFromComposite() const {
+  const core::SelectionMask& selection = m_document.selection();
+  if (!selection.hasSelection()) {
+    return m_composited;
+  }
+
+  const std::optional<core::Rect> bounds = selection.boundingRect();
+  if (!bounds.has_value()) {
+    return m_composited;
+  }
+  const core::Rect rect = *bounds;
+  core::PixelBuffer cropped(rect.width, rect.height, core::Color::Transparent());
+  for (int y = 0; y < rect.height; ++y) {
+    for (int x = 0; x < rect.width; ++x) {
+      const int sx = rect.x + x;
+      const int sy = rect.y + y;
+      if (!m_composited.inBounds(sx, sy) || !selection.contains(sx, sy)) {
+        continue;
+      }
+      cropped.setPixel(x, y, m_composited.pixel(sx, sy));
+    }
+  }
+  return cropped;
+}
+
+void AppController::importFlattenedBuffer(const core::PixelBuffer& buffer, const std::string& layerName) {
+  if (buffer.width() <= 0 || buffer.height() <= 0) {
+    return;
+  }
+  m_document = core::Document(buffer.width(), buffer.height());
+  core::Layer& base = m_document.layerAt(0);
+  base.buffer() = buffer;
+  base.setKind(core::LayerKind::Raster);
+  base.clearVectorPaths();
+  if (!layerName.empty()) {
+    base.setName(layerName);
+  }
+  m_layerCounter = 1;
+  ensureCurrentSubToolCompatibility();
+  m_stroking = false;
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+}
+
+bool AppController::pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName) {
+  if (buffer.width() <= 0 || buffer.height() <= 0) {
+    return false;
+  }
+  ++m_layerCounter;
+  const std::string finalName = layerName.empty() ? ("Layer " + std::to_string(m_layerCounter)) : layerName;
+  const std::size_t index = m_document.addRasterLayer(finalName);
+  core::Layer& layer = m_document.layerAt(index);
+  layer.buffer().fill(core::Color::Transparent());
+  for (int y = 0; y < buffer.height(); ++y) {
+    for (int x = 0; x < buffer.width(); ++x) {
+      if (!layer.buffer().inBounds(x, y)) {
+        continue;
+      }
+      layer.buffer().setPixel(x, y, buffer.pixel(x, y));
+    }
+  }
+  m_document.setActiveLayer(index);
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
   emit documentChanged();
   return true;
 }
@@ -557,61 +827,147 @@ std::string AppController::currentLayerCompatibilityHint() const {
 }
 
 bool AppController::currentToolSupportsColor() const noexcept {
-  return !m_uiState.eraseMode && containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Color);
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return !m_uiState.eraseMode &&
+         containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Color);
 }
 
 bool AppController::currentToolSupportsSize() const noexcept {
-  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Size);
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Size) ||
+         containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::StrokeWidth);
 }
 
 bool AppController::currentToolSupportsOpacity() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Opacity);
 }
 
 bool AppController::currentToolSupportsHardness() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Hardness);
 }
 
 bool AppController::currentToolSupportsFlow() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Flow);
 }
 
 bool AppController::currentToolSupportsSpacing() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Spacing);
 }
 
 bool AppController::currentToolSupportsAntiAlias() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::AntiAlias);
 }
 
 bool AppController::currentToolSupportsStabilization() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Stabilization);
 }
 
 bool AppController::currentToolSupportsPostCorrection() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::PostCorrection);
 }
 
 bool AppController::currentToolSupportsVelocityCorrection() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::VelocityCorrection);
 }
 
 bool AppController::currentToolSupportsShapeType() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::ShapeType);
 }
 
+bool AppController::currentToolSupportsAngle() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Angle);
+}
+
+bool AppController::currentToolSupportsRoundness() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Roundness);
+}
+
+bool AppController::currentToolSupportsTaperStart() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::TaperStart);
+}
+
+bool AppController::currentToolSupportsTaperEnd() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::TaperEnd);
+}
+
 bool AppController::currentToolSupportsBlendMode() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return !m_uiState.eraseMode &&
          containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::BlendMode);
 }
 
 bool AppController::currentToolSupportsEraseMode() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::EraseMode);
 }
 
 bool AppController::currentToolSupportsLockAlphaRespect() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
   return !m_uiState.eraseMode &&
          containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::LockAlphaRespect);
+}
+
+bool AppController::currentToolSupportsSnapAngle() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::SnapAngle);
+}
+
+bool AppController::currentToolSupportsSimplifyLevel() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::SimplifyLevel);
 }
 
 void AppController::beginStroke(int x, int y) {
@@ -952,6 +1308,42 @@ void AppController::setBrushShapeType(core::BrushShapeType shapeType) {
   emit toolStateChanged();
 }
 
+void AppController::setBrushAngle(int angle) {
+  const int normalized = std::clamp(angle, -180, 180);
+  if (m_uiState.angle == normalized) {
+    return;
+  }
+  m_uiState.angle = normalized;
+  emit toolStateChanged();
+}
+
+void AppController::setBrushRoundness(int roundness) {
+  const int normalized = clampPercent(roundness);
+  if (m_uiState.roundness == normalized) {
+    return;
+  }
+  m_uiState.roundness = normalized;
+  emit toolStateChanged();
+}
+
+void AppController::setBrushTaperStart(int taperStart) {
+  const int normalized = clampPercent(taperStart);
+  if (m_uiState.taperStart == normalized) {
+    return;
+  }
+  m_uiState.taperStart = normalized;
+  emit toolStateChanged();
+}
+
+void AppController::setBrushTaperEnd(int taperEnd) {
+  const int normalized = clampPercent(taperEnd);
+  if (m_uiState.taperEnd == normalized) {
+    return;
+  }
+  m_uiState.taperEnd = normalized;
+  emit toolStateChanged();
+}
+
 void AppController::setBrushBlendMode(core::BlendMode blendMode) {
   if (m_uiState.blendMode == blendMode) {
     return;
@@ -976,6 +1368,25 @@ void AppController::setBrushLockAlphaRespect(bool enabled) {
   }
   m_uiState.lockAlphaRespect = enabled;
   applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setLineSnapAngle(int snapAngle) {
+  const int normalized = std::clamp(snapAngle, 0, 180);
+  if (m_uiState.snapAngle == normalized) {
+    return;
+  }
+  m_uiState.snapAngle = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setLineSimplifyLevel(int simplifyLevel) {
+  const int normalized = clampPercent(simplifyLevel);
+  if (m_uiState.simplifyLevel == normalized) {
+    return;
+  }
+  m_uiState.simplifyLevel = normalized;
   emit toolStateChanged();
 }
 
@@ -1024,7 +1435,7 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
 bool AppController::isSubToolCompatibleWithLayerKind(
     const app::ui::SubToolDescriptor& subTool,
     core::LayerKind layerKind) const noexcept {
-  const app::ui::TargetLayerKind target = subTool.preset.targetLayerKind;
+  const app::ui::TargetLayerKind target = subTool.profile.targetLayerKind;
   if (target == app::ui::TargetLayerKind::Both) {
     return true;
   }
@@ -1134,6 +1545,10 @@ void AppController::applyUiStateToTools() {
     m_eraserTool->setVelocityBasedCorrection(m_uiState.velocityBasedCorrection);
     m_eraserTool->setShapeType(m_uiState.shapeType);
   }
+
+  if (m_lineTool != nullptr) {
+    m_lineTool->setSnapAngleDegrees(m_uiState.snapAngle);
+  }
 }
 
 void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescriptor& subTool) {
@@ -1144,8 +1559,14 @@ void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescripto
   m_uiState.hardness = clampPercent(profile.shape.hardness);
   m_uiState.flow = clampPercent(profile.stroke.flow);
   m_uiState.spacing = std::clamp(profile.stroke.spacing, 1, 300);
+  m_uiState.angle = std::clamp(profile.shape.angle, -180, 180);
+  m_uiState.roundness = clampPercent(profile.shape.roundness);
+  m_uiState.taperStart = clampPercent(profile.shape.taperStart);
+  m_uiState.taperEnd = clampPercent(profile.shape.taperEnd);
   m_uiState.antiAlias = profile.stroke.antiAlias;
   m_uiState.stabilization = clampPercent(profile.stabilizer.stabilization);
+  m_uiState.snapAngle = std::clamp(profile.vector.snapAngle, 0, 180);
+  m_uiState.simplifyLevel = clampPercent(profile.vector.simplifyLevel);
   m_uiState.postCorrection = profile.stabilizer.postCorrection;
   m_uiState.velocityBasedCorrection = profile.stabilizer.velocityBasedCorrection;
   m_uiState.shapeType = profile.shape.shapeType;

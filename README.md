@@ -19,6 +19,7 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
 
 - New canvas creation
 - Layer add/delete/duplicate/select/rename/visibility toggle/reorder
+- Layer reorder by drag & drop (plus Up/Down shortcuts)
 - Raster layer + Vector layer coexistence (`LayerKind`)
 - Tool system with switchable tools:
   - Brush / Eraser / Eyedropper / Fill
@@ -28,11 +29,11 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
 - Stroke-level Undo (`Ctrl+Z`) / Redo (`Ctrl+Y`) for drawing and selection updates
 - Sub-tool presets for Brush/Eraser (Normal/Hard/Soft/Airbrush etc.)
 - Sub-tool management (`Duplicate`, `Rename`, `Delete`, `Reset`)
-- Tool property panel with immediate apply (`size`, `opacity`, `hardness`, `flow`, `spacing`, stabilization, blend/erase controls)
+- Tool property panel with immediate apply (`size`, `opacity`, `hardness`, `flow`, `spacing`, stabilization, shape/blend/erase controls, angle/roundness/taper, vector snap/simplify)
 - Canvas overlay for line preview, selection preview/border, move preview, brush cursor
 - Composited canvas display
 - Dock-based workspace with Window menu toggles + reset workspace
-- Tool/selection/layer/view/window menu + keyboard shortcuts for core actions
+- File/Edit/Tool/Select/Layer/View/Window menu with practical actions (open/save/export, clipboard image copy/paste, merge/rasterize)
 
 ## Current UI Shell
 
@@ -92,5 +93,6 @@ Detailed operational notes are in `docs/build.md`.
 - `[` / `]` Brush size down/up
 - `Ctrl+Z` Undo
 - `Ctrl+Y` or `Ctrl+Shift+Z` Redo
+- `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` Open / Save / Save As
 - `Ctrl+Alt+Up` / `Ctrl+Alt+Down` Move layer up/down
 - `Ctrl++` / `Ctrl+-` / `Ctrl+0` Zoom in/out/reset

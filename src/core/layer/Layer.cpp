@@ -43,4 +43,8 @@ void Layer::moveVectorPathsBy(int dx, int dy) noexcept {
   }
 }
 
+void Layer::resetRasterBuffer(Color fill) noexcept {
+  m_buffer.fill(fill);
+}
+
 } // namespace core

@@ -36,6 +36,13 @@ enum class ToolPropertyKey {
   PostCorrection,
   VelocityCorrection,
   ShapeType,
+  Angle,
+  Roundness,
+  TaperStart,
+  TaperEnd,
+  StrokeWidth,
+  SnapAngle,
+  SimplifyLevel,
   BlendMode,
   EraseMode,
   LockAlphaRespect
@@ -102,6 +109,9 @@ struct BrushPreset {
   int taperEnd {0};
   TargetLayerKind targetLayerKind {TargetLayerKind::Both};
   CursorStyle cursorStyle {CursorStyle::Default};
+  int snapAngle {0};
+  int simplifyLevel {0};
+  int strokeWidth {0};
 };
 
 struct SubToolDescriptor {

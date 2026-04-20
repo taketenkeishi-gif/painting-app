@@ -25,7 +25,9 @@ ToolBehaviorProfile makeProfile(const BrushPreset& preset) {
   profile.stabilizer.stabilization = preset.stabilization;
   profile.stabilizer.postCorrection = preset.postCorrection;
   profile.stabilizer.velocityBasedCorrection = preset.velocityBasedCorrection;
-  profile.vector.strokeWidth = preset.size;
+  profile.vector.strokeWidth = preset.strokeWidth > 0 ? preset.strokeWidth : preset.size;
+  profile.vector.snapAngle = preset.snapAngle;
+  profile.vector.simplifyLevel = preset.simplifyLevel;
   profile.blendMode = preset.blendMode;
   profile.eraseMode = preset.eraseMode;
   profile.lockAlphaRespect = preset.lockAlphaRespect;
@@ -124,16 +126,34 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
               makeSubTool(
                   "line_raster",
                   "Raster Line",
-                  BrushPreset {8, 100, 100, 100, 25, true, 10, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Cross},
-                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::ShapeType, ToolPropertyKey::AntiAlias, ToolPropertyKey::BlendMode},
+                  BrushPreset {8, 100, 100, 100, 25, true, 10, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Cross, 0, 0, 8},
+                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::ShapeType, ToolPropertyKey::AntiAlias, ToolPropertyKey::BlendMode, ToolPropertyKey::Angle},
                   "Drag to draw straight raster line."),
               makeSubTool(
                   "line_vector",
-                  "Vector Line",
-                  BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross},
-                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity},
-                  "Drag to create vector line path.")},
-          {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::ShapeType, ToolPropertyKey::AntiAlias, ToolPropertyKey::BlendMode},
+                  "Vector Basic",
+                  BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 8},
+                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
+                  "Drag to create vector line path."),
+              makeSubTool(
+                  "line_vector_snap",
+                  "Vector Snap",
+                  BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 15, 0, 8},
+                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
+                  "Drag to create snapped vector line."),
+              makeSubTool(
+                  "line_vector_thick",
+                  "Vector Thick",
+                  BrushPreset {16, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 16},
+                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
+                  "Drag to create thick vector line."),
+              makeSubTool(
+                  "line_vector_thin",
+                  "Vector Thin",
+                  BrushPreset {3, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 3},
+                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
+                  "Drag to create thin vector line.")},
+          {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::ShapeType, ToolPropertyKey::AntiAlias, ToolPropertyKey::BlendMode, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel, ToolPropertyKey::Angle},
           "Draw straight lines."},
       ToolDescriptor {
           core::ToolKind::RectSelection,

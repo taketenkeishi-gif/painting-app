@@ -1,6 +1,7 @@
 #include "app/panels/SubToolPanel.h"
 
 #include <QAbstractItemView>
+#include <QColor>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -15,6 +16,11 @@
 #include "app/bridge/AppController.h"
 
 namespace app::panels {
+
+namespace {
+constexpr int kSubToolIdRole = Qt::UserRole;
+constexpr int kSubToolEnabledRole = Qt::UserRole + 1;
+} // namespace
 
 SubToolPanel::SubToolPanel(QWidget* parent)
     : QWidget(parent),
@@ -100,20 +106,40 @@ void SubToolPanel::refreshFromController() {
   m_subToolList->clear();
   const auto items = m_controller->subToolViewModels();
   const QString query = m_searchEdit->text().trimmed();
+  bool hasEnabledRow = false;
   for (const auto& item : items) {
     const QString displayName = QString::fromStdString(item.name);
     if (!query.isEmpty() && !displayName.contains(query, Qt::CaseInsensitive)) {
       continue;
     }
     auto* row = new QListWidgetItem(QString::fromStdString(item.name), m_subToolList);
-    row->setData(Qt::UserRole, QString::fromStdString(item.id));
+    row->setData(kSubToolIdRole, QString::fromStdString(item.id));
+    row->setData(kSubToolEnabledRole, item.enabled);
+    row->setFlags(item.enabled ? (Qt::ItemIsEnabled | Qt::ItemIsSelectable) : Qt::NoItemFlags);
+    row->setForeground(item.enabled ? palette().windowText().color() : QColor(130, 136, 148));
+    row->setToolTip(item.hint.empty() ? displayName : QString::fromStdString(item.hint));
     row->setSizeHint(QSize(row->sizeHint().width(), 26));
+    hasEnabledRow = hasEnabledRow || item.enabled;
     if (item.active) {
       m_subToolList->setCurrentItem(row);
     }
   }
   if (m_subToolList->count() > 0 && m_subToolList->currentRow() < 0) {
-    m_subToolList->setCurrentRow(0);
+    for (int i = 0; i < m_subToolList->count(); ++i) {
+      QListWidgetItem* row = m_subToolList->item(i);
+      if (row != nullptr && row->data(kSubToolEnabledRole).toBool()) {
+        m_subToolList->setCurrentRow(i);
+        break;
+      }
+    }
+  }
+  const bool hasRows = m_subToolList->count() > 0;
+  m_duplicateButton->setEnabled(hasRows);
+  m_renameButton->setEnabled(hasRows && hasEnabledRow);
+  m_deleteButton->setEnabled(hasRows && hasEnabledRow);
+  m_resetButton->setEnabled(hasRows && hasEnabledRow);
+  if (!hasEnabledRow && hasRows) {
+    m_summaryLabel->setText("Sub Tool: (No compatible preset for active layer kind)");
   }
   m_refreshing = false;
 }
@@ -126,7 +152,10 @@ void SubToolPanel::onCurrentSubToolChanged(int row) {
   if (item == nullptr) {
     return;
   }
-  const QString id = item->data(Qt::UserRole).toString();
+  if (!item->data(kSubToolEnabledRole).toBool()) {
+    return;
+  }
+  const QString id = item->data(kSubToolIdRole).toString();
   if (id.isEmpty()) {
     return;
   }

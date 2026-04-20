@@ -16,8 +16,14 @@ struct UiState {
   int hardness {100};
   int flow {100};
   int spacing {25};
+  int angle {0};
+  int roundness {100};
+  int taperStart {0};
+  int taperEnd {0};
   bool antiAlias {true};
   int stabilization {0};
+  int snapAngle {0};
+  int simplifyLevel {0};
   bool postCorrection {false};
   bool velocityBasedCorrection {false};
   core::BrushShapeType shapeType {core::BrushShapeType::Circle};

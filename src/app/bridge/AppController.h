@@ -39,17 +39,26 @@ struct SubToolViewModel {
   std::string id;
   std::string name;
   bool active {false};
+  bool enabled {true};
+  std::string hint;
 };
 
 struct ToolStateViewModel {
   core::Color color {0, 0, 0, 255};
   int size {8};
+  int strokeWidth {8};
   int opacity {100};
   int hardness {100};
   int flow {100};
   int spacing {25};
+  int angle {0};
+  int roundness {100};
+  int taperStart {0};
+  int taperEnd {0};
   bool antiAlias {true};
   int stabilization {0};
+  int snapAngle {0};
+  int simplifyLevel {0};
   bool postCorrection {false};
   bool velocityBasedCorrection {false};
   core::BrushShapeType shapeType {core::BrushShapeType::Circle};
@@ -84,6 +93,10 @@ public:
   bool duplicateLayer(std::size_t index);
   bool duplicateActiveLayer();
   bool removeLayer(std::size_t index);
+  bool mergeLayerDown(std::size_t index);
+  bool mergeActiveLayerDown();
+  bool rasterizeLayer(std::size_t index);
+  bool rasterizeActiveLayer();
   bool renameLayer(std::size_t index, const std::string& name);
   bool moveLayer(std::size_t fromIndex, std::size_t toIndex);
   bool moveLayerUp(std::size_t index);
@@ -98,7 +111,14 @@ public:
   bool toggleActiveLayerVisible();
 
   bool clearSelection();
+  bool selectAll();
+  bool deselect();
   bool invertSelection();
+  bool fillSelectionOrCanvas();
+  bool deleteSelectionPixels();
+  core::PixelBuffer exportSelectionOrCanvasFromComposite() const;
+  void importFlattenedBuffer(const core::PixelBuffer& buffer, const std::string& layerName = "Imported");
+  bool pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName = "Pasted Layer");
 
   std::vector<core::ToolKind> availableTools() const;
   std::string toolDisplayName(core::ToolKind kind) const;
@@ -130,9 +150,15 @@ public:
   bool currentToolSupportsPostCorrection() const noexcept;
   bool currentToolSupportsVelocityCorrection() const noexcept;
   bool currentToolSupportsShapeType() const noexcept;
+  bool currentToolSupportsAngle() const noexcept;
+  bool currentToolSupportsRoundness() const noexcept;
+  bool currentToolSupportsTaperStart() const noexcept;
+  bool currentToolSupportsTaperEnd() const noexcept;
   bool currentToolSupportsBlendMode() const noexcept;
   bool currentToolSupportsEraseMode() const noexcept;
   bool currentToolSupportsLockAlphaRespect() const noexcept;
+  bool currentToolSupportsSnapAngle() const noexcept;
+  bool currentToolSupportsSimplifyLevel() const noexcept;
 
   void beginStroke(int x, int y);
   void continueStroke(int x, int y);
@@ -158,9 +184,15 @@ public:
   void setBrushPostCorrection(bool enabled);
   void setBrushVelocityBasedCorrection(bool enabled);
   void setBrushShapeType(core::BrushShapeType shapeType);
+  void setBrushAngle(int angle);
+  void setBrushRoundness(int roundness);
+  void setBrushTaperStart(int taperStart);
+  void setBrushTaperEnd(int taperEnd);
   void setBrushBlendMode(core::BlendMode blendMode);
   void setBrushEraseMode(bool eraseMode);
   void setBrushLockAlphaRespect(bool enabled);
+  void setLineSnapAngle(int snapAngle);
+  void setLineSimplifyLevel(int simplifyLevel);
 
 signals:
   void documentChanged();
@@ -227,6 +259,7 @@ private:
   core::ToolManager m_toolManager;
   core::BrushTool* m_brushTool {nullptr};
   core::EraserTool* m_eraserTool {nullptr};
+  core::LineTool* m_lineTool {nullptr};
 
   app::ui::ToolCatalog m_toolCatalog;
   app::ui::UiState m_uiState;

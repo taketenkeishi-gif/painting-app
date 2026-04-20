@@ -9,6 +9,8 @@ namespace core {
 
 class LineTool : public ITool {
 public:
+  void setSnapAngleDegrees(int snapAngleDegrees) noexcept { m_snapAngleDegrees = snapAngleDegrees < 0 ? 0 : snapAngleDegrees; }
+
   ToolKind kind() const noexcept override { return ToolKind::Line; }
   std::string_view displayName() const noexcept override { return "Line"; }
 
@@ -20,12 +22,14 @@ public:
   ToolOverlayState overlay() const override;
 
 private:
+  Point snappedPoint(const Point& start, const Point& rawEnd) const;
   void drawLine(Layer& layer, const Point& from, const Point& to, const Color& color, int size) const;
   void addVectorLine(Layer& layer, const Point& from, const Point& to, const Color& color, int size) const;
   void stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const;
   void blendPixel(PixelBuffer& buffer, int x, int y, const Color& src) const;
 
   bool m_drawing {false};
+  int m_snapAngleDegrees {0};
   Point m_start {0, 0};
   Point m_current {0, 0};
 };

@@ -4,6 +4,8 @@
 #include <QFont>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QAbstractItemModel>
+#include <QModelIndex>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QStyle>
@@ -39,6 +41,11 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_layerList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
   m_layerList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  m_layerList->setDragEnabled(true);
+  m_layerList->viewport()->setAcceptDrops(true);
+  m_layerList->setDropIndicatorShown(true);
+  m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
+  m_layerList->setDefaultDropAction(Qt::MoveAction);
   m_layerList->setSpacing(2);
 
   m_opacitySlider->setRange(0, 100);
@@ -79,6 +86,11 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_deleteButton, &QPushButton::clicked, this, &LayerPanel::onDeleteLayerClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
+  connect(
+      m_layerList->model(),
+      &QAbstractItemModel::rowsMoved,
+      this,
+      &LayerPanel::onLayerRowsMoved);
   connect(m_opacitySlider, &QSlider::valueChanged, this, &LayerPanel::onOpacityChanged);
 }
 
@@ -243,6 +255,36 @@ void LayerPanel::onOpacityChanged(int value) {
   }
   m_opacityLabel->setText(QString("Opacity: %1%").arg(value));
   m_controller->setActiveLayerOpacity(value);
+}
+
+void LayerPanel::onLayerRowsMoved(
+    const QModelIndex& parent,
+    int start,
+    int end,
+    const QModelIndex& destination,
+    int row) {
+  Q_UNUSED(parent);
+  Q_UNUSED(destination);
+  if (m_controller == nullptr || m_isRefreshing || m_isDraggingLayer) {
+    return;
+  }
+  if (start < 0 || end != start) {
+    return;
+  }
+  int toRow = row;
+  if (toRow > start) {
+    --toRow;
+  }
+  if (toRow < 0 || toRow == start) {
+    return;
+  }
+
+  m_isDraggingLayer = true;
+  const bool moved = m_controller->moveLayer(static_cast<std::size_t>(start), static_cast<std::size_t>(toRow));
+  m_isDraggingLayer = false;
+  if (!moved) {
+    refreshLayers();
+  }
 }
 
 void LayerPanel::refreshButtonState() {

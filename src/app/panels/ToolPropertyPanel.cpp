@@ -54,6 +54,12 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_flowLabel(new QLabel("Flow", this)),
       m_spacingLabel(new QLabel("Spacing", this)),
       m_stabilizationLabel(new QLabel("Stabilization", this)),
+      m_angleLabel(new QLabel("Angle", this)),
+      m_roundnessLabel(new QLabel("Roundness", this)),
+      m_taperStartLabel(new QLabel("Taper Start", this)),
+      m_taperEndLabel(new QLabel("Taper End", this)),
+      m_snapAngleLabel(new QLabel("Snap Angle", this)),
+      m_simplifyLabel(new QLabel("Simplify", this)),
       m_colorButton(new QPushButton("Color", this)),
       m_sizeSpin(new QSpinBox(this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
@@ -70,6 +76,18 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_postCorrectionCheck(new QCheckBox("Post Correction", this)),
       m_velocityCorrectionCheck(new QCheckBox("Velocity Correction", this)),
       m_shapeTypeCombo(new QComboBox(this)),
+      m_angleSlider(new QSlider(Qt::Horizontal, this)),
+      m_angleSpin(new QSpinBox(this)),
+      m_roundnessSlider(new QSlider(Qt::Horizontal, this)),
+      m_roundnessSpin(new QSpinBox(this)),
+      m_taperStartSlider(new QSlider(Qt::Horizontal, this)),
+      m_taperStartSpin(new QSpinBox(this)),
+      m_taperEndSlider(new QSlider(Qt::Horizontal, this)),
+      m_taperEndSpin(new QSpinBox(this)),
+      m_snapAngleSlider(new QSlider(Qt::Horizontal, this)),
+      m_snapAngleSpin(new QSpinBox(this)),
+      m_simplifySlider(new QSlider(Qt::Horizontal, this)),
+      m_simplifySpin(new QSpinBox(this)),
       m_blendModeCombo(new QComboBox(this)),
       m_eraseModeCheck(new QCheckBox("Erase Mode", this)),
       m_lockAlphaRespectCheck(new QCheckBox("Lock Alpha", this)) {
@@ -89,6 +107,18 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_spacingSpin->setRange(1, 300);
   m_stabilizationSlider->setRange(0, 100);
   m_stabilizationSpin->setRange(0, 100);
+  m_angleSlider->setRange(-180, 180);
+  m_angleSpin->setRange(-180, 180);
+  m_roundnessSlider->setRange(0, 100);
+  m_roundnessSpin->setRange(0, 100);
+  m_taperStartSlider->setRange(0, 100);
+  m_taperStartSpin->setRange(0, 100);
+  m_taperEndSlider->setRange(0, 100);
+  m_taperEndSpin->setRange(0, 100);
+  m_snapAngleSlider->setRange(0, 180);
+  m_snapAngleSpin->setRange(0, 180);
+  m_simplifySlider->setRange(0, 100);
+  m_simplifySpin->setRange(0, 100);
 
   m_shapeTypeCombo->addItem("Circle", static_cast<int>(core::BrushShapeType::Circle));
   m_shapeTypeCombo->addItem("Square", static_cast<int>(core::BrushShapeType::Square));
@@ -183,7 +213,35 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto* shapeLayout = new QVBoxLayout(shapeGroup);
   shapeLayout->setContentsMargins(8, 8, 8, 8);
   shapeLayout->setSpacing(6);
+  auto* angleRow = new QHBoxLayout();
+  angleRow->setContentsMargins(0, 0, 0, 0);
+  angleRow->setSpacing(6);
+  angleRow->addWidget(m_angleSlider, 1);
+  angleRow->addWidget(m_angleSpin);
+  auto* roundnessRow = new QHBoxLayout();
+  roundnessRow->setContentsMargins(0, 0, 0, 0);
+  roundnessRow->setSpacing(6);
+  roundnessRow->addWidget(m_roundnessSlider, 1);
+  roundnessRow->addWidget(m_roundnessSpin);
+  auto* taperStartRow = new QHBoxLayout();
+  taperStartRow->setContentsMargins(0, 0, 0, 0);
+  taperStartRow->setSpacing(6);
+  taperStartRow->addWidget(m_taperStartSlider, 1);
+  taperStartRow->addWidget(m_taperStartSpin);
+  auto* taperEndRow = new QHBoxLayout();
+  taperEndRow->setContentsMargins(0, 0, 0, 0);
+  taperEndRow->setSpacing(6);
+  taperEndRow->addWidget(m_taperEndSlider, 1);
+  taperEndRow->addWidget(m_taperEndSpin);
   shapeLayout->addWidget(m_shapeTypeCombo);
+  shapeLayout->addWidget(m_angleLabel);
+  shapeLayout->addLayout(angleRow);
+  shapeLayout->addWidget(m_roundnessLabel);
+  shapeLayout->addLayout(roundnessRow);
+  shapeLayout->addWidget(m_taperStartLabel);
+  shapeLayout->addLayout(taperStartRow);
+  shapeLayout->addWidget(m_taperEndLabel);
+  shapeLayout->addLayout(taperEndRow);
   contentLayout->addWidget(shapeGroup);
   m_shapeSection = shapeGroup;
 
@@ -191,9 +249,23 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto* drawControlLayout = new QVBoxLayout(drawControlGroup);
   drawControlLayout->setContentsMargins(8, 8, 8, 8);
   drawControlLayout->setSpacing(6);
+  auto* snapAngleRow = new QHBoxLayout();
+  snapAngleRow->setContentsMargins(0, 0, 0, 0);
+  snapAngleRow->setSpacing(6);
+  snapAngleRow->addWidget(m_snapAngleSlider, 1);
+  snapAngleRow->addWidget(m_snapAngleSpin);
+  auto* simplifyRow = new QHBoxLayout();
+  simplifyRow->setContentsMargins(0, 0, 0, 0);
+  simplifyRow->setSpacing(6);
+  simplifyRow->addWidget(m_simplifySlider, 1);
+  simplifyRow->addWidget(m_simplifySpin);
   drawControlLayout->addWidget(m_blendModeCombo);
   drawControlLayout->addWidget(m_eraseModeCheck);
   drawControlLayout->addWidget(m_lockAlphaRespectCheck);
+  drawControlLayout->addWidget(m_snapAngleLabel);
+  drawControlLayout->addLayout(snapAngleRow);
+  drawControlLayout->addWidget(m_simplifyLabel);
+  drawControlLayout->addLayout(simplifyRow);
   contentLayout->addWidget(drawControlGroup);
   m_drawingControlSection = drawControlGroup;
 
@@ -220,6 +292,18 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_postCorrectionCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onPostCorrectionToggled);
   connect(m_velocityCorrectionCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onVelocityCorrectionToggled);
   connect(m_shapeTypeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onShapeTypeChanged);
+  connect(m_angleSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onAngleSliderChanged);
+  connect(m_angleSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onAngleSpinChanged);
+  connect(m_roundnessSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onRoundnessSliderChanged);
+  connect(m_roundnessSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onRoundnessSpinChanged);
+  connect(m_taperStartSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onTaperStartSliderChanged);
+  connect(m_taperStartSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onTaperStartSpinChanged);
+  connect(m_taperEndSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onTaperEndSliderChanged);
+  connect(m_taperEndSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onTaperEndSpinChanged);
+  connect(m_snapAngleSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onSnapAngleSliderChanged);
+  connect(m_snapAngleSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSnapAngleSpinChanged);
+  connect(m_simplifySlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onSimplifySliderChanged);
+  connect(m_simplifySpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSimplifySpinChanged);
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onBlendModeChanged);
   connect(m_eraseModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onEraseModeToggled);
   connect(m_lockAlphaRespectCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onLockAlphaRespectToggled);
@@ -258,9 +342,15 @@ void ToolPropertyPanel::refreshFromController() {
   const bool supportsPostCorrection = m_controller->currentToolSupportsPostCorrection();
   const bool supportsVelocityCorrection = m_controller->currentToolSupportsVelocityCorrection();
   const bool supportsShape = m_controller->currentToolSupportsShapeType();
+  const bool supportsAngle = m_controller->currentToolSupportsAngle();
+  const bool supportsRoundness = m_controller->currentToolSupportsRoundness();
+  const bool supportsTaperStart = m_controller->currentToolSupportsTaperStart();
+  const bool supportsTaperEnd = m_controller->currentToolSupportsTaperEnd();
   const bool supportsBlend = m_controller->currentToolSupportsBlendMode();
   const bool supportsEraseMode = m_controller->currentToolSupportsEraseMode();
   const bool supportsLockAlpha = m_controller->currentToolSupportsLockAlphaRespect();
+  const bool supportsSnapAngle = m_controller->currentToolSupportsSnapAngle();
+  const bool supportsSimplify = m_controller->currentToolSupportsSimplifyLevel();
   m_colorLabel->setVisible(supportsColor);
   m_colorButton->setVisible(supportsColor);
   m_sizeLabel->setVisible(supportsSize);
@@ -286,11 +376,31 @@ void ToolPropertyPanel::refreshFromController() {
   m_velocityCorrectionCheck->setVisible(supportsVelocityCorrection);
   m_correctionSection->setVisible(supportsAntiAlias || supportsStabilization || supportsPostCorrection || supportsVelocityCorrection);
   m_shapeTypeCombo->setVisible(supportsShape);
-  m_shapeSection->setVisible(supportsShape);
+  m_angleLabel->setVisible(supportsAngle);
+  m_angleSlider->setVisible(supportsAngle);
+  m_angleSpin->setVisible(supportsAngle);
+  m_roundnessLabel->setVisible(supportsRoundness);
+  m_roundnessSlider->setVisible(supportsRoundness);
+  m_roundnessSpin->setVisible(supportsRoundness);
+  m_taperStartLabel->setVisible(supportsTaperStart);
+  m_taperStartSlider->setVisible(supportsTaperStart);
+  m_taperStartSpin->setVisible(supportsTaperStart);
+  m_taperEndLabel->setVisible(supportsTaperEnd);
+  m_taperEndSlider->setVisible(supportsTaperEnd);
+  m_taperEndSpin->setVisible(supportsTaperEnd);
+  m_shapeSection->setVisible(
+      supportsShape || supportsAngle || supportsRoundness || supportsTaperStart || supportsTaperEnd);
   m_blendModeCombo->setVisible(supportsBlend);
   m_eraseModeCheck->setVisible(supportsEraseMode);
   m_lockAlphaRespectCheck->setVisible(supportsLockAlpha);
-  m_drawingControlSection->setVisible(supportsBlend || supportsEraseMode || supportsLockAlpha);
+  m_snapAngleLabel->setVisible(supportsSnapAngle);
+  m_snapAngleSlider->setVisible(supportsSnapAngle);
+  m_snapAngleSpin->setVisible(supportsSnapAngle);
+  m_simplifyLabel->setVisible(supportsSimplify);
+  m_simplifySlider->setVisible(supportsSimplify);
+  m_simplifySpin->setVisible(supportsSimplify);
+  m_drawingControlSection->setVisible(
+      supportsBlend || supportsEraseMode || supportsLockAlpha || supportsSnapAngle || supportsSimplify);
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);
@@ -308,9 +418,21 @@ void ToolPropertyPanel::refreshFromController() {
   const QSignalBlocker blocker13(m_postCorrectionCheck);
   const QSignalBlocker blocker14(m_velocityCorrectionCheck);
   const QSignalBlocker blocker15(m_shapeTypeCombo);
-  const QSignalBlocker blocker16(m_blendModeCombo);
-  const QSignalBlocker blocker17(m_eraseModeCheck);
-  const QSignalBlocker blocker18(m_lockAlphaRespectCheck);
+  const QSignalBlocker blocker16(m_angleSlider);
+  const QSignalBlocker blocker17(m_angleSpin);
+  const QSignalBlocker blocker18(m_roundnessSlider);
+  const QSignalBlocker blocker19(m_roundnessSpin);
+  const QSignalBlocker blocker20(m_taperStartSlider);
+  const QSignalBlocker blocker21(m_taperStartSpin);
+  const QSignalBlocker blocker22(m_taperEndSlider);
+  const QSignalBlocker blocker23(m_taperEndSpin);
+  const QSignalBlocker blocker24(m_snapAngleSlider);
+  const QSignalBlocker blocker25(m_snapAngleSpin);
+  const QSignalBlocker blocker26(m_simplifySlider);
+  const QSignalBlocker blocker27(m_simplifySpin);
+  const QSignalBlocker blocker28(m_blendModeCombo);
+  const QSignalBlocker blocker29(m_eraseModeCheck);
+  const QSignalBlocker blocker30(m_lockAlphaRespectCheck);
   m_sizeSpin->setValue(state.size);
   m_opacitySlider->setValue(state.opacity);
   m_opacitySpin->setValue(state.opacity);
@@ -326,6 +448,18 @@ void ToolPropertyPanel::refreshFromController() {
   m_postCorrectionCheck->setChecked(state.postCorrection);
   m_velocityCorrectionCheck->setChecked(state.velocityBasedCorrection);
   m_shapeTypeCombo->setCurrentIndex(m_shapeTypeCombo->findData(static_cast<int>(state.shapeType)));
+  m_angleSlider->setValue(state.angle);
+  m_angleSpin->setValue(state.angle);
+  m_roundnessSlider->setValue(state.roundness);
+  m_roundnessSpin->setValue(state.roundness);
+  m_taperStartSlider->setValue(state.taperStart);
+  m_taperStartSpin->setValue(state.taperStart);
+  m_taperEndSlider->setValue(state.taperEnd);
+  m_taperEndSpin->setValue(state.taperEnd);
+  m_snapAngleSlider->setValue(state.snapAngle);
+  m_snapAngleSpin->setValue(state.snapAngle);
+  m_simplifySlider->setValue(state.simplifyLevel);
+  m_simplifySpin->setValue(state.simplifyLevel);
   m_blendModeCombo->setCurrentIndex(m_blendModeCombo->findData(static_cast<int>(state.blendMode)));
   m_eraseModeCheck->setChecked(state.eraseMode);
   m_lockAlphaRespectCheck->setChecked(state.lockAlphaRespect);
@@ -471,6 +605,114 @@ void ToolPropertyPanel::onShapeTypeChanged(int index) {
     return;
   }
   m_controller->setBrushShapeType(static_cast<core::BrushShapeType>(value.toInt()));
+}
+
+void ToolPropertyPanel::onAngleSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsAngle()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_angleSpin);
+  m_angleSpin->setValue(value);
+  m_controller->setBrushAngle(value);
+}
+
+void ToolPropertyPanel::onAngleSpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsAngle()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_angleSlider);
+  m_angleSlider->setValue(value);
+  m_controller->setBrushAngle(value);
+}
+
+void ToolPropertyPanel::onRoundnessSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsRoundness()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_roundnessSpin);
+  m_roundnessSpin->setValue(value);
+  m_controller->setBrushRoundness(value);
+}
+
+void ToolPropertyPanel::onRoundnessSpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsRoundness()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_roundnessSlider);
+  m_roundnessSlider->setValue(value);
+  m_controller->setBrushRoundness(value);
+}
+
+void ToolPropertyPanel::onTaperStartSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsTaperStart()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_taperStartSpin);
+  m_taperStartSpin->setValue(value);
+  m_controller->setBrushTaperStart(value);
+}
+
+void ToolPropertyPanel::onTaperStartSpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsTaperStart()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_taperStartSlider);
+  m_taperStartSlider->setValue(value);
+  m_controller->setBrushTaperStart(value);
+}
+
+void ToolPropertyPanel::onTaperEndSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsTaperEnd()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_taperEndSpin);
+  m_taperEndSpin->setValue(value);
+  m_controller->setBrushTaperEnd(value);
+}
+
+void ToolPropertyPanel::onTaperEndSpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsTaperEnd()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_taperEndSlider);
+  m_taperEndSlider->setValue(value);
+  m_controller->setBrushTaperEnd(value);
+}
+
+void ToolPropertyPanel::onSnapAngleSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsSnapAngle()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_snapAngleSpin);
+  m_snapAngleSpin->setValue(value);
+  m_controller->setLineSnapAngle(value);
+}
+
+void ToolPropertyPanel::onSnapAngleSpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsSnapAngle()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_snapAngleSlider);
+  m_snapAngleSlider->setValue(value);
+  m_controller->setLineSnapAngle(value);
+}
+
+void ToolPropertyPanel::onSimplifySliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsSimplifyLevel()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_simplifySpin);
+  m_simplifySpin->setValue(value);
+  m_controller->setLineSimplifyLevel(value);
+}
+
+void ToolPropertyPanel::onSimplifySpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsSimplifyLevel()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_simplifySlider);
+  m_simplifySlider->setValue(value);
+  m_controller->setLineSimplifyLevel(value);
 }
 
 void ToolPropertyPanel::onBlendModeChanged(int index) {

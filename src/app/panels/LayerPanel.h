@@ -5,6 +5,7 @@
 #include <QWidget>
 
 class QLabel;
+class QModelIndex;
 class QSlider;
 
 namespace app::bridge {
@@ -30,6 +31,7 @@ private slots:
   void onMoveLayerDownClicked();
   void onCurrentLayerChanged(int row);
   void onLayerItemChanged(QListWidgetItem* item);
+  void onLayerRowsMoved(const QModelIndex& parent, int start, int end, const QModelIndex& destination, int row);
   void onOpacityChanged(int value);
 
 private:
@@ -47,6 +49,7 @@ private:
   QPushButton* m_downButton {nullptr};
   QPushButton* m_deleteButton {nullptr};
   bool m_isRefreshing {false};
+  bool m_isDraggingLayer {false};
 };
 
 } // namespace app::panels

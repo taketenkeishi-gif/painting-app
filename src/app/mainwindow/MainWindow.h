@@ -4,6 +4,8 @@
 
 #include <QMainWindow>
 #include <QByteArray>
+#include <QString>
+#include <QStringList>
 
 #include "core/color/Color.h"
 #include "core/tools/ToolType.h"
@@ -43,9 +45,20 @@ public:
 private slots:
   void onNewCanvas();
   void onToolStateChanged();
+  void onOpenTriggered();
+  void onSaveTriggered();
+  void onSaveAsTriggered();
+  void onExportPngTriggered();
   void onUndoTriggered();
   void onRedoTriggered();
+  void onCutTriggered();
+  void onCopyTriggered();
+  void onPasteTriggered();
+  void onDeletePixelsTriggered();
+  void onFillTriggered();
   void onSetToolTriggered();
+  void onSelectAllTriggered();
+  void onDeselectTriggered();
   void onClearSelectionTriggered();
   void onInvertSelectionTriggered();
   void onToggleLayerVisibilityTriggered();
@@ -55,6 +68,8 @@ private slots:
   void onAddVectorLayerTriggered();
   void onDuplicateLayerTriggered();
   void onDeleteLayerTriggered();
+  void onMergeDownTriggered();
+  void onRasterizeLayerTriggered();
   void onDecreaseBrushSizeTriggered();
   void onIncreaseBrushSizeTriggered();
   void onZoomInTriggered();
@@ -76,6 +91,10 @@ private:
   void updateTopToolInfo();
   void updateColorPanel();
   void updateToolActionState();
+  bool openImageFile(const QString& path);
+  bool saveImageFile(const QString& path);
+  void pushRecentFile(const QString& path);
+  void rebuildRecentFilesMenu();
   QAction* createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut);
 
   app::bridge::AppController* m_controller {nullptr};
@@ -112,8 +131,17 @@ private:
   QPushButton* m_backgroundColorButton {nullptr};
   core::Color m_backgroundColor {255, 255, 255, 255};
   QAction* m_newCanvasAction {nullptr};
+  QAction* m_openAction {nullptr};
+  QAction* m_saveAction {nullptr};
+  QAction* m_saveAsAction {nullptr};
+  QAction* m_exportPngAction {nullptr};
   QAction* m_undoAction {nullptr};
   QAction* m_redoAction {nullptr};
+  QAction* m_cutAction {nullptr};
+  QAction* m_copyAction {nullptr};
+  QAction* m_pasteAction {nullptr};
+  QAction* m_deletePixelsAction {nullptr};
+  QAction* m_fillAction {nullptr};
   QAction* m_addLayerAction {nullptr};
   QAction* m_addRasterLayerAction {nullptr};
   QAction* m_addVectorLayerAction {nullptr};
@@ -123,6 +151,8 @@ private:
   QAction* m_moveLayerDownAction {nullptr};
   QAction* m_toggleLayerVisibilityAction {nullptr};
   QAction* m_clearSelectionAction {nullptr};
+  QAction* m_selectAllAction {nullptr};
+  QAction* m_deselectAction {nullptr};
   QAction* m_invertSelectionAction {nullptr};
   QAction* m_brushSizeDownAction {nullptr};
   QAction* m_brushSizeUpAction {nullptr};
@@ -131,8 +161,13 @@ private:
   QAction* m_resetZoomAction {nullptr};
   QAction* m_fitToScreenAction {nullptr};
   QAction* m_resetWorkspaceAction {nullptr};
+  QAction* m_mergeDownAction {nullptr};
+  QAction* m_rasterizeLayerAction {nullptr};
+  QMenu* m_recentFilesMenu {nullptr};
   std::map<core::ToolKind, QAction*> m_toolActions;
   QByteArray m_defaultDockState;
+  QString m_currentFilePath;
+  QStringList m_recentFiles;
   int m_lastCanvasWidth {800};
   int m_lastCanvasHeight {600};
 };
