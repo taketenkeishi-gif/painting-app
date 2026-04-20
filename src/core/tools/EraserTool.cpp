@@ -30,8 +30,9 @@ ToolResult EraserTool::onPointerMove(ToolContext& context, const ToolPointerEven
     return {};
   }
 
-  eraseStroke(*active, m_lastPoint, event.point);
-  m_lastPoint = event.point;
+  const Point stabilizedPoint = applyStabilization(m_lastPoint, event.point);
+  eraseStroke(*active, m_lastPoint, stabilizedPoint);
+  m_lastPoint = stabilizedPoint;
   ToolResult result;
   result.pixelsChanged = true;
   return result;
@@ -48,11 +49,21 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
     return {};
   }
 
-  if (m_lastPoint.x == event.point.x && m_lastPoint.y == event.point.y) {
+  const Point stabilizedPoint = applyStabilization(m_lastPoint, event.point);
+  if (m_lastPoint.x == stabilizedPoint.x && m_lastPoint.y == stabilizedPoint.y &&
+      (!m_postCorrection ||
+       (stabilizedPoint.x == event.point.x && stabilizedPoint.y == event.point.y))) {
     return {};
   }
 
-  eraseStroke(*active, m_lastPoint, event.point);
+  eraseStroke(*active, m_lastPoint, stabilizedPoint);
+  if (m_postCorrection &&
+      (stabilizedPoint.x != event.point.x || stabilizedPoint.y != event.point.y)) {
+    eraseStroke(*active, stabilizedPoint, event.point);
+    m_lastPoint = event.point;
+  } else {
+    m_lastPoint = stabilizedPoint;
+  }
   ToolResult result;
   result.pixelsChanged = true;
   return result;
@@ -71,6 +82,24 @@ ToolResult EraserTool::onWheel(ToolContext& context, int deltaSteps, const ToolP
   return {};
 }
 
+Point EraserTool::applyStabilization(const Point& from, const Point& to) const {
+  const float stabilization = std::clamp(m_stabilization, 0.0F, 1.0F);
+  if (stabilization <= 0.001F) {
+    return to;
+  }
+
+  float response = 1.0F - stabilization * 0.85F;
+  if (m_velocityBasedCorrection) {
+    const float distance = std::hypot(static_cast<float>(to.x - from.x), static_cast<float>(to.y - from.y));
+    const float velocityFactor = std::clamp(1.0F - distance / 80.0F, 0.25F, 1.0F);
+    response *= velocityFactor;
+  }
+  response = std::clamp(response, 0.05F, 1.0F);
+  return Point {
+      static_cast<int>(std::lround(static_cast<float>(from.x) + static_cast<float>(to.x - from.x) * response)),
+      static_cast<int>(std::lround(static_cast<float>(from.y) + static_cast<float>(to.y - from.y) * response))};
+}
+
 void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) const {
   PixelBuffer& buffer = layer.buffer();
   const int radius = std::max(1, m_size) / 2;
@@ -81,7 +110,11 @@ void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) c
   const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacingPixels)));
 
   if (distance <= 0.001F) {
-    eraseCircle(buffer, from, radius);
+    if (m_shapeType == BrushShapeType::Square) {
+      eraseSquare(buffer, from, radius);
+    } else {
+      eraseCircle(buffer, from, radius);
+    }
     return;
   }
 
@@ -90,7 +123,11 @@ void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) c
     const Point p {
         static_cast<int>(std::lround(static_cast<float>(from.x) + static_cast<float>(dx) * t)),
         static_cast<int>(std::lround(static_cast<float>(from.y) + static_cast<float>(dy) * t))};
-    eraseCircle(buffer, p, radius);
+    if (m_shapeType == BrushShapeType::Square) {
+      eraseSquare(buffer, p, radius);
+    } else {
+      eraseCircle(buffer, p, radius);
+    }
   }
 }
 
@@ -108,13 +145,44 @@ void EraserTool::eraseCircle(PixelBuffer& buffer, const Point& center, int radiu
           continue;
         }
         float strength = 1.0F;
-        if (hardEdge < 0.999F && distance > hardEdge) {
-          strength = 1.0F - (distance - hardEdge) / (1.0F - hardEdge);
+        if (m_antiAlias) {
+          if (hardEdge < 0.999F && distance > hardEdge) {
+            strength = 1.0F - (distance - hardEdge) / (1.0F - hardEdge);
+          }
+        } else {
+          strength = distance <= hardEdge ? 1.0F : 0.0F;
         }
-        strength *= std::clamp(m_opacity, 0.0F, 1.0F);
+        strength *= std::clamp(m_opacity * m_flow, 0.0F, 1.0F);
         if (strength > 0.001F) {
           erasePixel(buffer, x, y, strength);
         }
+      }
+    }
+  }
+}
+
+void EraserTool::eraseSquare(PixelBuffer& buffer, const Point& center, int radius) const {
+  const float radiusF = static_cast<float>(std::max(1, radius));
+  const float hardEdge = std::clamp(m_hardness, 0.0F, 1.0F);
+  for (int y = center.y - radius; y <= center.y + radius; ++y) {
+    for (int x = center.x - radius; x <= center.x + radius; ++x) {
+      const int dx = std::abs(x - center.x);
+      const int dy = std::abs(y - center.y);
+      const float distance = static_cast<float>(std::max(dx, dy)) / radiusF;
+      if (distance > 1.0F) {
+        continue;
+      }
+      float strength = 1.0F;
+      if (m_antiAlias) {
+        if (hardEdge < 0.999F && distance > hardEdge) {
+          strength = 1.0F - (distance - hardEdge) / (1.0F - hardEdge);
+        }
+      } else {
+        strength = distance <= hardEdge ? 1.0F : 0.0F;
+      }
+      strength *= std::clamp(m_opacity * m_flow, 0.0F, 1.0F);
+      if (strength > 0.001F) {
+        erasePixel(buffer, x, y, strength);
       }
     }
   }

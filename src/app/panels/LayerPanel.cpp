@@ -3,7 +3,11 @@
 #include <QColor>
 #include <QFont>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QSignalBlocker>
+#include <QSlider>
+#include <QStyle>
+#include <QSize>
 #include <QVBoxLayout>
 
 #include "app/bridge/AppController.h"
@@ -19,15 +23,33 @@ constexpr int kVisibilityRole = Qt::UserRole + 2;
 
 LayerPanel::LayerPanel(QWidget* parent)
     : QWidget(parent),
+      m_headerLabel(new QLabel("Layers", this)),
       m_layerList(new QListWidget(this)),
+      m_opacityLabel(new QLabel("Opacity: 100%", this)),
+      m_opacitySlider(new QSlider(Qt::Horizontal, this)),
       m_addButton(new QPushButton("Add", this)),
       m_deleteButton(new QPushButton("Delete", this)) {
+  m_headerLabel->setStyleSheet("font-weight: 700;");
   m_layerList->setAlternatingRowColors(true);
   m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_layerList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
+  m_layerList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  m_layerList->setSpacing(2);
+
+  m_opacitySlider->setRange(0, 100);
+  m_opacitySlider->setValue(100);
+  m_opacitySlider->setToolTip("Active layer opacity");
+
+  m_addButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+  m_deleteButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
 
   auto* layout = new QVBoxLayout(this);
+  layout->setContentsMargins(6, 6, 6, 6);
+  layout->setSpacing(6);
+  layout->addWidget(m_headerLabel);
   layout->addWidget(m_layerList);
+  layout->addWidget(m_opacityLabel);
+  layout->addWidget(m_opacitySlider);
 
   auto* buttonRow = new QHBoxLayout();
   buttonRow->addWidget(m_addButton);
@@ -40,6 +62,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_deleteButton, &QPushButton::clicked, this, &LayerPanel::onDeleteLayerClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
+  connect(m_opacitySlider, &QSlider::valueChanged, this, &LayerPanel::onOpacityChanged);
 }
 
 void LayerPanel::setController(app::bridge::AppController* controller) {
@@ -74,14 +97,18 @@ void LayerPanel::refreshLayers() {
     item->setData(kNameRole, QString::fromStdString(model.name));
     item->setData(kVisibilityRole, model.visible);
     item->setToolTip("Toggle visibility with the checkbox. Double-click name to rename.");
+    item->setSizeHint(QSize(item->sizeHint().width(), 28));
 
     QFont font = item->font();
     font.setBold(model.active);
     item->setFont(font);
-    item->setBackground(model.active ? QColor(55, 80, 120) : QColor(Qt::transparent));
+    item->setBackground(model.active ? QColor(48, 79, 130) : QColor(Qt::transparent));
 
     if (model.active) {
       m_layerList->setCurrentRow(i);
+      const QSignalBlocker sliderBlocker(m_opacitySlider);
+      m_opacitySlider->setValue(model.opacityPercent);
+      m_opacityLabel->setText(QString("Opacity: %1%").arg(model.opacityPercent));
     }
   }
 
@@ -148,14 +175,24 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
   }
 }
 
+void LayerPanel::onOpacityChanged(int value) {
+  if (m_controller == nullptr || m_isRefreshing) {
+    return;
+  }
+  m_opacityLabel->setText(QString("Opacity: %1%").arg(value));
+  m_controller->setActiveLayerOpacity(value);
+}
+
 void LayerPanel::refreshButtonState() {
   if (m_controller == nullptr) {
     m_deleteButton->setEnabled(false);
+    m_opacitySlider->setEnabled(false);
     return;
   }
   const bool hasSelection = m_layerList->currentRow() >= 0;
   const bool canDelete = m_controller->document().layerCount() > 1;
   m_deleteButton->setEnabled(hasSelection && canDelete);
+  m_opacitySlider->setEnabled(hasSelection);
 }
 
 } // namespace app::panels

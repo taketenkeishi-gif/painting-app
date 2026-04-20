@@ -1,7 +1,10 @@
 #include "app/mainwindow/MainWindow.h"
 
+#include <cstdint>
+
 #include <QAction>
 #include <QActionGroup>
+#include <QColorDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -12,8 +15,13 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
+#include <QPushButton>
+#include <QSplitter>
 #include <QSpinBox>
 #include <QStatusBar>
+#include <QStyle>
+#include <QTabWidget>
+#include <QToolBar>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -27,6 +35,18 @@
 namespace app::mainwindow {
 
 namespace {
+
+QColor toQColor(const core::Color& color) {
+  return QColor(color.r, color.g, color.b, color.a);
+}
+
+core::Color toCoreColor(const QColor& color) {
+  return core::Color {
+      static_cast<std::uint8_t>(color.red()),
+      static_cast<std::uint8_t>(color.green()),
+      static_cast<std::uint8_t>(color.blue()),
+      static_cast<std::uint8_t>(color.alpha())};
+}
 
 QGroupBox* makePanelGroup(const QString& title, QWidget* child, QWidget* parent) {
   auto* box = new QGroupBox(title, parent);
@@ -57,6 +77,8 @@ MainWindow::MainWindow(QWidget* parent)
 
   setupShellLayout();
   createMenus();
+  createToolBar();
+  applyUiChrome();
 
   connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &MainWindow::onToolStateChanged);
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateActiveLayerStatus);
@@ -68,61 +90,117 @@ MainWindow::MainWindow(QWidget* parent)
   updateUndoRedoState();
   updateActiveLayerStatus();
   updateTopToolInfo();
+  updateColorPanel();
 }
 
 void MainWindow::setupShellLayout() {
   auto* root = new QWidget(this);
-  auto* rootLayout = new QHBoxLayout(root);
-  rootLayout->setContentsMargins(6, 6, 6, 6);
-  rootLayout->setSpacing(8);
+  auto* rootLayout = new QVBoxLayout(root);
+  rootLayout->setContentsMargins(4, 4, 4, 4);
+  rootLayout->setSpacing(6);
 
-  m_leftToolHost = new QFrame(root);
-  m_leftToolHost->setObjectName("LeftToolHost");
-  m_leftToolHost->setMinimumWidth(110);
-  m_leftToolHost->setMaximumWidth(140);
-  auto* leftLayout = new QVBoxLayout(m_leftToolHost);
-  leftLayout->setContentsMargins(8, 8, 8, 8);
-  leftLayout->setSpacing(8);
-  auto* leftTitle = new QLabel("Tools", m_leftToolHost);
-  leftTitle->setStyleSheet("font-weight: 700;");
-  leftLayout->addWidget(leftTitle);
-  leftLayout->addWidget(m_toolPanel, 1);
-
-  auto* centerHost = new QWidget(root);
-  auto* centerLayout = new QVBoxLayout(centerHost);
-  centerLayout->setContentsMargins(0, 0, 0, 0);
-  centerLayout->setSpacing(6);
-
-  m_topBar = new QFrame(centerHost);
+  m_topBar = new QFrame(root);
   m_topBar->setObjectName("TopBarHost");
   auto* topLayout = new QHBoxLayout(m_topBar);
-  topLayout->setContentsMargins(10, 8, 10, 8);
+  topLayout->setContentsMargins(10, 6, 10, 6);
   topLayout->setSpacing(12);
   m_currentToolLabel = new QLabel("Tool: Brush", m_topBar);
-  m_currentSubToolLabel = new QLabel("Sub Tool: Round Brush", m_topBar);
+  m_currentSubToolLabel = new QLabel("Sub Tool: Normal", m_topBar);
   topLayout->addWidget(m_currentToolLabel);
   topLayout->addWidget(m_currentSubToolLabel);
   topLayout->addStretch(1);
+  rootLayout->addWidget(m_topBar);
 
-  centerLayout->addWidget(m_topBar);
+  m_mainSplitter = new QSplitter(Qt::Horizontal, root);
+
+  m_leftToolHost = new QFrame(m_mainSplitter);
+  m_leftToolHost->setObjectName("LeftToolHost");
+  auto* leftLayout = new QVBoxLayout(m_leftToolHost);
+  leftLayout->setContentsMargins(4, 4, 4, 4);
+  leftLayout->setSpacing(6);
+  m_leftSplitter = new QSplitter(Qt::Vertical, m_leftToolHost);
+  leftLayout->addWidget(m_leftSplitter, 1);
+
+  auto* toolGroup = makePanelGroup("Tools", m_toolPanel, m_leftSplitter);
+  auto* subToolGroup = makePanelGroup("Sub Tool", m_subToolPanel, m_leftSplitter);
+  auto* propGroup = makePanelGroup("Tool Property", m_toolPropertyPanel, m_leftSplitter);
+
+  auto* colorPanel = new QWidget(m_leftSplitter);
+  auto* colorLayout = new QVBoxLayout(colorPanel);
+  colorLayout->setContentsMargins(8, 8, 8, 8);
+  colorLayout->setSpacing(6);
+  auto* colorTitle = new QLabel("Color", colorPanel);
+  colorTitle->setStyleSheet("font-weight: 700;");
+  m_foregroundColorButton = new QPushButton("FG", colorPanel);
+  m_backgroundColorButton = new QPushButton("BG", colorPanel);
+  auto* swapColorButton = new QPushButton("Swap", colorPanel);
+  auto* colorButtons = new QHBoxLayout();
+  colorButtons->setContentsMargins(0, 0, 0, 0);
+  colorButtons->setSpacing(6);
+  colorButtons->addWidget(m_foregroundColorButton);
+  colorButtons->addWidget(m_backgroundColorButton);
+  colorLayout->addWidget(colorTitle);
+  colorLayout->addLayout(colorButtons);
+  colorLayout->addWidget(swapColorButton);
+  colorLayout->addStretch(1);
+  connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
+  connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
+  connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
+
+  m_leftSplitter->addWidget(toolGroup);
+  m_leftSplitter->addWidget(subToolGroup);
+  m_leftSplitter->addWidget(propGroup);
+  m_leftSplitter->addWidget(colorPanel);
+  m_leftSplitter->setStretchFactor(0, 0);
+  m_leftSplitter->setStretchFactor(1, 2);
+  m_leftSplitter->setStretchFactor(2, 3);
+  m_leftSplitter->setStretchFactor(3, 1);
+
+  auto* centerHost = new QFrame(m_mainSplitter);
+  centerHost->setObjectName("CenterCanvasHost");
+  auto* centerLayout = new QVBoxLayout(centerHost);
+  centerLayout->setContentsMargins(0, 0, 0, 0);
+  centerLayout->setSpacing(0);
   centerLayout->addWidget(m_canvasWidget, 1);
 
-  m_rightPanelHost = new QFrame(root);
+  m_rightPanelHost = new QFrame(m_mainSplitter);
   m_rightPanelHost->setObjectName("RightPanelHost");
-  m_rightPanelHost->setMinimumWidth(300);
-  m_rightPanelHost->setMaximumWidth(380);
   auto* rightLayout = new QVBoxLayout(m_rightPanelHost);
   rightLayout->setContentsMargins(4, 4, 4, 4);
-  rightLayout->setSpacing(8);
+  rightLayout->setSpacing(6);
+  m_rightSplitter = new QSplitter(Qt::Vertical, m_rightPanelHost);
+  rightLayout->addWidget(m_rightSplitter, 1);
 
-  rightLayout->addWidget(makePanelGroup("Layer", m_layerPanel, m_rightPanelHost), 2);
-  rightLayout->addWidget(makePanelGroup("Sub Tool", m_subToolPanel, m_rightPanelHost), 1);
-  rightLayout->addWidget(makePanelGroup("Tool Property", m_toolPropertyPanel, m_rightPanelHost), 2);
+  auto* layerGroup = makePanelGroup("Layer", m_layerPanel, m_rightSplitter);
 
-  rootLayout->addWidget(m_leftToolHost);
-  rootLayout->addWidget(centerHost, 1);
-  rootLayout->addWidget(m_rightPanelHost);
+  m_rightTabWidget = new QTabWidget(m_rightSplitter);
+  auto* infoPanel = new QWidget(m_rightTabWidget);
+  auto* infoLayout = new QVBoxLayout(infoPanel);
+  infoLayout->setContentsMargins(8, 8, 8, 8);
+  infoLayout->setSpacing(6);
+  auto* infoTitle = new QLabel("Tool Guide", infoPanel);
+  infoTitle->setStyleSheet("font-weight: 700;");
+  auto* infoText = new QLabel("Use left panels to pick tool/sub tool and tune properties.", infoPanel);
+  infoText->setWordWrap(true);
+  infoLayout->addWidget(infoTitle);
+  infoLayout->addWidget(infoText);
+  infoLayout->addStretch(1);
+  m_rightTabWidget->addTab(infoPanel, "Info");
 
+  m_rightSplitter->addWidget(layerGroup);
+  m_rightSplitter->addWidget(m_rightTabWidget);
+  m_rightSplitter->setStretchFactor(0, 3);
+  m_rightSplitter->setStretchFactor(1, 1);
+
+  m_mainSplitter->addWidget(m_leftToolHost);
+  m_mainSplitter->addWidget(centerHost);
+  m_mainSplitter->addWidget(m_rightPanelHost);
+  m_mainSplitter->setStretchFactor(0, 0);
+  m_mainSplitter->setStretchFactor(1, 1);
+  m_mainSplitter->setStretchFactor(2, 0);
+  m_mainSplitter->setSizes({340, 920, 320});
+
+  rootLayout->addWidget(m_mainSplitter, 1);
   setCentralWidget(root);
 }
 
@@ -194,6 +272,8 @@ void MainWindow::createMenus() {
 
   m_toolStatusLabel = new QLabel("Tool: Brush", this);
   m_toolStatusLabel->setObjectName("ToolStatusLabel");
+  m_subToolStatusLabel = new QLabel("Sub: Normal", this);
+  m_subToolStatusLabel->setObjectName("SubToolStatusLabel");
   m_guideStatusLabel = new QLabel("Guide: LMB drag to paint. Wheel adjusts size.", this);
   m_guideStatusLabel->setObjectName("ToolGuideStatusLabel");
   m_colorStatusLabel = new QLabel("Color: #000000", this);
@@ -204,13 +284,53 @@ void MainWindow::createMenus() {
   m_activeLayerStatusLabel->setObjectName("ActiveLayerStatusLabel");
   m_zoomStatusLabel = new QLabel("Zoom: 100%", this);
   m_zoomStatusLabel->setObjectName("ZoomStatusLabel");
+  m_selectionStatusLabel = new QLabel("Selection: Off", this);
+  m_selectionStatusLabel->setObjectName("SelectionStatusLabel");
 
   statusBar()->addWidget(m_toolStatusLabel);
+  statusBar()->addWidget(m_subToolStatusLabel);
   statusBar()->addWidget(m_guideStatusLabel, 1);
   statusBar()->addPermanentWidget(m_colorStatusLabel);
   statusBar()->addPermanentWidget(m_sizeStatusLabel);
   statusBar()->addPermanentWidget(m_zoomStatusLabel);
+  statusBar()->addPermanentWidget(m_selectionStatusLabel);
   statusBar()->addPermanentWidget(m_activeLayerStatusLabel);
+}
+
+void MainWindow::createToolBar() {
+  m_quickToolBar = addToolBar("Quick Tools");
+  m_quickToolBar->setMovable(false);
+  m_quickToolBar->setIconSize(QSize(18, 18));
+
+  m_newCanvasAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
+  m_undoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
+  m_redoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
+  m_addLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+  m_toggleLayerVisibilityAction->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
+
+  m_quickToolBar->addAction(m_newCanvasAction);
+  m_quickToolBar->addSeparator();
+  m_quickToolBar->addAction(m_undoAction);
+  m_quickToolBar->addAction(m_redoAction);
+  m_quickToolBar->addSeparator();
+  m_quickToolBar->addAction(m_addLayerAction);
+  m_quickToolBar->addAction(m_toggleLayerVisibilityAction);
+}
+
+void MainWindow::applyUiChrome() {
+  setStyleSheet(
+      "QMainWindow { background: #202328; color: #e8e8e8; }"
+      "#TopBarHost { background: #2b2f36; border: 1px solid #3a3f48; border-radius: 4px; }"
+      "#LeftToolHost, #RightPanelHost { background: #24272d; border: 1px solid #353b45; border-radius: 4px; }"
+      "#CenterCanvasHost { background: #1f2227; border: 1px solid #353b45; border-radius: 4px; }"
+      "QGroupBox { border: 1px solid #3f4652; border-radius: 4px; margin-top: 12px; padding-top: 10px; }"
+      "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #d9dde5; font-weight: 700; }"
+      "QListWidget { background: #1f2328; border: 1px solid #353b44; }"
+      "QListWidget::item:selected { background: #32507a; color: #ffffff; }"
+      "QPushButton { background: #2d323a; border: 1px solid #4b5464; border-radius: 3px; padding: 4px 8px; }"
+      "QPushButton:hover { background: #39404a; }"
+      "QMenuBar, QToolBar { background: #2a2f36; }"
+      "QStatusBar { background: #2a2f36; border-top: 1px solid #3a3f48; }");
 }
 
 void MainWindow::updateUndoRedoState() {
@@ -251,6 +371,9 @@ void MainWindow::updateActiveLayerStatus() {
   }
   const std::size_t active = doc.activeLayerIndex();
   m_activeLayerStatusLabel->setText(QString("Layer: %1").arg(QString::fromStdString(doc.layerAt(active).name())));
+  if (m_selectionStatusLabel != nullptr) {
+    m_selectionStatusLabel->setText(QString("Selection: %1").arg(doc.selection().hasSelection() ? "On" : "Off"));
+  }
 }
 
 void MainWindow::updateTopToolInfo() {
@@ -317,11 +440,15 @@ void MainWindow::onToolStateChanged() {
   if (m_toolStatusLabel != nullptr) {
     m_toolStatusLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
   }
+  if (m_subToolStatusLabel != nullptr) {
+    m_subToolStatusLabel->setText(QString("Sub: %1").arg(QString::fromStdString(m_controller->currentSubToolDisplayName())));
+  }
 
   if (m_guideStatusLabel != nullptr) {
     m_guideStatusLabel->setText(QString("Guide: %1").arg(QString::fromStdString(m_controller->currentToolGuide())));
   }
 
+  updateColorPanel();
   updateTopToolInfo();
 }
 
@@ -362,6 +489,56 @@ void MainWindow::onDecreaseBrushSizeTriggered() {
 
 void MainWindow::onIncreaseBrushSizeTriggered() {
   m_controller->adjustBrushSize(1);
+}
+
+void MainWindow::onChooseForegroundColor() {
+  const QColor current = toQColor(m_controller->toolState().color);
+  const QColor picked = QColorDialog::getColor(current, this, "Foreground Color", QColorDialog::ShowAlphaChannel);
+  if (!picked.isValid()) {
+    return;
+  }
+  m_controller->setBrushColor(toCoreColor(picked));
+}
+
+void MainWindow::onChooseBackgroundColor() {
+  const QColor current = toQColor(m_backgroundColor);
+  const QColor picked = QColorDialog::getColor(current, this, "Background Color", QColorDialog::ShowAlphaChannel);
+  if (!picked.isValid()) {
+    return;
+  }
+  m_backgroundColor = toCoreColor(picked);
+  updateColorPanel();
+}
+
+void MainWindow::onSwapColors() {
+  const core::Color foreground = m_controller->toolState().color;
+  m_controller->setBrushColor(m_backgroundColor);
+  m_backgroundColor = foreground;
+  updateColorPanel();
+}
+
+void MainWindow::updateColorPanel() {
+  if (m_foregroundColorButton == nullptr || m_backgroundColorButton == nullptr) {
+    return;
+  }
+
+  const QColor fg = toQColor(m_controller->toolState().color);
+  const QColor bg = toQColor(m_backgroundColor);
+  const auto makeStyle = [](const QColor& color) {
+    const int luminance = (299 * color.red() + 587 * color.green() + 114 * color.blue()) / 1000;
+    const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
+    return QString("QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #505866; min-height:24px; }")
+        .arg(color.red())
+        .arg(color.green())
+        .arg(color.blue())
+        .arg(color.alpha())
+        .arg(textColor);
+  };
+
+  m_foregroundColorButton->setText(QString("FG %1").arg(fg.name(QColor::HexRgb).toUpper()));
+  m_backgroundColorButton->setText(QString("BG %1").arg(bg.name(QColor::HexRgb).toUpper()));
+  m_foregroundColorButton->setStyleSheet(makeStyle(fg));
+  m_backgroundColorButton->setStyleSheet(makeStyle(bg));
 }
 
 void MainWindow::updateToolActionState() {

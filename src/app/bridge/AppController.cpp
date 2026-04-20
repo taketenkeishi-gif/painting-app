@@ -1,6 +1,7 @@
 #include "app/bridge/AppController.h"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <utility>
 
@@ -99,7 +100,8 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
     models.push_back(LayerViewModel {
         layer.name(),
         layer.visible(),
-        i == m_document.activeLayerIndex()});
+        i == m_document.activeLayerIndex(),
+        static_cast<int>(std::lround(std::clamp(layer.opacity(), 0.0F, 1.0F) * 100.0F))});
   }
   return models;
 }
@@ -120,7 +122,21 @@ std::vector<SubToolViewModel> AppController::subToolViewModels() const {
 }
 
 ToolStateViewModel AppController::toolState() const noexcept {
-  return ToolStateViewModel {m_currentColor, m_uiState.size, m_uiState.opacity, m_uiState.hardness};
+  return ToolStateViewModel {
+      m_currentColor,
+      m_uiState.size,
+      m_uiState.opacity,
+      m_uiState.hardness,
+      m_uiState.flow,
+      m_uiState.spacing,
+      m_uiState.antiAlias,
+      m_uiState.stabilization,
+      m_uiState.postCorrection,
+      m_uiState.velocityBasedCorrection,
+      m_uiState.shapeType,
+      m_uiState.blendMode,
+      m_uiState.eraseMode,
+      m_uiState.lockAlphaRespect};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -195,6 +211,36 @@ void AppController::setLayerVisible(std::size_t index, bool visible) {
   rerender();
   emit layersChanged();
   emit documentChanged();
+}
+
+void AppController::setLayerOpacity(std::size_t index, int opacityPercent) {
+  if (index >= m_document.layerCount()) {
+    return;
+  }
+  const float normalized = static_cast<float>(clampPercent(opacityPercent)) / 100.0F;
+  core::Layer& layer = m_document.layerAt(index);
+  if (std::abs(layer.opacity() - normalized) < 0.0001F) {
+    return;
+  }
+  layer.setOpacity(normalized);
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+}
+
+void AppController::setActiveLayerOpacity(int opacityPercent) {
+  if (m_document.layerCount() == 0) {
+    return;
+  }
+  setLayerOpacity(m_document.activeLayerIndex(), opacityPercent);
+}
+
+int AppController::activeLayerOpacity() const noexcept {
+  if (m_document.layerCount() == 0) {
+    return 100;
+  }
+  const float opacity = m_document.layerAt(m_document.activeLayerIndex()).opacity();
+  return static_cast<int>(std::lround(std::clamp(opacity, 0.0F, 1.0F) * 100.0F));
 }
 
 bool AppController::toggleActiveLayerVisible() {
@@ -324,6 +370,48 @@ bool AppController::currentToolSupportsOpacity() const noexcept {
 
 bool AppController::currentToolSupportsHardness() const noexcept {
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Hardness);
+}
+
+bool AppController::currentToolSupportsFlow() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Flow);
+}
+
+bool AppController::currentToolSupportsSpacing() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Spacing);
+}
+
+bool AppController::currentToolSupportsAntiAlias() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::AntiAlias);
+}
+
+bool AppController::currentToolSupportsStabilization() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Stabilization);
+}
+
+bool AppController::currentToolSupportsPostCorrection() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::PostCorrection);
+}
+
+bool AppController::currentToolSupportsVelocityCorrection() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::VelocityCorrection);
+}
+
+bool AppController::currentToolSupportsShapeType() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::ShapeType);
+}
+
+bool AppController::currentToolSupportsBlendMode() const noexcept {
+  return !m_uiState.eraseMode &&
+         containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::BlendMode);
+}
+
+bool AppController::currentToolSupportsEraseMode() const noexcept {
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::EraseMode);
+}
+
+bool AppController::currentToolSupportsLockAlphaRespect() const noexcept {
+  return !m_uiState.eraseMode &&
+         containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::LockAlphaRespect);
 }
 
 void AppController::beginStroke(int x, int y) {
@@ -567,6 +655,101 @@ void AppController::setBrushHardness(int hardness) {
   emit toolStateChanged();
 }
 
+void AppController::setBrushFlow(int flow) {
+  const int normalized = clampPercent(flow);
+  if (m_uiState.flow == normalized) {
+    return;
+  }
+
+  m_uiState.flow = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushSpacing(int spacing) {
+  const int normalized = std::clamp(spacing, 1, 300);
+  if (m_uiState.spacing == normalized) {
+    return;
+  }
+
+  m_uiState.spacing = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushAntiAlias(bool antiAlias) {
+  if (m_uiState.antiAlias == antiAlias) {
+    return;
+  }
+  m_uiState.antiAlias = antiAlias;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushStabilization(int stabilization) {
+  const int normalized = clampPercent(stabilization);
+  if (m_uiState.stabilization == normalized) {
+    return;
+  }
+  m_uiState.stabilization = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushPostCorrection(bool enabled) {
+  if (m_uiState.postCorrection == enabled) {
+    return;
+  }
+  m_uiState.postCorrection = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushVelocityBasedCorrection(bool enabled) {
+  if (m_uiState.velocityBasedCorrection == enabled) {
+    return;
+  }
+  m_uiState.velocityBasedCorrection = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushShapeType(core::BrushShapeType shapeType) {
+  if (m_uiState.shapeType == shapeType) {
+    return;
+  }
+  m_uiState.shapeType = shapeType;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushBlendMode(core::BlendMode blendMode) {
+  if (m_uiState.blendMode == blendMode) {
+    return;
+  }
+  m_uiState.blendMode = blendMode;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushEraseMode(bool eraseMode) {
+  if (m_uiState.eraseMode == eraseMode) {
+    return;
+  }
+  m_uiState.eraseMode = eraseMode;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setBrushLockAlphaRespect(bool enabled) {
+  if (m_uiState.lockAlphaRespect == enabled) {
+    return;
+  }
+  m_uiState.lockAlphaRespect = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
 bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
   switch (kind) {
     case core::ToolKind::Brush:
@@ -638,6 +821,7 @@ void AppController::applyUiStateToTools() {
   const float hardness = static_cast<float>(m_uiState.hardness) / 100.0F;
   const float flow = static_cast<float>(m_uiState.flow) / 100.0F;
   const float spacing = static_cast<float>(std::max(1, m_uiState.spacing)) / 100.0F;
+  const float stabilization = static_cast<float>(m_uiState.stabilization) / 100.0F;
 
   if (m_brushTool != nullptr) {
     m_brushTool->setSize(m_uiState.size);
@@ -645,14 +829,28 @@ void AppController::applyUiStateToTools() {
     m_brushTool->setHardness(hardness);
     m_brushTool->setFlow(flow);
     m_brushTool->setSpacing(spacing);
+    m_brushTool->setAntiAlias(m_uiState.antiAlias);
+    m_brushTool->setStabilization(stabilization);
+    m_brushTool->setPostCorrection(m_uiState.postCorrection);
+    m_brushTool->setVelocityBasedCorrection(m_uiState.velocityBasedCorrection);
+    m_brushTool->setShapeType(m_uiState.shapeType);
+    m_brushTool->setBlendMode(m_uiState.blendMode);
+    m_brushTool->setEraseMode(m_uiState.eraseMode);
+    m_brushTool->setLockAlphaRespect(m_uiState.lockAlphaRespect);
     m_brushTool->setColor(m_currentColor);
   }
 
   if (m_eraserTool != nullptr) {
     m_eraserTool->setSize(m_uiState.size);
     m_eraserTool->setOpacity(opacity);
+    m_eraserTool->setFlow(flow);
     m_eraserTool->setHardness(hardness);
     m_eraserTool->setSpacing(spacing);
+    m_eraserTool->setAntiAlias(m_uiState.antiAlias);
+    m_eraserTool->setStabilization(stabilization);
+    m_eraserTool->setPostCorrection(m_uiState.postCorrection);
+    m_eraserTool->setVelocityBasedCorrection(m_uiState.velocityBasedCorrection);
+    m_eraserTool->setShapeType(m_uiState.shapeType);
   }
 }
 
@@ -663,7 +861,14 @@ void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescripto
   m_uiState.hardness = clampPercent(subTool.preset.hardness);
   m_uiState.flow = clampPercent(subTool.preset.flow);
   m_uiState.spacing = std::clamp(subTool.preset.spacing, 1, 300);
+  m_uiState.antiAlias = subTool.preset.antiAlias;
+  m_uiState.stabilization = clampPercent(subTool.preset.stabilization);
+  m_uiState.postCorrection = subTool.preset.postCorrection;
+  m_uiState.velocityBasedCorrection = subTool.preset.velocityBasedCorrection;
+  m_uiState.shapeType = subTool.preset.shapeType;
+  m_uiState.blendMode = subTool.preset.blendMode;
   m_uiState.eraseMode = subTool.preset.eraseMode;
+  m_uiState.lockAlphaRespect = subTool.preset.lockAlphaRespect;
 }
 
 core::ToolContext AppController::makeToolContext() {

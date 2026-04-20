@@ -31,6 +31,7 @@ struct LayerViewModel {
   std::string name;
   bool visible {true};
   bool active {false};
+  int opacityPercent {100};
 };
 
 struct SubToolViewModel {
@@ -44,6 +45,16 @@ struct ToolStateViewModel {
   int size {8};
   int opacity {100};
   int hardness {100};
+  int flow {100};
+  int spacing {25};
+  bool antiAlias {true};
+  int stabilization {0};
+  bool postCorrection {false};
+  bool velocityBasedCorrection {false};
+  core::BrushShapeType shapeType {core::BrushShapeType::Circle};
+  core::BlendMode blendMode {core::BlendMode::Normal};
+  bool eraseMode {false};
+  bool lockAlphaRespect {false};
 };
 
 struct CanvasOverlayViewModel {
@@ -71,6 +82,9 @@ public:
   bool renameLayer(std::size_t index, const std::string& name);
   void setActiveLayer(std::size_t index);
   void setLayerVisible(std::size_t index, bool visible);
+  void setLayerOpacity(std::size_t index, int opacityPercent);
+  void setActiveLayerOpacity(int opacityPercent);
+  int activeLayerOpacity() const noexcept;
   bool toggleActiveLayerVisible();
 
   bool clearSelection();
@@ -91,6 +105,16 @@ public:
   bool currentToolSupportsSize() const noexcept;
   bool currentToolSupportsOpacity() const noexcept;
   bool currentToolSupportsHardness() const noexcept;
+  bool currentToolSupportsFlow() const noexcept;
+  bool currentToolSupportsSpacing() const noexcept;
+  bool currentToolSupportsAntiAlias() const noexcept;
+  bool currentToolSupportsStabilization() const noexcept;
+  bool currentToolSupportsPostCorrection() const noexcept;
+  bool currentToolSupportsVelocityCorrection() const noexcept;
+  bool currentToolSupportsShapeType() const noexcept;
+  bool currentToolSupportsBlendMode() const noexcept;
+  bool currentToolSupportsEraseMode() const noexcept;
+  bool currentToolSupportsLockAlphaRespect() const noexcept;
 
   void beginStroke(int x, int y);
   void continueStroke(int x, int y);
@@ -109,6 +133,16 @@ public:
   void adjustBrushSize(int delta);
   void setBrushOpacity(int opacity);
   void setBrushHardness(int hardness);
+  void setBrushFlow(int flow);
+  void setBrushSpacing(int spacing);
+  void setBrushAntiAlias(bool antiAlias);
+  void setBrushStabilization(int stabilization);
+  void setBrushPostCorrection(bool enabled);
+  void setBrushVelocityBasedCorrection(bool enabled);
+  void setBrushShapeType(core::BrushShapeType shapeType);
+  void setBrushBlendMode(core::BlendMode blendMode);
+  void setBrushEraseMode(bool eraseMode);
+  void setBrushLockAlphaRespect(bool enabled);
 
 signals:
   void documentChanged();

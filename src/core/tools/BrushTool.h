@@ -18,6 +18,14 @@ public:
   void setHardness(float hardness) noexcept { m_settings.hardness = std::clamp(hardness, 0.0F, 1.0F); }
   void setFlow(float flow) noexcept { m_settings.flow = std::clamp(flow, 0.0F, 1.0F); }
   void setSpacing(float spacing) noexcept { m_settings.spacing = std::clamp(spacing, 0.01F, 3.0F); }
+  void setAntiAlias(bool antiAlias) noexcept { m_settings.antiAlias = antiAlias; }
+  void setStabilization(float stabilization) noexcept { m_settings.stabilization = std::clamp(stabilization, 0.0F, 1.0F); }
+  void setPostCorrection(bool postCorrection) noexcept { m_settings.postCorrection = postCorrection; }
+  void setVelocityBasedCorrection(bool enabled) noexcept { m_settings.velocityBasedCorrection = enabled; }
+  void setShapeType(BrushShapeType shapeType) noexcept { m_settings.shapeType = shapeType; }
+  void setBlendMode(BlendMode blendMode) noexcept { m_settings.blendMode = blendMode; }
+  void setEraseMode(bool eraseMode) noexcept { m_settings.eraseMode = eraseMode; }
+  void setLockAlphaRespect(bool lockAlpha) noexcept { m_settings.lockAlphaRespect = lockAlpha; }
 
   const BrushSettings& settings() const noexcept { return m_settings; }
 
@@ -33,7 +41,9 @@ public:
   ToolResult onWheel(ToolContext& context, int deltaSteps, const ToolPointerEvent& event) override;
 
 private:
+  Point applyStabilization(const Point& from, const Point& to) const;
   void stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const;
+  void stampSquare(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const;
   void blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, float strength) const;
 
   BrushSettings m_settings;

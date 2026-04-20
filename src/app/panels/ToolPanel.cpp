@@ -2,8 +2,9 @@
 
 #include <QSignalBlocker>
 #include <QToolButton>
-#include <QVBoxLayout>
+#include <QGridLayout>
 #include <QLayoutItem>
+#include <QStyle>
 
 #include "app/bridge/AppController.h"
 
@@ -11,10 +12,21 @@ namespace app::panels {
 
 ToolPanel::ToolPanel(QWidget* parent)
     : QWidget(parent) {
-  auto* layout = new QVBoxLayout(this);
+  setStyleSheet(
+      "QToolButton {"
+      "  border: 1px solid #3a3a3a;"
+      "  background: #2b2d31;"
+      "  color: #d8d8d8;"
+      "  border-radius: 4px;"
+      "  padding: 2px;"
+      "}"
+      "QToolButton:hover { background: #353942; border-color: #5e6f90; }"
+      "QToolButton:checked { background: #2f4f7f; border-color: #7fb3ff; color: #ffffff; }");
+  auto* layout = new QGridLayout(this);
   layout->setContentsMargins(6, 6, 6, 6);
   layout->setSpacing(6);
-  layout->addStretch(1);
+  layout->setColumnStretch(0, 1);
+  layout->setColumnStretch(1, 1);
 }
 
 void ToolPanel::setController(app::bridge::AppController* controller) {
@@ -61,7 +73,7 @@ void ToolPanel::onToolButtonClicked() {
 }
 
 void ToolPanel::rebuildButtons() {
-  auto* layout = qobject_cast<QVBoxLayout*>(this->layout());
+  auto* layout = qobject_cast<QGridLayout*>(this->layout());
   if (layout == nullptr || m_controller == nullptr) {
     return;
   }
@@ -78,18 +90,54 @@ void ToolPanel::rebuildButtons() {
     delete item;
   }
 
+  int index = 0;
   for (const core::ToolKind kind : m_controller->availableTools()) {
     auto* button = new QToolButton(this);
     button->setText(QString::fromStdString(m_controller->toolDisplayName(kind)));
     button->setCheckable(true);
     button->setAutoExclusive(true);
-    button->setMinimumHeight(34);
+    button->setIconSize(QSize(18, 18));
+    button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    button->setMinimumHeight(56);
     button->setProperty("toolKind", static_cast<int>(kind));
+
+    switch (kind) {
+      case core::ToolKind::Brush:
+        button->setIcon(style()->standardIcon(QStyle::SP_DriveFDIcon));
+        break;
+      case core::ToolKind::Eraser:
+        button->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
+        break;
+      case core::ToolKind::Eyedropper:
+        button->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+        break;
+      case core::ToolKind::Fill:
+        button->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
+        break;
+      case core::ToolKind::Line:
+        button->setIcon(style()->standardIcon(QStyle::SP_ArrowRight));
+        break;
+      case core::ToolKind::RectSelection:
+        button->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
+        break;
+      case core::ToolKind::MoveLayer:
+        button->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
+        break;
+      case core::ToolKind::Hand:
+        button->setIcon(style()->standardIcon(QStyle::SP_DialogHelpButton));
+        break;
+      case core::ToolKind::Zoom:
+        button->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
+        break;
+      default:
+        break;
+    }
+
     connect(button, &QToolButton::clicked, this, &ToolPanel::onToolButtonClicked);
-    layout->addWidget(button);
+    layout->addWidget(button, index / 2, index % 2);
     m_buttons[kind] = button;
+    ++index;
   }
-  layout->addStretch(1);
 }
 
 } // namespace app::panels

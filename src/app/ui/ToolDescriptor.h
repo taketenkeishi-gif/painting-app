@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 
+#include "core/tools/ToolTypes.h"
 #include "core/tools/ToolType.h"
 
 namespace app::ui {
@@ -14,7 +15,15 @@ enum class ToolPropertyKey {
   Opacity,
   Hardness,
   Flow,
-  Spacing
+  Spacing,
+  AntiAlias,
+  Stabilization,
+  PostCorrection,
+  VelocityCorrection,
+  ShapeType,
+  BlendMode,
+  EraseMode,
+  LockAlphaRespect
 };
 
 struct BrushPreset {
@@ -23,7 +32,14 @@ struct BrushPreset {
   int hardness {100};
   int flow {100};
   int spacing {25};
+  bool antiAlias {true};
+  int stabilization {0};
+  bool postCorrection {false};
+  bool velocityBasedCorrection {false};
+  core::BrushShapeType shapeType {core::BrushShapeType::Circle};
+  core::BlendMode blendMode {core::BlendMode::Normal};
   bool eraseMode {false};
+  bool lockAlphaRespect {false};
 };
 
 struct SubToolDescriptor {

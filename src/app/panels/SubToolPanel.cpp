@@ -1,8 +1,11 @@
 #include "app/panels/SubToolPanel.h"
 
 #include <QAbstractItemView>
+#include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
+#include <QPushButton>
 #include <QSignalBlocker>
 #include <QVBoxLayout>
 
@@ -13,18 +16,37 @@ namespace app::panels {
 SubToolPanel::SubToolPanel(QWidget* parent)
     : QWidget(parent),
       m_toolNameLabel(new QLabel("Tool: -", this)),
+      m_searchEdit(new QLineEdit(this)),
+      m_duplicateButton(new QPushButton("Duplicate", this)),
       m_subToolList(new QListWidget(this)) {
   auto* layout = new QVBoxLayout(this);
   layout->setContentsMargins(6, 6, 6, 6);
   layout->setSpacing(6);
 
+  m_searchEdit->setPlaceholderText("Search sub tool...");
+  m_duplicateButton->setToolTip("Preset duplicate UI stub. Behavior will be implemented in a later phase.");
+
   m_subToolList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_subToolList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  m_subToolList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  m_subToolList->setSpacing(2);
+  m_subToolList->setStyleSheet(
+      "QListWidget::item { padding: 4px 6px; border-bottom: 1px solid #30343d; }"
+      "QListWidget::item:selected { background: #345985; color: #ffffff; }");
+
+  auto* searchRow = new QHBoxLayout();
+  searchRow->setContentsMargins(0, 0, 0, 0);
+  searchRow->setSpacing(6);
+  searchRow->addWidget(m_searchEdit, 1);
+  searchRow->addWidget(m_duplicateButton);
 
   layout->addWidget(m_toolNameLabel);
+  layout->addLayout(searchRow);
   layout->addWidget(m_subToolList);
 
   connect(m_subToolList, &QListWidget::currentRowChanged, this, &SubToolPanel::onCurrentSubToolChanged);
+  connect(m_searchEdit, &QLineEdit::textChanged, this, &SubToolPanel::onFilterTextChanged);
+  connect(m_duplicateButton, &QPushButton::clicked, this, &SubToolPanel::onDuplicateClicked);
 }
 
 void SubToolPanel::setController(app::bridge::AppController* controller) {
@@ -51,9 +73,15 @@ void SubToolPanel::refreshFromController() {
   m_toolNameLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
   m_subToolList->clear();
   const auto items = m_controller->subToolViewModels();
+  const QString query = m_searchEdit->text().trimmed();
   for (const auto& item : items) {
+    const QString displayName = QString::fromStdString(item.name);
+    if (!query.isEmpty() && !displayName.contains(query, Qt::CaseInsensitive)) {
+      continue;
+    }
     auto* row = new QListWidgetItem(QString::fromStdString(item.name), m_subToolList);
     row->setData(Qt::UserRole, QString::fromStdString(item.id));
+    row->setSizeHint(QSize(row->sizeHint().width(), 26));
     if (item.active) {
       m_subToolList->setCurrentItem(row);
     }
@@ -77,6 +105,15 @@ void SubToolPanel::onCurrentSubToolChanged(int row) {
     return;
   }
   m_controller->setCurrentSubTool(id.toStdString());
+}
+
+void SubToolPanel::onFilterTextChanged(const QString& text) {
+  Q_UNUSED(text);
+  refreshFromController();
+}
+
+void SubToolPanel::onDuplicateClicked() {
+  m_duplicateButton->setText("Duplicate (WIP)");
 }
 
 } // namespace app::panels

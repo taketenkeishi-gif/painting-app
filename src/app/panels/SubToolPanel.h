@@ -4,6 +4,9 @@
 
 class QLabel;
 class QListWidget;
+class QLineEdit;
+class QPushButton;
+class QString;
 
 namespace app::bridge {
 class AppController;
@@ -21,11 +24,15 @@ public:
 private slots:
   void refreshFromController();
   void onCurrentSubToolChanged(int row);
+  void onFilterTextChanged(const QString& text);
+  void onDuplicateClicked();
 
 private:
   bool m_refreshing {false};
   app::bridge::AppController* m_controller {nullptr};
   QLabel* m_toolNameLabel {nullptr};
+  QLineEdit* m_searchEdit {nullptr};
+  QPushButton* m_duplicateButton {nullptr};
   QListWidget* m_subToolList {nullptr};
 };
 
