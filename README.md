@@ -18,25 +18,28 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
 ## Current MVP Scope
 
 - New canvas creation
-- Layer add/delete/select/rename/visibility toggle
+- Layer add/delete/duplicate/select/rename/visibility toggle/reorder
+- Raster layer + Vector layer coexistence (`LayerKind`)
 - Tool system with switchable tools:
   - Brush / Eraser / Eyedropper / Fill
   - Line / RectSelection / MoveLayer
   - Hand / Zoom
+- Layer-kind constrained tool usage (raster-only / vector-only / both)
 - Stroke-level Undo (`Ctrl+Z`) / Redo (`Ctrl+Y`) for drawing and selection updates
 - Sub-tool presets for Brush/Eraser (Normal/Hard/Soft/Airbrush etc.)
-- Tool property panel with immediate apply (`size`, `opacity`, `hardness`)
+- Sub-tool management (`Duplicate`, `Rename`, `Delete`, `Reset`)
+- Tool property panel with immediate apply (`size`, `opacity`, `hardness`, `flow`, `spacing`, stabilization, blend/erase controls)
 - Canvas overlay for line preview, selection preview/border, move preview, brush cursor
 - Composited canvas display
-- Tool/selection/layer menu + keyboard shortcuts for core actions
+- Dock-based workspace with Window menu toggles + reset workspace
+- Tool/selection/layer/view/window menu + keyboard shortcuts for core actions
 
 ## Current UI Shell
 
-- Left: tool selection panel
-- Top: current tool and current sub-tool bar
-- Right: layer panel + sub-tool panel + tool-property panel
+- Left docks: tool panel / sub-tool panel / tool-property panel / color panel
+- Right docks: layer panel / info panel
 - Center: canvas viewport
-- Bottom: status bar (tool, guide, color, size, zoom, active layer)
+- Bottom: status bar (tool, sub-tool, guide, color, size, zoom, selection, active layer)
 
 ## Build Quick Start (Windows / PowerShell)
 
@@ -89,3 +92,5 @@ Detailed operational notes are in `docs/build.md`.
 - `[` / `]` Brush size down/up
 - `Ctrl+Z` Undo
 - `Ctrl+Y` or `Ctrl+Shift+Z` Redo
+- `Ctrl+Alt+Up` / `Ctrl+Alt+Down` Move layer up/down
+- `Ctrl++` / `Ctrl+-` / `Ctrl+0` Zoom in/out/reset

@@ -21,6 +21,11 @@ class CanvasWidget : public QWidget {
 public:
   explicit CanvasWidget(QWidget* parent = nullptr);
   void setController(app::bridge::AppController* controller);
+  void zoomIn();
+  void zoomOut();
+  void resetZoom();
+  void fitToScreen();
+  int zoomPercent() const;
 
 protected:
   void paintEvent(QPaintEvent* event) override;

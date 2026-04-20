@@ -18,6 +18,7 @@ namespace {
 
 constexpr int kNameRole = Qt::UserRole + 1;
 constexpr int kVisibilityRole = Qt::UserRole + 2;
+constexpr int kKindRole = Qt::UserRole + 3;
 
 } // namespace
 
@@ -27,7 +28,9 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_layerList(new QListWidget(this)),
       m_opacityLabel(new QLabel("Opacity: 100%", this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
-      m_addButton(new QPushButton("Add", this)),
+      m_addRasterButton(new QPushButton("New Raster", this)),
+      m_addVectorButton(new QPushButton("New Vector", this)),
+      m_duplicateButton(new QPushButton("Duplicate", this)),
       m_upButton(new QPushButton("Up", this)),
       m_downButton(new QPushButton("Down", this)),
       m_deleteButton(new QPushButton("Delete", this)) {
@@ -42,7 +45,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_opacitySlider->setValue(100);
   m_opacitySlider->setToolTip("Active layer opacity");
 
-  m_addButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+  m_addRasterButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+  m_addVectorButton->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
+  m_duplicateButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
   m_upButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
   m_downButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
   m_deleteButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
@@ -56,7 +61,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   layout->addWidget(m_opacitySlider);
 
   auto* buttonRow = new QHBoxLayout();
-  buttonRow->addWidget(m_addButton);
+  buttonRow->addWidget(m_addRasterButton);
+  buttonRow->addWidget(m_addVectorButton);
+  buttonRow->addWidget(m_duplicateButton);
   buttonRow->addWidget(m_upButton);
   buttonRow->addWidget(m_downButton);
   buttonRow->addWidget(m_deleteButton);
@@ -64,7 +71,9 @@ LayerPanel::LayerPanel(QWidget* parent)
 
   setLayout(layout);
 
-  connect(m_addButton, &QPushButton::clicked, this, &LayerPanel::onAddLayerClicked);
+  connect(m_addRasterButton, &QPushButton::clicked, this, &LayerPanel::onAddRasterLayerClicked);
+  connect(m_addVectorButton, &QPushButton::clicked, this, &LayerPanel::onAddVectorLayerClicked);
+  connect(m_duplicateButton, &QPushButton::clicked, this, &LayerPanel::onDuplicateLayerClicked);
   connect(m_upButton, &QPushButton::clicked, this, &LayerPanel::onMoveLayerUpClicked);
   connect(m_downButton, &QPushButton::clicked, this, &LayerPanel::onMoveLayerDownClicked);
   connect(m_deleteButton, &QPushButton::clicked, this, &LayerPanel::onDeleteLayerClicked);
@@ -99,11 +108,13 @@ void LayerPanel::refreshLayers() {
   const auto models = m_controller->layerViewModels();
   for (int i = 0; i < static_cast<int>(models.size()); ++i) {
     const auto& model = models[static_cast<std::size_t>(i)];
-    auto* item = new QListWidgetItem(QString::fromStdString(model.name), m_layerList);
+    const QString kindPrefix = model.kind == core::LayerKind::Vector ? "[V] " : "[R] ";
+    auto* item = new QListWidgetItem(kindPrefix + QString::fromStdString(model.name), m_layerList);
     item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEditable);
     item->setCheckState(model.visible ? Qt::Checked : Qt::Unchecked);
     item->setData(kNameRole, QString::fromStdString(model.name));
     item->setData(kVisibilityRole, model.visible);
+    item->setData(kKindRole, static_cast<int>(model.kind));
     item->setToolTip("Toggle visibility with the checkbox. Double-click name to rename.");
     item->setSizeHint(QSize(item->sizeHint().width(), 28));
 
@@ -124,11 +135,29 @@ void LayerPanel::refreshLayers() {
   refreshButtonState();
 }
 
-void LayerPanel::onAddLayerClicked() {
+void LayerPanel::onAddRasterLayerClicked() {
   if (m_controller == nullptr) {
     return;
   }
-  m_controller->addLayer();
+  m_controller->addRasterLayer();
+}
+
+void LayerPanel::onAddVectorLayerClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->addVectorLayer();
+}
+
+void LayerPanel::onDuplicateLayerClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  const int row = m_layerList->currentRow();
+  if (row < 0) {
+    return;
+  }
+  m_controller->duplicateLayer(static_cast<std::size_t>(row));
 }
 
 void LayerPanel::onDeleteLayerClicked() {
@@ -181,7 +210,10 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
   }
 
   const QString oldName = item->data(kNameRole).toString();
-  const QString newName = item->text().trimmed();
+  QString newName = item->text().trimmed();
+  if (newName.startsWith("[R] ", Qt::CaseInsensitive) || newName.startsWith("[V] ", Qt::CaseInsensitive)) {
+    newName = newName.mid(4).trimmed();
+  }
   if (newName.isEmpty()) {
     const QSignalBlocker signalBlocker(m_layerList);
     item->setText(oldName);
@@ -216,6 +248,7 @@ void LayerPanel::onOpacityChanged(int value) {
 void LayerPanel::refreshButtonState() {
   if (m_controller == nullptr) {
     m_deleteButton->setEnabled(false);
+    m_duplicateButton->setEnabled(false);
     m_upButton->setEnabled(false);
     m_downButton->setEnabled(false);
     m_opacitySlider->setEnabled(false);
@@ -227,6 +260,7 @@ void LayerPanel::refreshButtonState() {
   const bool canMoveUp = current >= 0 && static_cast<std::size_t>(current + 1) < m_controller->document().layerCount();
   const bool canMoveDown = current > 0;
   m_deleteButton->setEnabled(hasSelection && canDelete);
+  m_duplicateButton->setEnabled(hasSelection);
   m_upButton->setEnabled(canMoveUp);
   m_downButton->setEnabled(canMoveDown);
   m_opacitySlider->setEnabled(hasSelection);

@@ -12,7 +12,7 @@ bool FillTool::isSameColor(const Color& a, const Color& b) noexcept {
 
 ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
-  if (active == nullptr) {
+  if (active == nullptr || active->kind() != LayerKind::Raster) {
     return {};
   }
 

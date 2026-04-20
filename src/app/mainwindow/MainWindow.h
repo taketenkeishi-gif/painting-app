@@ -3,6 +3,7 @@
 #include <map>
 
 #include <QMainWindow>
+#include <QByteArray>
 
 #include "core/color/Color.h"
 #include "core/tools/ToolType.h"
@@ -11,6 +12,7 @@ class QAction;
 class QLabel;
 class QMenu;
 class QKeySequence;
+class QDockWidget;
 class QPushButton;
 class QSplitter;
 class QTabWidget;
@@ -49,8 +51,17 @@ private slots:
   void onToggleLayerVisibilityTriggered();
   void onMoveLayerUpTriggered();
   void onMoveLayerDownTriggered();
+  void onAddRasterLayerTriggered();
+  void onAddVectorLayerTriggered();
+  void onDuplicateLayerTriggered();
+  void onDeleteLayerTriggered();
   void onDecreaseBrushSizeTriggered();
   void onIncreaseBrushSizeTriggered();
+  void onZoomInTriggered();
+  void onZoomOutTriggered();
+  void onResetZoomTriggered();
+  void onFitToScreenTriggered();
+  void onResetWorkspaceTriggered();
   void onChooseForegroundColor();
   void onChooseBackgroundColor();
   void onSwapColors();
@@ -80,6 +91,12 @@ private:
   QSplitter* m_leftSplitter {nullptr};
   QSplitter* m_rightSplitter {nullptr};
   QTabWidget* m_rightTabWidget {nullptr};
+  QDockWidget* m_toolDock {nullptr};
+  QDockWidget* m_subToolDock {nullptr};
+  QDockWidget* m_toolPropertyDock {nullptr};
+  QDockWidget* m_colorDock {nullptr};
+  QDockWidget* m_layerDock {nullptr};
+  QDockWidget* m_infoDock {nullptr};
   QToolBar* m_quickToolBar {nullptr};
   QLabel* m_currentToolLabel {nullptr};
   QLabel* m_currentSubToolLabel {nullptr};
@@ -98,6 +115,10 @@ private:
   QAction* m_undoAction {nullptr};
   QAction* m_redoAction {nullptr};
   QAction* m_addLayerAction {nullptr};
+  QAction* m_addRasterLayerAction {nullptr};
+  QAction* m_addVectorLayerAction {nullptr};
+  QAction* m_duplicateLayerAction {nullptr};
+  QAction* m_deleteLayerAction {nullptr};
   QAction* m_moveLayerUpAction {nullptr};
   QAction* m_moveLayerDownAction {nullptr};
   QAction* m_toggleLayerVisibilityAction {nullptr};
@@ -105,7 +126,13 @@ private:
   QAction* m_invertSelectionAction {nullptr};
   QAction* m_brushSizeDownAction {nullptr};
   QAction* m_brushSizeUpAction {nullptr};
+  QAction* m_zoomInAction {nullptr};
+  QAction* m_zoomOutAction {nullptr};
+  QAction* m_resetZoomAction {nullptr};
+  QAction* m_fitToScreenAction {nullptr};
+  QAction* m_resetWorkspaceAction {nullptr};
   std::map<core::ToolKind, QAction*> m_toolActions;
+  QByteArray m_defaultDockState;
   int m_lastCanvasWidth {800};
   int m_lastCanvasHeight {600};
 };

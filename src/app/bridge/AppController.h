@@ -32,6 +32,7 @@ struct LayerViewModel {
   bool visible {true};
   bool active {false};
   int opacityPercent {100};
+  core::LayerKind kind {core::LayerKind::Raster};
 };
 
 struct SubToolViewModel {
@@ -78,6 +79,10 @@ public:
 
   void newDocument(int width, int height);
   void addLayer();
+  void addRasterLayer();
+  void addVectorLayer();
+  bool duplicateLayer(std::size_t index);
+  bool duplicateActiveLayer();
   bool removeLayer(std::size_t index);
   bool renameLayer(std::size_t index, const std::string& name);
   bool moveLayer(std::size_t fromIndex, std::size_t toIndex);
@@ -97,14 +102,22 @@ public:
 
   std::vector<core::ToolKind> availableTools() const;
   std::string toolDisplayName(core::ToolKind kind) const;
+  bool canUseToolOnActiveLayer(core::ToolKind kind) const;
   bool setCurrentTool(core::ToolKind kind);
   core::ToolKind currentTool() const noexcept;
   bool setCurrentSubTool(const std::string& subToolId);
   std::string currentSubToolId() const;
+  bool duplicateCurrentSubTool();
+  bool renameCurrentSubTool(const std::string& displayName);
+  bool deleteCurrentSubTool();
+  bool resetCurrentSubTool();
 
   std::string currentToolDisplayName() const;
   std::string currentSubToolDisplayName() const;
   std::string currentToolGuide() const;
+  std::string activeLayerKindDisplayName() const;
+  bool canUseCurrentToolOnActiveLayer() const;
+  std::string currentLayerCompatibilityHint() const;
 
   bool currentToolSupportsColor() const noexcept;
   bool currentToolSupportsSize() const noexcept;
@@ -166,8 +179,8 @@ private:
     HistoryKind kind {HistoryKind::Stroke};
     std::string actionName {"Stroke"};
     std::size_t layerIndex {0};
-    core::PixelBuffer before;
-    core::PixelBuffer after;
+    std::optional<core::Layer> beforeLayer;
+    std::optional<core::Layer> afterLayer;
     bool beforeVisible {true};
     bool afterVisible {true};
     std::size_t beforeIndex {0};
@@ -181,13 +194,17 @@ private:
     bool trackSelection {false};
     std::string actionName {"Stroke"};
     std::size_t layerIndex {0};
-    core::PixelBuffer before;
+    std::optional<core::Layer> beforeLayer;
     core::SelectionMask beforeSelection;
   };
 
   static bool toolWritesPixels(core::ToolKind kind) noexcept;
   static bool toolWritesSelection(core::ToolKind kind) noexcept;
   static std::string actionNameForTool(core::ToolKind kind);
+  bool isSubToolCompatibleWithLayerKind(const app::ui::SubToolDescriptor& subTool, core::LayerKind layerKind) const noexcept;
+  bool isCurrentSubToolCompatibleWithActiveLayer() const noexcept;
+  const app::ui::SubToolDescriptor* firstCompatibleSubTool(core::ToolKind kind, core::LayerKind layerKind) const noexcept;
+  void ensureCurrentSubToolCompatibility();
 
   const app::ui::ToolDescriptor* currentToolDescriptor() const noexcept;
   const app::ui::SubToolDescriptor* currentSubToolDescriptor() const noexcept;

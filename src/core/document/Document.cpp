@@ -9,7 +9,7 @@ namespace core {
 Document::Document(int width, int height)
     : m_canvasSize {width, height},
       m_selection(width, height) {
-  addLayer("Layer 1");
+  addRasterLayer("Layer 1");
 }
 
 Layer& Document::layerAt(std::size_t index) {
@@ -48,10 +48,31 @@ const Layer* Document::activeLayer() const noexcept {
   return &m_layers[m_activeLayerIndex];
 }
 
-std::size_t Document::addLayer(const std::string& name) {
+std::size_t Document::addLayer(const std::string& name, LayerKind kind) {
   const std::string finalName = name.empty() ? makeDefaultLayerName(m_layers.size()) : name;
-  m_layers.emplace_back(finalName, m_canvasSize.width, m_canvasSize.height);
+  m_layers.emplace_back(finalName, m_canvasSize.width, m_canvasSize.height, kind);
   m_activeLayerIndex = m_layers.size() - 1;
+  return m_activeLayerIndex;
+}
+
+std::size_t Document::addRasterLayer(const std::string& name) {
+  return addLayer(name, LayerKind::Raster);
+}
+
+std::size_t Document::addVectorLayer(const std::string& name) {
+  return addLayer(name, LayerKind::Vector);
+}
+
+std::size_t Document::duplicateLayer(std::size_t index) {
+  if (index >= m_layers.size()) {
+    return m_activeLayerIndex;
+  }
+
+  Layer duplicated = m_layers[index];
+  duplicated.setName(duplicated.name() + " Copy");
+  const auto insertPos = m_layers.begin() + static_cast<std::ptrdiff_t>(index + 1);
+  m_layers.insert(insertPos, duplicated);
+  m_activeLayerIndex = index + 1;
   return m_activeLayerIndex;
 }
 

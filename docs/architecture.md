@@ -21,6 +21,16 @@
   - `ToolCatalog`
   - `UiState`
 - Brush/Eraser behavior is driven by sub-tool presets (`size/opacity/hardness/flow/spacing`).
+- Sub-tools carry `targetLayerKind` (`Raster` / `Vector` / `Both`) so tool availability can follow active layer type.
+- Sub-tool presets are runtime-editable (`duplicate/rename/delete/reset`) through `ToolCatalog`.
+
+## Layer Model
+
+- `Layer` now carries `LayerKind`:
+  - `Raster`: pixel buffer-based painting
+  - `Vector`: path list (`VectorPath`) rendered at composite time
+- `LineTool` writes vector paths on vector layers and raster pixels on raster layers.
+- `Renderer` rasterizes vector paths into a temporary buffer and composites it with standard alpha blending.
 
 ## History Scope
 
@@ -32,11 +42,12 @@
 
 ## UI Shell
 
-- Left: tool selection panel
-- Top: current tool/sub-tool info bar
-- Right: layer + sub-tool + tool-property panels
-- Center: canvas
-- Bottom: status bar (tool, guide, color, size, zoom, active layer)
+- `QDockWidget` workspace:
+  - Left docks: Tool / Sub Tool / Tool Property / Color
+  - Right docks: Layer / Info
+  - Center: Canvas
+  - Bottom: status bar
+- `Window` menu controls panel visibility and supports reset workspace.
 
 ## Extensibility Direction
 

@@ -26,7 +26,10 @@ public:
   Layer* activeLayer() noexcept;
   const Layer* activeLayer() const noexcept;
 
-  std::size_t addLayer(const std::string& name = {});
+  std::size_t addLayer(const std::string& name = {}, LayerKind kind = LayerKind::Raster);
+  std::size_t addRasterLayer(const std::string& name = {});
+  std::size_t addVectorLayer(const std::string& name = {});
+  std::size_t duplicateLayer(std::size_t index);
   bool removeLayer(std::size_t index) noexcept;
   bool renameLayer(std::size_t index, const std::string& newName);
   bool setLayerVisible(std::size_t index, bool visible) noexcept;

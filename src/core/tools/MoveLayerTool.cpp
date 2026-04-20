@@ -38,9 +38,23 @@ ToolResult MoveLayerTool::onPointerRelease(ToolContext& context, const ToolPoint
     return {};
   }
 
-  PixelBuffer& source = active->buffer();
   const int dx = m_current.x - m_start.x;
   const int dy = m_current.y - m_start.y;
+  if (dx == 0 && dy == 0) {
+    ToolResult result;
+    result.viewportChanged = true;
+    return result;
+  }
+
+  if (active->kind() == LayerKind::Vector) {
+    active->moveVectorPathsBy(dx, dy);
+    ToolResult result;
+    result.pixelsChanged = true;
+    result.viewportChanged = true;
+    return result;
+  }
+
+  PixelBuffer& source = active->buffer();
   const SelectionMask& selection = context.document.selection();
   const bool hasSelection = selection.hasSelection();
 

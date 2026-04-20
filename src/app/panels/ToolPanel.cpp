@@ -54,6 +54,7 @@ void ToolPanel::refreshFromController() {
     const QSignalBlocker blocker(button);
     button->setChecked(kind == current);
     button->setToolTip(QString::fromStdString(m_controller->toolDisplayName(kind)));
+    button->setEnabled(m_controller->canUseToolOnActiveLayer(kind));
   }
 }
 

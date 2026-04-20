@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace core {
 
@@ -38,7 +39,11 @@ ToolResult LineTool::onPointerRelease(ToolContext& context, const ToolPointerEve
     return {};
   }
 
-  drawLine(*active, m_start, m_current, context.currentColor, context.brushSize);
+  if (active->kind() == LayerKind::Vector) {
+    addVectorLine(*active, m_start, m_current, context.currentColor, context.brushSize);
+  } else {
+    drawLine(*active, m_start, m_current, context.currentColor, context.brushSize);
+  }
   ToolResult result;
   result.pixelsChanged = true;
   result.viewportChanged = true;
@@ -93,6 +98,16 @@ void LineTool::drawLine(Layer& layer, const Point& from, const Point& to, const 
         static_cast<int>(std::lround(static_cast<float>(from.y) + static_cast<float>(dy) * t))};
     stampCircle(buffer, p, radius, color);
   }
+}
+
+void LineTool::addVectorLine(Layer& layer, const Point& from, const Point& to, const Color& color, int size) const {
+  VectorPath path;
+  path.points.push_back(from);
+  path.points.push_back(to);
+  path.color = color;
+  path.width = std::max(1, size);
+  path.opacity = static_cast<float>(color.a) / 255.0F;
+  layer.addVectorPath(std::move(path));
 }
 
 void LineTool::stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const {

@@ -7,7 +7,7 @@ namespace core {
 
 ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
-  if (active == nullptr) {
+  if (active == nullptr || active->kind() != LayerKind::Raster) {
     return {};
   }
 
@@ -25,7 +25,7 @@ ToolResult BrushTool::onPointerMove(ToolContext& context, const ToolPointerEvent
   }
 
   Layer* active = context.document.activeLayer();
-  if (active == nullptr) {
+  if (active == nullptr || active->kind() != LayerKind::Raster) {
     m_drawing = false;
     return {};
   }
@@ -45,7 +45,7 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
 
   m_drawing = false;
   Layer* active = context.document.activeLayer();
-  if (active == nullptr) {
+  if (active == nullptr || active->kind() != LayerKind::Raster) {
     return {};
   }
 

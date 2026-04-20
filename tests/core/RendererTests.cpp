@@ -24,4 +24,11 @@ void runRendererTests() {
   expectNear(hiddenTop.r, 255, 0, "Hidden top layer should not affect red.");
   expectNear(hiddenTop.g, 0, 0, "Hidden top layer should not affect green.");
   expectNear(hiddenTop.b, 0, 0, "Hidden top layer should not affect blue.");
+
+  core::Document vectorDoc(16, 16);
+  vectorDoc.addVectorLayer("Vector");
+  core::Layer& vectorLayer = vectorDoc.layerAt(1);
+  vectorLayer.addVectorPath(core::VectorPath {{core::Point {2, 2}, core::Point {13, 13}}, core::Color {0, 255, 0, 255}, 2, 1.0F});
+  const core::Color vectorPixel = renderer.composite(vectorDoc).pixel(8, 8);
+  expectTrue(vectorPixel.g > 0, "Vector path should rasterize and appear in composited image.");
 }

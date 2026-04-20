@@ -62,16 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-tests.ps1
 
 After build, run `LayeredPaintApp.exe` and verify:
 
-1. Window opens with `left tool panel / top bar / right panel stack / center canvas / bottom status`.
-2. New Canvas changes width and height.
-3. Add Layer creates a new selectable layer.
-4. Selecting another layer changes the active highlight and draw target.
-5. Double-clicking a layer name renames it.
+1. Window opens with `left/right dock panels + center canvas + bottom status`.
+2. Window menu can hide/show docks and `Reset Workspace` restores default layout.
+3. New Canvas changes width and height.
+4. Layer panel can add Raster/Vector layers, duplicate, delete, and reorder.
+5. Selecting another layer changes active highlight and draw target; row prefix shows `[R]` or `[V]`.
 6. Visibility checkbox toggles composited display.
-7. Delete removes selected layer but never removes the last remaining layer.
-8. Tool panel switches active tool and top/status labels follow it.
-9. Tool property panel shows color/size for Brush/Eraser (and guide text for other tools).
-10. Line / RectSelection / MoveLayer show stable overlay while dragging.
+7. Brush on Vector layer is blocked (status guide shows compatibility hint).
+8. Line tool on Vector layer creates vector path and appears in composited canvas.
+9. Sub-tool panel supports duplicate/rename/delete/reset.
+10. Tool property panel applies changes immediately.
 11. Draw one stroke, press `Ctrl+Z`, stroke disappears.
 12. Press `Ctrl+Y`, undone stroke returns.
 

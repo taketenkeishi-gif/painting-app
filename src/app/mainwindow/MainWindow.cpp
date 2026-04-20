@@ -7,6 +7,8 @@
 #include <QColorDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDockWidget>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QFrame>
 #include <QGroupBox>
@@ -31,6 +33,7 @@
 #include "app/panels/SubToolPanel.h"
 #include "app/panels/ToolPanel.h"
 #include "app/panels/ToolPropertyPanel.h"
+#include "platform/qt/QtImageConverter.h"
 
 namespace app::mainwindow {
 
@@ -94,38 +97,10 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::setupShellLayout() {
-  auto* root = new QWidget(this);
-  auto* rootLayout = new QVBoxLayout(root);
-  rootLayout->setContentsMargins(4, 4, 4, 4);
-  rootLayout->setSpacing(6);
+  setCentralWidget(m_canvasWidget);
+  setDockNestingEnabled(true);
 
-  m_topBar = new QFrame(root);
-  m_topBar->setObjectName("TopBarHost");
-  auto* topLayout = new QHBoxLayout(m_topBar);
-  topLayout->setContentsMargins(10, 6, 10, 6);
-  topLayout->setSpacing(12);
-  m_currentToolLabel = new QLabel("Tool: Brush", m_topBar);
-  m_currentSubToolLabel = new QLabel("Sub Tool: Normal", m_topBar);
-  topLayout->addWidget(m_currentToolLabel);
-  topLayout->addWidget(m_currentSubToolLabel);
-  topLayout->addStretch(1);
-  rootLayout->addWidget(m_topBar);
-
-  m_mainSplitter = new QSplitter(Qt::Horizontal, root);
-
-  m_leftToolHost = new QFrame(m_mainSplitter);
-  m_leftToolHost->setObjectName("LeftToolHost");
-  auto* leftLayout = new QVBoxLayout(m_leftToolHost);
-  leftLayout->setContentsMargins(4, 4, 4, 4);
-  leftLayout->setSpacing(6);
-  m_leftSplitter = new QSplitter(Qt::Vertical, m_leftToolHost);
-  leftLayout->addWidget(m_leftSplitter, 1);
-
-  auto* toolGroup = makePanelGroup("Tools", m_toolPanel, m_leftSplitter);
-  auto* subToolGroup = makePanelGroup("Sub Tool", m_subToolPanel, m_leftSplitter);
-  auto* propGroup = makePanelGroup("Tool Property", m_toolPropertyPanel, m_leftSplitter);
-
-  auto* colorPanel = new QWidget(m_leftSplitter);
+  auto* colorPanel = new QWidget(this);
   auto* colorLayout = new QVBoxLayout(colorPanel);
   colorLayout->setContentsMargins(8, 8, 8, 8);
   colorLayout->setSpacing(6);
@@ -134,6 +109,7 @@ void MainWindow::setupShellLayout() {
   m_foregroundColorButton = new QPushButton("FG", colorPanel);
   m_backgroundColorButton = new QPushButton("BG", colorPanel);
   auto* swapColorButton = new QPushButton("Swap", colorPanel);
+  auto* resetColorButton = new QPushButton("Reset B/W", colorPanel);
   auto* colorButtons = new QHBoxLayout();
   colorButtons->setContentsMargins(0, 0, 0, 0);
   colorButtons->setSpacing(6);
@@ -142,66 +118,55 @@ void MainWindow::setupShellLayout() {
   colorLayout->addWidget(colorTitle);
   colorLayout->addLayout(colorButtons);
   colorLayout->addWidget(swapColorButton);
+  colorLayout->addWidget(resetColorButton);
   colorLayout->addStretch(1);
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
   connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
+  connect(resetColorButton, &QPushButton::clicked, this, [this]() {
+    m_controller->setBrushColor(core::Color::OpaqueBlack());
+    m_backgroundColor = core::Color {255, 255, 255, 255};
+    updateColorPanel();
+  });
 
-  m_leftSplitter->addWidget(toolGroup);
-  m_leftSplitter->addWidget(subToolGroup);
-  m_leftSplitter->addWidget(propGroup);
-  m_leftSplitter->addWidget(colorPanel);
-  m_leftSplitter->setStretchFactor(0, 0);
-  m_leftSplitter->setStretchFactor(1, 2);
-  m_leftSplitter->setStretchFactor(2, 3);
-  m_leftSplitter->setStretchFactor(3, 1);
-
-  auto* centerHost = new QFrame(m_mainSplitter);
-  centerHost->setObjectName("CenterCanvasHost");
-  auto* centerLayout = new QVBoxLayout(centerHost);
-  centerLayout->setContentsMargins(0, 0, 0, 0);
-  centerLayout->setSpacing(0);
-  centerLayout->addWidget(m_canvasWidget, 1);
-
-  m_rightPanelHost = new QFrame(m_mainSplitter);
-  m_rightPanelHost->setObjectName("RightPanelHost");
-  auto* rightLayout = new QVBoxLayout(m_rightPanelHost);
-  rightLayout->setContentsMargins(4, 4, 4, 4);
-  rightLayout->setSpacing(6);
-  m_rightSplitter = new QSplitter(Qt::Vertical, m_rightPanelHost);
-  rightLayout->addWidget(m_rightSplitter, 1);
-
-  auto* layerGroup = makePanelGroup("Layer", m_layerPanel, m_rightSplitter);
-
-  m_rightTabWidget = new QTabWidget(m_rightSplitter);
-  auto* infoPanel = new QWidget(m_rightTabWidget);
+  auto* infoPanel = new QWidget(this);
   auto* infoLayout = new QVBoxLayout(infoPanel);
   infoLayout->setContentsMargins(8, 8, 8, 8);
   infoLayout->setSpacing(6);
-  auto* infoTitle = new QLabel("Tool Guide", infoPanel);
+  auto* infoTitle = new QLabel("Info", infoPanel);
   infoTitle->setStyleSheet("font-weight: 700;");
-  auto* infoText = new QLabel("Use left panels to pick tool/sub tool and tune properties.", infoPanel);
+  auto* infoText = new QLabel("Tool, sub tool, and layer constraints are shown in status bar.", infoPanel);
   infoText->setWordWrap(true);
   infoLayout->addWidget(infoTitle);
   infoLayout->addWidget(infoText);
   infoLayout->addStretch(1);
-  m_rightTabWidget->addTab(infoPanel, "Info");
 
-  m_rightSplitter->addWidget(layerGroup);
-  m_rightSplitter->addWidget(m_rightTabWidget);
-  m_rightSplitter->setStretchFactor(0, 3);
-  m_rightSplitter->setStretchFactor(1, 1);
+  auto makeDock = [this](const QString& title, QWidget* widget, const char* name) {
+    auto* dock = new QDockWidget(title, this);
+    dock->setObjectName(name);
+    dock->setWidget(widget);
+    dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    return dock;
+  };
 
-  m_mainSplitter->addWidget(m_leftToolHost);
-  m_mainSplitter->addWidget(centerHost);
-  m_mainSplitter->addWidget(m_rightPanelHost);
-  m_mainSplitter->setStretchFactor(0, 0);
-  m_mainSplitter->setStretchFactor(1, 1);
-  m_mainSplitter->setStretchFactor(2, 0);
-  m_mainSplitter->setSizes({340, 920, 320});
+  m_toolDock = makeDock("Tools", m_toolPanel, "ToolDock");
+  m_subToolDock = makeDock("Sub Tool", m_subToolPanel, "SubToolDock");
+  m_toolPropertyDock = makeDock("Tool Property", m_toolPropertyPanel, "ToolPropertyDock");
+  m_colorDock = makeDock("Color", colorPanel, "ColorDock");
+  m_layerDock = makeDock("Layer", m_layerPanel, "LayerDock");
+  m_infoDock = makeDock("Info", infoPanel, "InfoDock");
 
-  rootLayout->addWidget(m_mainSplitter, 1);
-  setCentralWidget(root);
+  addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
+  splitDockWidget(m_toolDock, m_subToolDock, Qt::Vertical);
+  splitDockWidget(m_subToolDock, m_toolPropertyDock, Qt::Vertical);
+  splitDockWidget(m_toolPropertyDock, m_colorDock, Qt::Vertical);
+
+  addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
+  splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
+
+  m_toolDock->raise();
+  m_layerDock->raise();
+  m_defaultDockState = saveState();
 }
 
 void MainWindow::createMenus() {
@@ -210,11 +175,20 @@ void MainWindow::createMenus() {
   auto* toolMenu = menuBar()->addMenu("&Tool");
   auto* selectMenu = menuBar()->addMenu("&Select");
   auto* layerMenu = menuBar()->addMenu("&Layer");
+  auto* viewMenu = menuBar()->addMenu("&View");
+  auto* windowMenu = menuBar()->addMenu("&Window");
+  auto* helpMenu = menuBar()->addMenu("&Help");
 
   m_newCanvasAction = new QAction("&New Canvas", this);
+  auto* exportPngAction = new QAction("Export &PNG...", this);
+  auto* closeAction = new QAction("&Close", this);
   m_undoAction = new QAction("&Undo", this);
   m_redoAction = new QAction("&Redo", this);
-  m_addLayerAction = new QAction("&Add Layer", this);
+  m_addLayerAction = new QAction("&New Raster Layer", this);
+  m_addRasterLayerAction = m_addLayerAction;
+  m_addVectorLayerAction = new QAction("New &Vector Layer", this);
+  m_duplicateLayerAction = new QAction("&Duplicate Layer", this);
+  m_deleteLayerAction = new QAction("&Delete Layer", this);
   m_moveLayerUpAction = new QAction("Move Layer &Up", this);
   m_moveLayerDownAction = new QAction("Move Layer &Down", this);
   m_toggleLayerVisibilityAction = new QAction("&Toggle Visibility", this);
@@ -222,11 +196,22 @@ void MainWindow::createMenus() {
   m_invertSelectionAction = new QAction("&Invert Selection", this);
   m_brushSizeDownAction = new QAction("Brush Size &Down", this);
   m_brushSizeUpAction = new QAction("Brush Size &Up", this);
+  m_zoomInAction = new QAction("Zoom &In", this);
+  m_zoomOutAction = new QAction("Zoom &Out", this);
+  m_resetZoomAction = new QAction("&Reset Zoom", this);
+  m_fitToScreenAction = new QAction("&Fit To Screen", this);
+  m_resetWorkspaceAction = new QAction("&Reset Workspace", this);
+  auto* aboutAction = new QAction("&About", this);
 
   m_newCanvasAction->setShortcut(QKeySequence::New);
+  exportPngAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
+  closeAction->setShortcut(QKeySequence::Close);
   m_undoAction->setShortcut(QKeySequence::Undo);
   m_redoAction->setShortcuts({QKeySequence::Redo, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
   m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+  m_addVectorLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_N));
+  m_duplicateLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
+  m_deleteLayerAction->setShortcut(QKeySequence::Delete);
   m_moveLayerUpAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Up));
   m_moveLayerDownAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Down));
   m_toggleLayerVisibilityAction->setShortcut(QKeySequence(Qt::Key_V));
@@ -234,8 +219,16 @@ void MainWindow::createMenus() {
   m_invertSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
   m_brushSizeDownAction->setShortcut(QKeySequence(Qt::Key_BracketLeft));
   m_brushSizeUpAction->setShortcut(QKeySequence(Qt::Key_BracketRight));
+  m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
+  m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
+  m_resetZoomAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+  m_fitToScreenAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_9));
+  m_resetWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
 
   fileMenu->addAction(m_newCanvasAction);
+  fileMenu->addAction(exportPngAction);
+  fileMenu->addSeparator();
+  fileMenu->addAction(closeAction);
   editMenu->addAction(m_undoAction);
   editMenu->addAction(m_redoAction);
   editMenu->addSeparator();
@@ -261,12 +254,53 @@ void MainWindow::createMenus() {
   selectMenu->addAction(m_clearSelectionAction);
   selectMenu->addAction(m_invertSelectionAction);
 
-  layerMenu->addAction(m_addLayerAction);
+  layerMenu->addAction(m_addRasterLayerAction);
+  layerMenu->addAction(m_addVectorLayerAction);
+  layerMenu->addAction(m_duplicateLayerAction);
+  layerMenu->addAction(m_deleteLayerAction);
+  layerMenu->addSeparator();
   layerMenu->addAction(m_moveLayerUpAction);
   layerMenu->addAction(m_moveLayerDownAction);
   layerMenu->addAction(m_toggleLayerVisibilityAction);
 
+  viewMenu->addAction(m_zoomInAction);
+  viewMenu->addAction(m_zoomOutAction);
+  viewMenu->addAction(m_resetZoomAction);
+  viewMenu->addAction(m_fitToScreenAction);
+
+  if (m_toolDock != nullptr) {
+    windowMenu->addAction(m_toolDock->toggleViewAction());
+  }
+  if (m_subToolDock != nullptr) {
+    windowMenu->addAction(m_subToolDock->toggleViewAction());
+  }
+  if (m_toolPropertyDock != nullptr) {
+    windowMenu->addAction(m_toolPropertyDock->toggleViewAction());
+  }
+  if (m_colorDock != nullptr) {
+    windowMenu->addAction(m_colorDock->toggleViewAction());
+  }
+  if (m_layerDock != nullptr) {
+    windowMenu->addAction(m_layerDock->toggleViewAction());
+  }
+  if (m_infoDock != nullptr) {
+    windowMenu->addAction(m_infoDock->toggleViewAction());
+  }
+  windowMenu->addSeparator();
+  windowMenu->addAction(m_resetWorkspaceAction);
+
+  helpMenu->addAction(aboutAction);
+
   connect(m_newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
+  connect(exportPngAction, &QAction::triggered, this, [this]() {
+    const QString path = QFileDialog::getSaveFileName(this, "Export PNG", QString(), "PNG Image (*.png)");
+    if (path.isEmpty()) {
+      return;
+    }
+    const QImage image = platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
+    image.save(path, "PNG");
+  });
+  connect(closeAction, &QAction::triggered, this, &QWidget::close);
   connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndoTriggered);
   connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedoTriggered);
   connect(m_clearSelectionAction, &QAction::triggered, this, &MainWindow::onClearSelectionTriggered);
@@ -276,7 +310,18 @@ void MainWindow::createMenus() {
   connect(m_moveLayerDownAction, &QAction::triggered, this, &MainWindow::onMoveLayerDownTriggered);
   connect(m_brushSizeDownAction, &QAction::triggered, this, &MainWindow::onDecreaseBrushSizeTriggered);
   connect(m_brushSizeUpAction, &QAction::triggered, this, &MainWindow::onIncreaseBrushSizeTriggered);
-  connect(m_addLayerAction, &QAction::triggered, m_controller, &app::bridge::AppController::addLayer);
+  connect(m_addRasterLayerAction, &QAction::triggered, this, &MainWindow::onAddRasterLayerTriggered);
+  connect(m_addVectorLayerAction, &QAction::triggered, this, &MainWindow::onAddVectorLayerTriggered);
+  connect(m_duplicateLayerAction, &QAction::triggered, this, &MainWindow::onDuplicateLayerTriggered);
+  connect(m_deleteLayerAction, &QAction::triggered, this, &MainWindow::onDeleteLayerTriggered);
+  connect(m_zoomInAction, &QAction::triggered, this, &MainWindow::onZoomInTriggered);
+  connect(m_zoomOutAction, &QAction::triggered, this, &MainWindow::onZoomOutTriggered);
+  connect(m_resetZoomAction, &QAction::triggered, this, &MainWindow::onResetZoomTriggered);
+  connect(m_fitToScreenAction, &QAction::triggered, this, &MainWindow::onFitToScreenTriggered);
+  connect(m_resetWorkspaceAction, &QAction::triggered, this, &MainWindow::onResetWorkspaceTriggered);
+  connect(aboutAction, &QAction::triggered, this, [this]() {
+    statusBar()->showMessage("Layered Paint App - UI shell + raster/vector base", 4000);
+  });
 
   m_toolStatusLabel = new QLabel("Tool: Brush", this);
   m_toolStatusLabel->setObjectName("ToolStatusLabel");
@@ -313,35 +358,50 @@ void MainWindow::createToolBar() {
   m_newCanvasAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
   m_undoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
   m_redoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
-  m_addLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+  m_addRasterLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+  m_addVectorLayerAction->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
+  m_duplicateLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
+  m_deleteLayerAction->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
   m_toggleLayerVisibilityAction->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
   m_moveLayerUpAction->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
   m_moveLayerDownAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
+  m_zoomInAction->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
+  m_zoomOutAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
 
   m_quickToolBar->addAction(m_newCanvasAction);
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_undoAction);
   m_quickToolBar->addAction(m_redoAction);
   m_quickToolBar->addSeparator();
-  m_quickToolBar->addAction(m_addLayerAction);
+  m_quickToolBar->addAction(m_addRasterLayerAction);
+  m_quickToolBar->addAction(m_addVectorLayerAction);
+  m_quickToolBar->addAction(m_duplicateLayerAction);
+  m_quickToolBar->addAction(m_deleteLayerAction);
   m_quickToolBar->addAction(m_moveLayerUpAction);
   m_quickToolBar->addAction(m_moveLayerDownAction);
   m_quickToolBar->addAction(m_toggleLayerVisibilityAction);
+  m_quickToolBar->addSeparator();
+  m_quickToolBar->addAction(m_zoomInAction);
+  m_quickToolBar->addAction(m_zoomOutAction);
+  m_quickToolBar->addAction(m_resetZoomAction);
 }
 
 void MainWindow::applyUiChrome() {
   setStyleSheet(
-      "QMainWindow { background: #202328; color: #e8e8e8; }"
-      "#TopBarHost { background: #2b2f36; border: 1px solid #3a3f48; border-radius: 4px; }"
-      "#LeftToolHost, #RightPanelHost { background: #24272d; border: 1px solid #353b45; border-radius: 4px; }"
-      "#CenterCanvasHost { background: #1f2227; border: 1px solid #353b45; border-radius: 4px; }"
+      "QMainWindow { background: #1f2227; color: #e8e8e8; }"
+      "QDockWidget { color: #d9dde5; }"
+      "QDockWidget::title { background: #2b3038; border: 1px solid #3a414d; padding: 4px 8px; }"
+      "QDockWidget > QWidget { background: #262a31; }"
       "QGroupBox { border: 1px solid #3f4652; border-radius: 4px; margin-top: 12px; padding-top: 10px; }"
       "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #d9dde5; font-weight: 700; }"
-      "QListWidget { background: #1f2328; border: 1px solid #353b44; }"
+      "QListWidget { background: #1f2328; border: 1px solid #353b44; color: #dfe5ef; }"
       "QListWidget::item:selected { background: #32507a; color: #ffffff; }"
-      "QPushButton { background: #2d323a; border: 1px solid #4b5464; border-radius: 3px; padding: 4px 8px; }"
+      "QPushButton, QToolButton { background: #2d323a; border: 1px solid #4b5464; border-radius: 3px; padding: 4px 8px; color: #e2e6ee; }"
       "QPushButton:hover { background: #39404a; }"
-      "QMenuBar, QToolBar { background: #2a2f36; }"
+      "QMenuBar, QToolBar { background: #2a2f36; color: #e2e6ee; }"
+      "QLineEdit, QSpinBox, QComboBox { background: #1e2228; border: 1px solid #3e4654; color: #e6ebf3; }"
+      "QSlider::groove:horizontal { background: #20252d; height: 6px; border-radius: 3px; }"
+      "QSlider::handle:horizontal { background: #6f92c2; width: 12px; border-radius: 6px; margin: -3px 0; }"
       "QStatusBar { background: #2a2f36; border-top: 1px solid #3a3f48; }");
 }
 
@@ -382,7 +442,9 @@ void MainWindow::updateActiveLayerStatus() {
     return;
   }
   const std::size_t active = doc.activeLayerIndex();
-  m_activeLayerStatusLabel->setText(QString("Layer: %1").arg(QString::fromStdString(doc.layerAt(active).name())));
+  const core::Layer& layer = doc.layerAt(active);
+  const QString kind = layer.kind() == core::LayerKind::Vector ? "Vector" : "Raster";
+  m_activeLayerStatusLabel->setText(QString("Layer: %1 (%2)").arg(QString::fromStdString(layer.name()), kind));
   if (m_selectionStatusLabel != nullptr) {
     m_selectionStatusLabel->setText(QString("Selection: %1").arg(doc.selection().hasSelection() ? "On" : "Off"));
   }
@@ -507,12 +569,54 @@ void MainWindow::onMoveLayerDownTriggered() {
   }
 }
 
+void MainWindow::onAddRasterLayerTriggered() {
+  m_controller->addRasterLayer();
+}
+
+void MainWindow::onAddVectorLayerTriggered() {
+  m_controller->addVectorLayer();
+}
+
+void MainWindow::onDuplicateLayerTriggered() {
+  m_controller->duplicateActiveLayer();
+}
+
+void MainWindow::onDeleteLayerTriggered() {
+  if (m_controller->document().layerCount() == 0) {
+    return;
+  }
+  m_controller->removeLayer(m_controller->document().activeLayerIndex());
+}
+
 void MainWindow::onDecreaseBrushSizeTriggered() {
   m_controller->adjustBrushSize(-1);
 }
 
 void MainWindow::onIncreaseBrushSizeTriggered() {
   m_controller->adjustBrushSize(1);
+}
+
+void MainWindow::onZoomInTriggered() {
+  m_canvasWidget->zoomIn();
+}
+
+void MainWindow::onZoomOutTriggered() {
+  m_canvasWidget->zoomOut();
+}
+
+void MainWindow::onResetZoomTriggered() {
+  m_canvasWidget->resetZoom();
+}
+
+void MainWindow::onFitToScreenTriggered() {
+  m_canvasWidget->fitToScreen();
+}
+
+void MainWindow::onResetWorkspaceTriggered() {
+  if (m_defaultDockState.isEmpty()) {
+    return;
+  }
+  restoreState(m_defaultDockState);
 }
 
 void MainWindow::onChooseForegroundColor() {
@@ -570,6 +674,7 @@ void MainWindow::updateToolActionState() {
   for (const auto& [kind, action] : m_toolActions) {
     if (action != nullptr) {
       action->setChecked(kind == current);
+      action->setEnabled(m_controller->canUseToolOnActiveLayer(kind));
     }
   }
 }

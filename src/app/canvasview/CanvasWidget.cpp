@@ -141,6 +141,45 @@ void CanvasWidget::setController(app::bridge::AppController* controller) {
   refreshFromController();
 }
 
+void CanvasWidget::zoomIn() {
+  auto& state = stateFor(this);
+  state.zoom = std::clamp(state.zoom * 1.1, 0.1, 16.0);
+  updateZoomStatusLabel(this);
+  update();
+}
+
+void CanvasWidget::zoomOut() {
+  auto& state = stateFor(this);
+  state.zoom = std::clamp(state.zoom / 1.1, 0.1, 16.0);
+  updateZoomStatusLabel(this);
+  update();
+}
+
+void CanvasWidget::resetZoom() {
+  auto& state = stateFor(this);
+  state.zoom = 1.0;
+  state.panOffset = QPointF(0.0, 0.0);
+  updateZoomStatusLabel(this);
+  update();
+}
+
+void CanvasWidget::fitToScreen() {
+  if (m_image.isNull()) {
+    return;
+  }
+  auto& state = stateFor(this);
+  const double zoomX = static_cast<double>(width()) / static_cast<double>(m_image.width());
+  const double zoomY = static_cast<double>(height()) / static_cast<double>(m_image.height());
+  state.zoom = std::clamp(std::min(zoomX, zoomY), 0.1, 16.0);
+  state.panOffset = QPointF(0.0, 0.0);
+  updateZoomStatusLabel(this);
+  update();
+}
+
+int CanvasWidget::zoomPercent() const {
+  return static_cast<int>(std::lround(stateFor(this).zoom * 100.0));
+}
+
 void CanvasWidget::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
   auto& state = stateFor(this);

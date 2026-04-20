@@ -25,6 +25,37 @@ bool pixelBuffersEqual(const core::PixelBuffer& lhs, const core::PixelBuffer& rh
   return true;
 }
 
+bool vectorPathsEqual(const std::vector<core::VectorPath>& lhs, const std::vector<core::VectorPath>& rhs) {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+  for (std::size_t i = 0; i < lhs.size(); ++i) {
+    const core::VectorPath& a = lhs[i];
+    const core::VectorPath& b = rhs[i];
+    if (a.width != b.width || std::abs(a.opacity - b.opacity) > 0.0001F ||
+        a.color.r != b.color.r || a.color.g != b.color.g || a.color.b != b.color.b || a.color.a != b.color.a ||
+        a.points.size() != b.points.size()) {
+      return false;
+    }
+    for (std::size_t j = 0; j < a.points.size(); ++j) {
+      if (a.points[j].x != b.points[j].x || a.points[j].y != b.points[j].y) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool layersEqual(const core::Layer& lhs, const core::Layer& rhs) {
+  if (lhs.kind() != rhs.kind()) {
+    return false;
+  }
+  if (!pixelBuffersEqual(lhs.buffer(), rhs.buffer())) {
+    return false;
+  }
+  return vectorPathsEqual(lhs.vectorPaths(), rhs.vectorPaths());
+}
+
 bool containsProperty(const std::vector<app::ui::ToolPropertyKey>& properties, app::ui::ToolPropertyKey key) {
   return std::find(properties.begin(), properties.end(), key) != properties.end();
 }
@@ -101,7 +132,8 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
         layer.name(),
         layer.visible(),
         i == m_document.activeLayerIndex(),
-        static_cast<int>(std::lround(std::clamp(layer.opacity(), 0.0F, 1.0F) * 100.0F))});
+        static_cast<int>(std::lround(std::clamp(layer.opacity(), 0.0F, 1.0F) * 100.0F)),
+        layer.kind()});
   }
   return models;
 }
@@ -142,7 +174,24 @@ ToolStateViewModel AppController::toolState() const noexcept {
 void AppController::newDocument(int width, int height) {
   m_document = core::Document(width, height);
   m_layerCounter = 1;
+  ensureCurrentSubToolCompatibility();
   m_stroking = false;
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+}
+
+void AppController::addLayer() {
+  addRasterLayer();
+}
+
+void AppController::addRasterLayer() {
+  ++m_layerCounter;
+  m_document.addRasterLayer("Layer " + std::to_string(m_layerCounter));
+  ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
   rerender();
@@ -150,23 +199,47 @@ void AppController::newDocument(int width, int height) {
   emit documentChanged();
 }
 
-void AppController::addLayer() {
+void AppController::addVectorLayer() {
   ++m_layerCounter;
-  m_document.addLayer("Layer " + std::to_string(m_layerCounter));
+  m_document.addVectorLayer("Vector " + std::to_string(m_layerCounter));
+  ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
   rerender();
   emit layersChanged();
   emit documentChanged();
+}
+
+bool AppController::duplicateLayer(std::size_t index) {
+  if (index >= m_document.layerCount()) {
+    return false;
+  }
+  m_document.duplicateLayer(index);
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::duplicateActiveLayer() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  return duplicateLayer(m_document.activeLayerIndex());
 }
 
 bool AppController::removeLayer(std::size_t index) {
   if (!m_document.removeLayer(index)) {
     return false;
   }
+  ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
   rerender();
+  emit toolStateChanged();
   emit layersChanged();
   emit documentChanged();
   return true;
@@ -227,6 +300,8 @@ void AppController::setActiveLayer(std::size_t index) {
   if (!m_document.setActiveLayer(index)) {
     return;
   }
+  ensureCurrentSubToolCompatibility();
+  emit toolStateChanged();
   emit layersChanged();
 }
 
@@ -334,6 +409,14 @@ std::string AppController::toolDisplayName(core::ToolKind kind) const {
   return std::string {core::toolKindDisplayName(kind)};
 }
 
+bool AppController::canUseToolOnActiveLayer(core::ToolKind kind) const {
+  const core::Layer* active = m_document.activeLayer();
+  if (active == nullptr) {
+    return true;
+  }
+  return firstCompatibleSubTool(kind, active->kind()) != nullptr;
+}
+
 bool AppController::setCurrentTool(core::ToolKind kind) {
   if (!m_toolManager.setActiveTool(kind)) {
     return false;
@@ -347,6 +430,7 @@ bool AppController::setCurrentTool(core::ToolKind kind) {
     }
   }
 
+  ensureCurrentSubToolCompatibility();
   selectSubToolInternal(currentSubToolId(), false);
   emit toolStateChanged();
   emit documentChanged();
@@ -361,6 +445,10 @@ bool AppController::setCurrentSubTool(const std::string& subToolId) {
   if (!selectSubToolInternal(subToolId, true)) {
     return false;
   }
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    ensureCurrentSubToolCompatibility();
+    emit toolStateChanged();
+  }
   emit documentChanged();
   return true;
 }
@@ -372,6 +460,55 @@ std::string AppController::currentSubToolId() const {
   }
   const app::ui::SubToolDescriptor* sub = m_toolCatalog.defaultSubTool(currentTool());
   return sub == nullptr ? std::string {} : sub->id;
+}
+
+bool AppController::duplicateCurrentSubTool() {
+  const std::string sourceId = currentSubToolId();
+  const app::ui::SubToolDescriptor* source = currentSubToolDescriptor();
+  if (source == nullptr) {
+    return false;
+  }
+  if (!m_toolCatalog.duplicateSubTool(currentTool(), sourceId, source->displayName + " Copy")) {
+    return false;
+  }
+  const app::ui::ToolDescriptor* tool = currentToolDescriptor();
+  if (tool == nullptr || tool->subTools.empty()) {
+    return false;
+  }
+  const app::ui::SubToolDescriptor& created = tool->subTools.back();
+  return setCurrentSubTool(created.id);
+}
+
+bool AppController::renameCurrentSubTool(const std::string& displayName) {
+  if (!m_toolCatalog.renameSubTool(currentTool(), currentSubToolId(), displayName)) {
+    return false;
+  }
+  emit toolStateChanged();
+  return true;
+}
+
+bool AppController::deleteCurrentSubTool() {
+  const std::string deletingId = currentSubToolId();
+  if (!m_toolCatalog.removeSubTool(currentTool(), deletingId)) {
+    return false;
+  }
+  const app::ui::SubToolDescriptor* fallback = m_toolCatalog.defaultSubTool(currentTool());
+  if (fallback != nullptr) {
+    m_selectedSubToolByTool[currentTool()] = fallback->id;
+    selectSubToolInternal(fallback->id, true);
+  }
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::resetCurrentSubTool() {
+  const std::string id = currentSubToolId();
+  if (!m_toolCatalog.resetSubTool(currentTool(), id)) {
+    return false;
+  }
+  selectSubToolInternal(id, true);
+  emit documentChanged();
+  return true;
 }
 
 std::string AppController::currentToolDisplayName() const {
@@ -389,14 +526,34 @@ std::string AppController::currentSubToolDisplayName() const {
 
 std::string AppController::currentToolGuide() const {
   const app::ui::SubToolDescriptor* sub = currentSubToolDescriptor();
+  const std::string hint = currentLayerCompatibilityHint();
   if (sub != nullptr && !sub->guide.empty()) {
-    return sub->guide;
+    return hint.empty() ? sub->guide : sub->guide + "  " + hint;
   }
   const app::ui::ToolDescriptor* descriptor = currentToolDescriptor();
   if (descriptor != nullptr) {
-    return descriptor->guide;
+    return hint.empty() ? descriptor->guide : descriptor->guide + "  " + hint;
   }
-  return "";
+  return hint;
+}
+
+std::string AppController::activeLayerKindDisplayName() const {
+  const core::Layer* layer = m_document.activeLayer();
+  if (layer == nullptr) {
+    return "None";
+  }
+  return layer->kind() == core::LayerKind::Vector ? "Vector" : "Raster";
+}
+
+bool AppController::canUseCurrentToolOnActiveLayer() const {
+  return isCurrentSubToolCompatibleWithActiveLayer();
+}
+
+std::string AppController::currentLayerCompatibilityHint() const {
+  if (isCurrentSubToolCompatibleWithActiveLayer()) {
+    return {};
+  }
+  return "(Tool limited by active layer kind)";
 }
 
 bool AppController::currentToolSupportsColor() const noexcept {
@@ -461,6 +618,9 @@ void AppController::beginStroke(int x, int y) {
   if (m_stroking) {
     return;
   }
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return;
+  }
 
   const core::ToolKind activeKind = m_toolManager.activeToolKind();
   PendingStrokeState pending;
@@ -472,7 +632,7 @@ void AppController::beginStroke(int x, int y) {
     }
     pending.trackPixels = true;
     pending.layerIndex = m_document.activeLayerIndex();
-    pending.before = activeLayer->buffer();
+    pending.beforeLayer = *activeLayer;
   }
   if (toolWritesSelection(activeKind)) {
     pending.trackSelection = true;
@@ -569,7 +729,11 @@ bool AppController::undo() {
 
   switch (entry.kind) {
     case HistoryKind::Stroke:
-      m_document.layerAt(entry.layerIndex).buffer() = entry.before;
+      if (!entry.beforeLayer.has_value()) {
+        clearStrokeHistory();
+        return false;
+      }
+      m_document.layerAt(entry.layerIndex) = *entry.beforeLayer;
       break;
     case HistoryKind::LayerVisibility:
       m_document.setLayerVisible(entry.layerIndex, entry.beforeVisible);
@@ -616,7 +780,11 @@ bool AppController::redo() {
 
   switch (entry.kind) {
     case HistoryKind::Stroke:
-      m_document.layerAt(entry.layerIndex).buffer() = entry.after;
+      if (!entry.afterLayer.has_value()) {
+        clearStrokeHistory();
+        return false;
+      }
+      m_document.layerAt(entry.layerIndex) = *entry.afterLayer;
       break;
     case HistoryKind::LayerVisibility:
       m_document.setLayerVisible(entry.layerIndex, entry.afterVisible);
@@ -853,6 +1021,59 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
   }
 }
 
+bool AppController::isSubToolCompatibleWithLayerKind(
+    const app::ui::SubToolDescriptor& subTool,
+    core::LayerKind layerKind) const noexcept {
+  const app::ui::TargetLayerKind target = subTool.preset.targetLayerKind;
+  if (target == app::ui::TargetLayerKind::Both) {
+    return true;
+  }
+  if (target == app::ui::TargetLayerKind::Raster) {
+    return layerKind == core::LayerKind::Raster;
+  }
+  return layerKind == core::LayerKind::Vector;
+}
+
+bool AppController::isCurrentSubToolCompatibleWithActiveLayer() const noexcept {
+  const app::ui::SubToolDescriptor* sub = currentSubToolDescriptor();
+  const core::Layer* layer = m_document.activeLayer();
+  if (sub == nullptr || layer == nullptr) {
+    return true;
+  }
+  return isSubToolCompatibleWithLayerKind(*sub, layer->kind());
+}
+
+const app::ui::SubToolDescriptor* AppController::firstCompatibleSubTool(
+    core::ToolKind kind,
+    core::LayerKind layerKind) const noexcept {
+  const app::ui::ToolDescriptor* descriptor = m_toolCatalog.findTool(kind);
+  if (descriptor == nullptr) {
+    return nullptr;
+  }
+  for (const app::ui::SubToolDescriptor& sub : descriptor->subTools) {
+    if (isSubToolCompatibleWithLayerKind(sub, layerKind)) {
+      return &sub;
+    }
+  }
+  return nullptr;
+}
+
+void AppController::ensureCurrentSubToolCompatibility() {
+  const core::Layer* active = m_document.activeLayer();
+  if (active == nullptr) {
+    return;
+  }
+  const std::string currentId = currentSubToolId();
+  const app::ui::SubToolDescriptor* current = m_toolCatalog.findSubTool(currentTool(), currentId);
+  if (current != nullptr && isSubToolCompatibleWithLayerKind(*current, active->kind())) {
+    return;
+  }
+  const app::ui::SubToolDescriptor* compatible = firstCompatibleSubTool(currentTool(), active->kind());
+  if (compatible != nullptr) {
+    m_selectedSubToolByTool[currentTool()] = compatible->id;
+  }
+}
+
 const app::ui::ToolDescriptor* AppController::currentToolDescriptor() const noexcept {
   return m_toolCatalog.findTool(currentTool());
 }
@@ -916,20 +1137,21 @@ void AppController::applyUiStateToTools() {
 }
 
 void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescriptor& subTool) {
+  const app::ui::ToolBehaviorProfile& profile = subTool.profile;
   m_uiState.subToolId = subTool.id;
-  m_uiState.size = std::max(1, subTool.preset.size);
-  m_uiState.opacity = clampPercent(subTool.preset.opacity);
-  m_uiState.hardness = clampPercent(subTool.preset.hardness);
-  m_uiState.flow = clampPercent(subTool.preset.flow);
-  m_uiState.spacing = std::clamp(subTool.preset.spacing, 1, 300);
-  m_uiState.antiAlias = subTool.preset.antiAlias;
-  m_uiState.stabilization = clampPercent(subTool.preset.stabilization);
-  m_uiState.postCorrection = subTool.preset.postCorrection;
-  m_uiState.velocityBasedCorrection = subTool.preset.velocityBasedCorrection;
-  m_uiState.shapeType = subTool.preset.shapeType;
-  m_uiState.blendMode = subTool.preset.blendMode;
-  m_uiState.eraseMode = subTool.preset.eraseMode;
-  m_uiState.lockAlphaRespect = subTool.preset.lockAlphaRespect;
+  m_uiState.size = std::max(1, profile.stroke.size);
+  m_uiState.opacity = clampPercent(profile.stroke.opacity);
+  m_uiState.hardness = clampPercent(profile.shape.hardness);
+  m_uiState.flow = clampPercent(profile.stroke.flow);
+  m_uiState.spacing = std::clamp(profile.stroke.spacing, 1, 300);
+  m_uiState.antiAlias = profile.stroke.antiAlias;
+  m_uiState.stabilization = clampPercent(profile.stabilizer.stabilization);
+  m_uiState.postCorrection = profile.stabilizer.postCorrection;
+  m_uiState.velocityBasedCorrection = profile.stabilizer.velocityBasedCorrection;
+  m_uiState.shapeType = profile.shape.shapeType;
+  m_uiState.blendMode = profile.blendMode;
+  m_uiState.eraseMode = profile.eraseMode;
+  m_uiState.lockAlphaRespect = profile.lockAlphaRespect;
 }
 
 core::ToolContext AppController::makeToolContext() {
@@ -971,14 +1193,17 @@ void AppController::finishPendingStrokeHistory() {
       return;
     }
 
-    const core::PixelBuffer after = m_document.layerAt(layerIndex).buffer();
-    if (!pixelBuffersEqual(pending.before, after)) {
+    if (!pending.beforeLayer.has_value()) {
+      return;
+    }
+    const core::Layer after = m_document.layerAt(layerIndex);
+    if (!layersEqual(*pending.beforeLayer, after)) {
       StrokeHistoryEntry entry;
       entry.kind = HistoryKind::Stroke;
       entry.actionName = pending.actionName;
       entry.layerIndex = layerIndex;
-      entry.before = pending.before;
-      entry.after = after;
+      entry.beforeLayer = *pending.beforeLayer;
+      entry.afterLayer = after;
       pushHistoryEntry(std::move(entry));
     }
   }

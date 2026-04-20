@@ -21,6 +21,7 @@ public:
 
 private:
   void drawLine(Layer& layer, const Point& from, const Point& to, const Color& color, int size) const;
+  void addVectorLine(Layer& layer, const Point& from, const Point& to, const Color& color, int size) const;
   void stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const;
   void blendPixel(PixelBuffer& buffer, int x, int y, const Color& src) const;
 

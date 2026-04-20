@@ -45,4 +45,14 @@ void runDocumentTests() {
   expectTrue(orderDoc.layerAt(2).name() == "Top", "Layer order should reflect upward move.");
   expectTrue(!orderDoc.moveLayerUp(2), "moveLayerUp should fail for topmost layer.");
   expectTrue(!orderDoc.moveLayerDown(0), "moveLayerDown should fail for bottom-most layer.");
+
+  core::Document vectorDoc(48, 48);
+  const std::size_t vectorIndex = vectorDoc.addVectorLayer("Vector 1");
+  expectTrue(vectorDoc.layerAt(vectorIndex).kind() == core::LayerKind::Vector, "addVectorLayer should create vector kind.");
+  vectorDoc.layerAt(vectorIndex).addVectorPath(core::VectorPath {{core::Point {1, 1}, core::Point {10, 10}}, core::Color {255, 0, 0, 255}, 3, 1.0F});
+  expectTrue(!vectorDoc.layerAt(vectorIndex).vectorPaths().empty(), "Vector layer should keep vector paths.");
+  const std::size_t duplicateIndex = vectorDoc.duplicateLayer(vectorIndex);
+  expectTrue(duplicateIndex == vectorIndex + 1, "duplicateLayer should insert next to source.");
+  expectTrue(vectorDoc.layerAt(duplicateIndex).kind() == core::LayerKind::Vector, "Duplicated layer should preserve kind.");
+  expectTrue(vectorDoc.layerAt(duplicateIndex).vectorPaths().size() == vectorDoc.layerAt(vectorIndex).vectorPaths().size(), "Duplicated vector paths should be copied.");
 }

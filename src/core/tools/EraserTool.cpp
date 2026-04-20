@@ -7,7 +7,7 @@ namespace core {
 
 ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
-  if (active == nullptr) {
+  if (active == nullptr || active->kind() != LayerKind::Raster) {
     return {};
   }
 
@@ -25,7 +25,7 @@ ToolResult EraserTool::onPointerMove(ToolContext& context, const ToolPointerEven
   }
 
   Layer* active = context.document.activeLayer();
-  if (active == nullptr) {
+  if (active == nullptr || active->kind() != LayerKind::Raster) {
     m_erasing = false;
     return {};
   }
@@ -45,7 +45,7 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
 
   m_erasing = false;
   Layer* active = context.document.activeLayer();
-  if (active == nullptr) {
+  if (active == nullptr || active->kind() != LayerKind::Raster) {
     return {};
   }
 

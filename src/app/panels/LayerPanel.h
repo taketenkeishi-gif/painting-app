@@ -22,7 +22,9 @@ public:
 
 private slots:
   void refreshLayers();
-  void onAddLayerClicked();
+  void onAddRasterLayerClicked();
+  void onAddVectorLayerClicked();
+  void onDuplicateLayerClicked();
   void onDeleteLayerClicked();
   void onMoveLayerUpClicked();
   void onMoveLayerDownClicked();
@@ -38,7 +40,9 @@ private:
   QListWidget* m_layerList {nullptr};
   QLabel* m_opacityLabel {nullptr};
   QSlider* m_opacitySlider {nullptr};
-  QPushButton* m_addButton {nullptr};
+  QPushButton* m_addRasterButton {nullptr};
+  QPushButton* m_addVectorButton {nullptr};
+  QPushButton* m_duplicateButton {nullptr};
   QPushButton* m_upButton {nullptr};
   QPushButton* m_downButton {nullptr};
   QPushButton* m_deleteButton {nullptr};

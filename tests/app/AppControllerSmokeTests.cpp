@@ -1,5 +1,6 @@
 #include <exception>
 #include <iostream>
+#include <string>
 
 #include "app/bridge/AppController.h"
 #include "core/color/Color.h"
@@ -216,6 +217,52 @@ int main() {
     controller.endStroke();
     const core::Color linePixel = controller.document().layerAt(0).buffer().pixel(33, 33);
     expectTrue(linePixel.r > 0 && linePixel.g > 0, "Line tool should draw between press/release points.");
+
+    // Vector layer workflow + layer-kind gated tools
+    controller.newDocument(64, 64);
+    controller.addVectorLayer();
+    controller.setActiveLayer(1);
+    expectTrue(controller.document().layerAt(1).kind() == core::LayerKind::Vector, "Vector layer should be creatable from controller.");
+    expectTrue(controller.activeLayerKindDisplayName() == "Vector", "Active layer kind label should reflect vector layer.");
+
+    controller.setCurrentTool(core::ToolKind::Brush);
+    expectTrue(!controller.canUseCurrentToolOnActiveLayer(), "Brush should be restricted on vector layer.");
+    controller.setBrushColor(core::Color {255, 0, 0, 255});
+    controller.beginStroke(8, 8);
+    controller.continueStroke(14, 8);
+    controller.endStroke();
+    const core::Color vectorBrushAttempt = controller.compositedBuffer().pixel(10, 8);
+    expectTrue(vectorBrushAttempt.a == 0, "Raster-only brush should not draw on vector layer.");
+
+    controller.setCurrentTool(core::ToolKind::Line);
+    expectTrue(controller.setCurrentSubTool("line_vector"), "Vector line sub-tool should be selectable.");
+    expectTrue(controller.canUseCurrentToolOnActiveLayer(), "Vector line should be available on vector layer.");
+    controller.setBrushColor(core::Color {0, 255, 255, 255});
+    controller.beginStroke(6, 6);
+    controller.continueStroke(20, 20);
+    controller.endStroke();
+    expectTrue(!controller.document().layerAt(1).vectorPaths().empty(), "Line on vector layer should store vector paths.");
+    const core::Color vectorLinePixel = controller.compositedBuffer().pixel(12, 12);
+    expectTrue(vectorLinePixel.g > 0 && vectorLinePixel.b > 0, "Vector line should appear in composited output.");
+    expectTrue(controller.undo(), "Vector line stroke should be undoable.");
+    expectTrue(controller.document().layerAt(1).vectorPaths().empty(), "Undo should remove vector path.");
+    expectTrue(controller.redo(), "Vector line stroke should be redoable.");
+    expectTrue(!controller.document().layerAt(1).vectorPaths().empty(), "Redo should restore vector path.");
+
+    // Sub-tool management operations
+    controller.setCurrentTool(core::ToolKind::Brush);
+    const std::string originalSubTool = controller.currentSubToolId();
+    expectTrue(controller.duplicateCurrentSubTool(), "Duplicate sub-tool should create a new editable preset.");
+    const std::string duplicatedSubTool = controller.currentSubToolId();
+    expectTrue(duplicatedSubTool != originalSubTool, "Duplicated preset should become active with new id.");
+    expectTrue(controller.renameCurrentSubTool("My Brush"), "Rename sub-tool should update display name.");
+    expectTrue(controller.currentSubToolDisplayName() == "My Brush", "Renamed sub-tool name should be reflected.");
+    expectTrue(controller.deleteCurrentSubTool(), "Delete sub-tool should remove duplicated preset.");
+    expectTrue(controller.currentSubToolId() != duplicatedSubTool, "After delete, active sub-tool should switch to an existing one.");
+    expectTrue(controller.setCurrentSubTool("brush_hard"), "Built-in hard brush sub-tool should be selectable.");
+    controller.setBrushSize(77);
+    expectTrue(controller.resetCurrentSubTool(), "Reset sub-tool should restore default descriptor values.");
+    expectTrue(controller.toolState().size == 6, "Reset hard brush should restore default size.");
 
     std::cout << "App smoke tests passed.\n";
     return 0;

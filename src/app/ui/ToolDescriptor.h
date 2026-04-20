@@ -9,6 +9,21 @@
 
 namespace app::ui {
 
+enum class TargetLayerKind {
+  Raster,
+  Vector,
+  Both
+};
+
+enum class CursorStyle {
+  Default,
+  Brush,
+  Cross,
+  Hand,
+  Zoom,
+  Fill
+};
+
 enum class ToolPropertyKey {
   Color,
   Size,
@@ -26,6 +41,47 @@ enum class ToolPropertyKey {
   LockAlphaRespect
 };
 
+struct StrokeSettings {
+  int size {8};
+  int opacity {100};
+  int flow {100};
+  int spacing {25};
+  bool antiAlias {true};
+};
+
+struct BrushShapeSettings {
+  core::BrushShapeType shapeType {core::BrushShapeType::Circle};
+  int hardness {100};
+  int angle {0};
+  int roundness {100};
+  int taperStart {0};
+  int taperEnd {0};
+};
+
+struct StabilizerSettings {
+  int stabilization {0};
+  bool postCorrection {false};
+  bool velocityBasedCorrection {false};
+};
+
+struct VectorStrokeSettings {
+  int strokeWidth {8};
+  int simplifyLevel {0};
+  int snapAngle {0};
+};
+
+struct ToolBehaviorProfile {
+  StrokeSettings stroke;
+  BrushShapeSettings shape;
+  StabilizerSettings stabilizer;
+  VectorStrokeSettings vector;
+  core::BlendMode blendMode {core::BlendMode::Normal};
+  bool eraseMode {false};
+  bool lockAlphaRespect {false};
+  TargetLayerKind targetLayerKind {TargetLayerKind::Both};
+  CursorStyle cursorStyle {CursorStyle::Default};
+};
+
 struct BrushPreset {
   int size {8};
   int opacity {100};
@@ -40,12 +96,19 @@ struct BrushPreset {
   core::BlendMode blendMode {core::BlendMode::Normal};
   bool eraseMode {false};
   bool lockAlphaRespect {false};
+  int angle {0};
+  int roundness {100};
+  int taperStart {0};
+  int taperEnd {0};
+  TargetLayerKind targetLayerKind {TargetLayerKind::Both};
+  CursorStyle cursorStyle {CursorStyle::Default};
 };
 
 struct SubToolDescriptor {
   std::string id;
   std::string displayName;
   BrushPreset preset;
+  ToolBehaviorProfile profile;
   std::vector<ToolPropertyKey> editableProperties;
   std::string guide;
 };
@@ -65,10 +128,19 @@ public:
 
   const std::vector<ToolDescriptor>& tools() const noexcept { return m_tools; }
   const ToolDescriptor* findTool(core::ToolKind kind) const noexcept;
+  ToolDescriptor* findToolMutable(core::ToolKind kind) noexcept;
   const SubToolDescriptor* findSubTool(core::ToolKind kind, std::string_view subToolId) const noexcept;
+  SubToolDescriptor* findSubToolMutable(core::ToolKind kind, std::string_view subToolId) noexcept;
   const SubToolDescriptor* defaultSubTool(core::ToolKind kind) const noexcept;
+  bool duplicateSubTool(core::ToolKind kind, std::string_view sourceSubToolId, const std::string& newDisplayName);
+  bool renameSubTool(core::ToolKind kind, std::string_view subToolId, const std::string& newDisplayName);
+  bool removeSubTool(core::ToolKind kind, std::string_view subToolId);
+  bool resetSubTool(core::ToolKind kind, std::string_view subToolId);
 
 private:
+  static std::string makeSubToolId(std::string_view baseId, const std::vector<SubToolDescriptor>& existing);
+
+  std::vector<ToolDescriptor> m_defaultTools;
   std::vector<ToolDescriptor> m_tools;
 };
 
