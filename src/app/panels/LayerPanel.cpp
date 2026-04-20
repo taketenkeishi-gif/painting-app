@@ -28,6 +28,8 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_opacityLabel(new QLabel("Opacity: 100%", this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
       m_addButton(new QPushButton("Add", this)),
+      m_upButton(new QPushButton("Up", this)),
+      m_downButton(new QPushButton("Down", this)),
       m_deleteButton(new QPushButton("Delete", this)) {
   m_headerLabel->setStyleSheet("font-weight: 700;");
   m_layerList->setAlternatingRowColors(true);
@@ -41,6 +43,8 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_opacitySlider->setToolTip("Active layer opacity");
 
   m_addButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
+  m_upButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
+  m_downButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
   m_deleteButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
 
   auto* layout = new QVBoxLayout(this);
@@ -53,12 +57,16 @@ LayerPanel::LayerPanel(QWidget* parent)
 
   auto* buttonRow = new QHBoxLayout();
   buttonRow->addWidget(m_addButton);
+  buttonRow->addWidget(m_upButton);
+  buttonRow->addWidget(m_downButton);
   buttonRow->addWidget(m_deleteButton);
   layout->addLayout(buttonRow);
 
   setLayout(layout);
 
   connect(m_addButton, &QPushButton::clicked, this, &LayerPanel::onAddLayerClicked);
+  connect(m_upButton, &QPushButton::clicked, this, &LayerPanel::onMoveLayerUpClicked);
+  connect(m_downButton, &QPushButton::clicked, this, &LayerPanel::onMoveLayerDownClicked);
   connect(m_deleteButton, &QPushButton::clicked, this, &LayerPanel::onDeleteLayerClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
@@ -134,6 +142,28 @@ void LayerPanel::onDeleteLayerClicked() {
   m_controller->removeLayer(static_cast<std::size_t>(row));
 }
 
+void LayerPanel::onMoveLayerUpClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  const int row = m_layerList->currentRow();
+  if (row < 0) {
+    return;
+  }
+  m_controller->moveLayerUp(static_cast<std::size_t>(row));
+}
+
+void LayerPanel::onMoveLayerDownClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  const int row = m_layerList->currentRow();
+  if (row < 0) {
+    return;
+  }
+  m_controller->moveLayerDown(static_cast<std::size_t>(row));
+}
+
 void LayerPanel::onCurrentLayerChanged(int row) {
   if (m_controller == nullptr || m_isRefreshing || row < 0) {
     return;
@@ -186,12 +216,19 @@ void LayerPanel::onOpacityChanged(int value) {
 void LayerPanel::refreshButtonState() {
   if (m_controller == nullptr) {
     m_deleteButton->setEnabled(false);
+    m_upButton->setEnabled(false);
+    m_downButton->setEnabled(false);
     m_opacitySlider->setEnabled(false);
     return;
   }
   const bool hasSelection = m_layerList->currentRow() >= 0;
   const bool canDelete = m_controller->document().layerCount() > 1;
+  const int current = m_layerList->currentRow();
+  const bool canMoveUp = current >= 0 && static_cast<std::size_t>(current + 1) < m_controller->document().layerCount();
+  const bool canMoveDown = current > 0;
   m_deleteButton->setEnabled(hasSelection && canDelete);
+  m_upButton->setEnabled(canMoveUp);
+  m_downButton->setEnabled(canMoveDown);
   m_opacitySlider->setEnabled(hasSelection);
 }
 

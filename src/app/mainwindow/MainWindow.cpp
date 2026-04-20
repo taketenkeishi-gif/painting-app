@@ -215,6 +215,8 @@ void MainWindow::createMenus() {
   m_undoAction = new QAction("&Undo", this);
   m_redoAction = new QAction("&Redo", this);
   m_addLayerAction = new QAction("&Add Layer", this);
+  m_moveLayerUpAction = new QAction("Move Layer &Up", this);
+  m_moveLayerDownAction = new QAction("Move Layer &Down", this);
   m_toggleLayerVisibilityAction = new QAction("&Toggle Visibility", this);
   m_clearSelectionAction = new QAction("&Clear Selection", this);
   m_invertSelectionAction = new QAction("&Invert Selection", this);
@@ -225,6 +227,8 @@ void MainWindow::createMenus() {
   m_undoAction->setShortcut(QKeySequence::Undo);
   m_redoAction->setShortcuts({QKeySequence::Redo, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
   m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
+  m_moveLayerUpAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Up));
+  m_moveLayerDownAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Down));
   m_toggleLayerVisibilityAction->setShortcut(QKeySequence(Qt::Key_V));
   m_clearSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
   m_invertSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
@@ -258,6 +262,8 @@ void MainWindow::createMenus() {
   selectMenu->addAction(m_invertSelectionAction);
 
   layerMenu->addAction(m_addLayerAction);
+  layerMenu->addAction(m_moveLayerUpAction);
+  layerMenu->addAction(m_moveLayerDownAction);
   layerMenu->addAction(m_toggleLayerVisibilityAction);
 
   connect(m_newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
@@ -266,6 +272,8 @@ void MainWindow::createMenus() {
   connect(m_clearSelectionAction, &QAction::triggered, this, &MainWindow::onClearSelectionTriggered);
   connect(m_invertSelectionAction, &QAction::triggered, this, &MainWindow::onInvertSelectionTriggered);
   connect(m_toggleLayerVisibilityAction, &QAction::triggered, this, &MainWindow::onToggleLayerVisibilityTriggered);
+  connect(m_moveLayerUpAction, &QAction::triggered, this, &MainWindow::onMoveLayerUpTriggered);
+  connect(m_moveLayerDownAction, &QAction::triggered, this, &MainWindow::onMoveLayerDownTriggered);
   connect(m_brushSizeDownAction, &QAction::triggered, this, &MainWindow::onDecreaseBrushSizeTriggered);
   connect(m_brushSizeUpAction, &QAction::triggered, this, &MainWindow::onIncreaseBrushSizeTriggered);
   connect(m_addLayerAction, &QAction::triggered, m_controller, &app::bridge::AppController::addLayer);
@@ -307,6 +315,8 @@ void MainWindow::createToolBar() {
   m_redoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
   m_addLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
   m_toggleLayerVisibilityAction->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
+  m_moveLayerUpAction->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
+  m_moveLayerDownAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
 
   m_quickToolBar->addAction(m_newCanvasAction);
   m_quickToolBar->addSeparator();
@@ -314,6 +324,8 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addAction(m_redoAction);
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_addLayerAction);
+  m_quickToolBar->addAction(m_moveLayerUpAction);
+  m_quickToolBar->addAction(m_moveLayerDownAction);
   m_quickToolBar->addAction(m_toggleLayerVisibilityAction);
 }
 
@@ -479,6 +491,18 @@ void MainWindow::onInvertSelectionTriggered() {
 
 void MainWindow::onToggleLayerVisibilityTriggered() {
   if (m_controller->toggleActiveLayerVisible()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onMoveLayerUpTriggered() {
+  if (m_controller->moveActiveLayerUp()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onMoveLayerDownTriggered() {
+  if (m_controller->moveActiveLayerDown()) {
     updateUndoRedoState();
   }
 }

@@ -35,6 +35,7 @@ private slots:
 private:
   QRect canvasRect() const;
   std::optional<core::Point> mapToCanvas(const QPoint& widgetPos) const;
+  void updateCursorForState(const std::optional<core::Point>& canvasPoint);
 
   app::bridge::AppController* m_controller {nullptr};
   QImage m_image;

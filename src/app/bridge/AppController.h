@@ -80,6 +80,11 @@ public:
   void addLayer();
   bool removeLayer(std::size_t index);
   bool renameLayer(std::size_t index, const std::string& name);
+  bool moveLayer(std::size_t fromIndex, std::size_t toIndex);
+  bool moveLayerUp(std::size_t index);
+  bool moveLayerDown(std::size_t index);
+  bool moveActiveLayerUp();
+  bool moveActiveLayerDown();
   void setActiveLayer(std::size_t index);
   void setLayerVisible(std::size_t index, bool visible);
   void setLayerOpacity(std::size_t index, int opacityPercent);
@@ -153,6 +158,7 @@ private:
   enum class HistoryKind {
     Stroke,
     LayerVisibility,
+    LayerOrder,
     Selection
   };
 
@@ -164,6 +170,8 @@ private:
     core::PixelBuffer after;
     bool beforeVisible {true};
     bool afterVisible {true};
+    std::size_t beforeIndex {0};
+    std::size_t afterIndex {0};
     core::SelectionMask beforeSelection;
     core::SelectionMask afterSelection;
   };

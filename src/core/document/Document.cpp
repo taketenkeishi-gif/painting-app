@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <stdexcept>
+#include <utility>
 
 namespace core {
 
@@ -92,6 +93,40 @@ bool Document::setLayerOpacity(std::size_t index, float opacity) noexcept {
   }
   m_layers[index].setOpacity(opacity);
   return true;
+}
+
+bool Document::moveLayer(std::size_t fromIndex, std::size_t toIndex) noexcept {
+  if (fromIndex >= m_layers.size() || toIndex >= m_layers.size() || fromIndex == toIndex) {
+    return false;
+  }
+
+  Layer movedLayer = std::move(m_layers[fromIndex]);
+  m_layers.erase(m_layers.begin() + static_cast<std::ptrdiff_t>(fromIndex));
+  m_layers.insert(m_layers.begin() + static_cast<std::ptrdiff_t>(toIndex), std::move(movedLayer));
+
+  if (m_activeLayerIndex == fromIndex) {
+    m_activeLayerIndex = toIndex;
+  } else if (fromIndex < m_activeLayerIndex && m_activeLayerIndex <= toIndex) {
+    --m_activeLayerIndex;
+  } else if (toIndex <= m_activeLayerIndex && m_activeLayerIndex < fromIndex) {
+    ++m_activeLayerIndex;
+  }
+
+  return true;
+}
+
+bool Document::moveLayerUp(std::size_t index) noexcept {
+  if (index + 1 >= m_layers.size()) {
+    return false;
+  }
+  return moveLayer(index, index + 1);
+}
+
+bool Document::moveLayerDown(std::size_t index) noexcept {
+  if (index == 0 || index >= m_layers.size()) {
+    return false;
+  }
+  return moveLayer(index, index - 1);
 }
 
 std::string Document::makeDefaultLayerName(std::size_t currentLayerCount) {

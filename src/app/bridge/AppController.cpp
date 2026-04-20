@@ -180,6 +180,49 @@ bool AppController::renameLayer(std::size_t index, const std::string& name) {
   return true;
 }
 
+bool AppController::moveLayer(std::size_t fromIndex, std::size_t toIndex) {
+  if (!m_document.moveLayer(fromIndex, toIndex)) {
+    return false;
+  }
+
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::LayerOrder;
+  entry.actionName = "Layer Order";
+  entry.beforeIndex = fromIndex;
+  entry.afterIndex = toIndex;
+  pushHistoryEntry(std::move(entry));
+
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::moveLayerUp(std::size_t index) {
+  return moveLayer(index, index + 1);
+}
+
+bool AppController::moveLayerDown(std::size_t index) {
+  if (index == 0) {
+    return false;
+  }
+  return moveLayer(index, index - 1);
+}
+
+bool AppController::moveActiveLayerUp() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  return moveLayerUp(m_document.activeLayerIndex());
+}
+
+bool AppController::moveActiveLayerDown() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  return moveLayerDown(m_document.activeLayerIndex());
+}
+
 void AppController::setActiveLayer(std::size_t index) {
   if (!m_document.setActiveLayer(index)) {
     return;
@@ -513,6 +556,16 @@ bool AppController::undo() {
     clearStrokeHistory();
     return false;
   }
+  if (entry.kind == HistoryKind::LayerOrder &&
+      (entry.beforeIndex >= m_document.layerCount() || entry.afterIndex >= m_document.layerCount())) {
+    clearStrokeHistory();
+    return false;
+  }
+  if (entry.kind == HistoryKind::LayerOrder &&
+      (entry.beforeIndex >= m_document.layerCount() || entry.afterIndex >= m_document.layerCount())) {
+    clearStrokeHistory();
+    return false;
+  }
 
   switch (entry.kind) {
     case HistoryKind::Stroke:
@@ -520,6 +573,9 @@ bool AppController::undo() {
       break;
     case HistoryKind::LayerVisibility:
       m_document.setLayerVisible(entry.layerIndex, entry.beforeVisible);
+      break;
+    case HistoryKind::LayerOrder:
+      m_document.moveLayer(entry.afterIndex, entry.beforeIndex);
       break;
     case HistoryKind::Selection:
       m_document.selection() = entry.beforeSelection;
@@ -533,7 +589,8 @@ bool AppController::undo() {
   }
   m_redoHistory.push_back(std::move(entry));
   rerender();
-  if (m_redoHistory.back().kind == HistoryKind::LayerVisibility) {
+  if (m_redoHistory.back().kind == HistoryKind::LayerVisibility ||
+      m_redoHistory.back().kind == HistoryKind::LayerOrder) {
     emit layersChanged();
   }
   emit documentChanged();
@@ -564,6 +621,9 @@ bool AppController::redo() {
     case HistoryKind::LayerVisibility:
       m_document.setLayerVisible(entry.layerIndex, entry.afterVisible);
       break;
+    case HistoryKind::LayerOrder:
+      m_document.moveLayer(entry.beforeIndex, entry.afterIndex);
+      break;
     case HistoryKind::Selection:
       m_document.selection() = entry.afterSelection;
       break;
@@ -576,7 +636,8 @@ bool AppController::redo() {
   }
   m_undoHistory.push_back(std::move(entry));
   rerender();
-  if (m_undoHistory.back().kind == HistoryKind::LayerVisibility) {
+  if (m_undoHistory.back().kind == HistoryKind::LayerVisibility ||
+      m_undoHistory.back().kind == HistoryKind::LayerOrder) {
     emit layersChanged();
   }
   emit documentChanged();

@@ -24,6 +24,8 @@ private slots:
   void refreshLayers();
   void onAddLayerClicked();
   void onDeleteLayerClicked();
+  void onMoveLayerUpClicked();
+  void onMoveLayerDownClicked();
   void onCurrentLayerChanged(int row);
   void onLayerItemChanged(QListWidgetItem* item);
   void onOpacityChanged(int value);
@@ -37,6 +39,8 @@ private:
   QLabel* m_opacityLabel {nullptr};
   QSlider* m_opacitySlider {nullptr};
   QPushButton* m_addButton {nullptr};
+  QPushButton* m_upButton {nullptr};
+  QPushButton* m_downButton {nullptr};
   QPushButton* m_deleteButton {nullptr};
   bool m_isRefreshing {false};
 };

@@ -38,6 +38,17 @@ int main() {
     expectTrue(!controller.removeLayer(0), "Deleting the last layer should be rejected.");
     expectTrue(!controller.canUndo(), "Undo should be unavailable after history reset operations.");
 
+    controller.addLayer();
+    controller.addLayer();
+    controller.setActiveLayer(0);
+    expectTrue(controller.moveLayerUp(0), "moveLayerUp should move the active layer up one slot.");
+    expectTrue(controller.document().activeLayerIndex() == 1, "Active layer should follow moved layer.");
+    expectTrue(controller.canUndo(), "Layer order change should be undoable.");
+    expectTrue(controller.undo(), "Undo should restore layer order.");
+    expectTrue(controller.document().activeLayerIndex() == 0, "Undo should restore moved layer position.");
+    expectTrue(controller.redo(), "Redo should re-apply layer order move.");
+    expectTrue(controller.document().activeLayerIndex() == 1, "Redo should move layer again.");
+
     // Drawing + color/size reflection + undo/redo
     controller.addLayer();
     controller.setActiveLayer(1);

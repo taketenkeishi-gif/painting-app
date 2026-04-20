@@ -34,4 +34,15 @@ void runDocumentTests() {
   expectTrue(document.layerCount() == 1, "Layer count should be 1 after second removal.");
   expectTrue(document.activeLayerIndex() == 0, "Active index should move to last remaining layer.");
   expectTrue(!document.removeLayer(0), "removeLayer should fail when attempting to remove the last layer.");
+
+  core::Document orderDoc(32, 32);
+  orderDoc.renameLayer(0, "Base");
+  orderDoc.addLayer("Mid");
+  orderDoc.addLayer("Top");
+  expectTrue(orderDoc.moveLayerDown(2), "moveLayerDown should move top layer toward bottom.");
+  expectTrue(orderDoc.layerAt(1).name() == "Top", "Layer order should reflect downward move.");
+  expectTrue(orderDoc.moveLayerUp(1), "moveLayerUp should move layer back upward.");
+  expectTrue(orderDoc.layerAt(2).name() == "Top", "Layer order should reflect upward move.");
+  expectTrue(!orderDoc.moveLayerUp(2), "moveLayerUp should fail for topmost layer.");
+  expectTrue(!orderDoc.moveLayerDown(0), "moveLayerDown should fail for bottom-most layer.");
 }

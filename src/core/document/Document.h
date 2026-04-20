@@ -31,6 +31,9 @@ public:
   bool renameLayer(std::size_t index, const std::string& newName);
   bool setLayerVisible(std::size_t index, bool visible) noexcept;
   bool setLayerOpacity(std::size_t index, float opacity) noexcept;
+  bool moveLayer(std::size_t fromIndex, std::size_t toIndex) noexcept;
+  bool moveLayerUp(std::size_t index) noexcept;
+  bool moveLayerDown(std::size_t index) noexcept;
 
   SelectionMask& selection() noexcept { return m_selection; }
   const SelectionMask& selection() const noexcept { return m_selection; }

@@ -69,24 +69,27 @@ void updateZoomStatusLabel(const CanvasWidget* widget) {
   zoomLabel->setText(QString("Zoom: %1%").arg(percent));
 }
 
-void updateCursorForState(CanvasWidget* widget, const std::optional<core::Point>& canvasPoint) {
-  if (widget == nullptr) {
-    return;
+Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
+  switch (tool) {
+    case core::ToolKind::Brush:
+    case core::ToolKind::Eraser:
+      return Qt::BlankCursor;
+    case core::ToolKind::Eyedropper:
+      return Qt::CrossCursor;
+    case core::ToolKind::Fill:
+      return Qt::PointingHandCursor;
+    case core::ToolKind::Line:
+    case core::ToolKind::RectSelection:
+      return Qt::CrossCursor;
+    case core::ToolKind::MoveLayer:
+      return dragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor;
+    case core::ToolKind::Hand:
+      return dragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor;
+    case core::ToolKind::Zoom:
+      return Qt::SizeVerCursor;
+    default:
+      return Qt::ArrowCursor;
   }
-  const auto& state = stateFor(widget);
-  if (state.panning) {
-    widget->setCursor(Qt::ClosedHandCursor);
-    return;
-  }
-  if (g_spacePressed) {
-    widget->setCursor(Qt::OpenHandCursor);
-    return;
-  }
-  if (canvasPoint.has_value()) {
-    widget->setCursor(Qt::BlankCursor);
-    return;
-  }
-  widget->unsetCursor();
 }
 
 void ensureSpaceTrackerInstalled() {
@@ -126,6 +129,15 @@ void CanvasWidget::setController(app::bridge::AppController* controller) {
   }
 
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &CanvasWidget::refreshFromController);
+  connect(m_controller, &app::bridge::AppController::toolStateChanged, this, [this]() {
+    const auto& state = stateFor(this);
+    if (state.hasMousePos) {
+      updateCursorForState(mapToCanvas(state.lastMousePos));
+    } else {
+      updateCursorForState(std::nullopt);
+    }
+    update();
+  });
   refreshFromController();
 }
 
@@ -206,7 +218,9 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
 
   if (!state.panning && !g_spacePressed && state.hasMousePos && m_controller != nullptr) {
     const auto point = mapToCanvas(state.lastMousePos);
-    if (point.has_value() && m_controller->currentToolSupportsSize()) {
+    const core::ToolKind activeTool = m_controller->currentTool();
+    if (point.has_value() &&
+        (activeTool == core::ToolKind::Brush || activeTool == core::ToolKind::Eraser)) {
       const double radiusPx = std::max(1.0, (m_controller->toolState().size * state.zoom) / 2.0);
       const QPointF center(
           target.x() + (static_cast<double>(point->x) + 0.5) * state.zoom,
@@ -236,7 +250,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
       return;
     }
     m_controller->pickColorAt(point->x, point->y);
-    updateCursorForState(this, point);
+    updateCursorForState(point);
     update();
     return;
   }
@@ -249,7 +263,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   if (handPan) {
     state.panning = true;
     state.lastPanPos = event->position().toPoint();
-    updateCursorForState(this, std::nullopt);
+    updateCursorForState(std::nullopt);
     return;
   }
 
@@ -260,7 +274,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
 
   m_mouseDrawing = true;
   m_controller->beginStroke(point->x, point->y);
-  updateCursorForState(this, point);
+  updateCursorForState(point);
 }
 
 void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
@@ -272,14 +286,14 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   state.lastMousePos = event->position().toPoint();
   state.hasMousePos = true;
   const auto canvasPoint = mapToCanvas(state.lastMousePos);
-  updateCursorForState(this, canvasPoint);
+  updateCursorForState(canvasPoint);
 
   if (state.panning && (event->buttons() & Qt::LeftButton)) {
     const QPoint current = event->position().toPoint();
     const QPoint delta = current - state.lastPanPos;
     state.panOffset += QPointF(delta.x(), delta.y());
     state.lastPanPos = current;
-    updateCursorForState(this, std::nullopt);
+    updateCursorForState(std::nullopt);
     update();
     return;
   }
@@ -309,7 +323,7 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
   state.hasMousePos = true;
   if (state.panning) {
     state.panning = false;
-    updateCursorForState(this, mapToCanvas(state.lastMousePos));
+    updateCursorForState(mapToCanvas(state.lastMousePos));
     update();
     return;
   }
@@ -318,7 +332,7 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
     m_controller->endStroke();
   }
   m_mouseDrawing = false;
-  updateCursorForState(this, mapToCanvas(state.lastMousePos));
+  updateCursorForState(mapToCanvas(state.lastMousePos));
   update();
 }
 
@@ -357,7 +371,7 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
     }
 
     updateZoomStatusLabel(this);
-    updateCursorForState(this, mapToCanvas(event->position().toPoint()));
+    updateCursorForState(mapToCanvas(event->position().toPoint()));
     update();
     event->accept();
     return;
@@ -381,6 +395,8 @@ void CanvasWidget::refreshFromController() {
   }
   m_image = platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
   updateZoomStatusLabel(this);
+  const auto& state = stateFor(this);
+  updateCursorForState(state.hasMousePos ? mapToCanvas(state.lastMousePos) : std::optional<core::Point> {});
   update();
 }
 
@@ -416,6 +432,25 @@ std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) co
   const int clampedX = std::clamp(cx, 0, m_image.width() - 1);
   const int clampedY = std::clamp(cy, 0, m_image.height() - 1);
   return core::Point {clampedX, clampedY};
+}
+
+void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvasPoint) {
+  const auto& state = stateFor(this);
+  if (state.panning) {
+    setCursor(Qt::ClosedHandCursor);
+    return;
+  }
+  if (g_spacePressed) {
+    setCursor(Qt::OpenHandCursor);
+    return;
+  }
+  if (!canvasPoint.has_value() || m_controller == nullptr) {
+    unsetCursor();
+    return;
+  }
+
+  const bool dragging = m_mouseDrawing || (state.panning && (QApplication::mouseButtons() & Qt::LeftButton));
+  setCursor(cursorForTool(m_controller->currentTool(), dragging));
 }
 
 } // namespace app::canvasview

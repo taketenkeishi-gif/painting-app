@@ -47,6 +47,8 @@ private slots:
   void onClearSelectionTriggered();
   void onInvertSelectionTriggered();
   void onToggleLayerVisibilityTriggered();
+  void onMoveLayerUpTriggered();
+  void onMoveLayerDownTriggered();
   void onDecreaseBrushSizeTriggered();
   void onIncreaseBrushSizeTriggered();
   void onChooseForegroundColor();
@@ -96,6 +98,8 @@ private:
   QAction* m_undoAction {nullptr};
   QAction* m_redoAction {nullptr};
   QAction* m_addLayerAction {nullptr};
+  QAction* m_moveLayerUpAction {nullptr};
+  QAction* m_moveLayerDownAction {nullptr};
   QAction* m_toggleLayerVisibilityAction {nullptr};
   QAction* m_clearSelectionAction {nullptr};
   QAction* m_invertSelectionAction {nullptr};
