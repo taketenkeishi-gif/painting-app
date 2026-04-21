@@ -80,6 +80,10 @@ private slots:
   void onResetZoomTriggered();
   void onFitToScreenTriggered();
   void onResetWorkspaceTriggered();
+  void onSaveWorkspaceTriggered();
+  void onDeleteWorkspaceTriggered();
+  void onRestoreLastWorkspaceTriggered();
+  void onLoadWorkspaceByName(const QString& name);
   void onShortcutSettingsTriggered();
   void onChooseForegroundColor();
   void onChooseBackgroundColor();
@@ -101,6 +105,11 @@ private:
   bool saveImageFile(const QString& path);
   void pushRecentFile(const QString& path);
   void rebuildRecentFilesMenu();
+  void rebuildWorkspaceLayoutsMenu();
+  void loadWorkspaceLayoutState();
+  void saveWorkspaceLayout(const QString& name);
+  bool restoreWorkspaceLayout(const QString& name);
+  QStringList workspaceLayoutNames() const;
   void loadShortcutOverrides();
   void saveShortcutOverride(const QString& commandId, const QKeySequence& sequence);
   QAction* createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut);
@@ -176,6 +185,9 @@ private:
   QAction* m_toggleGridAction {nullptr};
   QAction* m_toggleOverlayAction {nullptr};
   QAction* m_resetWorkspaceAction {nullptr};
+  QAction* m_saveWorkspaceAction {nullptr};
+  QAction* m_deleteWorkspaceAction {nullptr};
+  QAction* m_restoreLastWorkspaceAction {nullptr};
   QAction* m_mergeDownAction {nullptr};
   QAction* m_rasterizeLayerAction {nullptr};
   QAction* m_shortcutSummaryAction {nullptr};
@@ -186,6 +198,7 @@ private:
   QAction* m_transparentColorAction {nullptr};
   QAction* m_clearRecentFilesAction {nullptr};
   QMenu* m_recentFilesMenu {nullptr};
+  QMenu* m_workspaceLayoutsMenu {nullptr};
   std::map<core::ToolKind, QAction*> m_toolActions;
   QByteArray m_defaultDockState;
   QString m_currentFilePath;

@@ -21,9 +21,11 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QImage>
+#include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QKeySequenceEdit>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -94,6 +96,7 @@ MainWindow::MainWindow(QWidget* parent)
 
   setupShellLayout();
   createMenus();
+  loadWorkspaceLayoutState();
   loadShortcutOverrides();
   createToolBar();
   applyUiChrome();
@@ -245,6 +248,9 @@ void MainWindow::createMenus() {
   m_toggleGridAction = new QAction("Toggle &Grid", this);
   m_toggleOverlayAction = new QAction("Toggle &Overlay", this);
   m_resetWorkspaceAction = new QAction("&Reset Workspace", this);
+  m_saveWorkspaceAction = new QAction("&Save Workspace...", this);
+  m_deleteWorkspaceAction = new QAction("&Delete Workspace...", this);
+  m_restoreLastWorkspaceAction = new QAction("&Restore Last Workspace", this);
   auto* aboutAction = new QAction("&About", this);
   m_shortcutSummaryAction = new QAction("&Shortcut Summary", this);
   m_openDocsAction = new QAction("&Open Docs", this);
@@ -296,6 +302,8 @@ void MainWindow::createMenus() {
   m_toggleGridAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft));
   m_toggleOverlayAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_8));
   m_resetWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
+  m_saveWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_S));
+  m_restoreLastWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_W));
   m_shortcutSettingsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_K));
   m_swapColorsAction->setShortcut(QKeySequence(Qt::Key_X));
   m_resetColorsAction->setShortcut(QKeySequence(Qt::Key_D));
@@ -398,7 +406,12 @@ void MainWindow::createMenus() {
     windowMenu->addAction(m_infoDock->toggleViewAction());
   }
   windowMenu->addSeparator();
+  m_workspaceLayoutsMenu = windowMenu->addMenu("Load Workspace");
+  windowMenu->addAction(m_saveWorkspaceAction);
+  windowMenu->addAction(m_deleteWorkspaceAction);
+  windowMenu->addAction(m_restoreLastWorkspaceAction);
   windowMenu->addAction(m_resetWorkspaceAction);
+  rebuildWorkspaceLayoutsMenu();
 
   helpMenu->addAction(aboutAction);
   helpMenu->addAction(m_shortcutSummaryAction);
@@ -445,6 +458,9 @@ void MainWindow::createMenus() {
   connect(m_toggleGridAction, &QAction::toggled, m_canvasWidget, &app::canvasview::CanvasWidget::setGridVisible);
   connect(m_toggleOverlayAction, &QAction::toggled, m_canvasWidget, &app::canvasview::CanvasWidget::setOverlayVisible);
   connect(m_resetWorkspaceAction, &QAction::triggered, this, &MainWindow::onResetWorkspaceTriggered);
+  connect(m_saveWorkspaceAction, &QAction::triggered, this, &MainWindow::onSaveWorkspaceTriggered);
+  connect(m_deleteWorkspaceAction, &QAction::triggered, this, &MainWindow::onDeleteWorkspaceTriggered);
+  connect(m_restoreLastWorkspaceAction, &QAction::triggered, this, &MainWindow::onRestoreLastWorkspaceTriggered);
   connect(m_swapColorsAction, &QAction::triggered, this, &MainWindow::onSwapColors);
   connect(m_resetColorsAction, &QAction::triggered, this, &MainWindow::onResetBlackWhiteColors);
   connect(m_transparentColorAction, &QAction::triggered, this, &MainWindow::onUseTransparentColor);
@@ -539,6 +555,9 @@ void MainWindow::createMenus() {
   markCommand(m_toggleGridAction, "view.toggle_grid");
   markCommand(m_toggleOverlayAction, "view.toggle_overlay");
   markCommand(m_resetWorkspaceAction, "window.reset_workspace");
+  markCommand(m_saveWorkspaceAction, "window.save_workspace");
+  markCommand(m_deleteWorkspaceAction, "window.delete_workspace");
+  markCommand(m_restoreLastWorkspaceAction, "window.restore_last_workspace");
   markCommand(m_shortcutSettingsAction, "help.shortcut_settings");
   markCommand(m_swapColorsAction, "color.swap");
   markCommand(m_resetColorsAction, "color.reset_bw");
@@ -1000,6 +1019,75 @@ void MainWindow::onResetWorkspaceTriggered() {
     return;
   }
   restoreState(m_defaultDockState);
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("workspaces");
+  settings.setValue("last", "__default__");
+  settings.endGroup();
+  statusBar()->showMessage("Workspace reset to default", 1800);
+}
+
+void MainWindow::onSaveWorkspaceTriggered() {
+  bool ok = false;
+  const QString name = QInputDialog::getText(
+      this,
+      "Save Workspace",
+      "Workspace name",
+      QLineEdit::Normal,
+      "Custom",
+      &ok);
+  if (!ok || name.trimmed().isEmpty()) {
+    return;
+  }
+  saveWorkspaceLayout(name.trimmed());
+  rebuildWorkspaceLayoutsMenu();
+  statusBar()->showMessage(QString("Workspace saved: %1").arg(name.trimmed()), 1800);
+}
+
+void MainWindow::onDeleteWorkspaceTriggered() {
+  const QStringList names = workspaceLayoutNames();
+  if (names.isEmpty()) {
+    statusBar()->showMessage("No saved workspace layouts", 1600);
+    return;
+  }
+  bool ok = false;
+  const QString name = QInputDialog::getItem(this, "Delete Workspace", "Workspace", names, 0, false, &ok);
+  if (!ok || name.isEmpty()) {
+    return;
+  }
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("workspaces/layouts");
+  settings.remove(name);
+  settings.endGroup();
+  settings.beginGroup("workspaces");
+  if (settings.value("last").toString() == name) {
+    settings.setValue("last", "__default__");
+  }
+  settings.endGroup();
+  rebuildWorkspaceLayoutsMenu();
+  statusBar()->showMessage(QString("Workspace deleted: %1").arg(name), 1800);
+}
+
+void MainWindow::onRestoreLastWorkspaceTriggered() {
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("workspaces");
+  const QString last = settings.value("last", "__default__").toString();
+  settings.endGroup();
+  if (last == "__default__") {
+    onResetWorkspaceTriggered();
+    return;
+  }
+  if (!restoreWorkspaceLayout(last)) {
+    statusBar()->showMessage("Last workspace not found", 1800);
+  }
+}
+
+void MainWindow::onLoadWorkspaceByName(const QString& name) {
+  if (name.isEmpty()) {
+    return;
+  }
+  if (!restoreWorkspaceLayout(name)) {
+    statusBar()->showMessage(QString("Failed to load workspace: %1").arg(name), 1800);
+  }
 }
 
 void MainWindow::onShortcutSettingsTriggered() {
@@ -1246,6 +1334,87 @@ void MainWindow::rebuildRecentFilesMenu() {
     m_clearRecentFilesAction->setEnabled(true);
     m_recentFilesMenu->addAction(m_clearRecentFilesAction);
   }
+}
+
+QStringList MainWindow::workspaceLayoutNames() const {
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("workspaces/layouts");
+  QStringList names = settings.childKeys();
+  settings.endGroup();
+  names.sort(Qt::CaseInsensitive);
+  return names;
+}
+
+void MainWindow::rebuildWorkspaceLayoutsMenu() {
+  if (m_workspaceLayoutsMenu == nullptr) {
+    return;
+  }
+  m_workspaceLayoutsMenu->clear();
+  const QStringList names = workspaceLayoutNames();
+  if (names.isEmpty()) {
+    QAction* empty = m_workspaceLayoutsMenu->addAction("(No saved layouts)");
+    empty->setEnabled(false);
+    return;
+  }
+  for (const QString& name : names) {
+    QAction* action = m_workspaceLayoutsMenu->addAction(name);
+    connect(action, &QAction::triggered, this, [this, name]() {
+      onLoadWorkspaceByName(name);
+    });
+  }
+}
+
+void MainWindow::loadWorkspaceLayoutState() {
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("workspaces");
+  const QString last = settings.value("last", "__default__").toString();
+  settings.endGroup();
+  if (last.isEmpty() || last == "__default__") {
+    return;
+  }
+  if (!restoreWorkspaceLayout(last)) {
+    settings.beginGroup("workspaces");
+    settings.setValue("last", "__default__");
+    settings.endGroup();
+  }
+}
+
+void MainWindow::saveWorkspaceLayout(const QString& name) {
+  if (name.isEmpty()) {
+    return;
+  }
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("workspaces/layouts");
+  settings.setValue(name, saveState());
+  settings.endGroup();
+  settings.beginGroup("workspaces");
+  settings.setValue("last", name);
+  settings.endGroup();
+}
+
+bool MainWindow::restoreWorkspaceLayout(const QString& name) {
+  if (name.isEmpty()) {
+    return false;
+  }
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("workspaces/layouts");
+  const QVariant value = settings.value(name);
+  settings.endGroup();
+  if (!value.isValid()) {
+    return false;
+  }
+  const QByteArray state = value.toByteArray();
+  if (state.isEmpty()) {
+    return false;
+  }
+  if (!restoreState(state)) {
+    return false;
+  }
+  settings.beginGroup("workspaces");
+  settings.setValue("last", name);
+  settings.endGroup();
+  statusBar()->showMessage(QString("Workspace loaded: %1").arg(name), 1800);
+  return true;
 }
 
 void MainWindow::loadShortcutOverrides() {

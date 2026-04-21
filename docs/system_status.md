@@ -53,8 +53,9 @@ Legend: `DONE` / `WIP` / `PARTIAL` / `TODO` / `BLOCKED`
 
 ## Workspace / Shortcut / Command System
 - `DONE`: dock toggle + reset workspace
+- `DONE`: workspace layout save/load/delete + restore last
 - `DONE`: shortcut settings dialog with runtime reassignment + persistence
-- `TODO`: command palette, workspace save/load presets
+- `TODO`: command palette, workspace preset import/export
 
 ## UI Theme / Token / Icon System
 - `WIP`: dark theme hierarchy and state colors

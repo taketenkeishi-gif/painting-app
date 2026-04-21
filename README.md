@@ -99,3 +99,5 @@ System-level implementation status is tracked in `docs/system_status.md`.
 - `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` Open / Save / Save As
 - `Ctrl+Alt+Up` / `Ctrl+Alt+Down` Move layer up/down
 - `Ctrl++` / `Ctrl+-` / `Ctrl+0` Zoom in/out/reset
+- `Ctrl+Alt+Shift+S` Save workspace layout
+- `Ctrl+Alt+W` Restore last workspace layout
