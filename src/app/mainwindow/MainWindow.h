@@ -46,9 +46,12 @@ private slots:
   void onNewCanvas();
   void onToolStateChanged();
   void onOpenTriggered();
+  void onNewFromClipboardTriggered();
+  void onImportAsLayerTriggered();
   void onSaveTriggered();
   void onSaveAsTriggered();
   void onExportPngTriggered();
+  void onExportFlattenedTriggered();
   void onUndoTriggered();
   void onRedoTriggered();
   void onCutTriggered();
@@ -77,9 +80,12 @@ private slots:
   void onResetZoomTriggered();
   void onFitToScreenTriggered();
   void onResetWorkspaceTriggered();
+  void onShortcutSettingsTriggered();
   void onChooseForegroundColor();
   void onChooseBackgroundColor();
   void onSwapColors();
+  void onResetBlackWhiteColors();
+  void onUseTransparentColor();
 
 private:
   void setupShellLayout();
@@ -95,6 +101,8 @@ private:
   bool saveImageFile(const QString& path);
   void pushRecentFile(const QString& path);
   void rebuildRecentFilesMenu();
+  void loadShortcutOverrides();
+  void saveShortcutOverride(const QString& commandId, const QKeySequence& sequence);
   QAction* createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut);
 
   app::bridge::AppController* m_controller {nullptr};
@@ -132,9 +140,13 @@ private:
   core::Color m_backgroundColor {255, 255, 255, 255};
   QAction* m_newCanvasAction {nullptr};
   QAction* m_openAction {nullptr};
+  QAction* m_newFromClipboardAction {nullptr};
+  QAction* m_importAsLayerAction {nullptr};
   QAction* m_saveAction {nullptr};
   QAction* m_saveAsAction {nullptr};
   QAction* m_exportPngAction {nullptr};
+  QAction* m_exportFlattenedAction {nullptr};
+  QAction* m_exitAction {nullptr};
   QAction* m_undoAction {nullptr};
   QAction* m_redoAction {nullptr};
   QAction* m_cutAction {nullptr};
@@ -142,6 +154,7 @@ private:
   QAction* m_pasteAction {nullptr};
   QAction* m_deletePixelsAction {nullptr};
   QAction* m_fillAction {nullptr};
+  QAction* m_clearAction {nullptr};
   QAction* m_addLayerAction {nullptr};
   QAction* m_addRasterLayerAction {nullptr};
   QAction* m_addVectorLayerAction {nullptr};
@@ -160,9 +173,18 @@ private:
   QAction* m_zoomOutAction {nullptr};
   QAction* m_resetZoomAction {nullptr};
   QAction* m_fitToScreenAction {nullptr};
+  QAction* m_toggleGridAction {nullptr};
+  QAction* m_toggleOverlayAction {nullptr};
   QAction* m_resetWorkspaceAction {nullptr};
   QAction* m_mergeDownAction {nullptr};
   QAction* m_rasterizeLayerAction {nullptr};
+  QAction* m_shortcutSummaryAction {nullptr};
+  QAction* m_openDocsAction {nullptr};
+  QAction* m_shortcutSettingsAction {nullptr};
+  QAction* m_swapColorsAction {nullptr};
+  QAction* m_resetColorsAction {nullptr};
+  QAction* m_transparentColorAction {nullptr};
+  QAction* m_clearRecentFilesAction {nullptr};
   QMenu* m_recentFilesMenu {nullptr};
   std::map<core::ToolKind, QAction*> m_toolActions;
   QByteArray m_defaultDockState;

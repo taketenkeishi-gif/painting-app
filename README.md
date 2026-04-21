@@ -19,7 +19,7 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
 
 - New canvas creation
 - Layer add/delete/duplicate/select/rename/visibility toggle/reorder
-- Layer reorder by drag & drop (plus Up/Down shortcuts)
+- Layer reorder by drag & drop with active layer tracking (plus Up/Down shortcuts with natural direction)
 - Raster layer + Vector layer coexistence (`LayerKind`)
 - Tool system with switchable tools:
   - Brush / Eraser / Eyedropper / Fill
@@ -29,11 +29,11 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
 - Stroke-level Undo (`Ctrl+Z`) / Redo (`Ctrl+Y`) for drawing and selection updates
 - Sub-tool presets for Brush/Eraser (Normal/Hard/Soft/Airbrush etc.)
 - Sub-tool management (`Duplicate`, `Rename`, `Delete`, `Reset`)
-- Tool property panel with immediate apply (`size`, `opacity`, `hardness`, `flow`, `spacing`, stabilization, shape/blend/erase controls, angle/roundness/taper, vector snap/simplify)
+- Tool property panel with high-density sections and immediate apply (`size/stroke width`, `opacity`, `hardness`, `flow`, `spacing`, stabilization, shape/blend/erase controls, angle/roundness/taper, vector snap/simplify)
 - Canvas overlay for line preview, selection preview/border, move preview, brush cursor
 - Composited canvas display
 - Dock-based workspace with Window menu toggles + reset workspace
-- File/Edit/Tool/Select/Layer/View/Window menu with practical actions (open/save/export, clipboard image copy/paste, merge/rasterize)
+- File/Edit/Tool/Select/Layer/View/Window/Help menu with practical actions (open/save/export, new-from-clipboard, import-as-layer, clipboard image copy/paste, merge/rasterize, overlay/grid toggles, shortcut summary, docs link)
 
 ## Current UI Shell
 
@@ -78,6 +78,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-tests.ps1
 ```
 
 Detailed operational notes are in `docs/build.md`.
+System-level implementation status is tracked in `docs/system_status.md`.
 
 ## Key Shortcuts
 
@@ -91,8 +92,10 @@ Detailed operational notes are in `docs/build.md`.
 - `H` Hand
 - `Z` Zoom
 - `[` / `]` Brush size down/up
+- `X` / `D` / `C` Swap FG/BG / reset black-white / transparent color
 - `Ctrl+Z` Undo
 - `Ctrl+Y` or `Ctrl+Shift+Z` Redo
+- `Ctrl+Shift+V` / `Ctrl+Alt+O` New from clipboard / Import image as layer
 - `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` Open / Save / Save As
 - `Ctrl+Alt+Up` / `Ctrl+Alt+Down` Move layer up/down
 - `Ctrl++` / `Ctrl+-` / `Ctrl+0` Zoom in/out/reset

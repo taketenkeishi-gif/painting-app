@@ -1,6 +1,8 @@
 #include "app/mainwindow/MainWindow.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <vector>
 
 #include <QAction>
 #include <QActionGroup>
@@ -9,6 +11,8 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDockWidget>
+#include <QDesktopServices>
+#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -19,9 +23,14 @@
 #include <QImage>
 #include <QKeySequence>
 #include <QLabel>
+#include <QKeySequenceEdit>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
+#include <QMap>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QSettings>
 #include <QSplitter>
 #include <QSpinBox>
 #include <QStatusBar>
@@ -30,6 +39,7 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <QUrl>
 
 #include "app/bridge/AppController.h"
 #include "app/canvasview/CanvasWidget.h"
@@ -84,6 +94,7 @@ MainWindow::MainWindow(QWidget* parent)
 
   setupShellLayout();
   createMenus();
+  loadShortcutOverrides();
   createToolBar();
   applyUiChrome();
 
@@ -114,6 +125,17 @@ void MainWindow::setupShellLayout() {
   m_backgroundColorButton = new QPushButton("BG", colorPanel);
   auto* swapColorButton = new QPushButton("Swap", colorPanel);
   auto* resetColorButton = new QPushButton("Reset B/W", colorPanel);
+  auto* transparentColorButton = new QPushButton("Transparent", colorPanel);
+  m_foregroundColorButton->setMinimumHeight(30);
+  m_backgroundColorButton->setMinimumHeight(30);
+  swapColorButton->setMinimumHeight(28);
+  resetColorButton->setMinimumHeight(28);
+  transparentColorButton->setMinimumHeight(28);
+  m_foregroundColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
+  m_backgroundColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
+  swapColorButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+  resetColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogCancelButton));
+  transparentColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogDiscardButton));
   auto* colorButtons = new QHBoxLayout();
   colorButtons->setContentsMargins(0, 0, 0, 0);
   colorButtons->setSpacing(6);
@@ -123,15 +145,13 @@ void MainWindow::setupShellLayout() {
   colorLayout->addLayout(colorButtons);
   colorLayout->addWidget(swapColorButton);
   colorLayout->addWidget(resetColorButton);
+  colorLayout->addWidget(transparentColorButton);
   colorLayout->addStretch(1);
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
   connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
-  connect(resetColorButton, &QPushButton::clicked, this, [this]() {
-    m_controller->setBrushColor(core::Color::OpaqueBlack());
-    m_backgroundColor = core::Color {255, 255, 255, 255};
-    updateColorPanel();
-  });
+  connect(resetColorButton, &QPushButton::clicked, this, &MainWindow::onResetBlackWhiteColors);
+  connect(transparentColorButton, &QPushButton::clicked, this, &MainWindow::onUseTransparentColor);
 
   auto* infoPanel = new QWidget(this);
   auto* infoLayout = new QVBoxLayout(infoPanel);
@@ -185,9 +205,13 @@ void MainWindow::createMenus() {
 
   m_newCanvasAction = new QAction("&New Canvas", this);
   m_openAction = new QAction("&Open...", this);
+  m_newFromClipboardAction = new QAction("New From &Clipboard", this);
+  m_importAsLayerAction = new QAction("&Import Image As Layer...", this);
   m_saveAction = new QAction("&Save", this);
   m_saveAsAction = new QAction("Save &As...", this);
   m_exportPngAction = new QAction("Export &PNG...", this);
+  m_exportFlattenedAction = new QAction("Export &Flattened Image...", this);
+  m_exitAction = new QAction("E&xit", this);
   auto* closeAction = new QAction("&Close", this);
   m_undoAction = new QAction("&Undo", this);
   m_redoAction = new QAction("&Redo", this);
@@ -196,6 +220,7 @@ void MainWindow::createMenus() {
   m_pasteAction = new QAction("&Paste", this);
   m_deletePixelsAction = new QAction("&Delete Pixels", this);
   m_fillAction = new QAction("&Fill", this);
+  m_clearAction = new QAction("C&lear", this);
   m_addLayerAction = new QAction("&New Raster Layer", this);
   m_addRasterLayerAction = m_addLayerAction;
   m_addVectorLayerAction = new QAction("New &Vector Layer", this);
@@ -217,16 +242,29 @@ void MainWindow::createMenus() {
   m_zoomOutAction = new QAction("Zoom &Out", this);
   m_resetZoomAction = new QAction("&Reset Zoom", this);
   m_fitToScreenAction = new QAction("&Fit To Screen", this);
+  m_toggleGridAction = new QAction("Toggle &Grid", this);
+  m_toggleOverlayAction = new QAction("Toggle &Overlay", this);
   m_resetWorkspaceAction = new QAction("&Reset Workspace", this);
   auto* aboutAction = new QAction("&About", this);
+  m_shortcutSummaryAction = new QAction("&Shortcut Summary", this);
+  m_openDocsAction = new QAction("&Open Docs", this);
+  m_shortcutSettingsAction = new QAction("Shortcut &Settings...", this);
+  m_swapColorsAction = new QAction("S&wap FG/BG", this);
+  m_resetColorsAction = new QAction("Reset &Black/White", this);
+  m_transparentColorAction = new QAction("Use &Transparent Color", this);
+  m_clearRecentFilesAction = new QAction("Clear Recent Files", this);
 
   m_recentFilesMenu = fileMenu->addMenu("Recent Files");
 
   m_newCanvasAction->setShortcut(QKeySequence::New);
   m_openAction->setShortcut(QKeySequence::Open);
+  m_newFromClipboardAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
+  m_importAsLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_O));
   m_saveAction->setShortcut(QKeySequence::Save);
   m_saveAsAction->setShortcut(QKeySequence::SaveAs);
   m_exportPngAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
+  m_exportFlattenedAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E));
+  m_exitAction->setShortcut(QKeySequence::Quit);
   closeAction->setShortcut(QKeySequence::Close);
   m_undoAction->setShortcut(QKeySequence::Undo);
   m_redoAction->setShortcuts({QKeySequence::Redo, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z)});
@@ -235,6 +273,7 @@ void MainWindow::createMenus() {
   m_pasteAction->setShortcut(QKeySequence::Paste);
   m_deletePixelsAction->setShortcut(QKeySequence(Qt::Key_Delete));
   m_fillAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Backspace));
+  m_clearAction->setShortcut(QKeySequence(Qt::Key_Backspace));
   m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
   m_addVectorLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_N));
   m_duplicateLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
@@ -254,20 +293,34 @@ void MainWindow::createMenus() {
   m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
   m_resetZoomAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
   m_fitToScreenAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_9));
+  m_toggleGridAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft));
+  m_toggleOverlayAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_8));
   m_resetWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
+  m_shortcutSettingsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_K));
+  m_swapColorsAction->setShortcut(QKeySequence(Qt::Key_X));
+  m_resetColorsAction->setShortcut(QKeySequence(Qt::Key_D));
+  m_transparentColorAction->setShortcut(QKeySequence(Qt::Key_C));
+  m_toggleGridAction->setCheckable(true);
+  m_toggleGridAction->setChecked(m_canvasWidget->isGridVisible());
+  m_toggleOverlayAction->setCheckable(true);
+  m_toggleOverlayAction->setChecked(m_canvasWidget->isOverlayVisible());
 
   fileMenu->addAction(m_newCanvasAction);
   fileMenu->addAction(m_openAction);
+  fileMenu->addAction(m_newFromClipboardAction);
+  fileMenu->addAction(m_importAsLayerAction);
   fileMenu->addAction(m_saveAction);
   fileMenu->addAction(m_saveAsAction);
   fileMenu->addSeparator();
   fileMenu->addAction(m_exportPngAction);
+  fileMenu->addAction(m_exportFlattenedAction);
   if (m_recentFilesMenu != nullptr) {
     rebuildRecentFilesMenu();
     fileMenu->addMenu(m_recentFilesMenu);
   }
   fileMenu->addSeparator();
   fileMenu->addAction(closeAction);
+  fileMenu->addAction(m_exitAction);
   editMenu->addAction(m_undoAction);
   editMenu->addAction(m_redoAction);
   editMenu->addSeparator();
@@ -276,6 +329,7 @@ void MainWindow::createMenus() {
   editMenu->addAction(m_pasteAction);
   editMenu->addAction(m_deletePixelsAction);
   editMenu->addAction(m_fillAction);
+  editMenu->addAction(m_clearAction);
   editMenu->addSeparator();
   editMenu->addAction(m_brushSizeDownAction);
   editMenu->addAction(m_brushSizeUpAction);
@@ -301,6 +355,11 @@ void MainWindow::createMenus() {
   selectMenu->addAction(m_deselectAction);
   selectMenu->addAction(m_invertSelectionAction);
 
+  toolMenu->addSeparator();
+  toolMenu->addAction(m_swapColorsAction);
+  toolMenu->addAction(m_resetColorsAction);
+  toolMenu->addAction(m_transparentColorAction);
+
   layerMenu->addAction(m_addRasterLayerAction);
   layerMenu->addAction(m_addVectorLayerAction);
   layerMenu->addAction(m_duplicateLayerAction);
@@ -316,6 +375,9 @@ void MainWindow::createMenus() {
   viewMenu->addAction(m_zoomOutAction);
   viewMenu->addAction(m_resetZoomAction);
   viewMenu->addAction(m_fitToScreenAction);
+  viewMenu->addSeparator();
+  viewMenu->addAction(m_toggleGridAction);
+  viewMenu->addAction(m_toggleOverlayAction);
 
   if (m_toolDock != nullptr) {
     windowMenu->addAction(m_toolDock->toggleViewAction());
@@ -339,12 +401,19 @@ void MainWindow::createMenus() {
   windowMenu->addAction(m_resetWorkspaceAction);
 
   helpMenu->addAction(aboutAction);
+  helpMenu->addAction(m_shortcutSummaryAction);
+  helpMenu->addAction(m_shortcutSettingsAction);
+  helpMenu->addAction(m_openDocsAction);
 
   connect(m_newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
   connect(m_openAction, &QAction::triggered, this, &MainWindow::onOpenTriggered);
+  connect(m_newFromClipboardAction, &QAction::triggered, this, &MainWindow::onNewFromClipboardTriggered);
+  connect(m_importAsLayerAction, &QAction::triggered, this, &MainWindow::onImportAsLayerTriggered);
   connect(m_saveAction, &QAction::triggered, this, &MainWindow::onSaveTriggered);
   connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::onSaveAsTriggered);
   connect(m_exportPngAction, &QAction::triggered, this, &MainWindow::onExportPngTriggered);
+  connect(m_exportFlattenedAction, &QAction::triggered, this, &MainWindow::onExportFlattenedTriggered);
+  connect(m_exitAction, &QAction::triggered, this, &QWidget::close);
   connect(closeAction, &QAction::triggered, this, &QWidget::close);
   connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndoTriggered);
   connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedoTriggered);
@@ -353,6 +422,7 @@ void MainWindow::createMenus() {
   connect(m_pasteAction, &QAction::triggered, this, &MainWindow::onPasteTriggered);
   connect(m_deletePixelsAction, &QAction::triggered, this, &MainWindow::onDeletePixelsTriggered);
   connect(m_fillAction, &QAction::triggered, this, &MainWindow::onFillTriggered);
+  connect(m_clearAction, &QAction::triggered, this, &MainWindow::onDeletePixelsTriggered);
   connect(m_clearSelectionAction, &QAction::triggered, this, &MainWindow::onClearSelectionTriggered);
   connect(m_selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllTriggered);
   connect(m_deselectAction, &QAction::triggered, this, &MainWindow::onDeselectTriggered);
@@ -372,9 +442,28 @@ void MainWindow::createMenus() {
   connect(m_zoomOutAction, &QAction::triggered, this, &MainWindow::onZoomOutTriggered);
   connect(m_resetZoomAction, &QAction::triggered, this, &MainWindow::onResetZoomTriggered);
   connect(m_fitToScreenAction, &QAction::triggered, this, &MainWindow::onFitToScreenTriggered);
+  connect(m_toggleGridAction, &QAction::toggled, m_canvasWidget, &app::canvasview::CanvasWidget::setGridVisible);
+  connect(m_toggleOverlayAction, &QAction::toggled, m_canvasWidget, &app::canvasview::CanvasWidget::setOverlayVisible);
   connect(m_resetWorkspaceAction, &QAction::triggered, this, &MainWindow::onResetWorkspaceTriggered);
+  connect(m_swapColorsAction, &QAction::triggered, this, &MainWindow::onSwapColors);
+  connect(m_resetColorsAction, &QAction::triggered, this, &MainWindow::onResetBlackWhiteColors);
+  connect(m_transparentColorAction, &QAction::triggered, this, &MainWindow::onUseTransparentColor);
+  connect(m_clearRecentFilesAction, &QAction::triggered, this, [this]() {
+    m_recentFiles.clear();
+    rebuildRecentFilesMenu();
+  });
   connect(aboutAction, &QAction::triggered, this, [this]() {
     statusBar()->showMessage("Layered Paint App - UI shell + raster/vector base", 4000);
+  });
+  connect(m_shortcutSummaryAction, &QAction::triggered, this, [this]() {
+    QMessageBox::information(
+        this,
+        "Shortcut Summary",
+        "B Brush\nE Eraser\nI Eyedropper\nG Fill\nU Line\nR Rect Selection\nM Move Layer\nH Hand\nZ Zoom\n[ ] Size\nCtrl+Z / Ctrl+Y Undo/Redo");
+  });
+  connect(m_shortcutSettingsAction, &QAction::triggered, this, &MainWindow::onShortcutSettingsTriggered);
+  connect(m_openDocsAction, &QAction::triggered, this, []() {
+    QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::currentPath() + "/README.md"));
   });
 
   m_toolStatusLabel = new QLabel("Tool: Brush", this);
@@ -402,6 +491,63 @@ void MainWindow::createMenus() {
   statusBar()->addPermanentWidget(m_zoomStatusLabel);
   statusBar()->addPermanentWidget(m_selectionStatusLabel);
   statusBar()->addPermanentWidget(m_activeLayerStatusLabel);
+
+  const auto markCommand = [](QAction* action, const QString& id) {
+    if (action == nullptr) {
+      return;
+    }
+    action->setProperty("commandId", id);
+    action->setProperty("defaultShortcut", action->shortcut().toString(QKeySequence::PortableText));
+  };
+  markCommand(m_newCanvasAction, "file.new");
+  markCommand(m_openAction, "file.open");
+  markCommand(m_newFromClipboardAction, "file.new_from_clipboard");
+  markCommand(m_importAsLayerAction, "file.import_as_layer");
+  markCommand(m_saveAction, "file.save");
+  markCommand(m_saveAsAction, "file.save_as");
+  markCommand(m_exportPngAction, "file.export_png");
+  markCommand(m_exportFlattenedAction, "file.export_flattened");
+  markCommand(m_clearRecentFilesAction, "file.clear_recent");
+  markCommand(m_exitAction, "file.exit");
+  markCommand(m_undoAction, "edit.undo");
+  markCommand(m_redoAction, "edit.redo");
+  markCommand(m_cutAction, "edit.cut");
+  markCommand(m_copyAction, "edit.copy");
+  markCommand(m_pasteAction, "edit.paste");
+  markCommand(m_deletePixelsAction, "edit.delete_pixels");
+  markCommand(m_fillAction, "edit.fill");
+  markCommand(m_clearAction, "edit.clear");
+  markCommand(m_brushSizeDownAction, "edit.brush_size_down");
+  markCommand(m_brushSizeUpAction, "edit.brush_size_up");
+  markCommand(m_selectAllAction, "select.all");
+  markCommand(m_deselectAction, "select.deselect");
+  markCommand(m_clearSelectionAction, "select.clear");
+  markCommand(m_invertSelectionAction, "select.invert");
+  markCommand(m_addRasterLayerAction, "layer.new_raster");
+  markCommand(m_addVectorLayerAction, "layer.new_vector");
+  markCommand(m_duplicateLayerAction, "layer.duplicate");
+  markCommand(m_deleteLayerAction, "layer.delete");
+  markCommand(m_moveLayerUpAction, "layer.move_up");
+  markCommand(m_moveLayerDownAction, "layer.move_down");
+  markCommand(m_toggleLayerVisibilityAction, "layer.toggle_visibility");
+  markCommand(m_mergeDownAction, "layer.merge_down");
+  markCommand(m_rasterizeLayerAction, "layer.rasterize");
+  markCommand(m_zoomInAction, "view.zoom_in");
+  markCommand(m_zoomOutAction, "view.zoom_out");
+  markCommand(m_resetZoomAction, "view.zoom_reset");
+  markCommand(m_fitToScreenAction, "view.fit_screen");
+  markCommand(m_toggleGridAction, "view.toggle_grid");
+  markCommand(m_toggleOverlayAction, "view.toggle_overlay");
+  markCommand(m_resetWorkspaceAction, "window.reset_workspace");
+  markCommand(m_shortcutSettingsAction, "help.shortcut_settings");
+  markCommand(m_swapColorsAction, "color.swap");
+  markCommand(m_resetColorsAction, "color.reset_bw");
+  markCommand(m_transparentColorAction, "color.transparent");
+  for (const auto& [kind, action] : m_toolActions) {
+    if (action != nullptr) {
+      markCommand(action, QString("tool.%1").arg(static_cast<int>(kind)));
+    }
+  }
 }
 
 void MainWindow::createToolBar() {
@@ -412,6 +558,7 @@ void MainWindow::createToolBar() {
   m_newCanvasAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
   m_openAction->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
   m_saveAction->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
+  m_exportPngAction->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
   m_undoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
   m_redoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
   m_addRasterLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
@@ -427,6 +574,7 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addAction(m_newCanvasAction);
   m_quickToolBar->addAction(m_openAction);
   m_quickToolBar->addAction(m_saveAction);
+  m_quickToolBar->addAction(m_exportPngAction);
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_undoAction);
   m_quickToolBar->addAction(m_redoAction);
@@ -446,21 +594,35 @@ void MainWindow::createToolBar() {
 
 void MainWindow::applyUiChrome() {
   setStyleSheet(
-      "QMainWindow { background: #1f2227; color: #e8e8e8; }"
-      "QDockWidget { color: #d9dde5; }"
-      "QDockWidget::title { background: #2b3038; border: 1px solid #3a414d; padding: 4px 8px; }"
-      "QDockWidget > QWidget { background: #262a31; }"
-      "QGroupBox { border: 1px solid #3f4652; border-radius: 4px; margin-top: 12px; padding-top: 10px; }"
-      "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #d9dde5; font-weight: 700; }"
-      "QListWidget { background: #1f2328; border: 1px solid #353b44; color: #dfe5ef; }"
-      "QListWidget::item:selected { background: #32507a; color: #ffffff; }"
-      "QPushButton, QToolButton { background: #2d323a; border: 1px solid #4b5464; border-radius: 3px; padding: 4px 8px; color: #e2e6ee; }"
-      "QPushButton:hover { background: #39404a; }"
-      "QMenuBar, QToolBar { background: #2a2f36; color: #e2e6ee; }"
-      "QLineEdit, QSpinBox, QComboBox { background: #1e2228; border: 1px solid #3e4654; color: #e6ebf3; }"
+      "QMainWindow { background: #1a1d22; color: #dfe4ee; }"
+      "QDockWidget { color: #d5dbe7; font-size: 12px; }"
+      "QDockWidget::title { background: #242a33; border: 1px solid #394352; padding: 5px 10px; font-weight: 700; }"
+      "QDockWidget > QWidget { background: #20252d; }"
+      "QGroupBox { border: 1px solid #394352; border-radius: 4px; margin-top: 12px; padding-top: 10px; }"
+      "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #cfd7e4; font-weight: 700; }"
+      "QListWidget { background: #181c22; border: 1px solid #36404f; color: #dfe5ef; outline: none; }"
+      "QListWidget::item { min-height: 24px; }"
+      "QListWidget::item:selected { background: #315980; color: #ffffff; }"
+      "QPushButton, QToolButton {"
+      "  background: #2b313b;"
+      "  border: 1px solid #4a5567;"
+      "  border-radius: 3px;"
+      "  padding: 4px 8px;"
+      "  min-height: 28px;"
+      "  color: #e3e8f2;"
+      "}"
+      "QPushButton:hover, QToolButton:hover { background: #343b47; border-color: #6b7f9d; }"
+      "QPushButton:pressed, QToolButton:pressed { background: #2a4768; border-color: #8bb8e8; }"
+      "QPushButton:disabled, QToolButton:disabled { background: #242931; color: #7d8797; border-color: #37404d; }"
+      "QMenuBar, QToolBar { background: #232830; color: #e2e6ee; border-bottom: 1px solid #394352; }"
+      "QMenuBar::item:selected { background: #2f3947; }"
+      "QMenu { background: #1f242b; color: #dfe4ee; border: 1px solid #394352; }"
+      "QMenu::item:selected { background: #315980; color: #ffffff; }"
+      "QLineEdit, QSpinBox, QComboBox { background: #171b21; border: 1px solid #3e4758; color: #e6ebf3; min-height: 24px; }"
+      "QLineEdit:focus, QSpinBox:focus, QComboBox:focus { border-color: #7ea7d6; }"
       "QSlider::groove:horizontal { background: #20252d; height: 6px; border-radius: 3px; }"
       "QSlider::handle:horizontal { background: #6f92c2; width: 12px; border-radius: 6px; margin: -3px 0; }"
-      "QStatusBar { background: #2a2f36; border-top: 1px solid #3a3f48; }");
+      "QStatusBar { background: #222830; border-top: 1px solid #394352; }");
 }
 
 void MainWindow::updateUndoRedoState() {
@@ -566,7 +728,8 @@ void MainWindow::onToolStateChanged() {
 
   if (m_colorStatusLabel != nullptr) {
     const QColor color(state.color.r, state.color.g, state.color.b, state.color.a);
-    m_colorStatusLabel->setText(QString("Color: %1").arg(color.name(QColor::HexRgb).toUpper()));
+    m_colorStatusLabel->setText(
+        QString("Color: %1 A%2").arg(color.name(QColor::HexRgb).toUpper()).arg(color.alpha()));
   }
 
   if (m_toolStatusLabel != nullptr) {
@@ -594,6 +757,44 @@ void MainWindow::onOpenTriggered() {
     return;
   }
   openImageFile(path);
+}
+
+void MainWindow::onNewFromClipboardTriggered() {
+  const QImage image = QGuiApplication::clipboard()->image();
+  if (image.isNull()) {
+    statusBar()->showMessage("Clipboard has no image", 1800);
+    return;
+  }
+  const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
+  if (buffer.width() <= 0 || buffer.height() <= 0) {
+    statusBar()->showMessage("Clipboard image is invalid", 1800);
+    return;
+  }
+  m_controller->importFlattenedBuffer(buffer, "Clipboard");
+  m_currentFilePath.clear();
+  statusBar()->showMessage("New canvas created from clipboard image", 2200);
+}
+
+void MainWindow::onImportAsLayerTriggered() {
+  const QString path = QFileDialog::getOpenFileName(
+      this,
+      "Import Image As Layer",
+      m_currentFilePath.isEmpty() ? QString() : QFileInfo(m_currentFilePath).absolutePath(),
+      "Image Files (*.png *.jpg *.jpeg *.bmp)");
+  if (path.isEmpty()) {
+    return;
+  }
+  QImage image(path);
+  if (image.isNull()) {
+    statusBar()->showMessage(QString("Import failed: %1").arg(path), 2500);
+    return;
+  }
+  const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
+  const QFileInfo info(path);
+  if (m_controller->pasteBufferAsNewRasterLayer(buffer, info.completeBaseName().toStdString())) {
+    statusBar()->showMessage(QString("Imported as layer: %1").arg(info.fileName()), 2500);
+    updateUndoRedoState();
+  }
 }
 
 void MainWindow::onSaveTriggered() {
@@ -629,6 +830,20 @@ void MainWindow::onExportPngTriggered() {
   }
   if (saveImageFile(path)) {
     statusBar()->showMessage(QString("Exported: %1").arg(path), 2500);
+  }
+}
+
+void MainWindow::onExportFlattenedTriggered() {
+  const QString path = QFileDialog::getSaveFileName(
+      this,
+      "Export Flattened Image",
+      QString(),
+      "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg);;BMP Image (*.bmp)");
+  if (path.isEmpty()) {
+    return;
+  }
+  if (saveImageFile(path)) {
+    statusBar()->showMessage(QString("Flattened export: %1").arg(path), 2500);
   }
 }
 
@@ -787,6 +1002,110 @@ void MainWindow::onResetWorkspaceTriggered() {
   restoreState(m_defaultDockState);
 }
 
+void MainWindow::onShortcutSettingsTriggered() {
+  struct ShortcutRow {
+    QAction* action {nullptr};
+    QKeySequenceEdit* edit {nullptr};
+  };
+
+  QList<QAction*> configurable;
+  const QList<QAction*> allActions = findChildren<QAction*>();
+  for (QAction* action : allActions) {
+    if (action != nullptr && action->property("commandId").isValid()) {
+      configurable.push_back(action);
+    }
+  }
+  std::sort(configurable.begin(), configurable.end(), [](const QAction* lhs, const QAction* rhs) {
+    return lhs->text() < rhs->text();
+  });
+
+  QDialog dialog(this);
+  dialog.setWindowTitle("Shortcut Settings");
+  dialog.resize(640, 620);
+  auto* root = new QVBoxLayout(&dialog);
+  root->setContentsMargins(10, 10, 10, 10);
+  root->setSpacing(8);
+
+  auto* help = new QLabel(
+      "Assign shortcuts. Empty value removes assignment. Duplicate assignments are highlighted on save.",
+      &dialog);
+  help->setWordWrap(true);
+  root->addWidget(help);
+
+  auto* scroll = new QScrollArea(&dialog);
+  scroll->setWidgetResizable(true);
+  auto* host = new QWidget(scroll);
+  auto* form = new QFormLayout(host);
+  form->setContentsMargins(6, 6, 6, 6);
+  form->setSpacing(8);
+
+  std::vector<ShortcutRow> rows;
+  rows.reserve(static_cast<std::size_t>(configurable.size()));
+  for (QAction* action : configurable) {
+    auto* edit = new QKeySequenceEdit(action->shortcut(), host);
+    edit->setClearButtonEnabled(true);
+    form->addRow(action->text().remove('&'), edit);
+    rows.push_back(ShortcutRow {action, edit});
+  }
+  host->setLayout(form);
+  scroll->setWidget(host);
+  root->addWidget(scroll, 1);
+
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+  auto* resetButton = buttons->addButton("Reset To Default", QDialogButtonBox::ResetRole);
+  root->addWidget(buttons);
+
+  connect(resetButton, &QPushButton::clicked, &dialog, [&rows]() {
+    for (const ShortcutRow& row : rows) {
+      if (row.action == nullptr || row.edit == nullptr) {
+        continue;
+      }
+      const QString defaultText = row.action->property("defaultShortcut").toString();
+      row.edit->setKeySequence(QKeySequence::fromString(defaultText, QKeySequence::PortableText));
+    }
+  });
+  connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  QMap<QString, QStringList> duplicates;
+  for (const ShortcutRow& row : rows) {
+    if (row.action == nullptr || row.edit == nullptr) {
+      continue;
+    }
+    const QString key = row.edit->keySequence().toString(QKeySequence::PortableText);
+    if (!key.isEmpty()) {
+      duplicates[key].push_back(row.action->text().remove('&'));
+    }
+  }
+  QStringList conflictLines;
+  for (auto it = duplicates.cbegin(); it != duplicates.cend(); ++it) {
+    if (it.value().size() > 1) {
+      conflictLines.push_back(QString("%1 -> %2").arg(it.key(), it.value().join(", ")));
+    }
+  }
+  if (!conflictLines.isEmpty()) {
+    const auto result = QMessageBox::question(
+        this,
+        "Shortcut Conflict",
+        QString("Duplicate shortcuts detected:\n\n%1\n\nApply anyway?").arg(conflictLines.join("\n")));
+    if (result != QMessageBox::Yes) {
+      return;
+    }
+  }
+
+  for (const ShortcutRow& row : rows) {
+    if (row.action == nullptr || row.edit == nullptr) {
+      continue;
+    }
+    row.action->setShortcut(row.edit->keySequence());
+    saveShortcutOverride(row.action->property("commandId").toString(), row.edit->keySequence());
+  }
+}
+
 void MainWindow::onChooseForegroundColor() {
   const QColor current = toQColor(m_controller->toolState().color);
   const QColor picked = QColorDialog::getColor(current, this, "Foreground Color", QColorDialog::ShowAlphaChannel);
@@ -813,6 +1132,19 @@ void MainWindow::onSwapColors() {
   updateColorPanel();
 }
 
+void MainWindow::onResetBlackWhiteColors() {
+  m_controller->setBrushColor(core::Color::OpaqueBlack());
+  m_backgroundColor = core::Color {255, 255, 255, 255};
+  updateColorPanel();
+}
+
+void MainWindow::onUseTransparentColor() {
+  core::Color color = m_controller->toolState().color;
+  color.a = 0;
+  m_controller->setBrushColor(color);
+  updateColorPanel();
+}
+
 void MainWindow::updateColorPanel() {
   if (m_foregroundColorButton == nullptr || m_backgroundColorButton == nullptr) {
     return;
@@ -831,7 +1163,8 @@ void MainWindow::updateColorPanel() {
         .arg(textColor);
   };
 
-  m_foregroundColorButton->setText(QString("FG %1").arg(fg.name(QColor::HexRgb).toUpper()));
+  const QString fgPrefix = fg.alpha() == 0 ? "FG Transparent" : "FG";
+  m_foregroundColorButton->setText(QString("%1 %2").arg(fgPrefix, fg.name(QColor::HexRgb).toUpper()));
   m_backgroundColorButton->setText(QString("BG %1").arg(bg.name(QColor::HexRgb).toUpper()));
   m_foregroundColorButton->setStyleSheet(makeStyle(fg));
   m_backgroundColorButton->setStyleSheet(makeStyle(bg));
@@ -895,6 +1228,11 @@ void MainWindow::rebuildRecentFilesMenu() {
   if (m_recentFiles.isEmpty()) {
     QAction* empty = m_recentFilesMenu->addAction("(No recent files)");
     empty->setEnabled(false);
+    if (m_clearRecentFilesAction != nullptr) {
+      m_recentFilesMenu->addSeparator();
+      m_clearRecentFilesAction->setEnabled(false);
+      m_recentFilesMenu->addAction(m_clearRecentFilesAction);
+    }
     return;
   }
   for (const QString& path : m_recentFiles) {
@@ -903,6 +1241,39 @@ void MainWindow::rebuildRecentFilesMenu() {
       openImageFile(path);
     });
   }
+  if (m_clearRecentFilesAction != nullptr) {
+    m_recentFilesMenu->addSeparator();
+    m_clearRecentFilesAction->setEnabled(true);
+    m_recentFilesMenu->addAction(m_clearRecentFilesAction);
+  }
+}
+
+void MainWindow::loadShortcutOverrides() {
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("shortcuts");
+  const QList<QAction*> actions = findChildren<QAction*>();
+  for (QAction* action : actions) {
+    if (action == nullptr || !action->property("commandId").isValid()) {
+      continue;
+    }
+    const QString commandId = action->property("commandId").toString();
+    if (!settings.contains(commandId)) {
+      continue;
+    }
+    const QString saved = settings.value(commandId).toString();
+    action->setShortcut(QKeySequence::fromString(saved, QKeySequence::PortableText));
+  }
+  settings.endGroup();
+}
+
+void MainWindow::saveShortcutOverride(const QString& commandId, const QKeySequence& sequence) {
+  if (commandId.isEmpty()) {
+    return;
+  }
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("shortcuts");
+  settings.setValue(commandId, sequence.toString(QKeySequence::PortableText));
+  settings.endGroup();
 }
 
 QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut) {

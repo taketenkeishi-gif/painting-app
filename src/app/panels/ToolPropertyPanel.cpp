@@ -45,8 +45,10 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_correctionSection(nullptr),
       m_shapeSection(nullptr),
       m_drawingControlSection(nullptr),
+      m_vectorSection(nullptr),
       m_toolNameLabel(new QLabel("Tool: -", this)),
       m_guideLabel(new QLabel("", this)),
+      m_compatibilityLabel(new QLabel("", this)),
       m_colorLabel(new QLabel("Color", this)),
       m_sizeLabel(new QLabel("Size", this)),
       m_opacityLabel(new QLabel("Opacity", this)),
@@ -96,6 +98,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   hostLayout->setSpacing(0);
 
   m_guideLabel->setWordWrap(true);
+  m_compatibilityLabel->setWordWrap(true);
+  m_compatibilityLabel->setStyleSheet("color: #f3bf58; font-weight: 600;");
   m_sizeSpin->setRange(1, 128);
   m_opacitySlider->setRange(0, 100);
   m_opacitySpin->setRange(0, 100);
@@ -136,6 +140,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   titleLayout->setContentsMargins(8, 8, 8, 8);
   titleLayout->setSpacing(4);
   titleLayout->addWidget(m_toolNameLabel);
+  titleLayout->addWidget(m_compatibilityLabel);
   titleLayout->addWidget(m_guideLabel);
   contentLayout->addWidget(titleFrame);
 
@@ -249,6 +254,16 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto* drawControlLayout = new QVBoxLayout(drawControlGroup);
   drawControlLayout->setContentsMargins(8, 8, 8, 8);
   drawControlLayout->setSpacing(6);
+  drawControlLayout->addWidget(m_blendModeCombo);
+  drawControlLayout->addWidget(m_eraseModeCheck);
+  drawControlLayout->addWidget(m_lockAlphaRespectCheck);
+  contentLayout->addWidget(drawControlGroup);
+  m_drawingControlSection = drawControlGroup;
+
+  auto* vectorGroup = new QGroupBox("Vector", m_contentWidget);
+  auto* vectorLayout = new QVBoxLayout(vectorGroup);
+  vectorLayout->setContentsMargins(8, 8, 8, 8);
+  vectorLayout->setSpacing(6);
   auto* snapAngleRow = new QHBoxLayout();
   snapAngleRow->setContentsMargins(0, 0, 0, 0);
   snapAngleRow->setSpacing(6);
@@ -259,15 +274,12 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   simplifyRow->setSpacing(6);
   simplifyRow->addWidget(m_simplifySlider, 1);
   simplifyRow->addWidget(m_simplifySpin);
-  drawControlLayout->addWidget(m_blendModeCombo);
-  drawControlLayout->addWidget(m_eraseModeCheck);
-  drawControlLayout->addWidget(m_lockAlphaRespectCheck);
-  drawControlLayout->addWidget(m_snapAngleLabel);
-  drawControlLayout->addLayout(snapAngleRow);
-  drawControlLayout->addWidget(m_simplifyLabel);
-  drawControlLayout->addLayout(simplifyRow);
-  contentLayout->addWidget(drawControlGroup);
-  m_drawingControlSection = drawControlGroup;
+  vectorLayout->addWidget(m_snapAngleLabel);
+  vectorLayout->addLayout(snapAngleRow);
+  vectorLayout->addWidget(m_simplifyLabel);
+  vectorLayout->addLayout(simplifyRow);
+  contentLayout->addWidget(vectorGroup);
+  m_vectorSection = vectorGroup;
 
   contentLayout->addStretch(1);
 
@@ -329,6 +341,9 @@ void ToolPropertyPanel::refreshFromController() {
   }
 
   m_toolNameLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
+  const QString compatibilityHint = QString::fromStdString(m_controller->currentLayerCompatibilityHint());
+  m_compatibilityLabel->setVisible(!compatibilityHint.isEmpty());
+  m_compatibilityLabel->setText(compatibilityHint);
   m_guideLabel->setText(QString::fromStdString(m_controller->currentToolGuide()));
 
   const bool supportsColor = m_controller->currentToolSupportsColor();
@@ -351,6 +366,7 @@ void ToolPropertyPanel::refreshFromController() {
   const bool supportsLockAlpha = m_controller->currentToolSupportsLockAlphaRespect();
   const bool supportsSnapAngle = m_controller->currentToolSupportsSnapAngle();
   const bool supportsSimplify = m_controller->currentToolSupportsSimplifyLevel();
+  m_sizeLabel->setText((supportsSnapAngle || supportsSimplify) ? "Stroke Width" : "Size");
   m_colorLabel->setVisible(supportsColor);
   m_colorButton->setVisible(supportsColor);
   m_sizeLabel->setVisible(supportsSize);
@@ -399,8 +415,8 @@ void ToolPropertyPanel::refreshFromController() {
   m_simplifyLabel->setVisible(supportsSimplify);
   m_simplifySlider->setVisible(supportsSimplify);
   m_simplifySpin->setVisible(supportsSimplify);
-  m_drawingControlSection->setVisible(
-      supportsBlend || supportsEraseMode || supportsLockAlpha || supportsSnapAngle || supportsSimplify);
+  m_drawingControlSection->setVisible(supportsBlend || supportsEraseMode || supportsLockAlpha);
+  m_vectorSection->setVisible(supportsSnapAngle || supportsSimplify);
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);

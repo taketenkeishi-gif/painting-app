@@ -26,6 +26,10 @@ public:
   void resetZoom();
   void fitToScreen();
   int zoomPercent() const;
+  void setGridVisible(bool visible);
+  void setOverlayVisible(bool visible);
+  bool isGridVisible() const noexcept { return m_showGrid; }
+  bool isOverlayVisible() const noexcept { return m_showOverlay; }
 
 protected:
   void paintEvent(QPaintEvent* event) override;
@@ -45,6 +49,8 @@ private:
   app::bridge::AppController* m_controller {nullptr};
   QImage m_image;
   bool m_mouseDrawing {false};
+  bool m_showGrid {false};
+  bool m_showOverlay {true};
 };
 
 } // namespace app::canvasview

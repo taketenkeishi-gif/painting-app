@@ -68,8 +68,10 @@ private:
   QWidget* m_correctionSection {nullptr};
   QWidget* m_shapeSection {nullptr};
   QWidget* m_drawingControlSection {nullptr};
+  QWidget* m_vectorSection {nullptr};
   QLabel* m_toolNameLabel {nullptr};
   QLabel* m_guideLabel {nullptr};
+  QLabel* m_compatibilityLabel {nullptr};
   QLabel* m_colorLabel {nullptr};
   QLabel* m_sizeLabel {nullptr};
   QLabel* m_opacityLabel {nullptr};

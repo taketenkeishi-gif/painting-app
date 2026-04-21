@@ -180,6 +180,22 @@ int CanvasWidget::zoomPercent() const {
   return static_cast<int>(std::lround(stateFor(this).zoom * 100.0));
 }
 
+void CanvasWidget::setGridVisible(bool visible) {
+  if (m_showGrid == visible) {
+    return;
+  }
+  m_showGrid = visible;
+  update();
+}
+
+void CanvasWidget::setOverlayVisible(bool visible) {
+  if (m_showOverlay == visible) {
+    return;
+  }
+  m_showOverlay = visible;
+  update();
+}
+
 void CanvasWidget::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
   auto& state = stateFor(this);
@@ -194,7 +210,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   painter.fillRect(target, QColor(32, 32, 32));
   painter.drawImage(target, m_image);
 
-  if (m_controller != nullptr) {
+  if (m_controller != nullptr && m_showOverlay) {
     const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
     const core::ToolKind activeTool = m_controller->currentTool();
     painter.setRenderHint(QPainter::Antialiasing, true);
@@ -255,7 +271,20 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     painter.drawText(badgeRect.adjusted(8, 0, -6, 0), Qt::AlignVCenter | Qt::AlignLeft, activeToolText);
   }
 
-  if (!state.panning && !g_spacePressed && state.hasMousePos && m_controller != nullptr) {
+  if (m_showGrid && state.zoom >= 8.0) {
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setPen(QPen(QColor(255, 255, 255, 26), 1.0));
+    for (int x = 0; x <= m_image.width(); ++x) {
+      const int sx = target.x() + static_cast<int>(std::lround(static_cast<double>(x) * state.zoom));
+      painter.drawLine(sx, target.y(), sx, target.y() + target.height());
+    }
+    for (int y = 0; y <= m_image.height(); ++y) {
+      const int sy = target.y() + static_cast<int>(std::lround(static_cast<double>(y) * state.zoom));
+      painter.drawLine(target.x(), sy, target.x() + target.width(), sy);
+    }
+  }
+
+  if (m_showOverlay && !state.panning && !g_spacePressed && state.hasMousePos && m_controller != nullptr) {
     const auto point = mapToCanvas(state.lastMousePos);
     const core::ToolKind activeTool = m_controller->currentTool();
     if (point.has_value() &&

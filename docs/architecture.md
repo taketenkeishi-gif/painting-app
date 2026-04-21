@@ -49,8 +49,12 @@
   - Center: Canvas
   - Bottom: status bar
 - `Window` menu controls panel visibility and supports reset workspace.
-- File/Edit menus are wired to controller-level operations (selection fill/delete, merge/rasterize, clipboard image import/export as raster layer).
+- Layer panel displays top-most layers at the top row and maps row/index explicitly, so button move and drag/drop reorder match user expectations.
+- Canvas view supports optional grid/overlay toggles through the `View` menu without changing core rendering data.
+- File/Edit menus are wired to controller-level operations (selection fill/delete, merge/rasterize, new-from-clipboard, import-as-layer, clipboard image import/export as raster layer, flattened export).
+- Color operations (`Swap FG/BG`, `Reset B/W`, `Transparent`) are command actions, so panel buttons and shortcuts share the same path.
 - Tool/sub-tool/property panels surface layer-kind compatibility through enabled/disabled state, so raster/vector mismatches are visible before execution.
+- Shortcut bindings are action-driven and persisted via `QSettings`, so menu and key operations follow one command path.
 
 ## Extensibility Direction
 

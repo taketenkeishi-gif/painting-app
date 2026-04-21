@@ -18,7 +18,8 @@ ToolPanel::ToolPanel(QWidget* parent)
       "  background: #2b2d31;"
       "  color: #d8d8d8;"
       "  border-radius: 4px;"
-      "  padding: 2px;"
+      "  padding: 4px 6px;"
+      "  min-height: 52px;"
       "}"
       "QToolButton:hover { background: #353942; border-color: #5e6f90; }"
       "QToolButton:checked { background: #2f4f7f; border-color: #7fb3ff; color: #ffffff; }");
@@ -97,9 +98,9 @@ void ToolPanel::rebuildButtons() {
     button->setText(QString::fromStdString(m_controller->toolDisplayName(kind)));
     button->setCheckable(true);
     button->setAutoExclusive(true);
-    button->setIconSize(QSize(18, 18));
+    button->setIconSize(QSize(16, 16));
     button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    button->setMinimumHeight(56);
+    button->setMinimumSize(QSize(86, 52));
     button->setProperty("toolKind", static_cast<int>(kind));
 
     switch (kind) {

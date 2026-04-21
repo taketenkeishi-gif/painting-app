@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include <QListWidget>
 #include <QPushButton>
 #include <QWidget>
@@ -35,6 +37,8 @@ private slots:
   void onOpacityChanged(int value);
 
 private:
+  std::size_t layerIndexFromRow(int row) const;
+  int rowFromLayerIndex(std::size_t layerIndex) const;
   void refreshButtonState();
 
   app::bridge::AppController* m_controller {nullptr};

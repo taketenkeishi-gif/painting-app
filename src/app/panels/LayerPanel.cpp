@@ -1,10 +1,13 @@
 #include "app/panels/LayerPanel.h"
 
+#include <algorithm>
+
 #include <QColor>
 #include <QFont>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QAbstractItemModel>
+#include <QList>
 #include <QModelIndex>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -21,6 +24,7 @@ namespace {
 constexpr int kNameRole = Qt::UserRole + 1;
 constexpr int kVisibilityRole = Qt::UserRole + 2;
 constexpr int kKindRole = Qt::UserRole + 3;
+constexpr int kLayerIndexRole = Qt::UserRole + 4;
 
 } // namespace
 
@@ -47,6 +51,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
   m_layerList->setDefaultDropAction(Qt::MoveAction);
   m_layerList->setSpacing(2);
+  m_layerList->setStyleSheet(
+      "QListWidget::item { padding: 5px 8px; border-bottom: 1px solid #313844; }"
+      "QListWidget::item:selected { background: #2e4f79; color: #ffffff; }");
 
   m_opacitySlider->setRange(0, 100);
   m_opacitySlider->setValue(100);
@@ -58,6 +65,17 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_upButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
   m_downButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
   m_deleteButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
+  const QList<QPushButton*> buttons {
+      m_addRasterButton,
+      m_addVectorButton,
+      m_duplicateButton,
+      m_upButton,
+      m_downButton,
+      m_deleteButton};
+  for (QPushButton* button : buttons) {
+    button->setMinimumHeight(28);
+    button->setIconSize(QSize(14, 14));
+  }
 
   auto* layout = new QVBoxLayout(this);
   layout->setContentsMargins(6, 6, 6, 6);
@@ -68,6 +86,8 @@ LayerPanel::LayerPanel(QWidget* parent)
   layout->addWidget(m_opacitySlider);
 
   auto* buttonRow = new QHBoxLayout();
+  buttonRow->setContentsMargins(0, 0, 0, 0);
+  buttonRow->setSpacing(4);
   buttonRow->addWidget(m_addRasterButton);
   buttonRow->addWidget(m_addVectorButton);
   buttonRow->addWidget(m_duplicateButton);
@@ -118,8 +138,9 @@ void LayerPanel::refreshLayers() {
   m_layerList->clear();
 
   const auto models = m_controller->layerViewModels();
-  for (int i = 0; i < static_cast<int>(models.size()); ++i) {
-    const auto& model = models[static_cast<std::size_t>(i)];
+  for (int row = 0; row < static_cast<int>(models.size()); ++row) {
+    const std::size_t layerIndex = layerIndexFromRow(row);
+    const auto& model = models[layerIndex];
     const QString kindPrefix = model.kind == core::LayerKind::Vector ? "[V] " : "[R] ";
     auto* item = new QListWidgetItem(kindPrefix + QString::fromStdString(model.name), m_layerList);
     item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEditable);
@@ -127,8 +148,9 @@ void LayerPanel::refreshLayers() {
     item->setData(kNameRole, QString::fromStdString(model.name));
     item->setData(kVisibilityRole, model.visible);
     item->setData(kKindRole, static_cast<int>(model.kind));
+    item->setData(kLayerIndexRole, static_cast<int>(layerIndex));
     item->setToolTip("Toggle visibility with the checkbox. Double-click name to rename.");
-    item->setSizeHint(QSize(item->sizeHint().width(), 28));
+    item->setSizeHint(QSize(item->sizeHint().width(), 30));
 
     QFont font = item->font();
     font.setBold(model.active);
@@ -136,7 +158,7 @@ void LayerPanel::refreshLayers() {
     item->setBackground(model.active ? QColor(48, 79, 130) : QColor(Qt::transparent));
 
     if (model.active) {
-      m_layerList->setCurrentRow(i);
+      m_layerList->setCurrentRow(rowFromLayerIndex(layerIndex));
       const QSignalBlocker sliderBlocker(m_opacitySlider);
       m_opacitySlider->setValue(model.opacityPercent);
       m_opacityLabel->setText(QString("Opacity: %1%").arg(model.opacityPercent));
@@ -169,7 +191,7 @@ void LayerPanel::onDuplicateLayerClicked() {
   if (row < 0) {
     return;
   }
-  m_controller->duplicateLayer(static_cast<std::size_t>(row));
+  m_controller->duplicateLayer(layerIndexFromRow(row));
 }
 
 void LayerPanel::onDeleteLayerClicked() {
@@ -180,7 +202,7 @@ void LayerPanel::onDeleteLayerClicked() {
   if (row < 0) {
     return;
   }
-  m_controller->removeLayer(static_cast<std::size_t>(row));
+  m_controller->removeLayer(layerIndexFromRow(row));
 }
 
 void LayerPanel::onMoveLayerUpClicked() {
@@ -191,7 +213,7 @@ void LayerPanel::onMoveLayerUpClicked() {
   if (row < 0) {
     return;
   }
-  m_controller->moveLayerUp(static_cast<std::size_t>(row));
+  m_controller->moveLayerUp(layerIndexFromRow(row));
 }
 
 void LayerPanel::onMoveLayerDownClicked() {
@@ -202,14 +224,14 @@ void LayerPanel::onMoveLayerDownClicked() {
   if (row < 0) {
     return;
   }
-  m_controller->moveLayerDown(static_cast<std::size_t>(row));
+  m_controller->moveLayerDown(layerIndexFromRow(row));
 }
 
 void LayerPanel::onCurrentLayerChanged(int row) {
   if (m_controller == nullptr || m_isRefreshing || row < 0) {
     return;
   }
-  m_controller->setActiveLayer(static_cast<std::size_t>(row));
+  m_controller->setActiveLayer(layerIndexFromRow(row));
 }
 
 void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
@@ -220,6 +242,9 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
   if (row < 0) {
     return;
   }
+  const int layerIndexValue = item->data(kLayerIndexRole).toInt();
+  const std::size_t layerIndex =
+      layerIndexValue >= 0 ? static_cast<std::size_t>(layerIndexValue) : layerIndexFromRow(row);
 
   const QString oldName = item->data(kNameRole).toString();
   QString newName = item->text().trimmed();
@@ -228,7 +253,9 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
   }
   if (newName.isEmpty()) {
     const QSignalBlocker signalBlocker(m_layerList);
-    item->setText(oldName);
+    const core::LayerKind kind = static_cast<core::LayerKind>(item->data(kKindRole).toInt());
+    const QString kindPrefix = kind == core::LayerKind::Vector ? "[V] " : "[R] ";
+    item->setText(kindPrefix + oldName);
     return;
   }
 
@@ -239,10 +266,10 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
   const bool visibilityChanged = visible != oldVisible;
 
   if (nameChanged) {
-    m_controller->renameLayer(static_cast<std::size_t>(row), newName.toStdString());
+    m_controller->renameLayer(layerIndex, newName.toStdString());
   }
   if (visibilityChanged) {
-    m_controller->setLayerVisible(static_cast<std::size_t>(row), visible);
+    m_controller->setLayerVisible(layerIndex, visible);
   }
   if (!nameChanged && !visibilityChanged) {
     refreshButtonState();
@@ -279,12 +306,38 @@ void LayerPanel::onLayerRowsMoved(
     return;
   }
 
+  const std::size_t fromLayerIndex = layerIndexFromRow(start);
+  const std::size_t toLayerIndex = layerIndexFromRow(toRow);
   m_isDraggingLayer = true;
-  const bool moved = m_controller->moveLayer(static_cast<std::size_t>(start), static_cast<std::size_t>(toRow));
+  const bool moved = m_controller->moveLayer(fromLayerIndex, toLayerIndex);
   m_isDraggingLayer = false;
   if (!moved) {
     refreshLayers();
   }
+}
+
+std::size_t LayerPanel::layerIndexFromRow(int row) const {
+  if (m_controller == nullptr) {
+    return 0;
+  }
+  const std::size_t count = m_controller->document().layerCount();
+  if (count == 0) {
+    return 0;
+  }
+  const int clamped = std::clamp(row, 0, static_cast<int>(count) - 1);
+  return count - 1 - static_cast<std::size_t>(clamped);
+}
+
+int LayerPanel::rowFromLayerIndex(std::size_t layerIndex) const {
+  if (m_controller == nullptr) {
+    return 0;
+  }
+  const std::size_t count = m_controller->document().layerCount();
+  if (count == 0) {
+    return 0;
+  }
+  const std::size_t clamped = std::min(layerIndex, count - 1);
+  return static_cast<int>(count - 1 - clamped);
 }
 
 void LayerPanel::refreshButtonState() {
@@ -299,8 +352,9 @@ void LayerPanel::refreshButtonState() {
   const bool hasSelection = m_layerList->currentRow() >= 0;
   const bool canDelete = m_controller->document().layerCount() > 1;
   const int current = m_layerList->currentRow();
-  const bool canMoveUp = current >= 0 && static_cast<std::size_t>(current + 1) < m_controller->document().layerCount();
-  const bool canMoveDown = current > 0;
+  const int lastRow = static_cast<int>(m_controller->document().layerCount()) - 1;
+  const bool canMoveUp = current > 0;
+  const bool canMoveDown = current >= 0 && current < lastRow;
   m_deleteButton->setEnabled(hasSelection && canDelete);
   m_duplicateButton->setEnabled(hasSelection);
   m_upButton->setEnabled(canMoveUp);

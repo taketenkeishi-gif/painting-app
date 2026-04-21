@@ -38,19 +38,24 @@ SubToolPanel::SubToolPanel(QWidget* parent)
 
   m_searchEdit->setPlaceholderText("Search sub tool...");
   m_duplicateButton->setToolTip("Duplicate current preset.");
+  m_searchEdit->setMinimumHeight(28);
+  m_duplicateButton->setMinimumHeight(28);
   m_renameButton->setText("Rename");
   m_deleteButton->setText("Delete");
   m_resetButton->setText("Reset");
   m_renameButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   m_deleteButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   m_resetButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+  m_renameButton->setMinimumHeight(28);
+  m_deleteButton->setMinimumHeight(28);
+  m_resetButton->setMinimumHeight(28);
 
   m_subToolList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_subToolList->setEditTriggers(QAbstractItemView::NoEditTriggers);
   m_subToolList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   m_subToolList->setSpacing(2);
   m_subToolList->setStyleSheet(
-      "QListWidget::item { padding: 4px 6px; border-bottom: 1px solid #30343d; }"
+      "QListWidget::item { padding: 5px 8px; border-bottom: 1px solid #30343d; }"
       "QListWidget::item:selected { background: #345985; color: #ffffff; }");
 
   auto* searchRow = new QHBoxLayout();
@@ -118,7 +123,7 @@ void SubToolPanel::refreshFromController() {
     row->setFlags(item.enabled ? (Qt::ItemIsEnabled | Qt::ItemIsSelectable) : Qt::NoItemFlags);
     row->setForeground(item.enabled ? palette().windowText().color() : QColor(130, 136, 148));
     row->setToolTip(item.hint.empty() ? displayName : QString::fromStdString(item.hint));
-    row->setSizeHint(QSize(row->sizeHint().width(), 26));
+    row->setSizeHint(QSize(row->sizeHint().width(), 30));
     hasEnabledRow = hasEnabledRow || item.enabled;
     if (item.active) {
       m_subToolList->setCurrentItem(row);
