@@ -95,6 +95,7 @@ private slots:
   void onRestoreLastWorkspaceTriggered();
   void onLoadWorkspaceByName(const QString& name);
   void onShortcutSettingsTriggered();
+  void onCommandPaletteTriggered();
   void onChooseForegroundColor();
   void onChooseBackgroundColor();
   void onSwapColors();
@@ -228,6 +229,7 @@ private:
   QAction* m_shortcutSummaryAction {nullptr};
   QAction* m_openDocsAction {nullptr};
   QAction* m_shortcutSettingsAction {nullptr};
+  QAction* m_commandPaletteAction {nullptr};
   QAction* m_swapColorsAction {nullptr};
   QAction* m_resetColorsAction {nullptr};
   QAction* m_transparentColorAction {nullptr};

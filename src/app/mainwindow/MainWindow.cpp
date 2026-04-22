@@ -27,6 +27,7 @@
 #include <QLabel>
 #include <QKeySequenceEdit>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -40,6 +41,7 @@
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QStyle>
+#include <QSet>
 #include <QTabWidget>
 #include <QToolBar>
 #include <QVariant>
@@ -423,6 +425,7 @@ void MainWindow::createMenus() {
   m_shortcutSummaryAction = new QAction("&Shortcut Summary", this);
   m_openDocsAction = new QAction("&Open Docs", this);
   m_shortcutSettingsAction = new QAction("Shortcut &Settings...", this);
+  m_commandPaletteAction = new QAction("Command &Palette...", this);
   m_swapColorsAction = new QAction("S&wap FG/BG", this);
   m_resetColorsAction = new QAction("Reset &Black/White", this);
   m_transparentColorAction = new QAction("Use &Transparent Color", this);
@@ -480,6 +483,7 @@ void MainWindow::createMenus() {
   m_saveWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_S));
   m_restoreLastWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_W));
   m_shortcutSettingsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_K));
+  m_commandPaletteAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_P));
   m_swapColorsAction->setShortcut(QKeySequence(Qt::Key_X));
   m_resetColorsAction->setShortcut(QKeySequence(Qt::Key_D));
   m_transparentColorAction->setShortcut(QKeySequence(Qt::Key_C));
@@ -594,6 +598,8 @@ void MainWindow::createMenus() {
   windowMenu->addAction(m_deleteWorkspaceAction);
   windowMenu->addAction(m_restoreLastWorkspaceAction);
   windowMenu->addAction(m_resetWorkspaceAction);
+  windowMenu->addSeparator();
+  windowMenu->addAction(m_commandPaletteAction);
   rebuildWorkspaceLayoutsMenu();
 
   helpMenu->addAction(aboutAction);
@@ -655,6 +661,7 @@ void MainWindow::createMenus() {
   connect(m_saveWorkspaceAction, &QAction::triggered, this, &MainWindow::onSaveWorkspaceTriggered);
   connect(m_deleteWorkspaceAction, &QAction::triggered, this, &MainWindow::onDeleteWorkspaceTriggered);
   connect(m_restoreLastWorkspaceAction, &QAction::triggered, this, &MainWindow::onRestoreLastWorkspaceTriggered);
+  connect(m_commandPaletteAction, &QAction::triggered, this, &MainWindow::onCommandPaletteTriggered);
   connect(m_swapColorsAction, &QAction::triggered, this, &MainWindow::onSwapColors);
   connect(m_resetColorsAction, &QAction::triggered, this, &MainWindow::onResetBlackWhiteColors);
   connect(m_transparentColorAction, &QAction::triggered, this, &MainWindow::onUseTransparentColor);
@@ -759,6 +766,7 @@ void MainWindow::createMenus() {
   markCommand(m_saveWorkspaceAction, "window.save_workspace");
   markCommand(m_deleteWorkspaceAction, "window.delete_workspace");
   markCommand(m_restoreLastWorkspaceAction, "window.restore_last_workspace");
+  markCommand(m_commandPaletteAction, "window.command_palette");
   markCommand(m_shortcutSettingsAction, "help.shortcut_settings");
   markCommand(m_swapColorsAction, "color.swap");
   markCommand(m_resetColorsAction, "color.reset_bw");
@@ -1355,6 +1363,118 @@ void MainWindow::onLoadWorkspaceByName(const QString& name) {
   }
   if (!restoreWorkspaceLayout(name)) {
     statusBar()->showMessage(QString("Failed to load workspace: %1").arg(name), 1800);
+  }
+}
+
+void MainWindow::onCommandPaletteTriggered() {
+  struct CommandEntry {
+    QAction* action {nullptr};
+    QString label;
+    QString commandId;
+    QString shortcut;
+  };
+
+  QList<QAction*> allActions = findChildren<QAction*>();
+  std::vector<CommandEntry> commands;
+  commands.reserve(static_cast<std::size_t>(allActions.size()));
+  QSet<QAction*> seen;
+  for (QAction* action : allActions) {
+    if (action == nullptr || !action->property("commandId").isValid()) {
+      continue;
+    }
+    if (!action->isEnabled()) {
+      continue;
+    }
+    if (action == m_commandPaletteAction || seen.contains(action)) {
+      continue;
+    }
+    seen.insert(action);
+    CommandEntry entry;
+    entry.action = action;
+    entry.label = action->text().remove('&').trimmed();
+    entry.commandId = action->property("commandId").toString();
+    entry.shortcut = action->shortcut().toString(QKeySequence::NativeText);
+    commands.push_back(entry);
+  }
+
+  std::sort(commands.begin(), commands.end(), [](const CommandEntry& lhs, const CommandEntry& rhs) {
+    return lhs.label.compare(rhs.label, Qt::CaseInsensitive) < 0;
+  });
+  if (commands.empty()) {
+    statusBar()->showMessage("No commands available", 1800);
+    return;
+  }
+
+  QDialog dialog(this);
+  dialog.setWindowTitle("Command Palette");
+  dialog.resize(640, 480);
+  auto* root = new QVBoxLayout(&dialog);
+  root->setContentsMargins(10, 10, 10, 10);
+  root->setSpacing(8);
+
+  auto* filterEdit = new QLineEdit(&dialog);
+  filterEdit->setPlaceholderText("Type command name, shortcut, or id...");
+  root->addWidget(filterEdit);
+
+  auto* list = new QListWidget(&dialog);
+  list->setSelectionMode(QAbstractItemView::SingleSelection);
+  list->setUniformItemSizes(true);
+  root->addWidget(list, 1);
+
+  auto repopulate = [&]() {
+    list->clear();
+    const QString query = filterEdit->text().trimmed();
+    for (std::size_t index = 0; index < commands.size(); ++index) {
+      const CommandEntry& entry = commands[index];
+      const bool matches = query.isEmpty()
+          || entry.label.contains(query, Qt::CaseInsensitive)
+          || entry.commandId.contains(query, Qt::CaseInsensitive)
+          || entry.shortcut.contains(query, Qt::CaseInsensitive);
+      if (!matches) {
+        continue;
+      }
+      QString text = entry.label;
+      if (!entry.shortcut.isEmpty()) {
+        text += QString("    [%1]").arg(entry.shortcut);
+      }
+      auto* item = new QListWidgetItem(text);
+      item->setToolTip(entry.commandId);
+      item->setData(Qt::UserRole, static_cast<int>(index));
+      list->addItem(item);
+    }
+    if (list->count() > 0) {
+      list->setCurrentRow(0);
+    }
+  };
+
+  connect(filterEdit, &QLineEdit::textChanged, &dialog, repopulate);
+  connect(filterEdit, &QLineEdit::returnPressed, &dialog, [&]() {
+    if (list->currentItem() == nullptr && list->count() > 0) {
+      list->setCurrentRow(0);
+    }
+    if (list->currentItem() != nullptr) {
+      dialog.accept();
+    }
+  });
+  connect(list, &QListWidget::itemDoubleClicked, &dialog, [&](QListWidgetItem*) { dialog.accept(); });
+
+  repopulate();
+  filterEdit->setFocus();
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  QListWidgetItem* selected = list->currentItem();
+  if (selected == nullptr) {
+    return;
+  }
+  const int commandIndex = selected->data(Qt::UserRole).toInt();
+  if (commandIndex < 0 || commandIndex >= static_cast<int>(commands.size())) {
+    return;
+  }
+  QAction* action = commands[static_cast<std::size_t>(commandIndex)].action;
+  if (action != nullptr && action->isEnabled()) {
+    action->trigger();
   }
 }
 
