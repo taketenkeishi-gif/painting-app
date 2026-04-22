@@ -1403,7 +1403,38 @@ void MainWindow::onCommandPaletteTriggered() {
     QAction* action {nullptr};
     QString label;
     QString commandId;
+    QString category;
     QString shortcut;
+    bool enabled {false};
+  };
+
+  const auto categoryLabelFromCommandId = [](const QString& commandId) -> QString {
+    const QString prefix = commandId.section('.', 0, 0).toLower();
+    if (prefix == "file") {
+      return "ファイル";
+    }
+    if (prefix == "edit") {
+      return "編集";
+    }
+    if (prefix == "tool") {
+      return "ツール";
+    }
+    if (prefix == "select") {
+      return "選択";
+    }
+    if (prefix == "layer") {
+      return "レイヤー";
+    }
+    if (prefix == "view") {
+      return "表示";
+    }
+    if (prefix == "window") {
+      return "ウィンドウ";
+    }
+    if (prefix == "help") {
+      return "ヘルプ";
+    }
+    return "その他";
   };
 
   QList<QAction*> allActions = findChildren<QAction*>();
@@ -1414,9 +1445,6 @@ void MainWindow::onCommandPaletteTriggered() {
     if (action == nullptr || !action->property("commandId").isValid()) {
       continue;
     }
-    if (!action->isEnabled()) {
-      continue;
-    }
     if (action == m_commandPaletteAction || seen.contains(action)) {
       continue;
     }
@@ -1425,15 +1453,24 @@ void MainWindow::onCommandPaletteTriggered() {
     entry.action = action;
     entry.label = action->text().remove('&').trimmed();
     entry.commandId = action->property("commandId").toString();
+    entry.category = categoryLabelFromCommandId(entry.commandId);
     entry.shortcut = action->shortcut().toString(QKeySequence::NativeText);
+    entry.enabled = action->isEnabled();
+    if (entry.label.isEmpty()) {
+      entry.label = entry.commandId;
+    }
     commands.push_back(entry);
   }
 
   std::sort(commands.begin(), commands.end(), [](const CommandEntry& lhs, const CommandEntry& rhs) {
+    const int categoryCompare = lhs.category.compare(rhs.category, Qt::CaseInsensitive);
+    if (categoryCompare != 0) {
+      return categoryCompare < 0;
+    }
     return lhs.label.compare(rhs.label, Qt::CaseInsensitive) < 0;
   });
   if (commands.empty()) {
-    statusBar()->showMessage("実行可能なコマンドがありません", 1800);
+    statusBar()->showMessage("コマンドが見つかりません", 1800);
     return;
   }
 
@@ -1445,12 +1482,17 @@ void MainWindow::onCommandPaletteTriggered() {
   root->setSpacing(8);
 
   auto* filterEdit = new QLineEdit(&dialog);
-  filterEdit->setPlaceholderText("コマンド名 / ショートカット / ID で検索...");
+  filterEdit->setPlaceholderText("コマンド名 / カテゴリ / ショートカット / ID で検索...");
   root->addWidget(filterEdit);
+
+  auto* hint = new QLabel("Enter で実行、無効コマンドは一覧で確認のみできます。", &dialog);
+  hint->setObjectName("commandPaletteHint");
+  root->addWidget(hint);
 
   auto* list = new QListWidget(&dialog);
   list->setSelectionMode(QAbstractItemView::SingleSelection);
   list->setUniformItemSizes(true);
+  list->setAlternatingRowColors(true);
   root->addWidget(list, 1);
 
   auto repopulate = [&]() {
@@ -1460,18 +1502,25 @@ void MainWindow::onCommandPaletteTriggered() {
       const CommandEntry& entry = commands[index];
       const bool matches = query.isEmpty()
           || entry.label.contains(query, Qt::CaseInsensitive)
+          || entry.category.contains(query, Qt::CaseInsensitive)
           || entry.commandId.contains(query, Qt::CaseInsensitive)
           || entry.shortcut.contains(query, Qt::CaseInsensitive);
       if (!matches) {
         continue;
       }
-      QString text = entry.label;
+      QString text = QString("[%1] %2").arg(entry.category, entry.label);
+      if (!entry.enabled) {
+        text += "  （無効）";
+      }
       if (!entry.shortcut.isEmpty()) {
         text += QString("    [%1]").arg(entry.shortcut);
       }
       auto* item = new QListWidgetItem(text);
       item->setToolTip(entry.commandId);
       item->setData(Qt::UserRole, static_cast<int>(index));
+      if (!entry.enabled) {
+        item->setFlags(item->flags() & ~Qt::ItemIsEnabled);
+      }
       list->addItem(item);
     }
     if (list->count() > 0) {
@@ -1484,11 +1533,15 @@ void MainWindow::onCommandPaletteTriggered() {
     if (list->currentItem() == nullptr && list->count() > 0) {
       list->setCurrentRow(0);
     }
-    if (list->currentItem() != nullptr) {
+    if (list->currentItem() != nullptr && (list->currentItem()->flags() & Qt::ItemIsEnabled)) {
       dialog.accept();
     }
   });
-  connect(list, &QListWidget::itemDoubleClicked, &dialog, [&](QListWidgetItem*) { dialog.accept(); });
+  connect(list, &QListWidget::itemDoubleClicked, &dialog, [&](QListWidgetItem* item) {
+    if (item != nullptr && (item->flags() & Qt::ItemIsEnabled)) {
+      dialog.accept();
+    }
+  });
 
   repopulate();
   filterEdit->setFocus();
@@ -1507,6 +1560,8 @@ void MainWindow::onCommandPaletteTriggered() {
   QAction* action = commands[static_cast<std::size_t>(commandIndex)].action;
   if (action != nullptr && action->isEnabled()) {
     action->trigger();
+  } else {
+    statusBar()->showMessage("このコマンドは現在の状態では実行できません", 2200);
   }
 }
 

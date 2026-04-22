@@ -335,7 +335,9 @@ int main() {
     controller.addVectorLayer();
     controller.setActiveLayer(1);
     expectTrue(controller.document().layerAt(1).kind() == core::LayerKind::Vector, "Vector layer should be creatable from controller.");
-    expectTrue(controller.activeLayerKindDisplayName() == "Vector", "Active layer kind label should reflect vector layer.");
+    expectTrue(
+        controller.activeLayerKindDisplayName() == u8"\u30D9\u30AF\u30BF\u30FC",
+        "Active layer kind label should reflect vector layer.");
 
     controller.setCurrentTool(core::ToolKind::Brush);
     expectTrue(!controller.canUseCurrentToolOnActiveLayer(), "Brush should be restricted on vector layer.");

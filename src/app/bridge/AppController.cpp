@@ -1009,32 +1009,56 @@ std::string AppController::currentSubToolDisplayName() const {
 }
 
 std::string AppController::currentToolGuide() const {
-  const app::ui::SubToolDescriptor* sub = currentSubToolDescriptor();
+  std::string guide;
+  switch (currentTool()) {
+    case core::ToolKind::Brush:
+      guide = u8"\u5DE6\u30C9\u30E9\u30C3\u30B0\u3067\u63CF\u753B\u3002\u30DB\u30A4\u30FC\u30EB/[]\u3067\u30B5\u30A4\u30BA\u5909\u66F4\u3002";
+      break;
+    case core::ToolKind::Eraser:
+      guide = u8"\u5DE6\u30C9\u30E9\u30C3\u30B0\u3067\u6D88\u53BB\u3002\u30DB\u30A4\u30FC\u30EB/[]\u3067\u30B5\u30A4\u30BA\u5909\u66F4\u3002";
+      break;
+    case core::ToolKind::Eyedropper:
+      guide = u8"\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u8272\u3092\u53D6\u5F97\u3002";
+      break;
+    case core::ToolKind::Fill:
+      guide = u8"\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u5857\u308A\u3064\u3076\u3057\u3002";
+      break;
+    case core::ToolKind::Line:
+      guide = u8"\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u76F4\u7DDA\u3092\u63CF\u753B\u3002";
+      break;
+    case core::ToolKind::RectSelection:
+      guide = u8"\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u9078\u629E\u7BC4\u56F2\u3092\u4F5C\u6210\u3002";
+      break;
+    case core::ToolKind::MoveLayer:
+      guide = u8"\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u30EC\u30A4\u30E4\u30FC\u5185\u5BB9\u3092\u79FB\u52D5\u3002";
+      break;
+    case core::ToolKind::Hand:
+      guide = u8"\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u30AD\u30E3\u30F3\u30D0\u30B9\u3092\u79FB\u52D5\u3002";
+      break;
+    case core::ToolKind::Zoom:
+      guide = u8"Ctrl+\u30DB\u30A4\u30FC\u30EB\u3067\u30BA\u30FC\u30E0\u3002";
+      break;
+    default:
+      break;
+  }
   const std::string hint = currentLayerCompatibilityHint();
-  if (sub != nullptr && !sub->guide.empty()) {
-    return hint.empty() ? sub->guide : sub->guide + "  " + hint;
-  }
-  const app::ui::ToolDescriptor* descriptor = currentToolDescriptor();
-  if (descriptor != nullptr) {
-    return hint.empty() ? descriptor->guide : descriptor->guide + "  " + hint;
-  }
-  return hint;
+  return hint.empty() ? guide : (guide.empty() ? hint : guide + "  " + hint);
 }
 
 std::string AppController::activeLayerKindDisplayName() const {
   const core::Layer* layer = m_document.activeLayer();
   if (layer == nullptr) {
-    return "None";
+    return u8"\u306A\u3057";
   }
   switch (layer->kind()) {
     case core::LayerKind::Raster:
-      return "Raster";
+      return u8"\u30E9\u30B9\u30BF";
     case core::LayerKind::Vector:
-      return "Vector";
+      return u8"\u30D9\u30AF\u30BF\u30FC";
     case core::LayerKind::Folder:
-      return "Folder";
+      return u8"\u30D5\u30A9\u30EB\u30C0";
     default:
-      return "Unknown";
+      return u8"\u4E0D\u660E";
   }
 }
 
@@ -1046,7 +1070,7 @@ std::string AppController::currentLayerCompatibilityHint() const {
   if (isCurrentSubToolCompatibleWithActiveLayer()) {
     return {};
   }
-  return "（現在のレイヤー種別では一部操作が無効です）";
+  return u8"\uFF08\u73FE\u5728\u306E\u30EC\u30A4\u30E4\u30FC\u7A2E\u5225\u3067\u306F\u4E00\u90E8\u64CD\u4F5C\u304C\u7121\u52B9\u3067\u3059\uFF09";
 }
 
 bool AppController::currentToolSupportsColor() const noexcept {
@@ -1768,25 +1792,25 @@ bool AppController::toolWritesSelection(core::ToolKind kind) noexcept {
 std::string AppController::actionNameForTool(core::ToolKind kind) {
   switch (kind) {
     case core::ToolKind::Brush:
-      return "Stroke";
+      return u8"\u63CF\u753B";
     case core::ToolKind::Eraser:
-      return "Eraser";
+      return u8"\u6D88\u53BB";
     case core::ToolKind::Line:
-      return "Line";
+      return u8"\u76F4\u7DDA";
     case core::ToolKind::Fill:
-      return "Fill";
+      return u8"\u5857\u308A\u3064\u3076\u3057";
     case core::ToolKind::MoveLayer:
-      return "Move Layer";
+      return u8"\u30EC\u30A4\u30E4\u30FC\u79FB\u52D5";
     case core::ToolKind::RectSelection:
-      return "Selection";
+      return u8"\u9078\u629E";
     case core::ToolKind::Eyedropper:
-      return "Eyedropper";
+      return u8"\u8272\u53D6\u5F97";
     case core::ToolKind::Hand:
-      return "Hand";
+      return u8"\u624B\u306E\u3072\u3089";
     case core::ToolKind::Zoom:
-      return "Zoom";
+      return u8"\u30BA\u30FC\u30E0";
     default:
-      return "Action";
+      return u8"\u64CD\u4F5C";
   }
 }
 
