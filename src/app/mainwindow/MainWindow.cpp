@@ -1,4 +1,4 @@
-#include "app/mainwindow/MainWindow.h"
+﻿#include "app/mainwindow/MainWindow.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -55,6 +55,7 @@
 #include "app/panels/SubToolPanel.h"
 #include "app/panels/ToolPanel.h"
 #include "app/panels/ToolPropertyPanel.h"
+#include "app/panels/ColorWheelWidget.h"
 #include "platform/qt/QtImageConverter.h"
 
 namespace app::mainwindow {
@@ -166,6 +167,7 @@ void MainWindow::setupShellLayout() {
   setDockNestingEnabled(true);
 
   auto* colorPanel = new QWidget(this);
+  m_colorPanelWidget = colorPanel;
   auto* colorLayout = new QVBoxLayout(colorPanel);
   colorLayout->setContentsMargins(8, 8, 8, 8);
   colorLayout->setSpacing(6);
@@ -184,6 +186,7 @@ void MainWindow::setupShellLayout() {
   m_satSpin = new QSpinBox(colorPanel);
   m_valSpin = new QSpinBox(colorPanel);
   m_alphaSpin = new QSpinBox(colorPanel);
+  m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
   m_foregroundColorButton->setMinimumHeight(30);
   m_backgroundColorButton->setMinimumHeight(30);
   swapColorButton->setMinimumHeight(28);
@@ -236,6 +239,7 @@ void MainWindow::setupShellLayout() {
   }
   colorLayout->addWidget(colorTitle);
   colorLayout->addLayout(colorButtons);
+  colorLayout->addWidget(m_colorWheelWidget, 1);
   colorLayout->addWidget(swapColorButton);
   colorLayout->addWidget(resetColorButton);
   colorLayout->addWidget(transparentColorButton);
@@ -323,6 +327,12 @@ void MainWindow::setupShellLayout() {
     m_updatingColorControls = false;
     applyForegroundFromHsvControls();
   });
+  connect(m_colorWheelWidget, &app::panels::ColorWheelWidget::colorChanged, this, [this](const QColor& color) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_controller->setBrushColor(toCoreColor(color));
+  });
   for (QPushButton* chip : m_colorHistoryButtons) {
     connect(chip, &QPushButton::clicked, this, [this, chip]() {
       const QVariant value = chip->property("coreColor");
@@ -377,17 +387,33 @@ void MainWindow::setupShellLayout() {
     return dock;
   };
 
-  m_toolDock = makeDock("ツール", m_toolPanel, "ToolDock");
-  m_subToolDock = makeDock("サブツール", m_subToolPanel, "SubToolDock");
-  m_toolPropertyDock = makeDock("ツールプロパティ", m_toolPropertyPanel, "ToolPropertyDock");
-  m_colorDock = makeDock("カラー", colorPanel, "ColorDock");
+  auto* leftWorkspace = new QWidget(this);
+  auto* leftWorkspaceLayout = new QHBoxLayout(leftWorkspace);
+  leftWorkspaceLayout->setContentsMargins(0, 0, 0, 0);
+  leftWorkspaceLayout->setSpacing(6);
+  m_toolPanel->setMinimumWidth(106);
+  m_toolPanel->setMaximumWidth(126);
+
+  auto* leftDetailSplitter = new QSplitter(Qt::Vertical, leftWorkspace);
+  leftDetailSplitter->setChildrenCollapsible(false);
+  leftDetailSplitter->addWidget(m_subToolPanel);
+  leftDetailSplitter->addWidget(m_toolPropertyPanel);
+  leftDetailSplitter->addWidget(colorPanel);
+  leftDetailSplitter->setStretchFactor(0, 3);
+  leftDetailSplitter->setStretchFactor(1, 4);
+  leftDetailSplitter->setStretchFactor(2, 3);
+
+  leftWorkspaceLayout->addWidget(m_toolPanel, 0);
+  leftWorkspaceLayout->addWidget(leftDetailSplitter, 1);
+
+  m_toolDock = makeDock("左ワークスペース", leftWorkspace, "ToolDock");
+  m_subToolDock = nullptr;
+  m_toolPropertyDock = nullptr;
+  m_colorDock = nullptr;
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
-  splitDockWidget(m_toolDock, m_subToolDock, Qt::Vertical);
-  splitDockWidget(m_subToolDock, m_toolPropertyDock, Qt::Vertical);
-  splitDockWidget(m_toolPropertyDock, m_colorDock, Qt::Vertical);
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
@@ -617,12 +643,27 @@ void MainWindow::createMenus() {
   }
   if (m_subToolDock != nullptr) {
     windowMenu->addAction(m_subToolDock->toggleViewAction());
+  } else if (m_subToolPanel != nullptr) {
+    auto* action = windowMenu->addAction("サブツール");
+    action->setCheckable(true);
+    action->setChecked(m_subToolPanel->isVisible());
+    connect(action, &QAction::toggled, m_subToolPanel, &QWidget::setVisible);
   }
   if (m_toolPropertyDock != nullptr) {
     windowMenu->addAction(m_toolPropertyDock->toggleViewAction());
+  } else if (m_toolPropertyPanel != nullptr) {
+    auto* action = windowMenu->addAction("ツールプロパティ");
+    action->setCheckable(true);
+    action->setChecked(m_toolPropertyPanel->isVisible());
+    connect(action, &QAction::toggled, m_toolPropertyPanel, &QWidget::setVisible);
   }
   if (m_colorDock != nullptr) {
     windowMenu->addAction(m_colorDock->toggleViewAction());
+  } else if (m_colorPanelWidget != nullptr) {
+    auto* action = windowMenu->addAction("カラー");
+    action->setCheckable(true);
+    action->setChecked(m_colorPanelWidget->isVisible());
+    connect(action, &QAction::toggled, m_colorPanelWidget, &QWidget::setVisible);
   }
   if (m_layerDock != nullptr) {
     windowMenu->addAction(m_layerDock->toggleViewAction());
@@ -1700,6 +1741,7 @@ void MainWindow::onChooseBackgroundColor() {
     return;
   }
   m_backgroundColor = toCoreColor(picked);
+  m_controller->setPaperColor(m_backgroundColor);
   updateColorPanel();
 }
 
@@ -1707,12 +1749,14 @@ void MainWindow::onSwapColors() {
   const core::Color foreground = m_controller->toolState().color;
   m_controller->setBrushColor(m_backgroundColor);
   m_backgroundColor = foreground;
+  m_controller->setPaperColor(m_backgroundColor);
   updateColorPanel();
 }
 
 void MainWindow::onResetBlackWhiteColors() {
   m_controller->setBrushColor(core::Color::OpaqueBlack());
   m_backgroundColor = core::Color {255, 255, 255, 255};
+  m_controller->setPaperColor(m_backgroundColor);
   updateColorPanel();
 }
 
@@ -1785,6 +1829,9 @@ void MainWindow::syncForegroundHsvControlsFromColor(const core::Color& color) {
   m_valSpin->setValue(value);
   m_alphaSlider->setValue(qcolor.alpha());
   m_alphaSpin->setValue(qcolor.alpha());
+  if (m_colorWheelWidget != nullptr) {
+    m_colorWheelWidget->setColor(qcolor);
+  }
   m_updatingColorControls = false;
 }
 
@@ -2029,3 +2076,4 @@ QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, cons
 }
 
 } // namespace app::mainwindow
+

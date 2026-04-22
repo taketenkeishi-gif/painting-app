@@ -7,6 +7,7 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QComboBox>
 #include <QLineEdit>
 #include <QAbstractItemModel>
 #include <QList>
@@ -34,6 +35,8 @@ constexpr int kMaskEnabledRole = Qt::UserRole + 7;
 constexpr int kLockedRole = Qt::UserRole + 8;
 constexpr int kAlphaLockedRole = Qt::UserRole + 9;
 constexpr int kPositionLockedRole = Qt::UserRole + 10;
+constexpr int kBlendModeRole = Qt::UserRole + 11;
+constexpr int kPaperRole = Qt::UserRole + 12;
 
 QString kindPrefix(core::LayerKind kind) {
   switch (kind) {
@@ -48,8 +51,20 @@ QString kindPrefix(core::LayerKind kind) {
   }
 }
 
+QString blendModeName(core::BlendMode mode) {
+  switch (mode) {
+    case core::BlendMode::Multiply:
+      return "乗算";
+    case core::BlendMode::Add:
+      return "加算";
+    case core::BlendMode::Normal:
+    default:
+      return "通常";
+  }
+}
+
 QString decorateLayerName(const app::bridge::LayerViewModel& model) {
-  QString text = kindPrefix(model.kind);
+  QString text = model.paperLayer ? "[P] " : kindPrefix(model.kind);
   if (model.clippedToBelow) {
     text += "[C] ";
   }
@@ -90,6 +105,7 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_layerList(new QListWidget(this)),
       m_opacityLabel(new QLabel("不透明度: 100%", this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
+      m_blendModeCombo(new QComboBox(this)),
       m_addRasterButton(new QPushButton("ラスタ追加", this)),
       m_addVectorButton(new QPushButton("ベクター追加", this)),
       m_addFolderButton(new QPushButton("フォルダ追加", this)),
@@ -125,6 +141,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_opacitySlider->setRange(0, 100);
   m_opacitySlider->setValue(100);
   m_opacitySlider->setToolTip("アクティブレイヤーの不透明度を調整します。");
+  m_blendModeCombo->addItem("合成: 通常", static_cast<int>(core::BlendMode::Normal));
+  m_blendModeCombo->addItem("合成: 乗算", static_cast<int>(core::BlendMode::Multiply));
+  m_blendModeCombo->addItem("合成: 加算", static_cast<int>(core::BlendMode::Add));
 
   m_addRasterButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
   m_addVectorButton->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
@@ -167,6 +186,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   layout->addWidget(m_layerList);
   layout->addWidget(m_opacityLabel);
   layout->addWidget(m_opacitySlider);
+  layout->addWidget(m_blendModeCombo);
 
   auto* quickTitle = new QLabel("頻用操作", this);
   quickTitle->setStyleSheet("font-weight: 600; color: #c9d4e4;");
@@ -224,6 +244,7 @@ LayerPanel::LayerPanel(QWidget* parent)
       this,
       &LayerPanel::onLayerRowsMoved);
   connect(m_opacitySlider, &QSlider::valueChanged, this, &LayerPanel::onOpacityChanged);
+  connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &LayerPanel::onBlendModeChanged);
 }
 
 void LayerPanel::setController(app::bridge::AppController* controller) {
@@ -262,21 +283,28 @@ void LayerPanel::refreshLayers() {
       }
     }
     auto* item = new QListWidgetItem(decorateLayerName(model), m_layerList);
-    item->setFlags(
-        Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEditable |
-        Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled);
+    Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable;
+    if (!model.paperLayer) {
+      flags |= Qt::ItemIsEditable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
+    }
+    item->setFlags(flags);
     item->setCheckState(model.visible ? Qt::Checked : Qt::Unchecked);
     item->setData(kNameRole, QString::fromStdString(model.name));
     item->setData(kVisibilityRole, model.visible);
     item->setData(kKindRole, static_cast<int>(model.kind));
-    item->setData(kLayerIndexRole, static_cast<int>(layerIndex));
+    item->setData(kLayerIndexRole, model.paperLayer ? -1 : static_cast<int>(layerIndex - 1));
     item->setData(kClippedRole, model.clippedToBelow);
     item->setData(kHasMaskRole, model.hasMask);
     item->setData(kMaskEnabledRole, model.maskEnabled);
     item->setData(kLockedRole, model.locked);
     item->setData(kAlphaLockedRole, model.alphaLocked);
     item->setData(kPositionLockedRole, model.positionLocked);
-    item->setToolTip("チェックで表示/非表示、名前のダブルクリックで変更できます。");
+    item->setData(kBlendModeRole, static_cast<int>(model.blendMode));
+    item->setData(kPaperRole, model.paperLayer);
+    item->setToolTip(
+        model.paperLayer
+            ? "用紙レイヤーです。チェックで表示/非表示を切り替えられます。"
+            : "チェックで表示/非表示、名前のダブルクリックで変更できます。");
     item->setSizeHint(QSize(item->sizeHint().width(), 30));
 
     QFont font = item->font();
@@ -287,8 +315,13 @@ void LayerPanel::refreshLayers() {
     if (model.active) {
       m_layerList->setCurrentItem(item);
       const QSignalBlocker sliderBlocker(m_opacitySlider);
+      const QSignalBlocker blendBlocker(m_blendModeCombo);
       m_opacitySlider->setValue(model.opacityPercent);
       m_opacityLabel->setText(QString("不透明度: %1%").arg(model.opacityPercent));
+      const int blendIndex = m_blendModeCombo->findData(static_cast<int>(model.blendMode));
+      if (blendIndex >= 0) {
+        m_blendModeCombo->setCurrentIndex(blendIndex);
+      }
     }
   }
 
@@ -429,6 +462,7 @@ void LayerPanel::onCurrentLayerChanged(int row) {
   }
   const int layerIndex = item->data(kLayerIndexRole).toInt();
   if (layerIndex < 0) {
+    refreshButtonState();
     return;
   }
   m_controller->setActiveLayer(static_cast<std::size_t>(layerIndex));
@@ -444,6 +478,13 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
     return;
   }
   const int layerIndexValue = item->data(kLayerIndexRole).toInt();
+  const bool isPaper = item->data(kPaperRole).toBool();
+  if (isPaper) {
+    const bool visible = item->checkState() == Qt::Checked;
+    m_controller->setPaperVisible(visible);
+    refreshButtonState();
+    return;
+  }
   const std::size_t layerIndex =
       layerIndexValue >= 0 ? static_cast<std::size_t>(layerIndexValue) : layerIndexFromRow(row);
 
@@ -486,8 +527,27 @@ void LayerPanel::onOpacityChanged(int value) {
   if (m_controller == nullptr || m_isRefreshing) {
     return;
   }
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  if (currentItem != nullptr && currentItem->data(kPaperRole).toBool()) {
+    return;
+  }
   m_opacityLabel->setText(QString("不透明度: %1%").arg(value));
   m_controller->setActiveLayerOpacity(value);
+}
+
+void LayerPanel::onBlendModeChanged(int index) {
+  if (m_controller == nullptr || m_isRefreshing) {
+    return;
+  }
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  if (currentItem == nullptr || currentItem->data(kPaperRole).toBool()) {
+    return;
+  }
+  const QVariant modeData = m_blendModeCombo->itemData(index);
+  if (!modeData.isValid()) {
+    return;
+  }
+  m_controller->setActiveLayerBlendMode(static_cast<core::BlendMode>(modeData.toInt()));
 }
 
 void LayerPanel::onFilterTextChanged(const QString& text) {
@@ -525,6 +585,11 @@ void LayerPanel::onLayerRowsMoved(
 
   const std::size_t fromLayerIndex = layerIndexFromRow(start);
   const std::size_t toLayerIndex = layerIndexFromRow(toRow);
+  const std::size_t layerCount = m_controller->document().layerCount();
+  if (fromLayerIndex >= layerCount || toLayerIndex >= layerCount) {
+    refreshLayers();
+    return;
+  }
   m_isDraggingLayer = true;
   const bool moved = m_controller->moveLayer(fromLayerIndex, toLayerIndex);
   m_isDraggingLayer = false;
@@ -540,6 +605,9 @@ std::size_t LayerPanel::layerIndexFromRow(int row) const {
   const std::size_t count = m_controller->document().layerCount();
   if (count == 0) {
     return 0;
+  }
+  if (row < 0 || row >= static_cast<int>(count)) {
+    return count;
   }
   const int clamped = std::clamp(row, 0, static_cast<int>(count) - 1);
   return count - 1 - static_cast<std::size_t>(clamped);
@@ -576,13 +644,19 @@ void LayerPanel::refreshButtonState() {
   const bool canDelete = m_controller->document().layerCount() > 1;
   const int current = m_layerList->currentRow();
   const int lastRow = static_cast<int>(m_controller->document().layerCount()) - 1;
+  QListWidgetItem* currentItem = current >= 0 ? m_layerList->item(current) : nullptr;
+  const bool paperSelected = currentItem != nullptr && currentItem->data(kPaperRole).toBool();
   const bool canMoveUp = current > 0;
   const bool canMoveDown = current >= 0 && current < lastRow;
-  m_deleteButton->setEnabled(hasSelection && canDelete);
-  m_duplicateButton->setEnabled(hasSelection);
-  m_upButton->setEnabled(canMoveUp);
-  m_downButton->setEnabled(canMoveDown);
-  m_opacitySlider->setEnabled(hasSelection);
+  m_deleteButton->setEnabled(hasSelection && canDelete && !paperSelected);
+  m_duplicateButton->setEnabled(hasSelection && !paperSelected);
+  m_upButton->setEnabled(canMoveUp && !paperSelected);
+  m_downButton->setEnabled(canMoveDown && !paperSelected);
+  m_opacitySlider->setEnabled(hasSelection && !paperSelected);
+  m_blendModeCombo->setEnabled(hasSelection && !paperSelected);
+  if (paperSelected) {
+    m_opacityLabel->setText("用紙レイヤー（背景色）");
+  }
 
   bool canClipOrMask = false;
   bool hasMask = false;
@@ -592,7 +666,7 @@ void LayerPanel::refreshButtonState() {
   bool alphaLocked = false;
   bool positionLocked = false;
   core::LayerKind kind = core::LayerKind::Raster;
-  if (hasSelection) {
+  if (hasSelection && !paperSelected) {
     QListWidgetItem* currentItem = m_layerList->item(current);
     if (currentItem != nullptr) {
       const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
@@ -606,6 +680,11 @@ void LayerPanel::refreshButtonState() {
         locked = layer.locked();
         alphaLocked = layer.alphaLocked();
         positionLocked = layer.positionLocked();
+        const QSignalBlocker blendBlocker(m_blendModeCombo);
+        const int blendIndex = m_blendModeCombo->findData(static_cast<int>(layer.blendMode()));
+        if (blendIndex >= 0) {
+          m_blendModeCombo->setCurrentIndex(blendIndex);
+        }
       }
     }
   }

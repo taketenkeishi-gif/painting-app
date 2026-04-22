@@ -6,6 +6,23 @@
 
 namespace core {
 
+namespace {
+
+Rect strokeDirtyRect(const Point& from, const Point& to, int size) {
+  const int radius = std::max(1, size) / 2 + 2;
+  const int minX = std::min(from.x, to.x) - radius;
+  const int minY = std::min(from.y, to.y) - radius;
+  const int maxX = std::max(from.x, to.x) + radius;
+  const int maxY = std::max(from.y, to.y) + radius;
+  return Rect {minX, minY, maxX - minX + 1, maxY - minY + 1};
+}
+
+Rect fullLayerRect(const Layer& layer) {
+  return Rect {0, 0, layer.buffer().width(), layer.buffer().height()};
+}
+
+} // namespace
+
 ToolResult LineTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   static_cast<void>(context);
   m_drawing = true;
@@ -21,7 +38,7 @@ ToolResult LineTool::onPointerMove(ToolContext& context, const ToolPointerEvent&
   if (!m_drawing) {
     return {};
   }
-  m_current = snappedPoint(m_start, event.point);
+  m_current = snappedPoint(m_start, event.point, event.shift);
   ToolResult result;
   result.viewportChanged = true;
   return result;
@@ -32,7 +49,7 @@ ToolResult LineTool::onPointerRelease(ToolContext& context, const ToolPointerEve
     return {};
   }
   m_drawing = false;
-  m_current = snappedPoint(m_start, event.point);
+  m_current = snappedPoint(m_start, event.point, event.shift);
 
   Layer* active = context.document.activeLayer();
   if (active == nullptr) {
@@ -52,11 +69,14 @@ ToolResult LineTool::onPointerRelease(ToolContext& context, const ToolPointerEve
   ToolResult result;
   result.pixelsChanged = true;
   result.viewportChanged = true;
+  result.dirtyRect = active->kind() == LayerKind::Vector ? fullLayerRect(*active)
+                                                          : strokeDirtyRect(m_start, m_current, context.brushSize);
   return result;
 }
 
-Point LineTool::snappedPoint(const Point& start, const Point& rawEnd) const {
-  if (m_snapAngleDegrees <= 0 || m_snapAngleDegrees >= 180) {
+Point LineTool::snappedPoint(const Point& start, const Point& rawEnd, bool shiftConstraint) const {
+  const int snapAngle = shiftConstraint ? 45 : m_snapAngleDegrees;
+  if (snapAngle <= 0 || snapAngle >= 180) {
     return rawEnd;
   }
   const float dx = static_cast<float>(rawEnd.x - start.x);
@@ -67,7 +87,7 @@ Point LineTool::snappedPoint(const Point& start, const Point& rawEnd) const {
   const float distance = std::hypot(dx, dy);
   const float angle = std::atan2(dy, dx);
   constexpr float kPi = 3.14159265358979323846F;
-  const float step = static_cast<float>(m_snapAngleDegrees) * kPi / 180.0F;
+  const float step = static_cast<float>(snapAngle) * kPi / 180.0F;
   const float snapped = std::round(angle / step) * step;
   return Point {
       static_cast<int>(std::lround(static_cast<float>(start.x) + std::cos(snapped) * distance)),

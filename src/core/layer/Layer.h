@@ -6,6 +6,7 @@
 
 #include "core/buffer/PixelBuffer.h"
 #include "core/common/Point.h"
+#include "core/tools/ToolTypes.h"
 
 namespace core {
 
@@ -40,6 +41,11 @@ public:
 
   float opacity() const noexcept { return m_opacity; }
   void setOpacity(float opacity) noexcept;
+  BlendMode blendMode() const noexcept { return m_blendMode; }
+  void setBlendMode(BlendMode mode) noexcept { m_blendMode = mode; }
+
+  bool isPaperLayer() const noexcept { return m_isPaperLayer; }
+  void setPaperLayer(bool paperLayer) noexcept { m_isPaperLayer = paperLayer; }
 
   PixelBuffer& buffer() noexcept { return m_buffer; }
   const PixelBuffer& buffer() const noexcept { return m_buffer; }
@@ -74,6 +80,8 @@ private:
   LayerKind m_kind {LayerKind::Raster};
   bool m_visible {true};
   float m_opacity {1.0F};
+  BlendMode m_blendMode {BlendMode::Normal};
+  bool m_isPaperLayer {false};
   PixelBuffer m_buffer;
   bool m_clippedToBelow {false};
   bool m_locked {false};

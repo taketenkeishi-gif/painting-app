@@ -22,7 +22,7 @@ public:
   ToolOverlayState overlay() const override;
 
 private:
-  Point snappedPoint(const Point& start, const Point& rawEnd) const;
+  Point snappedPoint(const Point& start, const Point& rawEnd, bool shiftConstraint) const;
   void drawLine(Layer& layer, const Point& from, const Point& to, const Color& color, int size) const;
   void addVectorLine(Layer& layer, const Point& from, const Point& to, const Color& color, int size) const;
   void stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color, bool lockAlpha) const;

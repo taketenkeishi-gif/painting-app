@@ -31,6 +31,7 @@ struct ToolResult {
   bool selectionChanged {false};
   bool viewportChanged {false};
   std::optional<Color> sampledColor;
+  std::optional<Rect> dirtyRect;
 };
 
 struct ToolContext {

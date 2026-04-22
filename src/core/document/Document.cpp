@@ -51,6 +51,8 @@ const Layer* Document::activeLayer() const noexcept {
 std::size_t Document::addLayer(const std::string& name, LayerKind kind) {
   const std::string finalName = name.empty() ? makeDefaultLayerName(m_layers.size()) : name;
   m_layers.emplace_back(finalName, m_canvasSize.width, m_canvasSize.height, kind);
+  m_layers.back().setPaperLayer(false);
+  m_layers.back().setBlendMode(BlendMode::Normal);
   m_activeLayerIndex = m_layers.size() - 1;
   return m_activeLayerIndex;
 }
@@ -81,7 +83,7 @@ std::size_t Document::duplicateLayer(std::size_t index) {
 }
 
 bool Document::removeLayer(std::size_t index) noexcept {
-  if (index >= m_layers.size() || m_layers.size() <= 1) {
+  if (index >= m_layers.size() || m_layers.size() <= 1 || m_layers[index].isPaperLayer()) {
     return false;
   }
 
@@ -122,6 +124,9 @@ bool Document::setLayerOpacity(std::size_t index, float opacity) noexcept {
 
 bool Document::moveLayer(std::size_t fromIndex, std::size_t toIndex) noexcept {
   if (fromIndex >= m_layers.size() || toIndex >= m_layers.size() || fromIndex == toIndex) {
+    return false;
+  }
+  if (m_layers[fromIndex].isPaperLayer() || m_layers[toIndex].isPaperLayer()) {
     return false;
   }
 

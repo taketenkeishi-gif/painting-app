@@ -11,6 +11,7 @@ class QLabel;
 class QModelIndex;
 class QSlider;
 class QLineEdit;
+class QComboBox;
 
 namespace app::bridge {
 class AppController;
@@ -44,6 +45,7 @@ private slots:
   void onLayerItemChanged(QListWidgetItem* item);
   void onLayerRowsMoved(const QModelIndex& parent, int start, int end, const QModelIndex& destination, int row);
   void onOpacityChanged(int value);
+  void onBlendModeChanged(int index);
   void onFilterTextChanged(const QString& text);
 
 private:
@@ -57,6 +59,7 @@ private:
   QListWidget* m_layerList {nullptr};
   QLabel* m_opacityLabel {nullptr};
   QSlider* m_opacitySlider {nullptr};
+  QComboBox* m_blendModeCombo {nullptr};
   QPushButton* m_addRasterButton {nullptr};
   QPushButton* m_addVectorButton {nullptr};
   QPushButton* m_addFolderButton {nullptr};

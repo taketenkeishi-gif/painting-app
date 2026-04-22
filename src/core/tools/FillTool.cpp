@@ -148,6 +148,7 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
   }
   ToolResult result;
   result.pixelsChanged = true;
+  result.dirtyRect = Rect {0, 0, buffer.width(), buffer.height()};
   return result;
 }
 

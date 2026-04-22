@@ -44,6 +44,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/SubToolPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPropertyPanel.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ColorWheelWidget.cpp
 )
 
 if(PAINT_BUILD_APP)

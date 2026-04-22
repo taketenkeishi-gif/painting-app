@@ -35,6 +35,7 @@ class LayerPanel;
 class SubToolPanel;
 class ToolPanel;
 class ToolPropertyPanel;
+class ColorWheelWidget;
 }
 
 namespace app::mainwindow {
@@ -163,6 +164,7 @@ private:
   QLabel* m_navigatorImageLabel {nullptr};
   QPushButton* m_foregroundColorButton {nullptr};
   QPushButton* m_backgroundColorButton {nullptr};
+  QWidget* m_colorPanelWidget {nullptr};
   QSlider* m_hueSlider {nullptr};
   QSlider* m_satSlider {nullptr};
   QSlider* m_valSlider {nullptr};
@@ -171,6 +173,7 @@ private:
   QSpinBox* m_satSpin {nullptr};
   QSpinBox* m_valSpin {nullptr};
   QSpinBox* m_alphaSpin {nullptr};
+  app::panels::ColorWheelWidget* m_colorWheelWidget {nullptr};
   std::vector<QPushButton*> m_colorHistoryButtons;
   std::vector<core::Color> m_colorHistory;
   core::Color m_backgroundColor {255, 255, 255, 255};

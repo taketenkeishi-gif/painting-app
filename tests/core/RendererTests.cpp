@@ -6,6 +6,7 @@
 
 void runRendererTests() {
   core::Document document(1, 1);
+  document.setPaperVisible(false);
   document.layerAt(0).buffer().setPixel(0, 0, core::Color {255, 0, 0, 255});
   document.addLayer("Top");
   document.layerAt(1).buffer().setPixel(0, 0, core::Color {0, 0, 255, 128});
@@ -26,6 +27,7 @@ void runRendererTests() {
   expectNear(hiddenTop.b, 0, 0, "Hidden top layer should not affect blue.");
 
   core::Document vectorDoc(16, 16);
+  vectorDoc.setPaperVisible(false);
   vectorDoc.addVectorLayer("Vector");
   core::Layer& vectorLayer = vectorDoc.layerAt(1);
   vectorLayer.addVectorPath(core::VectorPath {{core::Point {2, 2}, core::Point {13, 13}}, core::Color {0, 255, 0, 255}, 2, 1.0F});
@@ -33,6 +35,7 @@ void runRendererTests() {
   expectTrue(vectorPixel.g > 0, "Vector path should rasterize and appear in composited image.");
 
   core::Document clipDoc(2, 1);
+  clipDoc.setPaperVisible(false);
   clipDoc.layerAt(0).buffer().setPixel(0, 0, core::Color {255, 0, 0, 255});
   clipDoc.layerAt(0).buffer().setPixel(1, 0, core::Color::Transparent());
   clipDoc.addLayer("Top");
@@ -43,6 +46,7 @@ void runRendererTests() {
   expectTrue(clipped.pixel(1, 0).a == 0, "Clipped layer should not draw where below-alpha is zero.");
 
   core::Document maskDoc(1, 1);
+  maskDoc.setPaperVisible(false);
   maskDoc.layerAt(0).buffer().setPixel(0, 0, core::Color {255, 0, 0, 255});
   maskDoc.addLayer("MaskTop");
   core::Layer& maskTop = maskDoc.layerAt(1);
@@ -54,6 +58,7 @@ void runRendererTests() {
   expectNear(masked.b, 0, 0, "Masked top pixel should hide top blue.");
 
   core::Document folderDoc(1, 1);
+  folderDoc.setPaperVisible(false);
   folderDoc.addFolderLayer("Folder");
   folderDoc.layerAt(1).buffer().setPixel(0, 0, core::Color {0, 255, 0, 255});
   const core::Color folderComposite = renderer.composite(folderDoc).pixel(0, 0);

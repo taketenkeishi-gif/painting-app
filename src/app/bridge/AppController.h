@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -12,6 +13,7 @@
 #include "app/ui/ToolDescriptor.h"
 #include "app/ui/UiState.h"
 #include "core/common/Point.h"
+#include "core/common/Rect.h"
 #include "core/document/Document.h"
 #include "core/render/Renderer.h"
 #include "core/tools/BrushTool.h"
@@ -33,6 +35,8 @@ struct LayerViewModel {
   bool active {false};
   int opacityPercent {100};
   core::LayerKind kind {core::LayerKind::Raster};
+  core::BlendMode blendMode {core::BlendMode::Normal};
+  bool paperLayer {false};
   bool clippedToBelow {false};
   bool hasMask {false};
   bool maskEnabled {false};
@@ -94,6 +98,7 @@ public:
 
   const core::Document& document() const noexcept { return m_document; }
   const core::PixelBuffer& compositedBuffer() const noexcept { return m_composited; }
+  std::uint64_t compositeRevision() const noexcept { return m_compositeRevision; }
   CanvasOverlayViewModel canvasOverlay() const;
 
   std::vector<LayerViewModel> layerViewModels() const;
@@ -123,6 +128,9 @@ public:
   void setLayerOpacity(std::size_t index, int opacityPercent);
   void setActiveLayerOpacity(int opacityPercent);
   int activeLayerOpacity() const noexcept;
+  void setLayerBlendMode(std::size_t index, core::BlendMode mode);
+  void setActiveLayerBlendMode(core::BlendMode mode);
+  core::BlendMode activeLayerBlendMode() const noexcept;
   bool toggleActiveLayerVisible();
   bool toggleActiveLayerClipToBelow();
   bool toggleActiveLayerMask();
@@ -140,6 +148,11 @@ public:
   core::PixelBuffer exportSelectionOrCanvasFromComposite() const;
   void importFlattenedBuffer(const core::PixelBuffer& buffer, const std::string& layerName = "Imported");
   bool pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName = "Pasted Layer");
+  bool paperVisible() const noexcept;
+  void setPaperVisible(bool visible);
+  core::Color paperColor() const noexcept;
+  void setPaperColor(const core::Color& color);
+  std::optional<core::Rect> consumeDirtyCompositeRect();
 
   std::vector<core::ToolKind> availableTools() const;
   std::string toolDisplayName(core::ToolKind kind) const;
@@ -193,6 +206,7 @@ public:
   void continueStroke(int x, int y);
   void endStroke();
   bool pickColorAt(int x, int y);
+  void setInputModifiers(bool shift, bool ctrl, bool alt);
 
   bool undo();
   bool redo();
@@ -232,9 +246,11 @@ public:
   void setAutoSelectReferAllLayers(bool enabled);
 
 signals:
+  void canvasChanged();
   void documentChanged();
   void layersChanged();
   void toolStateChanged();
+  void overlayChanged();
 
 private:
   enum class HistoryKind {
@@ -288,6 +304,7 @@ private:
   void pushSelectionHistoryIfChanged(const core::SelectionMask& before, const std::string& actionName);
   void clearStrokeHistory() noexcept;
   void rerender();
+  void rerenderDirty(const core::Rect& dirtyRect);
 
   core::Document m_document;
   core::Renderer m_renderer;
@@ -309,10 +326,15 @@ private:
   std::optional<PendingStrokeState> m_pendingStroke;
   core::Point m_lastPointer {0, 0};
   core::Color m_currentColor {0, 0, 0, 255};
+  bool m_shiftModifier {false};
+  bool m_ctrlModifier {false};
+  bool m_altModifier {false};
 
   std::vector<StrokeHistoryEntry> m_undoHistory;
   std::vector<StrokeHistoryEntry> m_redoHistory;
   std::size_t m_maxStrokeHistory {20};
+  std::optional<core::Rect> m_lastCompositeDirtyRect;
+  std::uint64_t m_compositeRevision {0};
 };
 
 } // namespace app::bridge

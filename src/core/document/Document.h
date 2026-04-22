@@ -43,6 +43,11 @@ public:
   const SelectionMask& selection() const noexcept { return m_selection; }
   void clearSelection() noexcept { m_selection.clear(); }
 
+  bool paperVisible() const noexcept { return m_paperVisible; }
+  void setPaperVisible(bool visible) noexcept { m_paperVisible = visible; }
+  Color paperColor() const noexcept { return m_paperColor; }
+  void setPaperColor(Color color) noexcept { m_paperColor = color; }
+
 private:
   static std::string makeDefaultLayerName(std::size_t currentLayerCount);
 
@@ -50,6 +55,8 @@ private:
   std::vector<Layer> m_layers;
   std::size_t m_activeLayerIndex {0};
   SelectionMask m_selection;
+  bool m_paperVisible {true};
+  Color m_paperColor {255, 255, 255, 255};
 };
 
 } // namespace core

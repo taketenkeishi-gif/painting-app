@@ -5,6 +5,23 @@
 
 namespace core {
 
+namespace {
+
+Rect strokeDirtyRect(const Point& from, const Point& to, int size) {
+  const int radius = std::max(1, size) / 2 + 2;
+  const int minX = std::min(from.x, to.x) - radius;
+  const int minY = std::min(from.y, to.y) - radius;
+  const int maxX = std::max(from.x, to.x) + radius;
+  const int maxY = std::max(from.y, to.y) + radius;
+  return Rect {minX, minY, maxX - minX + 1, maxY - minY + 1};
+}
+
+Rect fullLayerRect(const Layer& layer) {
+  return Rect {0, 0, layer.buffer().width(), layer.buffer().height()};
+}
+
+} // namespace
+
 ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
   if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
@@ -23,6 +40,8 @@ ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEve
   }
   ToolResult result;
   result.pixelsChanged = true;
+  result.dirtyRect = active->kind() == LayerKind::Vector ? fullLayerRect(*active)
+                                                          : strokeDirtyRect(m_lastPoint, m_lastPoint, m_size);
   return result;
 }
 
@@ -41,15 +60,18 @@ ToolResult EraserTool::onPointerMove(ToolContext& context, const ToolPointerEven
     return {};
   }
 
+  const Point previous = m_lastPoint;
   const Point stabilizedPoint = applyStabilization(m_lastPoint, event.point);
   if (active->kind() == LayerKind::Vector) {
-    eraseVectorStroke(*active, m_lastPoint, stabilizedPoint);
+    eraseVectorStroke(*active, previous, stabilizedPoint);
   } else {
-    eraseStroke(*active, m_lastPoint, stabilizedPoint);
+    eraseStroke(*active, previous, stabilizedPoint);
   }
   m_lastPoint = stabilizedPoint;
   ToolResult result;
   result.pixelsChanged = true;
+  result.dirtyRect = active->kind() == LayerKind::Vector ? fullLayerRect(*active)
+                                                          : strokeDirtyRect(previous, stabilizedPoint, m_size);
   return result;
 }
 
@@ -79,12 +101,21 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
   } else {
     eraseStroke(*active, m_lastPoint, stabilizedPoint);
   }
+  Rect dirty = active->kind() == LayerKind::Vector ? fullLayerRect(*active)
+                                                    : strokeDirtyRect(m_lastPoint, stabilizedPoint, m_size);
   if (m_postCorrection &&
       (stabilizedPoint.x != event.point.x || stabilizedPoint.y != event.point.y)) {
     if (active->kind() == LayerKind::Vector) {
       eraseVectorStroke(*active, stabilizedPoint, event.point);
+      dirty = fullLayerRect(*active);
     } else {
       eraseStroke(*active, stabilizedPoint, event.point);
+      const Rect correctionRect = strokeDirtyRect(stabilizedPoint, event.point, m_size);
+      const int minX = std::min(dirty.x, correctionRect.x);
+      const int minY = std::min(dirty.y, correctionRect.y);
+      const int maxX = std::max(dirty.x + dirty.width, correctionRect.x + correctionRect.width);
+      const int maxY = std::max(dirty.y + dirty.height, correctionRect.y + correctionRect.height);
+      dirty = Rect {minX, minY, maxX - minX, maxY - minY};
     }
     m_lastPoint = event.point;
   } else {
@@ -92,6 +123,7 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
   }
   ToolResult result;
   result.pixelsChanged = true;
+  result.dirtyRect = dirty;
   return result;
 }
 

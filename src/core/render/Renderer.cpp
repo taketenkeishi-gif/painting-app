@@ -8,7 +8,7 @@ namespace core {
 
 namespace {
 
-Color blendOver(const Color& dst, const Color& src, float layerOpacity) {
+Color blendOver(const Color& dst, const Color& src, float layerOpacity, BlendMode blendMode) {
   const float srcA = (static_cast<float>(src.a) / 255.0F) * std::clamp(layerOpacity, 0.0F, 1.0F);
   const float dstA = static_cast<float>(dst.a) / 255.0F;
   const float outA = srcA + dstA * (1.0F - srcA);
@@ -23,9 +23,35 @@ Color blendOver(const Color& dst, const Color& src, float layerOpacity) {
   const float dstG = static_cast<float>(dst.g) / 255.0F;
   const float dstB = static_cast<float>(dst.b) / 255.0F;
 
-  const float outR = (srcR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
-  const float outG = (srcG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
-  const float outB = (srcB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
+  float outR = 0.0F;
+  float outG = 0.0F;
+  float outB = 0.0F;
+  switch (blendMode) {
+    case BlendMode::Multiply: {
+      const float mulR = dstR * srcR;
+      const float mulG = dstG * srcG;
+      const float mulB = dstB * srcB;
+      outR = (mulR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
+      outG = (mulG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
+      outB = (mulB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
+      break;
+    }
+    case BlendMode::Add: {
+      const float premulR = std::clamp(dstR * dstA + srcR * srcA, 0.0F, 1.0F);
+      const float premulG = std::clamp(dstG * dstA + srcG * srcA, 0.0F, 1.0F);
+      const float premulB = std::clamp(dstB * dstA + srcB * srcA, 0.0F, 1.0F);
+      outR = premulR / outA;
+      outG = premulG / outA;
+      outB = premulB / outA;
+      break;
+    }
+    case BlendMode::Normal:
+    default:
+      outR = (srcR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
+      outG = (srcG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
+      outB = (srcB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
+      break;
+  }
 
   return Color {
       static_cast<std::uint8_t>(std::round(std::clamp(outR, 0.0F, 1.0F) * 255.0F)),
@@ -39,7 +65,7 @@ void blendPixel(PixelBuffer& target, int x, int y, const Color& src) {
     return;
   }
   const Color dst = target.pixel(x, y);
-  target.setPixel(x, y, blendOver(dst, src, 1.0F));
+  target.setPixel(x, y, blendOver(dst, src, 1.0F, BlendMode::Normal));
 }
 
 void stampCircle(PixelBuffer& target, const Point& center, int radius, const Color& color) {
@@ -100,40 +126,77 @@ Color applyLayerMask(const Layer& layer, int x, int y, Color src) {
   return src;
 }
 
+Rect clampRectToCanvas(const Rect& rect, const Size& size) {
+  const int x0 = std::clamp(rect.x, 0, size.width);
+  const int y0 = std::clamp(rect.y, 0, size.height);
+  const int x1 = std::clamp(rect.x + rect.width, 0, size.width);
+  const int y1 = std::clamp(rect.y + rect.height, 0, size.height);
+  return Rect {x0, y0, std::max(0, x1 - x0), std::max(0, y1 - y0)};
+}
+
 } // namespace
 
 PixelBuffer Renderer::composite(const Document& document) const {
   const Size size = document.canvasSize();
   PixelBuffer output(size.width, size.height, Color::Transparent());
+  compositeInto(document, output, Rect {0, 0, size.width, size.height});
+  return output;
+}
 
-  for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
-    const Layer& layer = document.layerAt(layerIndex);
-    if (!layer.visible() || layer.opacity() <= 0.0F || layer.kind() == LayerKind::Folder) {
-      continue;
-    }
-
-    PixelBuffer vectorRaster;
-    const PixelBuffer* sourceBuffer = &layer.buffer();
-    if (layer.kind() == LayerKind::Vector) {
-      vectorRaster.resize(size.width, size.height, Color::Transparent());
-      rasterizeVectorLayer(layer, vectorRaster);
-      sourceBuffer = &vectorRaster;
-    }
-
-    for (int y = 0; y < size.height; ++y) {
-      for (int x = 0; x < size.width; ++x) {
-        const Color dst = output.pixel(x, y);
-        Color src = sourceBuffer->pixel(x, y);
-        src = applyLayerMask(layer, x, y, src);
-        if (layer.clippedToBelow() && dst.a == 0) {
-          continue;
-        }
-        output.setPixel(x, y, blendOver(dst, src, layer.opacity()));
-      }
-    }
+void Renderer::compositeInto(const Document& document, PixelBuffer& target, const Rect& dirtyRect) const {
+  const Size size = document.canvasSize();
+  if (size.width <= 0 || size.height <= 0) {
+    return;
+  }
+  if (target.width() != size.width || target.height() != size.height) {
+    target.resize(size.width, size.height, Color::Transparent());
   }
 
-  return output;
+  const Rect area = clampRectToCanvas(dirtyRect, size);
+  if (area.width <= 0 || area.height <= 0) {
+    return;
+  }
+
+  std::vector<PixelBuffer> vectorRasters;
+  vectorRasters.resize(document.layerCount());
+  for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
+    const Layer& layer = document.layerAt(layerIndex);
+    if (layer.kind() != LayerKind::Vector || !layer.visible() || layer.opacity() <= 0.0F) {
+      continue;
+    }
+    vectorRasters[layerIndex].resize(size.width, size.height, Color::Transparent());
+    rasterizeVectorLayer(layer, vectorRasters[layerIndex]);
+  }
+
+  for (int y = area.y; y < area.y + area.height; ++y) {
+    for (int x = area.x; x < area.x + area.width; ++x) {
+      Color composed = document.paperVisible() ? document.paperColor() : Color::Transparent();
+      float belowAlpha = 0.0F;
+
+      for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
+        const Layer& layer = document.layerAt(layerIndex);
+        if (!layer.visible() || layer.opacity() <= 0.0F || layer.kind() == LayerKind::Folder || layer.isPaperLayer()) {
+          continue;
+        }
+
+        const PixelBuffer* sourceBuffer = &layer.buffer();
+        if (layer.kind() == LayerKind::Vector) {
+          sourceBuffer = &vectorRasters[layerIndex];
+        }
+
+        Color src = sourceBuffer->pixel(x, y);
+        src = applyLayerMask(layer, x, y, src);
+        if (layer.clippedToBelow() && belowAlpha <= 0.0001F) {
+          continue;
+        }
+        composed = blendOver(composed, src, layer.opacity(), layer.blendMode());
+        const float srcAlpha = (static_cast<float>(src.a) / 255.0F) * std::clamp(layer.opacity(), 0.0F, 1.0F);
+        belowAlpha = srcAlpha + belowAlpha * (1.0F - srcAlpha);
+      }
+
+      target.setPixel(x, y, composed);
+    }
+  }
 }
 
 } // namespace core

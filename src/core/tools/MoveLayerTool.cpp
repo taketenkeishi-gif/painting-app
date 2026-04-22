@@ -56,6 +56,7 @@ ToolResult MoveLayerTool::onPointerRelease(ToolContext& context, const ToolPoint
     ToolResult result;
     result.pixelsChanged = true;
     result.viewportChanged = true;
+    result.dirtyRect = Rect {0, 0, active->buffer().width(), active->buffer().height()};
     return result;
   }
   if (active->kind() != LayerKind::Raster) {
@@ -111,6 +112,7 @@ ToolResult MoveLayerTool::onPointerRelease(ToolContext& context, const ToolPoint
   ToolResult result;
   result.pixelsChanged = true;
   result.viewportChanged = true;
+  result.dirtyRect = Rect {0, 0, source.width(), source.height()};
   return result;
 }
 

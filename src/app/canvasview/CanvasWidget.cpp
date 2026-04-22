@@ -1,4 +1,4 @@
-#include "app/canvasview/CanvasWidget.h"
+﻿#include "app/canvasview/CanvasWidget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -31,29 +31,6 @@ struct CanvasInteractionState {
 };
 
 std::unordered_map<const CanvasWidget*, CanvasInteractionState> g_canvasStates;
-bool g_spacePressed {false};
-
-class SpaceKeyTracker : public QObject {
-public:
-  using QObject::QObject;
-
-protected:
-  bool eventFilter(QObject* watched, QEvent* event) override {
-    Q_UNUSED(watched);
-    if (event->type() == QEvent::KeyPress) {
-      const auto* keyEvent = static_cast<QKeyEvent*>(event);
-      if (!keyEvent->isAutoRepeat() && keyEvent->key() == Qt::Key_Space) {
-        g_spacePressed = true;
-      }
-    } else if (event->type() == QEvent::KeyRelease) {
-      const auto* keyEvent = static_cast<QKeyEvent*>(event);
-      if (!keyEvent->isAutoRepeat() && keyEvent->key() == Qt::Key_Space) {
-        g_spacePressed = false;
-      }
-    }
-    return QObject::eventFilter(watched, event);
-  }
-};
 
 CanvasInteractionState& stateFor(const CanvasWidget* widget) {
   return g_canvasStates[widget];
@@ -69,6 +46,22 @@ void updateZoomStatusLabel(const CanvasWidget* widget) {
   }
   const int percent = static_cast<int>(std::lround(stateFor(widget).zoom * 100.0));
   zoomLabel->setText(QString("ズーム: %1%").arg(percent));
+}
+
+void drawCheckerboard(QPainter& painter, const QRect& rect, int cellSize) {
+  if (rect.width() <= 0 || rect.height() <= 0) {
+    return;
+  }
+  const int cell = std::max(4, cellSize);
+  const QColor a(58, 62, 70);
+  const QColor b(44, 48, 56);
+  for (int y = rect.top(); y <= rect.bottom(); y += cell) {
+    for (int x = rect.left(); x <= rect.right(); x += cell) {
+      const bool useA = ((x / cell) + (y / cell)) % 2 == 0;
+      const QRect tile(x, y, std::min(cell, rect.right() - x + 1), std::min(cell, rect.bottom() - y + 1));
+      painter.fillRect(tile, useA ? a : b);
+    }
+  }
 }
 
 Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
@@ -119,21 +112,10 @@ QString toolNameJa(core::ToolKind tool) {
   }
 }
 
-void ensureSpaceTrackerInstalled() {
-  static bool installed = false;
-  if (installed || qApp == nullptr) {
-    return;
-  }
-  auto* tracker = new SpaceKeyTracker(qApp);
-  qApp->installEventFilter(tracker);
-  installed = true;
-}
-
 } // namespace
 
 CanvasWidget::CanvasWidget(QWidget* parent)
     : QWidget(parent) {
-  ensureSpaceTrackerInstalled();
   stateFor(this);
   connect(this, &QObject::destroyed, this, [this]() {
     g_canvasStates.erase(this);
@@ -156,6 +138,10 @@ void CanvasWidget::setController(app::bridge::AppController* controller) {
   }
 
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &CanvasWidget::refreshFromController);
+  connect(m_controller, &app::bridge::AppController::canvasChanged, this, &CanvasWidget::refreshFromController);
+  connect(m_controller, &app::bridge::AppController::overlayChanged, this, [this]() {
+    update();
+  });
   connect(m_controller, &app::bridge::AppController::toolStateChanged, this, [this]() {
     const auto& state = stateFor(this);
     if (state.hasMousePos) {
@@ -234,8 +220,10 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   }
 
   const QRect target = canvasRect();
-  painter.fillRect(target, QColor(32, 32, 32));
+  drawCheckerboard(painter, target, static_cast<int>(std::lround(std::clamp(state.zoom * 10.0, 8.0, 24.0))));
   painter.drawImage(target, m_image);
+  painter.setPen(QPen(QColor(88, 96, 108), 1.0));
+  painter.drawRect(target.adjusted(0, 0, -1, -1));
 
   if (m_controller != nullptr && m_showOverlay) {
     const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
@@ -311,7 +299,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     }
   }
 
-  if (m_showOverlay && !state.panning && !g_spacePressed && state.hasMousePos && m_controller != nullptr) {
+  if (m_showOverlay && !state.panning && !m_spacePressed && state.hasMousePos && m_controller != nullptr) {
     const auto point = mapToCanvas(state.lastMousePos);
     const core::ToolKind activeTool = m_controller->currentTool();
     if (point.has_value() &&
@@ -334,6 +322,10 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   if (m_controller == nullptr) {
     return;
   }
+  m_controller->setInputModifiers(
+      event->modifiers().testFlag(Qt::ShiftModifier),
+      event->modifiers().testFlag(Qt::ControlModifier),
+      event->modifiers().testFlag(Qt::AltModifier));
 
   auto& state = stateFor(this);
   state.lastMousePos = event->position().toPoint();
@@ -369,7 +361,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     return;
   }
 
-  const bool handPan = g_spacePressed || m_controller->currentTool() == core::ToolKind::Hand;
+  const bool handPan = m_spacePressed || m_controller->currentTool() == core::ToolKind::Hand;
   if (handPan) {
     state.panning = true;
     state.panDragging = false;
@@ -392,6 +384,10 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   if (m_controller == nullptr) {
     return;
   }
+  m_controller->setInputModifiers(
+      event->modifiers().testFlag(Qt::ShiftModifier),
+      event->modifiers().testFlag(Qt::ControlModifier),
+      event->modifiers().testFlag(Qt::AltModifier));
 
   auto& state = stateFor(this);
   state.lastMousePos = event->position().toPoint();
@@ -422,7 +418,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   }
 
   if (!m_mouseDrawing || !(event->buttons() & Qt::LeftButton)) {
-    if (!g_spacePressed) {
+    if (!m_spacePressed) {
       update();
     }
     return;
@@ -440,6 +436,10 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
   if (m_controller == nullptr) {
     return;
   }
+  m_controller->setInputModifiers(
+      event->modifiers().testFlag(Qt::ShiftModifier),
+      event->modifiers().testFlag(Qt::ControlModifier),
+      event->modifiers().testFlag(Qt::AltModifier));
 
   auto& state = stateFor(this);
   state.lastMousePos = event->position().toPoint();
@@ -480,6 +480,10 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
     event->ignore();
     return;
   }
+  m_controller->setInputModifiers(
+      event->modifiers().testFlag(Qt::ShiftModifier),
+      event->modifiers().testFlag(Qt::ControlModifier),
+      event->modifiers().testFlag(Qt::AltModifier));
 
   auto& state = stateFor(this);
 
@@ -528,15 +532,81 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
   event->accept();
 }
 
+void CanvasWidget::keyPressEvent(QKeyEvent* event) {
+  if (event->isAutoRepeat()) {
+    QWidget::keyPressEvent(event);
+    return;
+  }
+  if (event->key() == Qt::Key_Space) {
+    m_spacePressed = true;
+    updateCursorForState(stateFor(this).hasMousePos ? mapToCanvas(stateFor(this).lastMousePos) : std::optional<core::Point> {});
+    update();
+    event->accept();
+    return;
+  }
+  QWidget::keyPressEvent(event);
+}
+
+void CanvasWidget::keyReleaseEvent(QKeyEvent* event) {
+  if (event->isAutoRepeat()) {
+    QWidget::keyReleaseEvent(event);
+    return;
+  }
+  if (event->key() == Qt::Key_Space) {
+    m_spacePressed = false;
+    updateCursorForState(stateFor(this).hasMousePos ? mapToCanvas(stateFor(this).lastMousePos) : std::optional<core::Point> {});
+    update();
+    event->accept();
+    return;
+  }
+  QWidget::keyReleaseEvent(event);
+}
+
 void CanvasWidget::refreshFromController() {
   if (m_controller == nullptr) {
     return;
   }
-  m_image = platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
+  const core::PixelBuffer& composited = m_controller->compositedBuffer();
+  const std::optional<core::Rect> dirtyRect = m_controller->consumeDirtyCompositeRect();
+  const bool canPatchRegion =
+      dirtyRect.has_value() &&
+      !m_image.isNull() &&
+      m_image.width() == composited.width() &&
+      m_image.height() == composited.height();
+  if (!canPatchRegion) {
+    m_image = platform::qt::QtImageConverter::toQImage(composited);
+  } else {
+    const core::Rect dirty = *dirtyRect;
+    const int x0 = std::clamp(dirty.x, 0, composited.width());
+    const int y0 = std::clamp(dirty.y, 0, composited.height());
+    const int x1 = std::clamp(dirty.x + dirty.width, 0, composited.width());
+    const int y1 = std::clamp(dirty.y + dirty.height, 0, composited.height());
+    for (int y = y0; y < y1; ++y) {
+      auto* scanLine = m_image.scanLine(y);
+      for (int x = x0; x < x1; ++x) {
+        const core::Color color = composited.pixel(x, y);
+        const int offset = x * 4;
+        scanLine[offset + 0] = color.r;
+        scanLine[offset + 1] = color.g;
+        scanLine[offset + 2] = color.b;
+        scanLine[offset + 3] = color.a;
+      }
+    }
+  }
   updateZoomStatusLabel(this);
   const auto& state = stateFor(this);
   updateCursorForState(state.hasMousePos ? mapToCanvas(state.lastMousePos) : std::optional<core::Point> {});
-  update();
+  if (canPatchRegion) {
+    const core::Rect dirty = *dirtyRect;
+    const QRect target = canvasRect();
+    const int x = static_cast<int>(std::floor(target.x() + static_cast<double>(dirty.x) * state.zoom)) - 2;
+    const int y = static_cast<int>(std::floor(target.y() + static_cast<double>(dirty.y) * state.zoom)) - 2;
+    const int w = static_cast<int>(std::ceil(static_cast<double>(dirty.width) * state.zoom)) + 4;
+    const int h = static_cast<int>(std::ceil(static_cast<double>(dirty.height) * state.zoom)) + 4;
+    update(QRect(x, y, std::max(1, w), std::max(1, h)));
+  } else {
+    update();
+  }
 }
 
 QRect CanvasWidget::canvasRect() const {
@@ -579,7 +649,7 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
     setCursor(state.panDragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
     return;
   }
-  if (g_spacePressed) {
+  if (m_spacePressed) {
     setCursor(Qt::OpenHandCursor);
     return;
   }
@@ -593,3 +663,4 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
 }
 
 } // namespace app::canvasview
+

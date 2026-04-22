@@ -1,4 +1,4 @@
-#include "app/panels/ToolPropertyPanel.h"
+﻿#include "app/panels/ToolPropertyPanel.h"
 
 #include <cstdint>
 
@@ -652,7 +652,7 @@ void ToolPropertyPanel::onChooseColor() {
     return;
   }
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
-  const QColor picked = QColorDialog::getColor(toQColor(state.color), this, "Tool Color", QColorDialog::ShowAlphaChannel);
+  const QColor picked = QColorDialog::getColor(toQColor(state.color), this, "描画色", QColorDialog::ShowAlphaChannel);
   if (!picked.isValid()) {
     return;
   }
@@ -1024,7 +1024,7 @@ void ToolPropertyPanel::updateColorButton() {
   const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
   const QString hex = color.name(QColor::HexRgb).toUpper();
 
-  m_colorButton->setText(QString("Color %1").arg(hex));
+  m_colorButton->setText(QString("色 %1").arg(hex));
   m_colorButton->setStyleSheet(
       QString("QPushButton { background-color: rgba(%1, %2, %3, %4); color: %5; border: 1px solid #555; padding: 2px 4px; }")
           .arg(color.red())
@@ -1035,3 +1035,4 @@ void ToolPropertyPanel::updateColorButton() {
 }
 
 } // namespace app::panels
+

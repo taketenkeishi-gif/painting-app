@@ -342,11 +342,17 @@ int main() {
     controller.setCurrentTool(core::ToolKind::Brush);
     expectTrue(!controller.canUseCurrentToolOnActiveLayer(), "Brush should be restricted on vector layer.");
     controller.setBrushColor(core::Color {255, 0, 0, 255});
+    const core::Color vectorBrushBefore = controller.compositedBuffer().pixel(10, 8);
     controller.beginStroke(8, 8);
     controller.continueStroke(14, 8);
     controller.endStroke();
     const core::Color vectorBrushAttempt = controller.compositedBuffer().pixel(10, 8);
-    expectTrue(vectorBrushAttempt.a == 0, "Raster-only brush should not draw on vector layer.");
+    expectTrue(
+        vectorBrushAttempt.r == vectorBrushBefore.r &&
+            vectorBrushAttempt.g == vectorBrushBefore.g &&
+            vectorBrushAttempt.b == vectorBrushBefore.b &&
+            vectorBrushAttempt.a == vectorBrushBefore.a,
+        "Raster-only brush should not draw on vector layer.");
 
     controller.setCurrentTool(core::ToolKind::Line);
     expectTrue(controller.setCurrentSubTool("line_vector"), "Vector line sub-tool should be selectable.");

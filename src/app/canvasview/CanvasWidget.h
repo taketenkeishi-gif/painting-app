@@ -8,6 +8,7 @@
 #include "core/common/Point.h"
 
 class QWheelEvent;
+class QKeyEvent;
 
 namespace app::bridge {
 class AppController;
@@ -37,6 +38,8 @@ protected:
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
+  void keyReleaseEvent(QKeyEvent* event) override;
 
 private slots:
   void refreshFromController();
@@ -51,6 +54,7 @@ private:
   bool m_mouseDrawing {false};
   bool m_showGrid {false};
   bool m_showOverlay {true};
+  bool m_spacePressed {false};
 };
 
 } // namespace app::canvasview

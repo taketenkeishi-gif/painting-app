@@ -5,6 +5,19 @@
 
 namespace core {
 
+namespace {
+
+Rect strokeDirtyRect(const Point& from, const Point& to, int size) {
+  const int radius = std::max(1, size) / 2 + 2;
+  const int minX = std::min(from.x, to.x) - radius;
+  const int minY = std::min(from.y, to.y) - radius;
+  const int maxX = std::max(from.x, to.x) + radius;
+  const int maxY = std::max(from.y, to.y) + radius;
+  return Rect {minX, minY, maxX - minX + 1, maxY - minY + 1};
+}
+
+} // namespace
+
 ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
   if (active == nullptr || active->kind() != LayerKind::Raster || active->locked()) {
@@ -16,6 +29,7 @@ ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEven
   stroke(*active, m_lastPoint, m_lastPoint);
   ToolResult result;
   result.pixelsChanged = true;
+  result.dirtyRect = strokeDirtyRect(m_lastPoint, m_lastPoint, m_settings.size);
   return result;
 }
 
@@ -30,11 +44,13 @@ ToolResult BrushTool::onPointerMove(ToolContext& context, const ToolPointerEvent
     return {};
   }
 
+  const Point previous = m_lastPoint;
   const Point stabilizedPoint = applyStabilization(m_lastPoint, event.point);
-  stroke(*active, m_lastPoint, stabilizedPoint);
+  stroke(*active, previous, stabilizedPoint);
   m_lastPoint = stabilizedPoint;
   ToolResult result;
   result.pixelsChanged = true;
+  result.dirtyRect = strokeDirtyRect(previous, stabilizedPoint, m_settings.size);
   return result;
 }
 
@@ -57,15 +73,23 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
   }
 
   stroke(*active, m_lastPoint, stabilizedPoint);
+  Rect dirty = strokeDirtyRect(m_lastPoint, stabilizedPoint, m_settings.size);
   if (m_settings.postCorrection &&
       (stabilizedPoint.x != event.point.x || stabilizedPoint.y != event.point.y)) {
     stroke(*active, stabilizedPoint, event.point);
+    const Rect correctionRect = strokeDirtyRect(stabilizedPoint, event.point, m_settings.size);
+    const int minX = std::min(dirty.x, correctionRect.x);
+    const int minY = std::min(dirty.y, correctionRect.y);
+    const int maxX = std::max(dirty.x + dirty.width, correctionRect.x + correctionRect.width);
+    const int maxY = std::max(dirty.y + dirty.height, correctionRect.y + correctionRect.height);
+    dirty = Rect {minX, minY, maxX - minX, maxY - minY};
     m_lastPoint = event.point;
   } else {
     m_lastPoint = stabilizedPoint;
   }
   ToolResult result;
   result.pixelsChanged = true;
+  result.dirtyRect = dirty;
   return result;
 }
 

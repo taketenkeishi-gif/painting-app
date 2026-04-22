@@ -50,6 +50,9 @@ bool layersEqual(const core::Layer& lhs, const core::Layer& rhs) {
   if (lhs.kind() != rhs.kind()) {
     return false;
   }
+  if (lhs.blendMode() != rhs.blendMode()) {
+    return false;
+  }
   if (lhs.clippedToBelow() != rhs.clippedToBelow()) {
     return false;
   }
@@ -144,7 +147,21 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
 
 std::vector<LayerViewModel> AppController::layerViewModels() const {
   std::vector<LayerViewModel> models;
-  models.reserve(m_document.layerCount());
+  models.reserve(m_document.layerCount() + 1);
+  models.push_back(LayerViewModel {
+      "用紙",
+      m_document.paperVisible(),
+      false,
+      100,
+      core::LayerKind::Raster,
+      core::BlendMode::Normal,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true});
   for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
     const core::Layer& layer = m_document.layerAt(i);
     models.push_back(LayerViewModel {
@@ -153,6 +170,8 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
         i == m_document.activeLayerIndex(),
         static_cast<int>(std::lround(std::clamp(layer.opacity(), 0.0F, 1.0F) * 100.0F)),
         layer.kind(),
+        layer.blendMode(),
+        layer.isPaperLayer(),
         layer.clippedToBelow(),
         layer.hasMask(),
         layer.maskEnabled(),
@@ -297,6 +316,7 @@ bool AppController::mergeLayerDown(std::size_t index) {
 
   const core::Size size = m_document.canvasSize();
   core::Document temp(size.width, size.height);
+  temp.setPaperVisible(false);
   temp.layerAt(0) = m_document.layerAt(index - 1);
   temp.layerAt(0).setVisible(true);
   temp.addLayer("MergeTop", m_document.layerAt(index).kind());
@@ -342,6 +362,7 @@ bool AppController::rasterizeLayer(std::size_t index) {
   const core::Layer before = layer;
   const core::Size size = m_document.canvasSize();
   core::Document temp(size.width, size.height);
+  temp.setPaperVisible(false);
   temp.layerAt(0) = layer;
   temp.layerAt(0).setVisible(true);
   temp.layerAt(0).setOpacity(1.0F);
@@ -505,6 +526,69 @@ int AppController::activeLayerOpacity() const noexcept {
   }
   const float opacity = m_document.layerAt(m_document.activeLayerIndex()).opacity();
   return static_cast<int>(std::lround(std::clamp(opacity, 0.0F, 1.0F) * 100.0F));
+}
+
+void AppController::setLayerBlendMode(std::size_t index, core::BlendMode mode) {
+  if (index >= m_document.layerCount()) {
+    return;
+  }
+  core::Layer& layer = m_document.layerAt(index);
+  if (layer.blendMode() == mode) {
+    return;
+  }
+  layer.setBlendMode(mode);
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+}
+
+void AppController::setActiveLayerBlendMode(core::BlendMode mode) {
+  if (m_document.layerCount() == 0) {
+    return;
+  }
+  setLayerBlendMode(m_document.activeLayerIndex(), mode);
+}
+
+core::BlendMode AppController::activeLayerBlendMode() const noexcept {
+  if (m_document.layerCount() == 0) {
+    return core::BlendMode::Normal;
+  }
+  return m_document.layerAt(m_document.activeLayerIndex()).blendMode();
+}
+
+bool AppController::paperVisible() const noexcept {
+  return m_document.paperVisible();
+}
+
+void AppController::setPaperVisible(bool visible) {
+  if (m_document.paperVisible() == visible) {
+    return;
+  }
+  m_document.setPaperVisible(visible);
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+}
+
+core::Color AppController::paperColor() const noexcept {
+  return m_document.paperColor();
+}
+
+void AppController::setPaperColor(const core::Color& color) {
+  if (m_document.paperColor().r == color.r && m_document.paperColor().g == color.g &&
+      m_document.paperColor().b == color.b && m_document.paperColor().a == color.a) {
+    return;
+  }
+  m_document.setPaperColor(color);
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+}
+
+std::optional<core::Rect> AppController::consumeDirtyCompositeRect() {
+  const std::optional<core::Rect> dirty = m_lastCompositeDirtyRect;
+  m_lastCompositeDirtyRect.reset();
+  return dirty;
 }
 
 bool AppController::toggleActiveLayerVisible() {
@@ -1311,6 +1395,9 @@ void AppController::beginStroke(int x, int y) {
   m_lastPointer = core::Point {x, y};
   core::ToolPointerEvent pressEvent;
   pressEvent.point = m_lastPointer;
+  pressEvent.shift = m_shiftModifier;
+  pressEvent.ctrl = m_ctrlModifier;
+  pressEvent.alt = m_altModifier;
   core::ToolContext context = makeToolContext();
   const core::ToolResult result = m_toolManager.pointerPress(context, pressEvent);
   applyToolResult(result);
@@ -1320,10 +1407,16 @@ void AppController::continueStroke(int x, int y) {
   if (!m_stroking) {
     return;
   }
+  if (m_lastPointer.x == x && m_lastPointer.y == y) {
+    return;
+  }
 
   m_lastPointer = core::Point {x, y};
   core::ToolPointerEvent moveEvent;
   moveEvent.point = m_lastPointer;
+  moveEvent.shift = m_shiftModifier;
+  moveEvent.ctrl = m_ctrlModifier;
+  moveEvent.alt = m_altModifier;
   core::ToolContext context = makeToolContext();
   const core::ToolResult result = m_toolManager.pointerMove(context, moveEvent);
   applyToolResult(result);
@@ -1337,6 +1430,9 @@ void AppController::endStroke() {
   m_stroking = false;
   core::ToolPointerEvent releaseEvent;
   releaseEvent.point = m_lastPointer;
+  releaseEvent.shift = m_shiftModifier;
+  releaseEvent.ctrl = m_ctrlModifier;
+  releaseEvent.alt = m_altModifier;
   core::ToolContext context = makeToolContext();
   const core::ToolResult result = m_toolManager.pointerRelease(context, releaseEvent);
   applyToolResult(result);
@@ -1351,6 +1447,9 @@ bool AppController::pickColorAt(int x, int y) {
 
   core::ToolPointerEvent event;
   event.point = core::Point {x, y};
+  event.shift = m_shiftModifier;
+  event.ctrl = m_ctrlModifier;
+  event.alt = m_altModifier;
   core::ToolContext context = makeToolContext();
   const core::ToolResult result = m_toolManager.pointerPress(context, event);
   m_toolManager.pointerRelease(context, event);
@@ -1361,6 +1460,12 @@ bool AppController::pickColorAt(int x, int y) {
   }
   setBrushColor(*result.sampledColor);
   return true;
+}
+
+void AppController::setInputModifiers(bool shift, bool ctrl, bool alt) {
+  m_shiftModifier = shift;
+  m_ctrlModifier = ctrl;
+  m_altModifier = alt;
 }
 
 bool AppController::undo() {
@@ -1996,18 +2101,34 @@ core::ToolContext AppController::makeToolContext() {
 
 void AppController::applyToolResult(const core::ToolResult& result) {
   bool changed = false;
+  bool pixelsChanged = false;
   if (result.sampledColor.has_value()) {
     setBrushColor(*result.sampledColor);
   }
   if (result.pixelsChanged) {
-    rerender();
+    if (result.dirtyRect.has_value()) {
+      rerenderDirty(*result.dirtyRect);
+    } else {
+      rerender();
+    }
     changed = true;
+    pixelsChanged = true;
   }
   if (result.selectionChanged) {
     changed = true;
   }
-  if (changed || result.viewportChanged) {
-    emit documentChanged();
+  if (changed) {
+    if (m_stroking) {
+      if (pixelsChanged) {
+        emit canvasChanged();
+      } else {
+        emit overlayChanged();
+      }
+    } else {
+      emit documentChanged();
+    }
+  } else if (result.viewportChanged) {
+    emit overlayChanged();
   }
 }
 
@@ -2095,6 +2216,17 @@ void AppController::clearStrokeHistory() noexcept {
 
 void AppController::rerender() {
   m_composited = m_renderer.composite(m_document);
+  m_lastCompositeDirtyRect.reset();
+}
+
+void AppController::rerenderDirty(const core::Rect& dirtyRect) {
+  if (m_composited.width() != m_document.canvasSize().width ||
+      m_composited.height() != m_document.canvasSize().height) {
+    rerender();
+    return;
+  }
+  m_renderer.compositeInto(m_document, m_composited, dirtyRect);
+  m_lastCompositeDirtyRect = dirtyRect;
 }
 
 } // namespace app::bridge
