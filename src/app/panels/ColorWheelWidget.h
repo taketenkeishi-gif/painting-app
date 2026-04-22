@@ -28,6 +28,9 @@ private:
   QPointF centerPoint() const;
   double outerRadius() const;
   double innerRadius() const;
+  double ringRadius() const;
+  double ringThickness() const;
+  QColor normalizedHsvColor(const QColor& color) const;
 
   bool updateHueFromPoint(const QPointF& point);
   bool updateSvFromPoint(const QPointF& point);
