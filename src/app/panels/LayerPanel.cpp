@@ -4,6 +4,7 @@
 
 #include <QColor>
 #include <QFont>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -12,6 +13,7 @@
 #include <QModelIndex>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QSizePolicy>
 #include <QStyle>
 #include <QSize>
 #include <QVBoxLayout>
@@ -108,6 +110,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_layerList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
   m_layerList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+  m_layerList->setUniformItemSizes(true);
   m_layerList->setDragEnabled(true);
   m_layerList->viewport()->setAcceptDrops(true);
   m_layerList->setDropIndicatorShown(true);
@@ -116,7 +119,8 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setSpacing(2);
   m_layerList->setStyleSheet(
       "QListWidget::item { padding: 5px 8px; border-bottom: 1px solid #313844; }"
-      "QListWidget::item:selected { background: #2e4f79; color: #ffffff; }");
+      "QListWidget::item:selected { background: #2e4f79; color: #ffffff; }"
+      "QListWidget::item:drop { border-top: 2px solid #7fb3ff; }");
 
   m_opacitySlider->setRange(0, 100);
   m_opacitySlider->setValue(100);
@@ -147,8 +151,10 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_lockAlphaButton,
       m_lockPositionButton};
   for (QPushButton* button : buttons) {
-    button->setMinimumHeight(28);
+    button->setMinimumHeight(30);
+    button->setMinimumWidth(90);
     button->setIconSize(QSize(14, 14));
+    button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   }
 
   auto* layout = new QVBoxLayout(this);
@@ -160,28 +166,31 @@ LayerPanel::LayerPanel(QWidget* parent)
   layout->addWidget(m_opacityLabel);
   layout->addWidget(m_opacitySlider);
 
-  auto* buttonRow = new QHBoxLayout();
-  buttonRow->setContentsMargins(0, 0, 0, 0);
-  buttonRow->setSpacing(4);
-  buttonRow->addWidget(m_addRasterButton);
-  buttonRow->addWidget(m_addVectorButton);
-  buttonRow->addWidget(m_addFolderButton);
-  buttonRow->addWidget(m_duplicateButton);
-  buttonRow->addWidget(m_upButton);
-  buttonRow->addWidget(m_downButton);
-  buttonRow->addWidget(m_deleteButton);
-  layout->addLayout(buttonRow);
+  auto* commandGrid = new QGridLayout();
+  commandGrid->setContentsMargins(0, 0, 0, 0);
+  commandGrid->setHorizontalSpacing(4);
+  commandGrid->setVerticalSpacing(4);
+  commandGrid->addWidget(m_addRasterButton, 0, 0);
+  commandGrid->addWidget(m_addVectorButton, 0, 1);
+  commandGrid->addWidget(m_addFolderButton, 0, 2);
+  commandGrid->addWidget(m_duplicateButton, 0, 3);
+  commandGrid->addWidget(m_upButton, 1, 0);
+  commandGrid->addWidget(m_downButton, 1, 1);
+  commandGrid->addWidget(m_deleteButton, 1, 2);
+  commandGrid->setColumnStretch(3, 1);
+  layout->addLayout(commandGrid);
 
-  auto* stateRow = new QHBoxLayout();
-  stateRow->setContentsMargins(0, 0, 0, 0);
-  stateRow->setSpacing(4);
-  stateRow->addWidget(m_clipButton);
-  stateRow->addWidget(m_maskButton);
-  stateRow->addWidget(m_removeMaskButton);
-  stateRow->addWidget(m_lockButton);
-  stateRow->addWidget(m_lockAlphaButton);
-  stateRow->addWidget(m_lockPositionButton);
-  layout->addLayout(stateRow);
+  auto* stateGrid = new QGridLayout();
+  stateGrid->setContentsMargins(0, 0, 0, 0);
+  stateGrid->setHorizontalSpacing(4);
+  stateGrid->setVerticalSpacing(4);
+  stateGrid->addWidget(m_clipButton, 0, 0);
+  stateGrid->addWidget(m_maskButton, 0, 1);
+  stateGrid->addWidget(m_removeMaskButton, 0, 2);
+  stateGrid->addWidget(m_lockButton, 1, 0);
+  stateGrid->addWidget(m_lockAlphaButton, 1, 1);
+  stateGrid->addWidget(m_lockPositionButton, 1, 2);
+  layout->addLayout(stateGrid);
 
   setLayout(layout);
 
