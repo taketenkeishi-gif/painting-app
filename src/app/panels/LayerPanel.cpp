@@ -85,26 +85,26 @@ QString stripLayerDecorators(QString text) {
 
 LayerPanel::LayerPanel(QWidget* parent)
     : QWidget(parent),
-      m_headerLabel(new QLabel("Layers", this)),
+      m_headerLabel(new QLabel("レイヤー", this)),
       m_filterEdit(new QLineEdit(this)),
       m_layerList(new QListWidget(this)),
-      m_opacityLabel(new QLabel("Opacity: 100%", this)),
+      m_opacityLabel(new QLabel("不透明度: 100%", this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
-      m_addRasterButton(new QPushButton("New Raster", this)),
-      m_addVectorButton(new QPushButton("New Vector", this)),
-      m_addFolderButton(new QPushButton("New Folder", this)),
-      m_duplicateButton(new QPushButton("Duplicate", this)),
-      m_upButton(new QPushButton("Up", this)),
-      m_downButton(new QPushButton("Down", this)),
-      m_deleteButton(new QPushButton("Delete", this)),
-      m_clipButton(new QPushButton("Clip", this)),
-      m_maskButton(new QPushButton("Mask", this)),
-      m_removeMaskButton(new QPushButton("Mask Off", this)),
-      m_lockButton(new QPushButton("Lock", this)),
-      m_lockAlphaButton(new QPushButton("Alpha", this)),
-      m_lockPositionButton(new QPushButton("Pos", this)) {
+      m_addRasterButton(new QPushButton("ラスタ追加", this)),
+      m_addVectorButton(new QPushButton("ベクター追加", this)),
+      m_addFolderButton(new QPushButton("フォルダ追加", this)),
+      m_duplicateButton(new QPushButton("複製", this)),
+      m_upButton(new QPushButton("上へ", this)),
+      m_downButton(new QPushButton("下へ", this)),
+      m_deleteButton(new QPushButton("削除", this)),
+      m_clipButton(new QPushButton("クリップ", this)),
+      m_maskButton(new QPushButton("マスク", this)),
+      m_removeMaskButton(new QPushButton("マスク解除", this)),
+      m_lockButton(new QPushButton("ロック", this)),
+      m_lockAlphaButton(new QPushButton("透明保護", this)),
+      m_lockPositionButton(new QPushButton("位置固定", this)) {
   m_headerLabel->setStyleSheet("font-weight: 700;");
-  m_filterEdit->setPlaceholderText("Search layers...");
+  m_filterEdit->setPlaceholderText("レイヤーを検索...");
   m_filterEdit->setClearButtonEnabled(true);
   m_layerList->setAlternatingRowColors(true);
   m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -131,9 +131,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_addFolderButton->setIcon(style()->standardIcon(QStyle::SP_DirClosedIcon));
   m_duplicateButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
   m_upButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
-  m_upButton->setToolTip("Move selected layer toward the top (front).");
+  m_upButton->setToolTip("選択中レイヤーを前面側（上）へ移動します。");
   m_downButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
-  m_downButton->setToolTip("Move selected layer toward the bottom (back).");
+  m_downButton->setToolTip("選択中レイヤーを背面側（下）へ移動します。");
   m_deleteButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
   m_clipButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
   m_maskButton->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
@@ -480,7 +480,7 @@ void LayerPanel::onOpacityChanged(int value) {
   if (m_controller == nullptr || m_isRefreshing) {
     return;
   }
-  m_opacityLabel->setText(QString("Opacity: %1%").arg(value));
+  m_opacityLabel->setText(QString("不透明度: %1%").arg(value));
   m_controller->setActiveLayerOpacity(value);
 }
 
@@ -609,11 +609,11 @@ void LayerPanel::refreshButtonState() {
   m_lockButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
   m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
   m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
-  m_clipButton->setText(clipped ? "Clip On" : "Clip");
-  m_maskButton->setText(maskEnabled ? "Mask On" : "Mask");
-  m_lockButton->setText(locked ? "Lock On" : "Lock");
-  m_lockAlphaButton->setText(alphaLocked ? "Alpha On" : "Alpha");
-  m_lockPositionButton->setText(positionLocked ? "Pos On" : "Pos");
+  m_clipButton->setText(clipped ? "クリップON" : "クリップ");
+  m_maskButton->setText(maskEnabled ? "マスクON" : "マスク");
+  m_lockButton->setText(locked ? "ロックON" : "ロック");
+  m_lockAlphaButton->setText(alphaLocked ? "透明保護ON" : "透明保護");
+  m_lockPositionButton->setText(positionLocked ? "位置固定ON" : "位置固定");
 }
 
 } // namespace app::panels

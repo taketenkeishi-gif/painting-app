@@ -35,6 +35,31 @@ QColor toQColor(const core::Color& color) {
   return QColor(color.r, color.g, color.b, color.a);
 }
 
+QString toolNameJa(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return "ブラシ";
+    case core::ToolKind::Eraser:
+      return "消しゴム";
+    case core::ToolKind::Eyedropper:
+      return "スポイト";
+    case core::ToolKind::Fill:
+      return "塗りつぶし";
+    case core::ToolKind::Line:
+      return "直線";
+    case core::ToolKind::RectSelection:
+      return "選択";
+    case core::ToolKind::MoveLayer:
+      return "移動";
+    case core::ToolKind::Hand:
+      return "手のひら";
+    case core::ToolKind::Zoom:
+      return "ズーム";
+    default:
+      return "ツール";
+  }
+}
+
 } // namespace
 
 ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
@@ -48,27 +73,27 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_vectorSection(nullptr),
       m_fillSection(nullptr),
       m_selectionSection(nullptr),
-      m_toolNameLabel(new QLabel("Tool: -", this)),
+      m_toolNameLabel(new QLabel("ツール: -", this)),
       m_guideLabel(new QLabel("", this)),
       m_compatibilityLabel(new QLabel("", this)),
-      m_colorLabel(new QLabel("Color", this)),
-      m_sizeLabel(new QLabel("Size", this)),
-      m_opacityLabel(new QLabel("Opacity", this)),
-      m_hardnessLabel(new QLabel("Hardness", this)),
-      m_flowLabel(new QLabel("Flow", this)),
-      m_spacingLabel(new QLabel("Spacing", this)),
-      m_stabilizationLabel(new QLabel("Stabilization", this)),
-      m_angleLabel(new QLabel("Angle", this)),
-      m_roundnessLabel(new QLabel("Roundness", this)),
-      m_taperStartLabel(new QLabel("Taper Start", this)),
-      m_taperEndLabel(new QLabel("Taper End", this)),
-      m_snapAngleLabel(new QLabel("Snap Angle", this)),
-      m_simplifyLabel(new QLabel("Simplify", this)),
-      m_fillThresholdLabel(new QLabel("Threshold", this)),
-      m_fillGapCloseLabel(new QLabel("Gap Close", this)),
-      m_selectionModeLabel(new QLabel("Mode", this)),
-      m_autoSelectThresholdLabel(new QLabel("Auto Threshold", this)),
-      m_colorButton(new QPushButton("Color", this)),
+      m_colorLabel(new QLabel("色", this)),
+      m_sizeLabel(new QLabel("サイズ", this)),
+      m_opacityLabel(new QLabel("不透明度", this)),
+      m_hardnessLabel(new QLabel("硬さ", this)),
+      m_flowLabel(new QLabel("流量", this)),
+      m_spacingLabel(new QLabel("間隔", this)),
+      m_stabilizationLabel(new QLabel("手ブレ補正", this)),
+      m_angleLabel(new QLabel("角度", this)),
+      m_roundnessLabel(new QLabel("真円率", this)),
+      m_taperStartLabel(new QLabel("入り抜き（始点）", this)),
+      m_taperEndLabel(new QLabel("入り抜き（終点）", this)),
+      m_snapAngleLabel(new QLabel("角度スナップ", this)),
+      m_simplifyLabel(new QLabel("単純化", this)),
+      m_fillThresholdLabel(new QLabel("しきい値", this)),
+      m_fillGapCloseLabel(new QLabel("隙間閉じ", this)),
+      m_selectionModeLabel(new QLabel("選択モード", this)),
+      m_autoSelectThresholdLabel(new QLabel("自動選択しきい値", this)),
+      m_colorButton(new QPushButton("色を選択", this)),
       m_sizeSpin(new QSpinBox(this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
       m_opacitySpin(new QSpinBox(this)),
@@ -78,11 +103,11 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_flowSpin(new QSpinBox(this)),
       m_spacingSlider(new QSlider(Qt::Horizontal, this)),
       m_spacingSpin(new QSpinBox(this)),
-      m_antiAliasCheck(new QCheckBox("Anti Alias", this)),
+      m_antiAliasCheck(new QCheckBox("アンチエイリアス", this)),
       m_stabilizationSlider(new QSlider(Qt::Horizontal, this)),
       m_stabilizationSpin(new QSpinBox(this)),
-      m_postCorrectionCheck(new QCheckBox("Post Correction", this)),
-      m_velocityCorrectionCheck(new QCheckBox("Velocity Correction", this)),
+      m_postCorrectionCheck(new QCheckBox("後補正", this)),
+      m_velocityCorrectionCheck(new QCheckBox("速度補正", this)),
       m_shapeTypeCombo(new QComboBox(this)),
       m_angleSlider(new QSlider(Qt::Horizontal, this)),
       m_angleSpin(new QSpinBox(this)),
@@ -98,18 +123,18 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_simplifySpin(new QSpinBox(this)),
       m_fillThresholdSlider(new QSlider(Qt::Horizontal, this)),
       m_fillThresholdSpin(new QSpinBox(this)),
-      m_fillContiguousCheck(new QCheckBox("Contiguous", this)),
-      m_fillReferAllLayersCheck(new QCheckBox("Refer All Layers", this)),
+      m_fillContiguousCheck(new QCheckBox("連結領域のみ", this)),
+      m_fillReferAllLayersCheck(new QCheckBox("全レイヤーを参照", this)),
       m_fillGapCloseSlider(new QSlider(Qt::Horizontal, this)),
       m_fillGapCloseSpin(new QSpinBox(this)),
       m_selectionModeCombo(new QComboBox(this)),
       m_autoSelectThresholdSlider(new QSlider(Qt::Horizontal, this)),
       m_autoSelectThresholdSpin(new QSpinBox(this)),
-      m_autoSelectContiguousCheck(new QCheckBox("Auto Contiguous", this)),
-      m_autoSelectReferAllLayersCheck(new QCheckBox("Auto Refer All Layers", this)),
+      m_autoSelectContiguousCheck(new QCheckBox("連結領域のみ", this)),
+      m_autoSelectReferAllLayersCheck(new QCheckBox("全レイヤーを参照", this)),
       m_blendModeCombo(new QComboBox(this)),
-      m_eraseModeCheck(new QCheckBox("Erase Mode", this)),
-      m_lockAlphaRespectCheck(new QCheckBox("Lock Alpha", this)) {
+      m_eraseModeCheck(new QCheckBox("消しゴムモード", this)),
+      m_lockAlphaRespectCheck(new QCheckBox("透明保護を尊重", this)) {
   auto* hostLayout = new QVBoxLayout(this);
   hostLayout->setContentsMargins(0, 0, 0, 0);
   hostLayout->setSpacing(0);
@@ -147,16 +172,16 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_autoSelectThresholdSlider->setRange(0, 255);
   m_autoSelectThresholdSpin->setRange(0, 255);
 
-  m_shapeTypeCombo->addItem("Circle", static_cast<int>(core::BrushShapeType::Circle));
-  m_shapeTypeCombo->addItem("Square", static_cast<int>(core::BrushShapeType::Square));
+  m_shapeTypeCombo->addItem("円", static_cast<int>(core::BrushShapeType::Circle));
+  m_shapeTypeCombo->addItem("四角", static_cast<int>(core::BrushShapeType::Square));
 
-  m_blendModeCombo->addItem("Normal", static_cast<int>(core::BlendMode::Normal));
-  m_blendModeCombo->addItem("Multiply", static_cast<int>(core::BlendMode::Multiply));
-  m_blendModeCombo->addItem("Add", static_cast<int>(core::BlendMode::Add));
+  m_blendModeCombo->addItem("通常", static_cast<int>(core::BlendMode::Normal));
+  m_blendModeCombo->addItem("乗算", static_cast<int>(core::BlendMode::Multiply));
+  m_blendModeCombo->addItem("加算", static_cast<int>(core::BlendMode::Add));
 
-  m_selectionModeCombo->addItem("Rectangle", static_cast<int>(app::ui::SelectionMode::Rectangle));
-  m_selectionModeCombo->addItem("Lasso", static_cast<int>(app::ui::SelectionMode::Lasso));
-  m_selectionModeCombo->addItem("Auto Select", static_cast<int>(app::ui::SelectionMode::AutoSelect));
+  m_selectionModeCombo->addItem("矩形", static_cast<int>(app::ui::SelectionMode::Rectangle));
+  m_selectionModeCombo->addItem("なげなわ", static_cast<int>(app::ui::SelectionMode::Lasso));
+  m_selectionModeCombo->addItem("自動選択", static_cast<int>(app::ui::SelectionMode::AutoSelect));
 
   auto* contentLayout = new QVBoxLayout(m_contentWidget);
   contentLayout->setContentsMargins(6, 6, 6, 6);
@@ -171,7 +196,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   titleLayout->addWidget(m_guideLabel);
   contentLayout->addWidget(titleFrame);
 
-  auto* basicGroup = new QGroupBox("Basic", m_contentWidget);
+  auto* basicGroup = new QGroupBox("基本", m_contentWidget);
   auto* basicLayout = new QVBoxLayout(basicGroup);
   basicLayout->setContentsMargins(8, 8, 8, 8);
   basicLayout->setSpacing(6);
@@ -198,7 +223,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   basicLayout->addLayout(hardnessRow);
   contentLayout->addWidget(basicGroup);
 
-  auto* dynamicsGroup = new QGroupBox("Brush Dynamics", m_contentWidget);
+  auto* dynamicsGroup = new QGroupBox("ブラシ特性", m_contentWidget);
   auto* dynamicsLayout = new QVBoxLayout(dynamicsGroup);
   dynamicsLayout->setContentsMargins(8, 8, 8, 8);
   dynamicsLayout->setSpacing(6);
@@ -222,7 +247,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(dynamicsGroup);
   m_brushDynamicsSection = dynamicsGroup;
 
-  auto* correctionGroup = new QGroupBox("Correction", m_contentWidget);
+  auto* correctionGroup = new QGroupBox("補正", m_contentWidget);
   auto* correctionLayout = new QVBoxLayout(correctionGroup);
   correctionLayout->setContentsMargins(8, 8, 8, 8);
   correctionLayout->setSpacing(6);
@@ -241,7 +266,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(correctionGroup);
   m_correctionSection = correctionGroup;
 
-  auto* shapeGroup = new QGroupBox("Shape", m_contentWidget);
+  auto* shapeGroup = new QGroupBox("形状", m_contentWidget);
   auto* shapeLayout = new QVBoxLayout(shapeGroup);
   shapeLayout->setContentsMargins(8, 8, 8, 8);
   shapeLayout->setSpacing(6);
@@ -277,7 +302,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(shapeGroup);
   m_shapeSection = shapeGroup;
 
-  auto* drawControlGroup = new QGroupBox("Drawing Control", m_contentWidget);
+  auto* drawControlGroup = new QGroupBox("描画制御", m_contentWidget);
   auto* drawControlLayout = new QVBoxLayout(drawControlGroup);
   drawControlLayout->setContentsMargins(8, 8, 8, 8);
   drawControlLayout->setSpacing(6);
@@ -287,7 +312,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(drawControlGroup);
   m_drawingControlSection = drawControlGroup;
 
-  auto* vectorGroup = new QGroupBox("Vector", m_contentWidget);
+  auto* vectorGroup = new QGroupBox("ベクター", m_contentWidget);
   auto* vectorLayout = new QVBoxLayout(vectorGroup);
   vectorLayout->setContentsMargins(8, 8, 8, 8);
   vectorLayout->setSpacing(6);
@@ -308,7 +333,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(vectorGroup);
   m_vectorSection = vectorGroup;
 
-  auto* fillGroup = new QGroupBox("Fill", m_contentWidget);
+  auto* fillGroup = new QGroupBox("塗りつぶし", m_contentWidget);
   auto* fillLayout = new QVBoxLayout(fillGroup);
   fillLayout->setContentsMargins(8, 8, 8, 8);
   fillLayout->setSpacing(6);
@@ -331,7 +356,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(fillGroup);
   m_fillSection = fillGroup;
 
-  auto* selectionGroup = new QGroupBox("Selection", m_contentWidget);
+  auto* selectionGroup = new QGroupBox("選択", m_contentWidget);
   auto* selectionLayout = new QVBoxLayout(selectionGroup);
   selectionLayout->setContentsMargins(8, 8, 8, 8);
   selectionLayout->setSpacing(6);
@@ -431,11 +456,11 @@ void ToolPropertyPanel::refreshFromController() {
     return;
   }
 
-  m_toolNameLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
+  m_toolNameLabel->setText(QString("ツール: %1").arg(toolNameJa(m_controller->currentTool())));
   const QString compatibilityHint = QString::fromStdString(m_controller->currentLayerCompatibilityHint());
   m_compatibilityLabel->setVisible(!compatibilityHint.isEmpty());
   m_compatibilityLabel->setText(compatibilityHint);
-  m_guideLabel->setText(QString::fromStdString(m_controller->currentToolGuide()));
+  m_guideLabel->setText(QString("操作: %1").arg(QString::fromStdString(m_controller->currentToolGuide())));
 
   const bool supportsColor = m_controller->currentToolSupportsColor();
   const bool supportsSize = m_controller->currentToolSupportsSize();

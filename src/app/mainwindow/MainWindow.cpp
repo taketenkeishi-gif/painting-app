@@ -81,6 +81,44 @@ QGroupBox* makePanelGroup(const QString& title, QWidget* child, QWidget* parent)
   return box;
 }
 
+QString toolNameJa(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return "ブラシ";
+    case core::ToolKind::Eraser:
+      return "消しゴム";
+    case core::ToolKind::Eyedropper:
+      return "スポイト";
+    case core::ToolKind::Fill:
+      return "塗りつぶし";
+    case core::ToolKind::Line:
+      return "直線";
+    case core::ToolKind::RectSelection:
+      return "選択";
+    case core::ToolKind::MoveLayer:
+      return "移動";
+    case core::ToolKind::Hand:
+      return "手のひら";
+    case core::ToolKind::Zoom:
+      return "ズーム";
+    default:
+      return "ツール";
+  }
+}
+
+QString layerKindJa(core::LayerKind kind) {
+  switch (kind) {
+    case core::LayerKind::Raster:
+      return "ラスタ";
+    case core::LayerKind::Vector:
+      return "ベクター";
+    case core::LayerKind::Folder:
+      return "フォルダ";
+    default:
+      return "不明";
+  }
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -91,7 +129,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_toolPanel(new app::panels::ToolPanel(this)),
       m_subToolPanel(new app::panels::SubToolPanel(this)),
       m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
-  setWindowTitle("Layered Paint App");
+  setWindowTitle("自作イラストアプリ");
   resize(1400, 860);
 
   m_canvasWidget->setController(m_controller);
@@ -131,13 +169,13 @@ void MainWindow::setupShellLayout() {
   auto* colorLayout = new QVBoxLayout(colorPanel);
   colorLayout->setContentsMargins(8, 8, 8, 8);
   colorLayout->setSpacing(6);
-  auto* colorTitle = new QLabel("Color", colorPanel);
+  auto* colorTitle = new QLabel("カラー", colorPanel);
   colorTitle->setStyleSheet("font-weight: 700;");
-  m_foregroundColorButton = new QPushButton("FG", colorPanel);
-  m_backgroundColorButton = new QPushButton("BG", colorPanel);
-  auto* swapColorButton = new QPushButton("Swap", colorPanel);
-  auto* resetColorButton = new QPushButton("Reset B/W", colorPanel);
-  auto* transparentColorButton = new QPushButton("Transparent", colorPanel);
+  m_foregroundColorButton = new QPushButton("描画色", colorPanel);
+  m_backgroundColorButton = new QPushButton("背景色", colorPanel);
+  auto* swapColorButton = new QPushButton("入れ替え", colorPanel);
+  auto* resetColorButton = new QPushButton("白黒に戻す", colorPanel);
+  auto* transparentColorButton = new QPushButton("透明色", colorPanel);
   m_hueSlider = new QSlider(Qt::Horizontal, colorPanel);
   m_satSlider = new QSlider(Qt::Horizontal, colorPanel);
   m_valSlider = new QSlider(Qt::Horizontal, colorPanel);
@@ -180,7 +218,7 @@ void MainWindow::setupShellLayout() {
     row->addWidget(spin);
     return row;
   };
-  auto* historyTitle = new QLabel("Recent", colorPanel);
+  auto* historyTitle = new QLabel("最近使った色", colorPanel);
   historyTitle->setStyleSheet("font-weight: 600;");
   auto* historyLayout = new QGridLayout();
   historyLayout->setContentsMargins(0, 0, 0, 0);
@@ -191,7 +229,7 @@ void MainWindow::setupShellLayout() {
     auto* chip = new QPushButton(colorPanel);
     chip->setMinimumSize(22, 22);
     chip->setMaximumSize(32, 24);
-    chip->setToolTip("Recent color");
+    chip->setToolTip("最近使った色");
     chip->setEnabled(false);
     historyLayout->addWidget(chip, i / 4, i % 4);
     m_colorHistoryButtons.push_back(chip);
@@ -303,9 +341,9 @@ void MainWindow::setupShellLayout() {
   auto* infoLayout = new QVBoxLayout(infoPanel);
   infoLayout->setContentsMargins(8, 8, 8, 8);
   infoLayout->setSpacing(6);
-  auto* infoTitle = new QLabel("Info", infoPanel);
+  auto* infoTitle = new QLabel("情報", infoPanel);
   infoTitle->setStyleSheet("font-weight: 700;");
-  auto* navigatorTitle = new QLabel("Navigator", infoPanel);
+  auto* navigatorTitle = new QLabel("ナビゲーター", infoPanel);
   navigatorTitle->setStyleSheet("font-weight: 700;");
   m_navigatorImageLabel = new QLabel(infoPanel);
   m_navigatorImageLabel->setMinimumSize(180, 120);
@@ -315,12 +353,12 @@ void MainWindow::setupShellLayout() {
   navigatorButtons->setContentsMargins(0, 0, 0, 0);
   navigatorButtons->setSpacing(6);
   auto* zoom100Button = new QPushButton("100%", infoPanel);
-  auto* fitButton = new QPushButton("Fit", infoPanel);
+  auto* fitButton = new QPushButton("画面に合わせる", infoPanel);
   zoom100Button->setMinimumHeight(24);
   fitButton->setMinimumHeight(24);
   navigatorButtons->addWidget(zoom100Button);
   navigatorButtons->addWidget(fitButton);
-  auto* infoText = new QLabel("Tool, sub tool, and layer constraints are shown in status bar.", infoPanel);
+  auto* infoText = new QLabel("ツール状態やレイヤー制約はステータスバーに表示されます。", infoPanel);
   infoText->setWordWrap(true);
   infoLayout->addWidget(infoTitle);
   infoLayout->addWidget(navigatorTitle);
@@ -339,12 +377,12 @@ void MainWindow::setupShellLayout() {
     return dock;
   };
 
-  m_toolDock = makeDock("Tools", m_toolPanel, "ToolDock");
-  m_subToolDock = makeDock("Sub Tool", m_subToolPanel, "SubToolDock");
-  m_toolPropertyDock = makeDock("Tool Property", m_toolPropertyPanel, "ToolPropertyDock");
-  m_colorDock = makeDock("Color", colorPanel, "ColorDock");
-  m_layerDock = makeDock("Layer", m_layerPanel, "LayerDock");
-  m_infoDock = makeDock("Info", infoPanel, "InfoDock");
+  m_toolDock = makeDock("ツール", m_toolPanel, "ToolDock");
+  m_subToolDock = makeDock("サブツール", m_subToolPanel, "SubToolDock");
+  m_toolPropertyDock = makeDock("ツールプロパティ", m_toolPropertyPanel, "ToolPropertyDock");
+  m_colorDock = makeDock("カラー", colorPanel, "ColorDock");
+  m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
+  m_infoDock = makeDock("情報", infoPanel, "InfoDock");
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
   splitDockWidget(m_toolDock, m_subToolDock, Qt::Vertical);
@@ -360,78 +398,78 @@ void MainWindow::setupShellLayout() {
 }
 
 void MainWindow::createMenus() {
-  auto* fileMenu = menuBar()->addMenu("&File");
-  auto* editMenu = menuBar()->addMenu("&Edit");
-  auto* toolMenu = menuBar()->addMenu("&Tool");
-  auto* selectMenu = menuBar()->addMenu("&Select");
-  auto* layerMenu = menuBar()->addMenu("&Layer");
-  auto* viewMenu = menuBar()->addMenu("&View");
-  auto* windowMenu = menuBar()->addMenu("&Window");
-  auto* helpMenu = menuBar()->addMenu("&Help");
+  auto* fileMenu = menuBar()->addMenu("ファイル(&F)");
+  auto* editMenu = menuBar()->addMenu("編集(&E)");
+  auto* toolMenu = menuBar()->addMenu("ツール(&T)");
+  auto* selectMenu = menuBar()->addMenu("選択(&S)");
+  auto* layerMenu = menuBar()->addMenu("レイヤー(&L)");
+  auto* viewMenu = menuBar()->addMenu("表示(&V)");
+  auto* windowMenu = menuBar()->addMenu("ウィンドウ(&W)");
+  auto* helpMenu = menuBar()->addMenu("ヘルプ(&H)");
 
-  m_newCanvasAction = new QAction("&New Canvas", this);
-  m_openAction = new QAction("&Open...", this);
-  m_newFromClipboardAction = new QAction("New From &Clipboard", this);
-  m_importAsLayerAction = new QAction("&Import Image As Layer...", this);
-  m_saveAction = new QAction("&Save", this);
-  m_saveAsAction = new QAction("Save &As...", this);
-  m_exportPngAction = new QAction("Export &PNG...", this);
-  m_exportFlattenedAction = new QAction("Export &Flattened Image...", this);
-  m_exitAction = new QAction("E&xit", this);
-  auto* closeAction = new QAction("&Close", this);
-  m_undoAction = new QAction("&Undo", this);
-  m_redoAction = new QAction("&Redo", this);
-  m_cutAction = new QAction("Cu&t", this);
-  m_copyAction = new QAction("&Copy", this);
-  m_pasteAction = new QAction("&Paste", this);
-  m_deletePixelsAction = new QAction("&Delete Pixels", this);
-  m_fillAction = new QAction("&Fill", this);
-  m_clearAction = new QAction("C&lear", this);
-  m_addLayerAction = new QAction("&New Raster Layer", this);
+  m_newCanvasAction = new QAction("新規キャンバス(&N)", this);
+  m_openAction = new QAction("開く(&O)...", this);
+  m_newFromClipboardAction = new QAction("クリップボードから新規作成(&C)", this);
+  m_importAsLayerAction = new QAction("画像をレイヤーとして読み込み(&I)...", this);
+  m_saveAction = new QAction("保存(&S)", this);
+  m_saveAsAction = new QAction("名前を付けて保存(&A)...", this);
+  m_exportPngAction = new QAction("PNG書き出し(&P)...", this);
+  m_exportFlattenedAction = new QAction("統合画像を書き出し(&E)...", this);
+  m_exitAction = new QAction("終了(&X)", this);
+  auto* closeAction = new QAction("閉じる(&C)", this);
+  m_undoAction = new QAction("元に戻す(&U)", this);
+  m_redoAction = new QAction("やり直し(&R)", this);
+  m_cutAction = new QAction("切り取り(&T)", this);
+  m_copyAction = new QAction("コピー(&C)", this);
+  m_pasteAction = new QAction("貼り付け(&P)", this);
+  m_deletePixelsAction = new QAction("選択ピクセルを削除(&D)", this);
+  m_fillAction = new QAction("塗りつぶし(&F)", this);
+  m_clearAction = new QAction("クリア(&L)", this);
+  m_addLayerAction = new QAction("新規ラスターレイヤー(&R)", this);
   m_addRasterLayerAction = m_addLayerAction;
-  m_addVectorLayerAction = new QAction("New &Vector Layer", this);
-  m_addFolderLayerAction = new QAction("New &Folder Layer", this);
-  m_duplicateLayerAction = new QAction("&Duplicate Layer", this);
-  m_deleteLayerAction = new QAction("&Delete Layer", this);
-  m_moveLayerUpAction = new QAction("Move Layer &Up", this);
-  m_moveLayerDownAction = new QAction("Move Layer &Down", this);
-  m_toggleLayerVisibilityAction = new QAction("&Toggle Visibility", this);
-  m_mergeDownAction = new QAction("&Merge Down", this);
-  m_rasterizeLayerAction = new QAction("&Rasterize Layer", this);
-  m_toggleLayerClipAction = new QAction("Toggle &Clipping", this);
-  m_toggleLayerMaskAction = new QAction("Toggle &Mask", this);
-  m_removeLayerMaskAction = new QAction("Remove Mas&k", this);
-  m_toggleLayerLockAction = new QAction("Toggle &Lock", this);
-  m_toggleLayerAlphaLockAction = new QAction("Toggle A&lpha Lock", this);
-  m_toggleLayerPositionLockAction = new QAction("Toggle &Position Lock", this);
+  m_addVectorLayerAction = new QAction("新規ベクターレイヤー(&V)", this);
+  m_addFolderLayerAction = new QAction("新規フォルダーレイヤー(&F)", this);
+  m_duplicateLayerAction = new QAction("レイヤーを複製(&D)", this);
+  m_deleteLayerAction = new QAction("レイヤーを削除(&Y)", this);
+  m_moveLayerUpAction = new QAction("レイヤーを上へ移動(&U)", this);
+  m_moveLayerDownAction = new QAction("レイヤーを下へ移動(&W)", this);
+  m_toggleLayerVisibilityAction = new QAction("表示/非表示を切替(&V)", this);
+  m_mergeDownAction = new QAction("下のレイヤーと結合(&M)", this);
+  m_rasterizeLayerAction = new QAction("ラスタライズ(&R)", this);
+  m_toggleLayerClipAction = new QAction("クリッピングを切替(&C)", this);
+  m_toggleLayerMaskAction = new QAction("マスクを切替(&K)", this);
+  m_removeLayerMaskAction = new QAction("マスクを削除(&H)", this);
+  m_toggleLayerLockAction = new QAction("ロックを切替(&L)", this);
+  m_toggleLayerAlphaLockAction = new QAction("透明保護を切替(&A)", this);
+  m_toggleLayerPositionLockAction = new QAction("位置固定を切替(&P)", this);
 
-  m_selectAllAction = new QAction("Select &All", this);
-  m_deselectAction = new QAction("&Deselect", this);
-  m_clearSelectionAction = new QAction("&Clear Selection", this);
-  m_invertSelectionAction = new QAction("&Invert Selection", this);
-  m_brushSizeDownAction = new QAction("Brush Size &Down", this);
-  m_brushSizeUpAction = new QAction("Brush Size &Up", this);
-  m_zoomInAction = new QAction("Zoom &In", this);
-  m_zoomOutAction = new QAction("Zoom &Out", this);
-  m_resetZoomAction = new QAction("&Reset Zoom", this);
-  m_fitToScreenAction = new QAction("&Fit To Screen", this);
-  m_toggleGridAction = new QAction("Toggle &Grid", this);
-  m_toggleOverlayAction = new QAction("Toggle &Overlay", this);
-  m_resetWorkspaceAction = new QAction("&Reset Workspace", this);
-  m_saveWorkspaceAction = new QAction("&Save Workspace...", this);
-  m_deleteWorkspaceAction = new QAction("&Delete Workspace...", this);
-  m_restoreLastWorkspaceAction = new QAction("&Restore Last Workspace", this);
-  auto* aboutAction = new QAction("&About", this);
-  m_shortcutSummaryAction = new QAction("&Shortcut Summary", this);
-  m_openDocsAction = new QAction("&Open Docs", this);
-  m_shortcutSettingsAction = new QAction("Shortcut &Settings...", this);
-  m_commandPaletteAction = new QAction("Command &Palette...", this);
-  m_swapColorsAction = new QAction("S&wap FG/BG", this);
-  m_resetColorsAction = new QAction("Reset &Black/White", this);
-  m_transparentColorAction = new QAction("Use &Transparent Color", this);
-  m_clearRecentFilesAction = new QAction("Clear Recent Files", this);
+  m_selectAllAction = new QAction("すべて選択(&A)", this);
+  m_deselectAction = new QAction("選択解除(&D)", this);
+  m_clearSelectionAction = new QAction("選択範囲をクリア(&C)", this);
+  m_invertSelectionAction = new QAction("選択範囲を反転(&I)", this);
+  m_brushSizeDownAction = new QAction("ブラシサイズを小さく(&-)", this);
+  m_brushSizeUpAction = new QAction("ブラシサイズを大きく(&+)", this);
+  m_zoomInAction = new QAction("ズームイン(&I)", this);
+  m_zoomOutAction = new QAction("ズームアウト(&O)", this);
+  m_resetZoomAction = new QAction("ズームをリセット(&Z)", this);
+  m_fitToScreenAction = new QAction("画面に合わせる(&F)", this);
+  m_toggleGridAction = new QAction("グリッド表示を切替(&G)", this);
+  m_toggleOverlayAction = new QAction("オーバーレイ表示を切替(&O)", this);
+  m_resetWorkspaceAction = new QAction("ワークスペースを初期化(&R)", this);
+  m_saveWorkspaceAction = new QAction("ワークスペースを保存(&S)...", this);
+  m_deleteWorkspaceAction = new QAction("ワークスペースを削除(&D)...", this);
+  m_restoreLastWorkspaceAction = new QAction("前回のワークスペースを復元(&L)", this);
+  auto* aboutAction = new QAction("このアプリについて(&A)", this);
+  m_shortcutSummaryAction = new QAction("ショートカット一覧(&S)", this);
+  m_openDocsAction = new QAction("READMEを開く(&D)", this);
+  m_shortcutSettingsAction = new QAction("ショートカット設定(&K)...", this);
+  m_commandPaletteAction = new QAction("コマンドパレット(&P)...", this);
+  m_swapColorsAction = new QAction("描画色/背景色を入れ替え(&X)", this);
+  m_resetColorsAction = new QAction("描画色/背景色を白黒に戻す(&D)", this);
+  m_transparentColorAction = new QAction("透明色を使用(&T)", this);
+  m_clearRecentFilesAction = new QAction("最近使ったファイルをクリア", this);
 
-  m_recentFilesMenu = fileMenu->addMenu("Recent Files");
+  m_recentFilesMenu = fileMenu->addMenu("最近使ったファイル");
 
   m_newCanvasAction->setShortcut(QKeySequence::New);
   m_openAction->setShortcut(QKeySequence::Open);
@@ -527,15 +565,15 @@ void MainWindow::createMenus() {
     QAction* action = createToolAction(toolMenu, kind, text, shortcut);
     action->setActionGroup(toolGroup);
   };
-  bindTool(core::ToolKind::Brush, "&Brush", QKeySequence(Qt::Key_B));
-  bindTool(core::ToolKind::Eraser, "&Eraser", QKeySequence(Qt::Key_E));
-  bindTool(core::ToolKind::Eyedropper, "&Eyedropper", QKeySequence(Qt::Key_I));
-  bindTool(core::ToolKind::Fill, "&Fill", QKeySequence(Qt::Key_G));
-  bindTool(core::ToolKind::Line, "&Line", QKeySequence(Qt::Key_U));
-  bindTool(core::ToolKind::RectSelection, "&Rect Selection", QKeySequence(Qt::Key_R));
-  bindTool(core::ToolKind::MoveLayer, "&Move Layer", QKeySequence(Qt::Key_M));
-  bindTool(core::ToolKind::Hand, "&Hand", QKeySequence(Qt::Key_H));
-  bindTool(core::ToolKind::Zoom, "&Zoom", QKeySequence(Qt::Key_Z));
+  bindTool(core::ToolKind::Brush, "ブラシ(&B)", QKeySequence(Qt::Key_B));
+  bindTool(core::ToolKind::Eraser, "消しゴム(&E)", QKeySequence(Qt::Key_E));
+  bindTool(core::ToolKind::Eyedropper, "スポイト(&I)", QKeySequence(Qt::Key_I));
+  bindTool(core::ToolKind::Fill, "塗りつぶし(&G)", QKeySequence(Qt::Key_G));
+  bindTool(core::ToolKind::Line, "直線(&U)", QKeySequence(Qt::Key_U));
+  bindTool(core::ToolKind::RectSelection, "選択(&R)", QKeySequence(Qt::Key_R));
+  bindTool(core::ToolKind::MoveLayer, "移動(&M)", QKeySequence(Qt::Key_M));
+  bindTool(core::ToolKind::Hand, "手のひら(&H)", QKeySequence(Qt::Key_H));
+  bindTool(core::ToolKind::Zoom, "ズーム(&Z)", QKeySequence(Qt::Key_Z));
 
   selectMenu->addAction(m_clearSelectionAction);
   selectMenu->addAction(m_selectAllAction);
@@ -593,7 +631,7 @@ void MainWindow::createMenus() {
     windowMenu->addAction(m_infoDock->toggleViewAction());
   }
   windowMenu->addSeparator();
-  m_workspaceLayoutsMenu = windowMenu->addMenu("Load Workspace");
+  m_workspaceLayoutsMenu = windowMenu->addMenu("ワークスペースを読み込み");
   windowMenu->addAction(m_saveWorkspaceAction);
   windowMenu->addAction(m_deleteWorkspaceAction);
   windowMenu->addAction(m_restoreLastWorkspaceAction);
@@ -670,34 +708,34 @@ void MainWindow::createMenus() {
     rebuildRecentFilesMenu();
   });
   connect(aboutAction, &QAction::triggered, this, [this]() {
-    statusBar()->showMessage("Layered Paint App - UI shell + raster/vector base", 4000);
+    statusBar()->showMessage("自作イラストアプリ - ラスタ/ベクター基盤", 4000);
   });
   connect(m_shortcutSummaryAction, &QAction::triggered, this, [this]() {
     QMessageBox::information(
         this,
-        "Shortcut Summary",
-        "B Brush\nE Eraser\nI Eyedropper\nG Fill\nU Line\nR Rect Selection\nM Move Layer\nH Hand\nZ Zoom\n[ ] Size\nCtrl+Z / Ctrl+Y Undo/Redo");
+        "ショートカット一覧",
+        "B ブラシ\nE 消しゴム\nI スポイト\nG 塗りつぶし\nU 直線\nR 選択\nM 移動\nH 手のひら\nZ ズーム\n[ ] ブラシサイズ\nCtrl+Z / Ctrl+Y 元に戻す/やり直し\nSpace+ドラッグ / 中ボタン+ドラッグ 一時パン");
   });
   connect(m_shortcutSettingsAction, &QAction::triggered, this, &MainWindow::onShortcutSettingsTriggered);
   connect(m_openDocsAction, &QAction::triggered, this, []() {
     QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::currentPath() + "/README.md"));
   });
 
-  m_toolStatusLabel = new QLabel("Tool: Brush", this);
+  m_toolStatusLabel = new QLabel("ツール: ブラシ", this);
   m_toolStatusLabel->setObjectName("ToolStatusLabel");
-  m_subToolStatusLabel = new QLabel("Sub: Normal", this);
+  m_subToolStatusLabel = new QLabel("サブツール: 通常", this);
   m_subToolStatusLabel->setObjectName("SubToolStatusLabel");
-  m_guideStatusLabel = new QLabel("Guide: LMB drag to paint. Wheel adjusts size.", this);
+  m_guideStatusLabel = new QLabel("操作: 左ドラッグで描画 / ホイールでサイズ / 中ボタンドラッグで一時パン", this);
   m_guideStatusLabel->setObjectName("ToolGuideStatusLabel");
-  m_colorStatusLabel = new QLabel("Color: #000000", this);
+  m_colorStatusLabel = new QLabel("色: #000000", this);
   m_colorStatusLabel->setObjectName("BrushColorStatusLabel");
-  m_sizeStatusLabel = new QLabel("Size: 8", this);
+  m_sizeStatusLabel = new QLabel("サイズ: 8", this);
   m_sizeStatusLabel->setObjectName("BrushSizeStatusLabel");
-  m_activeLayerStatusLabel = new QLabel("Layer: Layer 1", this);
+  m_activeLayerStatusLabel = new QLabel("レイヤー: Layer 1", this);
   m_activeLayerStatusLabel->setObjectName("ActiveLayerStatusLabel");
-  m_zoomStatusLabel = new QLabel("Zoom: 100%", this);
+  m_zoomStatusLabel = new QLabel("ズーム: 100%", this);
   m_zoomStatusLabel->setObjectName("ZoomStatusLabel");
-  m_selectionStatusLabel = new QLabel("Selection: Off", this);
+  m_selectionStatusLabel = new QLabel("選択: OFF", this);
   m_selectionStatusLabel->setObjectName("SelectionStatusLabel");
 
   statusBar()->addWidget(m_toolStatusLabel);
@@ -779,9 +817,10 @@ void MainWindow::createMenus() {
 }
 
 void MainWindow::createToolBar() {
-  m_quickToolBar = addToolBar("Quick Tools");
+  m_quickToolBar = addToolBar("クイック操作");
   m_quickToolBar->setMovable(false);
   m_quickToolBar->setIconSize(QSize(18, 18));
+  m_quickToolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
   m_newCanvasAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
   m_openAction->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
@@ -804,7 +843,6 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addAction(m_newCanvasAction);
   m_quickToolBar->addAction(m_openAction);
   m_quickToolBar->addAction(m_saveAction);
-  m_quickToolBar->addAction(m_exportPngAction);
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_undoAction);
   m_quickToolBar->addAction(m_redoAction);
@@ -812,16 +850,12 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_addRasterLayerAction);
   m_quickToolBar->addAction(m_addVectorLayerAction);
-  m_quickToolBar->addAction(m_addFolderLayerAction);
-  m_quickToolBar->addAction(m_duplicateLayerAction);
   m_quickToolBar->addAction(m_deleteLayerAction);
-  m_quickToolBar->addAction(m_moveLayerUpAction);
-  m_quickToolBar->addAction(m_moveLayerDownAction);
-  m_quickToolBar->addAction(m_toggleLayerVisibilityAction);
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_zoomInAction);
   m_quickToolBar->addAction(m_zoomOutAction);
   m_quickToolBar->addAction(m_resetZoomAction);
+  m_quickToolBar->addAction(m_fitToScreenAction);
 }
 
 void MainWindow::applyUiChrome() {
@@ -867,16 +901,16 @@ void MainWindow::updateUndoRedoState() {
 
   if (canUndo) {
     const QString label = QString::fromStdString(m_controller->nextUndoActionName());
-    m_undoAction->setText(label.isEmpty() ? "&Undo" : QString("&Undo %1").arg(label));
+    m_undoAction->setText(label.isEmpty() ? "元に戻す(&U)" : QString("元に戻す(&U) %1").arg(label));
   } else {
-    m_undoAction->setText("&Undo");
+    m_undoAction->setText("元に戻す(&U)");
   }
 
   if (canRedo) {
     const QString label = QString::fromStdString(m_controller->nextRedoActionName());
-    m_redoAction->setText(label.isEmpty() ? "&Redo" : QString("&Redo %1").arg(label));
+    m_redoAction->setText(label.isEmpty() ? "やり直し(&R)" : QString("やり直し(&R) %1").arg(label));
   } else {
-    m_redoAction->setText("&Redo");
+    m_redoAction->setText("やり直し(&R)");
   }
 
   m_undoAction->setEnabled(canUndo);
@@ -890,20 +924,15 @@ void MainWindow::updateActiveLayerStatus() {
 
   const core::Document& doc = m_controller->document();
   if (doc.layerCount() == 0) {
-    m_activeLayerStatusLabel->setText("Layer: (none)");
+    m_activeLayerStatusLabel->setText("レイヤー: （なし）");
     return;
   }
   const std::size_t active = doc.activeLayerIndex();
   const core::Layer& layer = doc.layerAt(active);
-  QString kind = "Raster";
-  if (layer.kind() == core::LayerKind::Vector) {
-    kind = "Vector";
-  } else if (layer.kind() == core::LayerKind::Folder) {
-    kind = "Folder";
-  }
-  m_activeLayerStatusLabel->setText(QString("Layer: %1 (%2)").arg(QString::fromStdString(layer.name()), kind));
+  m_activeLayerStatusLabel->setText(
+      QString("レイヤー: %1（%2）").arg(QString::fromStdString(layer.name()), layerKindJa(layer.kind())));
   if (m_selectionStatusLabel != nullptr) {
-    m_selectionStatusLabel->setText(QString("Selection: %1").arg(doc.selection().hasSelection() ? "On" : "Off"));
+    m_selectionStatusLabel->setText(QString("選択: %1").arg(doc.selection().hasSelection() ? "ON" : "OFF"));
   }
 }
 
@@ -912,8 +941,8 @@ void MainWindow::updateTopToolInfo() {
     return;
   }
 
-  m_currentToolLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
-  m_currentSubToolLabel->setText(QString("Sub Tool: %1").arg(QString::fromStdString(m_controller->currentSubToolDisplayName())));
+  m_currentToolLabel->setText(QString("ツール: %1").arg(toolNameJa(m_controller->currentTool())));
+  m_currentSubToolLabel->setText(QString("サブツール: %1").arg(QString::fromStdString(m_controller->currentSubToolDisplayName())));
   updateToolActionState();
 }
 
@@ -943,7 +972,7 @@ void MainWindow::onRedoTriggered() {
 
 void MainWindow::onNewCanvas() {
   QDialog dialog(this);
-  dialog.setWindowTitle("New Canvas");
+  dialog.setWindowTitle("新規キャンバス");
   auto* form = new QFormLayout(&dialog);
   auto* widthSpin = new QSpinBox(&dialog);
   auto* heightSpin = new QSpinBox(&dialog);
@@ -951,8 +980,8 @@ void MainWindow::onNewCanvas() {
   heightSpin->setRange(1, 8192);
   widthSpin->setValue(m_lastCanvasWidth);
   heightSpin->setValue(m_lastCanvasHeight);
-  form->addRow("Width", widthSpin);
-  form->addRow("Height", heightSpin);
+  form->addRow("幅", widthSpin);
+  form->addRow("高さ", heightSpin);
 
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
   form->addWidget(buttons);
@@ -979,24 +1008,25 @@ void MainWindow::onToolStateChanged() {
   }
 
   if (m_sizeStatusLabel != nullptr) {
-    m_sizeStatusLabel->setText(QString("Size: %1").arg(state.size));
+    m_sizeStatusLabel->setText(QString("サイズ: %1").arg(state.size));
   }
 
   if (m_colorStatusLabel != nullptr) {
     const QColor color(state.color.r, state.color.g, state.color.b, state.color.a);
     m_colorStatusLabel->setText(
-        QString("Color: %1 A%2").arg(color.name(QColor::HexRgb).toUpper()).arg(color.alpha()));
+        QString("色: %1 A%2").arg(color.name(QColor::HexRgb).toUpper()).arg(color.alpha()));
   }
 
   if (m_toolStatusLabel != nullptr) {
-    m_toolStatusLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
+    m_toolStatusLabel->setText(QString("ツール: %1").arg(toolNameJa(m_controller->currentTool())));
   }
   if (m_subToolStatusLabel != nullptr) {
-    m_subToolStatusLabel->setText(QString("Sub: %1").arg(QString::fromStdString(m_controller->currentSubToolDisplayName())));
+    m_subToolStatusLabel->setText(QString("サブツール: %1").arg(QString::fromStdString(m_controller->currentSubToolDisplayName())));
   }
 
   if (m_guideStatusLabel != nullptr) {
-    m_guideStatusLabel->setText(QString("Guide: %1").arg(QString::fromStdString(m_controller->currentToolGuide())));
+    m_guideStatusLabel->setText(
+        QString("操作: %1 / 中ボタンドラッグで一時パン").arg(QString::fromStdString(m_controller->currentToolGuide())));
   }
 
   updateColorPanel();
@@ -1007,9 +1037,9 @@ void MainWindow::onToolStateChanged() {
 void MainWindow::onOpenTriggered() {
   const QString path = QFileDialog::getOpenFileName(
       this,
-      "Open Image",
+      "画像を開く",
       m_currentFilePath.isEmpty() ? QString() : QFileInfo(m_currentFilePath).absolutePath(),
-      "Image Files (*.png *.jpg *.jpeg *.bmp)");
+      "画像ファイル (*.png *.jpg *.jpeg *.bmp)");
   if (path.isEmpty()) {
     return;
   }
@@ -1019,37 +1049,37 @@ void MainWindow::onOpenTriggered() {
 void MainWindow::onNewFromClipboardTriggered() {
   const QImage image = QGuiApplication::clipboard()->image();
   if (image.isNull()) {
-    statusBar()->showMessage("Clipboard has no image", 1800);
+    statusBar()->showMessage("クリップボードに画像がありません", 1800);
     return;
   }
   const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
   if (buffer.width() <= 0 || buffer.height() <= 0) {
-    statusBar()->showMessage("Clipboard image is invalid", 1800);
+    statusBar()->showMessage("クリップボード画像が不正です", 1800);
     return;
   }
   m_controller->importFlattenedBuffer(buffer, "Clipboard");
   m_currentFilePath.clear();
-  statusBar()->showMessage("New canvas created from clipboard image", 2200);
+  statusBar()->showMessage("クリップボード画像から新規キャンバスを作成しました", 2200);
 }
 
 void MainWindow::onImportAsLayerTriggered() {
   const QString path = QFileDialog::getOpenFileName(
       this,
-      "Import Image As Layer",
+      "画像をレイヤーとして読み込み",
       m_currentFilePath.isEmpty() ? QString() : QFileInfo(m_currentFilePath).absolutePath(),
-      "Image Files (*.png *.jpg *.jpeg *.bmp)");
+      "画像ファイル (*.png *.jpg *.jpeg *.bmp)");
   if (path.isEmpty()) {
     return;
   }
   QImage image(path);
   if (image.isNull()) {
-    statusBar()->showMessage(QString("Import failed: %1").arg(path), 2500);
+    statusBar()->showMessage(QString("読み込みに失敗しました: %1").arg(path), 2500);
     return;
   }
   const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
   const QFileInfo info(path);
   if (m_controller->pasteBufferAsNewRasterLayer(buffer, info.completeBaseName().toStdString())) {
-    statusBar()->showMessage(QString("Imported as layer: %1").arg(info.fileName()), 2500);
+    statusBar()->showMessage(QString("レイヤーとして読み込みました: %1").arg(info.fileName()), 2500);
     updateUndoRedoState();
   }
 }
@@ -1060,47 +1090,47 @@ void MainWindow::onSaveTriggered() {
     return;
   }
   if (saveImageFile(m_currentFilePath)) {
-    statusBar()->showMessage(QString("Saved: %1").arg(m_currentFilePath), 2500);
+    statusBar()->showMessage(QString("保存しました: %1").arg(m_currentFilePath), 2500);
   }
 }
 
 void MainWindow::onSaveAsTriggered() {
   const QString path = QFileDialog::getSaveFileName(
       this,
-      "Save Image",
+      "画像を保存",
       m_currentFilePath,
-      "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg);;BMP Image (*.bmp)");
+      "PNG画像 (*.png);;JPEG画像 (*.jpg *.jpeg);;BMP画像 (*.bmp)");
   if (path.isEmpty()) {
     return;
   }
   if (saveImageFile(path)) {
     m_currentFilePath = path;
     pushRecentFile(path);
-    statusBar()->showMessage(QString("Saved: %1").arg(path), 2500);
+    statusBar()->showMessage(QString("保存しました: %1").arg(path), 2500);
   }
 }
 
 void MainWindow::onExportPngTriggered() {
-  const QString path = QFileDialog::getSaveFileName(this, "Export PNG", QString(), "PNG Image (*.png)");
+  const QString path = QFileDialog::getSaveFileName(this, "PNGを書き出し", QString(), "PNG画像 (*.png)");
   if (path.isEmpty()) {
     return;
   }
   if (saveImageFile(path)) {
-    statusBar()->showMessage(QString("Exported: %1").arg(path), 2500);
+    statusBar()->showMessage(QString("書き出しました: %1").arg(path), 2500);
   }
 }
 
 void MainWindow::onExportFlattenedTriggered() {
   const QString path = QFileDialog::getSaveFileName(
       this,
-      "Export Flattened Image",
+      "統合画像を書き出し",
       QString(),
-      "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg);;BMP Image (*.bmp)");
+      "PNG画像 (*.png);;JPEG画像 (*.jpg *.jpeg);;BMP画像 (*.bmp)");
   if (path.isEmpty()) {
     return;
   }
   if (saveImageFile(path)) {
-    statusBar()->showMessage(QString("Flattened export: %1").arg(path), 2500);
+    statusBar()->showMessage(QString("統合画像を書き出しました: %1").arg(path), 2500);
   }
 }
 
@@ -1128,18 +1158,18 @@ void MainWindow::onCopyTriggered() {
     return;
   }
   QGuiApplication::clipboard()->setImage(platform::qt::QtImageConverter::toQImage(copied));
-  statusBar()->showMessage("Copied to clipboard", 1500);
+  statusBar()->showMessage("クリップボードにコピーしました", 1500);
 }
 
 void MainWindow::onPasteTriggered() {
   const QImage image = QGuiApplication::clipboard()->image();
   if (image.isNull()) {
-    statusBar()->showMessage("Clipboard has no image", 1500);
+    statusBar()->showMessage("クリップボードに画像がありません", 1500);
     return;
   }
   const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
   if (m_controller->pasteBufferAsNewRasterLayer(buffer, "Pasted Layer")) {
-    statusBar()->showMessage("Pasted as new raster layer", 1500);
+    statusBar()->showMessage("新規ラスターレイヤーとして貼り付けました", 1500);
   }
 }
 
@@ -1301,34 +1331,34 @@ void MainWindow::onResetWorkspaceTriggered() {
   settings.beginGroup("workspaces");
   settings.setValue("last", "__default__");
   settings.endGroup();
-  statusBar()->showMessage("Workspace reset to default", 1800);
+  statusBar()->showMessage("ワークスペースを初期化しました", 1800);
 }
 
 void MainWindow::onSaveWorkspaceTriggered() {
   bool ok = false;
   const QString name = QInputDialog::getText(
       this,
-      "Save Workspace",
-      "Workspace name",
+      "ワークスペース保存",
+      "ワークスペース名",
       QLineEdit::Normal,
-      "Custom",
+      "カスタム",
       &ok);
   if (!ok || name.trimmed().isEmpty()) {
     return;
   }
   saveWorkspaceLayout(name.trimmed());
   rebuildWorkspaceLayoutsMenu();
-  statusBar()->showMessage(QString("Workspace saved: %1").arg(name.trimmed()), 1800);
+  statusBar()->showMessage(QString("ワークスペースを保存しました: %1").arg(name.trimmed()), 1800);
 }
 
 void MainWindow::onDeleteWorkspaceTriggered() {
   const QStringList names = workspaceLayoutNames();
   if (names.isEmpty()) {
-    statusBar()->showMessage("No saved workspace layouts", 1600);
+    statusBar()->showMessage("保存済みワークスペースがありません", 1600);
     return;
   }
   bool ok = false;
-  const QString name = QInputDialog::getItem(this, "Delete Workspace", "Workspace", names, 0, false, &ok);
+  const QString name = QInputDialog::getItem(this, "ワークスペース削除", "対象", names, 0, false, &ok);
   if (!ok || name.isEmpty()) {
     return;
   }
@@ -1342,7 +1372,7 @@ void MainWindow::onDeleteWorkspaceTriggered() {
   }
   settings.endGroup();
   rebuildWorkspaceLayoutsMenu();
-  statusBar()->showMessage(QString("Workspace deleted: %1").arg(name), 1800);
+  statusBar()->showMessage(QString("ワークスペースを削除しました: %1").arg(name), 1800);
 }
 
 void MainWindow::onRestoreLastWorkspaceTriggered() {
@@ -1355,7 +1385,7 @@ void MainWindow::onRestoreLastWorkspaceTriggered() {
     return;
   }
   if (!restoreWorkspaceLayout(last)) {
-    statusBar()->showMessage("Last workspace not found", 1800);
+    statusBar()->showMessage("前回のワークスペースが見つかりません", 1800);
   }
 }
 
@@ -1364,7 +1394,7 @@ void MainWindow::onLoadWorkspaceByName(const QString& name) {
     return;
   }
   if (!restoreWorkspaceLayout(name)) {
-    statusBar()->showMessage(QString("Failed to load workspace: %1").arg(name), 1800);
+    statusBar()->showMessage(QString("ワークスペースの読み込みに失敗しました: %1").arg(name), 1800);
   }
 }
 
@@ -1403,19 +1433,19 @@ void MainWindow::onCommandPaletteTriggered() {
     return lhs.label.compare(rhs.label, Qt::CaseInsensitive) < 0;
   });
   if (commands.empty()) {
-    statusBar()->showMessage("No commands available", 1800);
+    statusBar()->showMessage("実行可能なコマンドがありません", 1800);
     return;
   }
 
   QDialog dialog(this);
-  dialog.setWindowTitle("Command Palette");
+  dialog.setWindowTitle("コマンドパレット");
   dialog.resize(640, 480);
   auto* root = new QVBoxLayout(&dialog);
   root->setContentsMargins(10, 10, 10, 10);
   root->setSpacing(8);
 
   auto* filterEdit = new QLineEdit(&dialog);
-  filterEdit->setPlaceholderText("Type command name, shortcut, or id...");
+  filterEdit->setPlaceholderText("コマンド名 / ショートカット / ID で検索...");
   root->addWidget(filterEdit);
 
   auto* list = new QListWidget(&dialog);
@@ -1498,14 +1528,14 @@ void MainWindow::onShortcutSettingsTriggered() {
   });
 
   QDialog dialog(this);
-  dialog.setWindowTitle("Shortcut Settings");
+  dialog.setWindowTitle("ショートカット設定");
   dialog.resize(640, 620);
   auto* root = new QVBoxLayout(&dialog);
   root->setContentsMargins(10, 10, 10, 10);
   root->setSpacing(8);
 
   auto* help = new QLabel(
-      "Assign shortcuts. Empty value removes assignment. Duplicate assignments are highlighted on save.",
+      "ショートカットを設定します。空欄は割り当て解除です。重複は保存時に警告されます。",
       &dialog);
   help->setWordWrap(true);
   root->addWidget(help);
@@ -1530,7 +1560,7 @@ void MainWindow::onShortcutSettingsTriggered() {
   root->addWidget(scroll, 1);
 
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-  auto* resetButton = buttons->addButton("Reset To Default", QDialogButtonBox::ResetRole);
+  auto* resetButton = buttons->addButton("初期値に戻す", QDialogButtonBox::ResetRole);
   root->addWidget(buttons);
 
   connect(resetButton, &QPushButton::clicked, &dialog, [&rows]() {
@@ -1568,8 +1598,8 @@ void MainWindow::onShortcutSettingsTriggered() {
   if (!conflictLines.isEmpty()) {
     const auto result = QMessageBox::question(
         this,
-        "Shortcut Conflict",
-        QString("Duplicate shortcuts detected:\n\n%1\n\nApply anyway?").arg(conflictLines.join("\n")));
+        "ショートカット競合",
+        QString("重複するショートカットがあります:\n\n%1\n\nこのまま適用しますか？").arg(conflictLines.join("\n")));
     if (result != QMessageBox::Yes) {
       return;
     }
@@ -1586,7 +1616,7 @@ void MainWindow::onShortcutSettingsTriggered() {
 
 void MainWindow::onChooseForegroundColor() {
   const QColor current = toQColor(m_controller->toolState().color);
-  const QColor picked = QColorDialog::getColor(current, this, "Foreground Color", QColorDialog::ShowAlphaChannel);
+  const QColor picked = QColorDialog::getColor(current, this, "描画色", QColorDialog::ShowAlphaChannel);
   if (!picked.isValid()) {
     return;
   }
@@ -1595,7 +1625,7 @@ void MainWindow::onChooseForegroundColor() {
 
 void MainWindow::onChooseBackgroundColor() {
   const QColor current = toQColor(m_backgroundColor);
-  const QColor picked = QColorDialog::getColor(current, this, "Background Color", QColorDialog::ShowAlphaChannel);
+  const QColor picked = QColorDialog::getColor(current, this, "背景色", QColorDialog::ShowAlphaChannel);
   if (!picked.isValid()) {
     return;
   }
@@ -1641,9 +1671,9 @@ void MainWindow::updateColorPanel() {
         .arg(textColor);
   };
 
-  const QString fgPrefix = fg.alpha() == 0 ? "FG Transparent" : "FG";
+  const QString fgPrefix = fg.alpha() == 0 ? "描画色 透明" : "描画色";
   m_foregroundColorButton->setText(QString("%1 %2").arg(fgPrefix, fg.name(QColor::HexRgb).toUpper()));
-  m_backgroundColorButton->setText(QString("BG %1").arg(bg.name(QColor::HexRgb).toUpper()));
+  m_backgroundColorButton->setText(QString("背景色 %1").arg(bg.name(QColor::HexRgb).toUpper()));
   m_foregroundColorButton->setStyleSheet(makeStyle(fg));
   m_backgroundColorButton->setStyleSheet(makeStyle(bg));
   refreshColorHistoryButtons();
@@ -1717,7 +1747,7 @@ void MainWindow::refreshColorHistoryButtons() {
     const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
     chip->setEnabled(true);
     chip->setText(color.alpha() == 0 ? "T" : "");
-    chip->setToolTip(color.alpha() == 0 ? "Transparent" : color.name(QColor::HexRgb).toUpper());
+    chip->setToolTip(color.alpha() == 0 ? "透明色" : color.name(QColor::HexRgb).toUpper());
     chip->setStyleSheet(
         QString("QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #596476; }")
             .arg(color.red())
@@ -1742,7 +1772,7 @@ void MainWindow::updateToolActionState() {
 bool MainWindow::openImageFile(const QString& path) {
   QImage image(path);
   if (image.isNull()) {
-    statusBar()->showMessage(QString("Open failed: %1").arg(path), 2500);
+    statusBar()->showMessage(QString("開くのに失敗しました: %1").arg(path), 2500);
     return false;
   }
   const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
@@ -1750,7 +1780,7 @@ bool MainWindow::openImageFile(const QString& path) {
   m_controller->importFlattenedBuffer(buffer, info.completeBaseName().toStdString());
   m_currentFilePath = path;
   pushRecentFile(path);
-  statusBar()->showMessage(QString("Opened: %1").arg(path), 2500);
+  statusBar()->showMessage(QString("開きました: %1").arg(path), 2500);
   return true;
 }
 
@@ -1761,7 +1791,7 @@ bool MainWindow::saveImageFile(const QString& path) {
   const QImage image = platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
   const bool ok = image.save(path);
   if (!ok) {
-    statusBar()->showMessage(QString("Save failed: %1").arg(path), 2500);
+    statusBar()->showMessage(QString("保存に失敗しました: %1").arg(path), 2500);
     return false;
   }
   return true;
@@ -1785,7 +1815,7 @@ void MainWindow::rebuildRecentFilesMenu() {
   }
   m_recentFilesMenu->clear();
   if (m_recentFiles.isEmpty()) {
-    QAction* empty = m_recentFilesMenu->addAction("(No recent files)");
+    QAction* empty = m_recentFilesMenu->addAction("（最近使ったファイルはありません）");
     empty->setEnabled(false);
     if (m_clearRecentFilesAction != nullptr) {
       m_recentFilesMenu->addSeparator();
@@ -1823,7 +1853,7 @@ void MainWindow::rebuildWorkspaceLayoutsMenu() {
   m_workspaceLayoutsMenu->clear();
   const QStringList names = workspaceLayoutNames();
   if (names.isEmpty()) {
-    QAction* empty = m_workspaceLayoutsMenu->addAction("(No saved layouts)");
+    QAction* empty = m_workspaceLayoutsMenu->addAction("（保存済みレイアウトはありません）");
     empty->setEnabled(false);
     return;
   }
@@ -1884,7 +1914,7 @@ bool MainWindow::restoreWorkspaceLayout(const QString& name) {
   settings.beginGroup("workspaces");
   settings.setValue("last", name);
   settings.endGroup();
-  statusBar()->showMessage(QString("Workspace loaded: %1").arg(name), 1800);
+  statusBar()->showMessage(QString("ワークスペースを読み込みました: %1").arg(name), 1800);
   return true;
 }
 
@@ -1921,7 +1951,7 @@ QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, cons
   action->setCheckable(true);
   action->setShortcut(shortcut);
   action->setData(static_cast<int>(kind));
-  action->setToolTip(QString::fromLatin1(core::toolKindDisplayName(kind)));
+  action->setToolTip(toolNameJa(kind));
   connect(action, &QAction::triggered, this, &MainWindow::onSetToolTriggered);
   toolMenu->addAction(action);
   m_toolActions[kind] = action;

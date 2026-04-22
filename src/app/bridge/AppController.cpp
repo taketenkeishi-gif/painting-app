@@ -1046,7 +1046,7 @@ std::string AppController::currentLayerCompatibilityHint() const {
   if (isCurrentSubToolCompatibleWithActiveLayer()) {
     return {};
   }
-  return "(Tool limited by active layer kind)";
+  return "（現在のレイヤー種別では一部操作が無効です）";
 }
 
 bool AppController::currentToolSupportsColor() const noexcept {

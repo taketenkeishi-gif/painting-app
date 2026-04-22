@@ -3,6 +3,7 @@
 #include <QSignalBlocker>
 #include <QToolButton>
 #include <QGridLayout>
+#include <QLabel>
 #include <QLayoutItem>
 #include <QStyle>
 
@@ -10,22 +11,52 @@
 
 namespace app::panels {
 
+namespace {
+
+QString toolNameJa(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return "ブラシ";
+    case core::ToolKind::Eraser:
+      return "消しゴム";
+    case core::ToolKind::Eyedropper:
+      return "スポイト";
+    case core::ToolKind::Fill:
+      return "塗りつぶし";
+    case core::ToolKind::Line:
+      return "直線";
+    case core::ToolKind::RectSelection:
+      return "選択";
+    case core::ToolKind::MoveLayer:
+      return "移動";
+    case core::ToolKind::Hand:
+      return "手のひら";
+    case core::ToolKind::Zoom:
+      return "ズーム";
+    default:
+      return "ツール";
+  }
+}
+
+} // namespace
+
 ToolPanel::ToolPanel(QWidget* parent)
     : QWidget(parent) {
   setStyleSheet(
       "QToolButton {"
-      "  border: 1px solid #3a3a3a;"
-      "  background: #2b2d31;"
+      "  border: 1px solid #445163;"
+      "  background: #29303a;"
       "  color: #d8d8d8;"
       "  border-radius: 4px;"
-      "  padding: 4px 6px;"
-      "  min-height: 52px;"
+      "  padding: 6px 6px;"
+      "  min-height: 54px;"
       "}"
-      "QToolButton:hover { background: #353942; border-color: #5e6f90; }"
-      "QToolButton:checked { background: #2f4f7f; border-color: #7fb3ff; color: #ffffff; }");
+      "QToolButton:hover { background: #36404c; border-color: #8aa8cf; }"
+      "QToolButton:checked { background: #2d527f; border-color: #8fc2ff; color: #ffffff; }"
+      "QToolButton:disabled { background: #20252d; border-color: #303845; color: #7c8798; }");
   auto* layout = new QGridLayout(this);
   layout->setContentsMargins(6, 6, 6, 6);
-  layout->setSpacing(6);
+  layout->setSpacing(5);
   layout->setColumnStretch(0, 1);
   layout->setColumnStretch(1, 1);
 }
@@ -51,11 +82,16 @@ void ToolPanel::refreshFromController() {
   }
 
   const core::ToolKind current = m_controller->currentTool();
+  const QString layerKind = QString::fromStdString(m_controller->activeLayerKindDisplayName());
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
+    const bool enabled = m_controller->canUseToolOnActiveLayer(kind);
     button->setChecked(kind == current);
-    button->setToolTip(QString::fromStdString(m_controller->toolDisplayName(kind)));
-    button->setEnabled(m_controller->canUseToolOnActiveLayer(kind));
+    button->setToolTip(
+        enabled
+            ? QString("%1 ツール").arg(toolNameJa(kind))
+            : QString("%1ツールは現在のレイヤー（%2）では使用できません").arg(toolNameJa(kind), layerKind));
+    button->setEnabled(enabled);
   }
 }
 
@@ -92,15 +128,19 @@ void ToolPanel::rebuildButtons() {
     delete item;
   }
 
+  auto* title = new QLabel("ツール", this);
+  title->setStyleSheet("font-weight:700; color:#dfe6f2; padding:2px 2px;");
+  layout->addWidget(title, 0, 0, 1, 2);
+
   int index = 0;
   for (const core::ToolKind kind : m_controller->availableTools()) {
     auto* button = new QToolButton(this);
-    button->setText(QString::fromStdString(m_controller->toolDisplayName(kind)));
+    button->setText(toolNameJa(kind));
     button->setCheckable(true);
     button->setAutoExclusive(true);
     button->setIconSize(QSize(16, 16));
     button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    button->setMinimumSize(QSize(86, 52));
+    button->setMinimumSize(QSize(88, 54));
     button->setProperty("toolKind", static_cast<int>(kind));
 
     switch (kind) {
@@ -136,7 +176,7 @@ void ToolPanel::rebuildButtons() {
     }
 
     connect(button, &QToolButton::clicked, this, &ToolPanel::onToolButtonClicked);
-    layout->addWidget(button, index / 2, index % 2);
+    layout->addWidget(button, (index / 2) + 1, index % 2);
     m_buttons[kind] = button;
     ++index;
   }

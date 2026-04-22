@@ -23,6 +23,7 @@ struct CanvasInteractionState {
   double zoom {1.0};
   QPointF panOffset {0.0, 0.0};
   bool panning {false};
+  bool temporaryMiddlePan {false};
   QPoint lastPanPos {0, 0};
   QPoint lastMousePos {0, 0};
   bool hasMousePos {false};
@@ -66,7 +67,7 @@ void updateZoomStatusLabel(const CanvasWidget* widget) {
     return;
   }
   const int percent = static_cast<int>(std::lround(stateFor(widget).zoom * 100.0));
-  zoomLabel->setText(QString("Zoom: %1%").arg(percent));
+  zoomLabel->setText(QString("ズーム: %1%").arg(percent));
 }
 
 Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
@@ -89,6 +90,31 @@ Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
       return Qt::SizeVerCursor;
     default:
       return Qt::ArrowCursor;
+  }
+}
+
+QString toolNameJa(core::ToolKind tool) {
+  switch (tool) {
+    case core::ToolKind::Brush:
+      return "ブラシ";
+    case core::ToolKind::Eraser:
+      return "消しゴム";
+    case core::ToolKind::Eyedropper:
+      return "スポイト";
+    case core::ToolKind::Fill:
+      return "塗りつぶし";
+    case core::ToolKind::Line:
+      return "直線";
+    case core::ToolKind::RectSelection:
+      return "選択";
+    case core::ToolKind::MoveLayer:
+      return "移動";
+    case core::ToolKind::Hand:
+      return "手のひら";
+    case core::ToolKind::Zoom:
+      return "ズーム";
+    default:
+      return "ツール";
   }
 }
 
@@ -262,7 +288,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.drawRect(QRectF(selectionRect.bottomRight().x() - handle / 2.0, selectionRect.bottomRight().y() - handle / 2.0, handle, handle));
     }
 
-    const QString activeToolText = QString::fromStdString(m_controller->currentToolDisplayName());
+    const QString activeToolText = toolNameJa(m_controller->currentTool());
     const QRect badgeRect(target.x() + 10, target.y() + 10, 180, 24);
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(0, 0, 0, 145));
@@ -323,7 +349,21 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     return;
   }
 
+  if (event->button() == Qt::MiddleButton) {
+    state.panning = true;
+    state.temporaryMiddlePan = true;
+    state.lastPanPos = event->position().toPoint();
+    m_mouseDrawing = false;
+    updateCursorForState(std::nullopt);
+    update();
+    return;
+  }
+
   if (event->button() != Qt::LeftButton) {
+    return;
+  }
+
+  if (state.temporaryMiddlePan) {
     return;
   }
 
@@ -366,6 +406,16 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
     return;
   }
 
+  if (state.panning && state.temporaryMiddlePan && (event->buttons() & Qt::MiddleButton)) {
+    const QPoint current = event->position().toPoint();
+    const QPoint delta = current - state.lastPanPos;
+    state.panOffset += QPointF(delta.x(), delta.y());
+    state.lastPanPos = current;
+    updateCursorForState(std::nullopt);
+    update();
+    return;
+  }
+
   if (!m_mouseDrawing || !(event->buttons() & Qt::LeftButton)) {
     if (!g_spacePressed) {
       update();
@@ -382,15 +432,29 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
-  if (event->button() != Qt::LeftButton || m_controller == nullptr) {
+  if (m_controller == nullptr) {
     return;
   }
 
   auto& state = stateFor(this);
   state.lastMousePos = event->position().toPoint();
   state.hasMousePos = true;
+
+  if (event->button() == Qt::MiddleButton && state.temporaryMiddlePan) {
+    state.panning = false;
+    state.temporaryMiddlePan = false;
+    updateCursorForState(mapToCanvas(state.lastMousePos));
+    update();
+    return;
+  }
+
+  if (event->button() != Qt::LeftButton) {
+    return;
+  }
+
   if (state.panning) {
     state.panning = false;
+    state.temporaryMiddlePan = false;
     updateCursorForState(mapToCanvas(state.lastMousePos));
     update();
     return;
