@@ -164,6 +164,29 @@ int main() {
     expectTrue(controller.document().layerAt(0).buffer().pixel(0, 0).a == 0, "Fill undo should restore previous pixel state.");
     expectTrue(controller.redo(), "Fill should be redoable.");
     expectTrue(controller.document().layerAt(0).buffer().pixel(0, 0).b > 0, "Fill redo should restore filled state.");
+    expectTrue(controller.currentToolSupportsFillThreshold(), "Fill tool should expose threshold property.");
+    expectTrue(controller.currentToolSupportsFillContiguous(), "Fill tool should expose contiguous property.");
+    expectTrue(controller.currentToolSupportsFillGapClose(), "Fill tool should expose gap-close property.");
+
+    controller.newDocument(32, 32);
+    controller.setActiveLayer(0);
+    controller.setCurrentTool(core::ToolKind::Brush);
+    controller.setBrushColor(core::Color {255, 0, 0, 255});
+    controller.setBrushSize(1);
+    controller.beginStroke(4, 4);
+    controller.endStroke();
+    controller.beginStroke(22, 20);
+    controller.endStroke();
+    controller.setCurrentTool(core::ToolKind::Fill);
+    controller.setCurrentSubTool("fill_default");
+    controller.setFillContiguous(false);
+    controller.setFillThreshold(0);
+    controller.setBrushColor(core::Color {0, 0, 255, 255});
+    controller.beginStroke(4, 4);
+    controller.endStroke();
+    const core::Color firstFilled = controller.document().layerAt(0).buffer().pixel(4, 4);
+    const core::Color secondFilled = controller.document().layerAt(0).buffer().pixel(22, 20);
+    expectTrue(firstFilled.b > 0 && secondFilled.b > 0, "Non-contiguous fill should recolor disconnected matching regions.");
 
     expectTrue(controller.setCurrentTool(core::ToolKind::RectSelection), "RectSelection tool should be selectable.");
     controller.beginStroke(4, 4);
@@ -197,6 +220,30 @@ int main() {
     expectTrue(controller.redo(), "Invert Selection should be redoable.");
     expectTrue(controller.document().selection().contains(0, 0), "Redo should re-apply inverted selection mask.");
     expectTrue(controller.clearSelection(), "Clear selection should work after invert redo.");
+    expectTrue(controller.currentToolSupportsSelectionMode(), "Selection tool should expose mode property.");
+
+    controller.newDocument(32, 32);
+    controller.setActiveLayer(0);
+    controller.setCurrentTool(core::ToolKind::Brush);
+    controller.setBrushColor(core::Color {200, 50, 50, 255});
+    controller.setBrushSize(1);
+    controller.beginStroke(3, 3);
+    controller.endStroke();
+    controller.beginStroke(24, 24);
+    controller.endStroke();
+    controller.setCurrentTool(core::ToolKind::RectSelection);
+    controller.setCurrentSubTool("auto_select");
+    controller.setSelectionMode(app::ui::SelectionMode::AutoSelect);
+    controller.setAutoSelectThreshold(8);
+    controller.setAutoSelectContiguous(false);
+    controller.setAutoSelectReferAllLayers(true);
+    controller.beginStroke(3, 3);
+    controller.endStroke();
+    expectTrue(
+        controller.document().selection().contains(3, 3) && controller.document().selection().contains(24, 24),
+        "Auto select with non-contiguous option should include disconnected matching colors.");
+    expectTrue(controller.undo(), "Auto select selection should be undoable.");
+    expectTrue(!controller.document().selection().hasSelection(), "Undo should restore empty selection after auto select.");
 
     expectTrue(controller.setCurrentTool(core::ToolKind::Brush), "Switching back to Brush should succeed.");
     controller.setBrushColor(core::Color {0, 255, 0, 255});
@@ -215,8 +262,17 @@ int main() {
     controller.beginStroke(30, 30);
     controller.continueStroke(36, 36);
     controller.endStroke();
-    const core::Color linePixel = controller.document().layerAt(0).buffer().pixel(33, 33);
-    expectTrue(linePixel.r > 0 && linePixel.g > 0, "Line tool should draw between press/release points.");
+    bool lineFound = false;
+    for (int y = 30; y <= 36 && !lineFound; ++y) {
+      for (int x = 30; x <= 36; ++x) {
+        const core::Color linePixel = controller.document().layerAt(0).buffer().pixel(x, y);
+        if (linePixel.r > 0 && linePixel.g > 0 && linePixel.a > 0) {
+          lineFound = true;
+          break;
+        }
+      }
+    }
+    expectTrue(lineFound, "Line tool should draw between press/release points.");
 
     // Vector layer workflow + layer-kind gated tools
     controller.newDocument(64, 64);

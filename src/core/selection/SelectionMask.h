@@ -21,6 +21,7 @@ public:
 
   void clear() noexcept;
   bool setRect(const Rect& rect);
+  bool setPixels(const std::vector<std::uint8_t>& pixels);
   bool invert();
 
   bool hasSelection() const noexcept { return m_hasSelection; }

@@ -45,7 +45,15 @@ enum class ToolPropertyKey {
   SimplifyLevel,
   BlendMode,
   EraseMode,
-  LockAlphaRespect
+  LockAlphaRespect,
+  FillThreshold,
+  FillContiguous,
+  FillReferAllLayers,
+  FillGapClose,
+  SelectionMode,
+  AutoSelectThreshold,
+  AutoSelectContiguous,
+  AutoSelectReferAllLayers
 };
 
 struct StrokeSettings {
@@ -77,11 +85,33 @@ struct VectorStrokeSettings {
   int snapAngle {0};
 };
 
+struct FillSettings {
+  int threshold {0};
+  bool contiguous {true};
+  bool referAllLayers {false};
+  int gapClose {0};
+};
+
+enum class SelectionMode {
+  Rectangle,
+  Lasso,
+  AutoSelect
+};
+
+struct SelectionSettings {
+  SelectionMode mode {SelectionMode::Rectangle};
+  int autoSelectThreshold {16};
+  bool autoSelectContiguous {true};
+  bool autoSelectReferAllLayers {true};
+};
+
 struct ToolBehaviorProfile {
   StrokeSettings stroke;
   BrushShapeSettings shape;
   StabilizerSettings stabilizer;
   VectorStrokeSettings vector;
+  FillSettings fill;
+  SelectionSettings selection;
   core::BlendMode blendMode {core::BlendMode::Normal};
   bool eraseMode {false};
   bool lockAlphaRespect {false};
@@ -112,6 +142,14 @@ struct BrushPreset {
   int snapAngle {0};
   int simplifyLevel {0};
   int strokeWidth {0};
+  int fillThreshold {0};
+  bool fillContiguous {true};
+  bool fillReferAllLayers {false};
+  int fillGapClose {0};
+  SelectionMode selectionMode {SelectionMode::Rectangle};
+  int autoSelectThreshold {16};
+  bool autoSelectContiguous {true};
+  bool autoSelectReferAllLayers {true};
 };
 
 struct SubToolDescriptor {

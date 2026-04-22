@@ -28,6 +28,14 @@ ToolBehaviorProfile makeProfile(const BrushPreset& preset) {
   profile.vector.strokeWidth = preset.strokeWidth > 0 ? preset.strokeWidth : preset.size;
   profile.vector.snapAngle = preset.snapAngle;
   profile.vector.simplifyLevel = preset.simplifyLevel;
+  profile.fill.threshold = preset.fillThreshold;
+  profile.fill.contiguous = preset.fillContiguous;
+  profile.fill.referAllLayers = preset.fillReferAllLayers;
+  profile.fill.gapClose = preset.fillGapClose;
+  profile.selection.mode = preset.selectionMode;
+  profile.selection.autoSelectThreshold = preset.autoSelectThreshold;
+  profile.selection.autoSelectContiguous = preset.autoSelectContiguous;
+  profile.selection.autoSelectReferAllLayers = preset.autoSelectReferAllLayers;
   profile.blendMode = preset.blendMode;
   profile.eraseMode = preset.eraseMode;
   profile.lockAlphaRespect = preset.lockAlphaRespect;
@@ -115,8 +123,34 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
           core::ToolKind::Fill,
           "fill",
           "Fill",
-          {makeSubTool("fill_default", "Contiguous Fill", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Fill}, {}, "Click to fill connected area.")},
-          {},
+          {
+              makeSubTool(
+                  "fill_contiguous",
+                  "Contiguous Fill",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Fill};
+                    p.fillThreshold = 0;
+                    p.fillContiguous = true;
+                    p.fillReferAllLayers = false;
+                    p.fillGapClose = 0;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose},
+                  "Click to fill connected area."),
+              makeSubTool(
+                  "fill_gapclose",
+                  "Gap Close Fill",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Fill};
+                    p.fillThreshold = 24;
+                    p.fillContiguous = true;
+                    p.fillReferAllLayers = true;
+                    p.fillGapClose = 2;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose},
+                  "Fill with simple gap-close and all-layer reference.")},
+          {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose},
           "Fill connected pixels."},
       ToolDescriptor {
           core::ToolKind::Line,
@@ -159,8 +193,41 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
           core::ToolKind::RectSelection,
           "rect_selection",
           "Rect Selection",
-          {makeSubTool("rect_default", "Rectangle", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross}, {}, "Drag to create selection.")},
-          {},
+          {
+              makeSubTool(
+                  "rect_default",
+                  "Rectangle",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
+                    p.selectionMode = SelectionMode::Rectangle;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::SelectionMode},
+                  "Drag to create rectangular selection."),
+              makeSubTool(
+                  "lasso_default",
+                  "Lasso",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
+                    p.selectionMode = SelectionMode::Lasso;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::SelectionMode},
+                  "Drag freehand to create lasso selection."),
+              makeSubTool(
+                  "auto_select",
+                  "Auto Select",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
+                    p.selectionMode = SelectionMode::AutoSelect;
+                    p.autoSelectThreshold = 20;
+                    p.autoSelectContiguous = true;
+                    p.autoSelectReferAllLayers = true;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
+                  "Click to select similar colors by threshold.")},
+          {ToolPropertyKey::SelectionMode, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
           "Create rectangular selection."},
       ToolDescriptor {
           core::ToolKind::MoveLayer,

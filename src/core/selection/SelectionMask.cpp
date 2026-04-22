@@ -55,6 +55,40 @@ bool SelectionMask::setRect(const Rect& rect) {
   return before != *this;
 }
 
+bool SelectionMask::setPixels(const std::vector<std::uint8_t>& pixels) {
+  if (pixels.size() != m_mask.size()) {
+    return false;
+  }
+
+  SelectionMask before = *this;
+  m_mask = pixels;
+
+  int minX = m_width;
+  int minY = m_height;
+  int maxX = -1;
+  int maxY = -1;
+  for (int y = 0; y < m_height; ++y) {
+    for (int x = 0; x < m_width; ++x) {
+      if (m_mask[indexOf(x, y)] == 0U) {
+        continue;
+      }
+      minX = std::min(minX, x);
+      minY = std::min(minY, y);
+      maxX = std::max(maxX, x);
+      maxY = std::max(maxY, y);
+    }
+  }
+
+  if (maxX < minX || maxY < minY) {
+    m_hasSelection = false;
+    m_bounds.reset();
+  } else {
+    m_hasSelection = true;
+    m_bounds = Rect {minX, minY, maxX - minX + 1, maxY - minY + 1};
+  }
+  return before != *this;
+}
+
 bool SelectionMask::invert() {
   if (m_width <= 0 || m_height <= 0) {
     return false;

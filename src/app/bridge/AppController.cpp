@@ -105,8 +105,12 @@ AppController::AppController(QObject* parent)
   auto line = std::make_unique<core::LineTool>();
   m_lineTool = line.get();
   m_toolManager.registerTool(std::move(line));
-  m_toolManager.registerTool(std::make_unique<core::RectSelectionTool>());
-  m_toolManager.registerTool(std::make_unique<core::FillTool>());
+  auto rectSelection = std::make_unique<core::RectSelectionTool>();
+  m_rectSelectionTool = rectSelection.get();
+  m_toolManager.registerTool(std::move(rectSelection));
+  auto fill = std::make_unique<core::FillTool>();
+  m_fillTool = fill.get();
+  m_toolManager.registerTool(std::move(fill));
   m_toolManager.registerTool(std::make_unique<core::MoveLayerTool>());
 
   for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
@@ -192,6 +196,14 @@ ToolStateViewModel AppController::toolState() const noexcept {
       m_uiState.stabilization,
       m_uiState.snapAngle,
       m_uiState.simplifyLevel,
+      m_uiState.fillThreshold,
+      m_uiState.fillContiguous,
+      m_uiState.fillReferAllLayers,
+      m_uiState.fillGapClose,
+      m_uiState.selectionMode,
+      m_uiState.autoSelectThreshold,
+      m_uiState.autoSelectContiguous,
+      m_uiState.autoSelectReferAllLayers,
       m_uiState.postCorrection,
       m_uiState.velocityBasedCorrection,
       m_uiState.shapeType,
@@ -1093,6 +1105,66 @@ bool AppController::currentToolSupportsSimplifyLevel() const noexcept {
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::SimplifyLevel);
 }
 
+bool AppController::currentToolSupportsFillThreshold() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::FillThreshold);
+}
+
+bool AppController::currentToolSupportsFillContiguous() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::FillContiguous);
+}
+
+bool AppController::currentToolSupportsFillReferAllLayers() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(
+      currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::FillReferAllLayers);
+}
+
+bool AppController::currentToolSupportsFillGapClose() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::FillGapClose);
+}
+
+bool AppController::currentToolSupportsSelectionMode() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::SelectionMode);
+}
+
+bool AppController::currentToolSupportsAutoSelectThreshold() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(
+      currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::AutoSelectThreshold);
+}
+
+bool AppController::currentToolSupportsAutoSelectContiguous() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(
+      currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::AutoSelectContiguous);
+}
+
+bool AppController::currentToolSupportsAutoSelectReferAllLayers() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(
+      currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::AutoSelectReferAllLayers);
+}
+
 void AppController::beginStroke(int x, int y) {
   if (m_stroking) {
     return;
@@ -1513,6 +1585,81 @@ void AppController::setLineSimplifyLevel(int simplifyLevel) {
   emit toolStateChanged();
 }
 
+void AppController::setFillThreshold(int threshold) {
+  const int normalized = std::clamp(threshold, 0, 255);
+  if (m_uiState.fillThreshold == normalized) {
+    return;
+  }
+  m_uiState.fillThreshold = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setFillContiguous(bool contiguous) {
+  if (m_uiState.fillContiguous == contiguous) {
+    return;
+  }
+  m_uiState.fillContiguous = contiguous;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setFillReferAllLayers(bool enabled) {
+  if (m_uiState.fillReferAllLayers == enabled) {
+    return;
+  }
+  m_uiState.fillReferAllLayers = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setFillGapClose(int gapClose) {
+  const int normalized = std::clamp(gapClose, 0, 8);
+  if (m_uiState.fillGapClose == normalized) {
+    return;
+  }
+  m_uiState.fillGapClose = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setSelectionMode(app::ui::SelectionMode mode) {
+  if (m_uiState.selectionMode == mode) {
+    return;
+  }
+  m_uiState.selectionMode = mode;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setAutoSelectThreshold(int threshold) {
+  const int normalized = std::clamp(threshold, 0, 255);
+  if (m_uiState.autoSelectThreshold == normalized) {
+    return;
+  }
+  m_uiState.autoSelectThreshold = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setAutoSelectContiguous(bool contiguous) {
+  if (m_uiState.autoSelectContiguous == contiguous) {
+    return;
+  }
+  m_uiState.autoSelectContiguous = contiguous;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setAutoSelectReferAllLayers(bool enabled) {
+  if (m_uiState.autoSelectReferAllLayers == enabled) {
+    return;
+  }
+  m_uiState.autoSelectReferAllLayers = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
 bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
   switch (kind) {
     case core::ToolKind::Brush:
@@ -1675,6 +1822,24 @@ void AppController::applyUiStateToTools() {
   if (m_lineTool != nullptr) {
     m_lineTool->setSnapAngleDegrees(m_uiState.snapAngle);
   }
+  if (m_fillTool != nullptr) {
+    m_fillTool->setThreshold(m_uiState.fillThreshold);
+    m_fillTool->setContiguous(m_uiState.fillContiguous);
+    m_fillTool->setReferAllLayers(m_uiState.fillReferAllLayers);
+    m_fillTool->setGapClose(m_uiState.fillGapClose);
+  }
+  if (m_rectSelectionTool != nullptr) {
+    core::RectSelectionTool::Mode mode = core::RectSelectionTool::Mode::Rectangle;
+    if (m_uiState.selectionMode == app::ui::SelectionMode::Lasso) {
+      mode = core::RectSelectionTool::Mode::Lasso;
+    } else if (m_uiState.selectionMode == app::ui::SelectionMode::AutoSelect) {
+      mode = core::RectSelectionTool::Mode::AutoSelect;
+    }
+    m_rectSelectionTool->setMode(mode);
+    m_rectSelectionTool->setAutoSelectThreshold(m_uiState.autoSelectThreshold);
+    m_rectSelectionTool->setAutoSelectContiguous(m_uiState.autoSelectContiguous);
+    m_rectSelectionTool->setAutoSelectReferAllLayers(m_uiState.autoSelectReferAllLayers);
+  }
 }
 
 void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescriptor& subTool) {
@@ -1693,6 +1858,14 @@ void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescripto
   m_uiState.stabilization = clampPercent(profile.stabilizer.stabilization);
   m_uiState.snapAngle = std::clamp(profile.vector.snapAngle, 0, 180);
   m_uiState.simplifyLevel = clampPercent(profile.vector.simplifyLevel);
+  m_uiState.fillThreshold = std::clamp(profile.fill.threshold, 0, 255);
+  m_uiState.fillContiguous = profile.fill.contiguous;
+  m_uiState.fillReferAllLayers = profile.fill.referAllLayers;
+  m_uiState.fillGapClose = std::clamp(profile.fill.gapClose, 0, 8);
+  m_uiState.selectionMode = profile.selection.mode;
+  m_uiState.autoSelectThreshold = std::clamp(profile.selection.autoSelectThreshold, 0, 255);
+  m_uiState.autoSelectContiguous = profile.selection.autoSelectContiguous;
+  m_uiState.autoSelectReferAllLayers = profile.selection.autoSelectReferAllLayers;
   m_uiState.postCorrection = profile.stabilizer.postCorrection;
   m_uiState.velocityBasedCorrection = profile.stabilizer.velocityBasedCorrection;
   m_uiState.shapeType = profile.shape.shapeType;

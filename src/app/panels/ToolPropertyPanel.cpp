@@ -46,6 +46,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_shapeSection(nullptr),
       m_drawingControlSection(nullptr),
       m_vectorSection(nullptr),
+      m_fillSection(nullptr),
+      m_selectionSection(nullptr),
       m_toolNameLabel(new QLabel("Tool: -", this)),
       m_guideLabel(new QLabel("", this)),
       m_compatibilityLabel(new QLabel("", this)),
@@ -62,6 +64,10 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_taperEndLabel(new QLabel("Taper End", this)),
       m_snapAngleLabel(new QLabel("Snap Angle", this)),
       m_simplifyLabel(new QLabel("Simplify", this)),
+      m_fillThresholdLabel(new QLabel("Threshold", this)),
+      m_fillGapCloseLabel(new QLabel("Gap Close", this)),
+      m_selectionModeLabel(new QLabel("Mode", this)),
+      m_autoSelectThresholdLabel(new QLabel("Auto Threshold", this)),
       m_colorButton(new QPushButton("Color", this)),
       m_sizeSpin(new QSpinBox(this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
@@ -90,6 +96,17 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_snapAngleSpin(new QSpinBox(this)),
       m_simplifySlider(new QSlider(Qt::Horizontal, this)),
       m_simplifySpin(new QSpinBox(this)),
+      m_fillThresholdSlider(new QSlider(Qt::Horizontal, this)),
+      m_fillThresholdSpin(new QSpinBox(this)),
+      m_fillContiguousCheck(new QCheckBox("Contiguous", this)),
+      m_fillReferAllLayersCheck(new QCheckBox("Refer All Layers", this)),
+      m_fillGapCloseSlider(new QSlider(Qt::Horizontal, this)),
+      m_fillGapCloseSpin(new QSpinBox(this)),
+      m_selectionModeCombo(new QComboBox(this)),
+      m_autoSelectThresholdSlider(new QSlider(Qt::Horizontal, this)),
+      m_autoSelectThresholdSpin(new QSpinBox(this)),
+      m_autoSelectContiguousCheck(new QCheckBox("Auto Contiguous", this)),
+      m_autoSelectReferAllLayersCheck(new QCheckBox("Auto Refer All Layers", this)),
       m_blendModeCombo(new QComboBox(this)),
       m_eraseModeCheck(new QCheckBox("Erase Mode", this)),
       m_lockAlphaRespectCheck(new QCheckBox("Lock Alpha", this)) {
@@ -123,6 +140,12 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_snapAngleSpin->setRange(0, 180);
   m_simplifySlider->setRange(0, 100);
   m_simplifySpin->setRange(0, 100);
+  m_fillThresholdSlider->setRange(0, 255);
+  m_fillThresholdSpin->setRange(0, 255);
+  m_fillGapCloseSlider->setRange(0, 8);
+  m_fillGapCloseSpin->setRange(0, 8);
+  m_autoSelectThresholdSlider->setRange(0, 255);
+  m_autoSelectThresholdSpin->setRange(0, 255);
 
   m_shapeTypeCombo->addItem("Circle", static_cast<int>(core::BrushShapeType::Circle));
   m_shapeTypeCombo->addItem("Square", static_cast<int>(core::BrushShapeType::Square));
@@ -130,6 +153,10 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_blendModeCombo->addItem("Normal", static_cast<int>(core::BlendMode::Normal));
   m_blendModeCombo->addItem("Multiply", static_cast<int>(core::BlendMode::Multiply));
   m_blendModeCombo->addItem("Add", static_cast<int>(core::BlendMode::Add));
+
+  m_selectionModeCombo->addItem("Rectangle", static_cast<int>(app::ui::SelectionMode::Rectangle));
+  m_selectionModeCombo->addItem("Lasso", static_cast<int>(app::ui::SelectionMode::Lasso));
+  m_selectionModeCombo->addItem("Auto Select", static_cast<int>(app::ui::SelectionMode::AutoSelect));
 
   auto* contentLayout = new QVBoxLayout(m_contentWidget);
   contentLayout->setContentsMargins(6, 6, 6, 6);
@@ -281,6 +308,47 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(vectorGroup);
   m_vectorSection = vectorGroup;
 
+  auto* fillGroup = new QGroupBox("Fill", m_contentWidget);
+  auto* fillLayout = new QVBoxLayout(fillGroup);
+  fillLayout->setContentsMargins(8, 8, 8, 8);
+  fillLayout->setSpacing(6);
+  auto* fillThresholdRow = new QHBoxLayout();
+  fillThresholdRow->setContentsMargins(0, 0, 0, 0);
+  fillThresholdRow->setSpacing(6);
+  fillThresholdRow->addWidget(m_fillThresholdSlider, 1);
+  fillThresholdRow->addWidget(m_fillThresholdSpin);
+  auto* fillGapCloseRow = new QHBoxLayout();
+  fillGapCloseRow->setContentsMargins(0, 0, 0, 0);
+  fillGapCloseRow->setSpacing(6);
+  fillGapCloseRow->addWidget(m_fillGapCloseSlider, 1);
+  fillGapCloseRow->addWidget(m_fillGapCloseSpin);
+  fillLayout->addWidget(m_fillThresholdLabel);
+  fillLayout->addLayout(fillThresholdRow);
+  fillLayout->addWidget(m_fillContiguousCheck);
+  fillLayout->addWidget(m_fillReferAllLayersCheck);
+  fillLayout->addWidget(m_fillGapCloseLabel);
+  fillLayout->addLayout(fillGapCloseRow);
+  contentLayout->addWidget(fillGroup);
+  m_fillSection = fillGroup;
+
+  auto* selectionGroup = new QGroupBox("Selection", m_contentWidget);
+  auto* selectionLayout = new QVBoxLayout(selectionGroup);
+  selectionLayout->setContentsMargins(8, 8, 8, 8);
+  selectionLayout->setSpacing(6);
+  auto* autoSelectThresholdRow = new QHBoxLayout();
+  autoSelectThresholdRow->setContentsMargins(0, 0, 0, 0);
+  autoSelectThresholdRow->setSpacing(6);
+  autoSelectThresholdRow->addWidget(m_autoSelectThresholdSlider, 1);
+  autoSelectThresholdRow->addWidget(m_autoSelectThresholdSpin);
+  selectionLayout->addWidget(m_selectionModeLabel);
+  selectionLayout->addWidget(m_selectionModeCombo);
+  selectionLayout->addWidget(m_autoSelectThresholdLabel);
+  selectionLayout->addLayout(autoSelectThresholdRow);
+  selectionLayout->addWidget(m_autoSelectContiguousCheck);
+  selectionLayout->addWidget(m_autoSelectReferAllLayersCheck);
+  contentLayout->addWidget(selectionGroup);
+  m_selectionSection = selectionGroup;
+
   contentLayout->addStretch(1);
 
   m_scrollArea->setWidgetResizable(true);
@@ -316,6 +384,29 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_snapAngleSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSnapAngleSpinChanged);
   connect(m_simplifySlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onSimplifySliderChanged);
   connect(m_simplifySpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSimplifySpinChanged);
+  connect(m_fillThresholdSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onFillThresholdSliderChanged);
+  connect(m_fillThresholdSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onFillThresholdSpinChanged);
+  connect(m_fillContiguousCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onFillContiguousToggled);
+  connect(m_fillReferAllLayersCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onFillReferAllLayersToggled);
+  connect(m_fillGapCloseSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onFillGapCloseSliderChanged);
+  connect(m_fillGapCloseSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onFillGapCloseSpinChanged);
+  connect(m_selectionModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onSelectionModeChanged);
+  connect(
+      m_autoSelectThresholdSlider,
+      &QSlider::valueChanged,
+      this,
+      &ToolPropertyPanel::onAutoSelectThresholdSliderChanged);
+  connect(
+      m_autoSelectThresholdSpin,
+      qOverload<int>(&QSpinBox::valueChanged),
+      this,
+      &ToolPropertyPanel::onAutoSelectThresholdSpinChanged);
+  connect(m_autoSelectContiguousCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onAutoSelectContiguousToggled);
+  connect(
+      m_autoSelectReferAllLayersCheck,
+      &QCheckBox::toggled,
+      this,
+      &ToolPropertyPanel::onAutoSelectReferAllLayersToggled);
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onBlendModeChanged);
   connect(m_eraseModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onEraseModeToggled);
   connect(m_lockAlphaRespectCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onLockAlphaRespectToggled);
@@ -366,6 +457,14 @@ void ToolPropertyPanel::refreshFromController() {
   const bool supportsLockAlpha = m_controller->currentToolSupportsLockAlphaRespect();
   const bool supportsSnapAngle = m_controller->currentToolSupportsSnapAngle();
   const bool supportsSimplify = m_controller->currentToolSupportsSimplifyLevel();
+  const bool supportsFillThreshold = m_controller->currentToolSupportsFillThreshold();
+  const bool supportsFillContiguous = m_controller->currentToolSupportsFillContiguous();
+  const bool supportsFillReferAllLayers = m_controller->currentToolSupportsFillReferAllLayers();
+  const bool supportsFillGapClose = m_controller->currentToolSupportsFillGapClose();
+  const bool supportsSelectionMode = m_controller->currentToolSupportsSelectionMode();
+  const bool supportsAutoSelectThreshold = m_controller->currentToolSupportsAutoSelectThreshold();
+  const bool supportsAutoSelectContiguous = m_controller->currentToolSupportsAutoSelectContiguous();
+  const bool supportsAutoSelectReferAllLayers = m_controller->currentToolSupportsAutoSelectReferAllLayers();
   m_sizeLabel->setText((supportsSnapAngle || supportsSimplify) ? "Stroke Width" : "Size");
   m_colorLabel->setVisible(supportsColor);
   m_colorButton->setVisible(supportsColor);
@@ -415,8 +514,27 @@ void ToolPropertyPanel::refreshFromController() {
   m_simplifyLabel->setVisible(supportsSimplify);
   m_simplifySlider->setVisible(supportsSimplify);
   m_simplifySpin->setVisible(supportsSimplify);
+  m_fillThresholdLabel->setVisible(supportsFillThreshold);
+  m_fillThresholdSlider->setVisible(supportsFillThreshold);
+  m_fillThresholdSpin->setVisible(supportsFillThreshold);
+  m_fillContiguousCheck->setVisible(supportsFillContiguous);
+  m_fillReferAllLayersCheck->setVisible(supportsFillReferAllLayers);
+  m_fillGapCloseLabel->setVisible(supportsFillGapClose);
+  m_fillGapCloseSlider->setVisible(supportsFillGapClose);
+  m_fillGapCloseSpin->setVisible(supportsFillGapClose);
+  m_selectionModeLabel->setVisible(supportsSelectionMode);
+  m_selectionModeCombo->setVisible(supportsSelectionMode);
+  m_autoSelectThresholdLabel->setVisible(supportsAutoSelectThreshold);
+  m_autoSelectThresholdSlider->setVisible(supportsAutoSelectThreshold);
+  m_autoSelectThresholdSpin->setVisible(supportsAutoSelectThreshold);
+  m_autoSelectContiguousCheck->setVisible(supportsAutoSelectContiguous);
+  m_autoSelectReferAllLayersCheck->setVisible(supportsAutoSelectReferAllLayers);
   m_drawingControlSection->setVisible(supportsBlend || supportsEraseMode || supportsLockAlpha);
   m_vectorSection->setVisible(supportsSnapAngle || supportsSimplify);
+  m_fillSection->setVisible(supportsFillThreshold || supportsFillContiguous || supportsFillReferAllLayers || supportsFillGapClose);
+  m_selectionSection->setVisible(
+      supportsSelectionMode || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
+      supportsAutoSelectReferAllLayers);
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);
@@ -449,6 +567,17 @@ void ToolPropertyPanel::refreshFromController() {
   const QSignalBlocker blocker28(m_blendModeCombo);
   const QSignalBlocker blocker29(m_eraseModeCheck);
   const QSignalBlocker blocker30(m_lockAlphaRespectCheck);
+  const QSignalBlocker blocker31(m_fillThresholdSlider);
+  const QSignalBlocker blocker32(m_fillThresholdSpin);
+  const QSignalBlocker blocker33(m_fillContiguousCheck);
+  const QSignalBlocker blocker34(m_fillReferAllLayersCheck);
+  const QSignalBlocker blocker35(m_fillGapCloseSlider);
+  const QSignalBlocker blocker36(m_fillGapCloseSpin);
+  const QSignalBlocker blocker37(m_selectionModeCombo);
+  const QSignalBlocker blocker38(m_autoSelectThresholdSlider);
+  const QSignalBlocker blocker39(m_autoSelectThresholdSpin);
+  const QSignalBlocker blocker40(m_autoSelectContiguousCheck);
+  const QSignalBlocker blocker41(m_autoSelectReferAllLayersCheck);
   m_sizeSpin->setValue(state.size);
   m_opacitySlider->setValue(state.opacity);
   m_opacitySpin->setValue(state.opacity);
@@ -479,6 +608,17 @@ void ToolPropertyPanel::refreshFromController() {
   m_blendModeCombo->setCurrentIndex(m_blendModeCombo->findData(static_cast<int>(state.blendMode)));
   m_eraseModeCheck->setChecked(state.eraseMode);
   m_lockAlphaRespectCheck->setChecked(state.lockAlphaRespect);
+  m_fillThresholdSlider->setValue(state.fillThreshold);
+  m_fillThresholdSpin->setValue(state.fillThreshold);
+  m_fillContiguousCheck->setChecked(state.fillContiguous);
+  m_fillReferAllLayersCheck->setChecked(state.fillReferAllLayers);
+  m_fillGapCloseSlider->setValue(state.fillGapClose);
+  m_fillGapCloseSpin->setValue(state.fillGapClose);
+  m_selectionModeCombo->setCurrentIndex(m_selectionModeCombo->findData(static_cast<int>(state.selectionMode)));
+  m_autoSelectThresholdSlider->setValue(state.autoSelectThreshold);
+  m_autoSelectThresholdSpin->setValue(state.autoSelectThreshold);
+  m_autoSelectContiguousCheck->setChecked(state.autoSelectContiguous);
+  m_autoSelectReferAllLayersCheck->setChecked(state.autoSelectReferAllLayers);
   updateColorButton();
 }
 
@@ -729,6 +869,99 @@ void ToolPropertyPanel::onSimplifySpinChanged(int value) {
   const QSignalBlocker blocker(m_simplifySlider);
   m_simplifySlider->setValue(value);
   m_controller->setLineSimplifyLevel(value);
+}
+
+void ToolPropertyPanel::onFillThresholdSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsFillThreshold()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_fillThresholdSpin);
+  m_fillThresholdSpin->setValue(value);
+  m_controller->setFillThreshold(value);
+}
+
+void ToolPropertyPanel::onFillThresholdSpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsFillThreshold()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_fillThresholdSlider);
+  m_fillThresholdSlider->setValue(value);
+  m_controller->setFillThreshold(value);
+}
+
+void ToolPropertyPanel::onFillContiguousToggled(bool checked) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsFillContiguous()) {
+    return;
+  }
+  m_controller->setFillContiguous(checked);
+}
+
+void ToolPropertyPanel::onFillReferAllLayersToggled(bool checked) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsFillReferAllLayers()) {
+    return;
+  }
+  m_controller->setFillReferAllLayers(checked);
+}
+
+void ToolPropertyPanel::onFillGapCloseSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsFillGapClose()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_fillGapCloseSpin);
+  m_fillGapCloseSpin->setValue(value);
+  m_controller->setFillGapClose(value);
+}
+
+void ToolPropertyPanel::onFillGapCloseSpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsFillGapClose()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_fillGapCloseSlider);
+  m_fillGapCloseSlider->setValue(value);
+  m_controller->setFillGapClose(value);
+}
+
+void ToolPropertyPanel::onSelectionModeChanged(int index) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsSelectionMode()) {
+    return;
+  }
+  const QVariant value = m_selectionModeCombo->itemData(index);
+  if (!value.isValid()) {
+    return;
+  }
+  m_controller->setSelectionMode(static_cast<app::ui::SelectionMode>(value.toInt()));
+}
+
+void ToolPropertyPanel::onAutoSelectThresholdSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsAutoSelectThreshold()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_autoSelectThresholdSpin);
+  m_autoSelectThresholdSpin->setValue(value);
+  m_controller->setAutoSelectThreshold(value);
+}
+
+void ToolPropertyPanel::onAutoSelectThresholdSpinChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsAutoSelectThreshold()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_autoSelectThresholdSlider);
+  m_autoSelectThresholdSlider->setValue(value);
+  m_controller->setAutoSelectThreshold(value);
+}
+
+void ToolPropertyPanel::onAutoSelectContiguousToggled(bool checked) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsAutoSelectContiguous()) {
+    return;
+  }
+  m_controller->setAutoSelectContiguous(checked);
+}
+
+void ToolPropertyPanel::onAutoSelectReferAllLayersToggled(bool checked) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsAutoSelectReferAllLayers()) {
+    return;
+  }
+  m_controller->setAutoSelectReferAllLayers(checked);
 }
 
 void ToolPropertyPanel::onBlendModeChanged(int index) {

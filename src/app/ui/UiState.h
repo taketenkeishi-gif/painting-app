@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "app/ui/ToolDescriptor.h"
 #include "core/tools/ToolTypes.h"
 #include "core/tools/ToolType.h"
 
@@ -30,6 +31,14 @@ struct UiState {
   core::BlendMode blendMode {core::BlendMode::Normal};
   bool eraseMode {false};
   bool lockAlphaRespect {false};
+  int fillThreshold {0};
+  bool fillContiguous {true};
+  bool fillReferAllLayers {false};
+  int fillGapClose {0};
+  SelectionMode selectionMode {SelectionMode::Rectangle};
+  int autoSelectThreshold {16};
+  bool autoSelectContiguous {true};
+  bool autoSelectReferAllLayers {true};
 };
 
 } // namespace app::ui

@@ -62,6 +62,14 @@ struct ToolStateViewModel {
   int stabilization {0};
   int snapAngle {0};
   int simplifyLevel {0};
+  int fillThreshold {0};
+  bool fillContiguous {true};
+  bool fillReferAllLayers {false};
+  int fillGapClose {0};
+  app::ui::SelectionMode selectionMode {app::ui::SelectionMode::Rectangle};
+  int autoSelectThreshold {16};
+  bool autoSelectContiguous {true};
+  bool autoSelectReferAllLayers {true};
   bool postCorrection {false};
   bool velocityBasedCorrection {false};
   core::BrushShapeType shapeType {core::BrushShapeType::Circle};
@@ -166,6 +174,14 @@ public:
   bool currentToolSupportsLockAlphaRespect() const noexcept;
   bool currentToolSupportsSnapAngle() const noexcept;
   bool currentToolSupportsSimplifyLevel() const noexcept;
+  bool currentToolSupportsFillThreshold() const noexcept;
+  bool currentToolSupportsFillContiguous() const noexcept;
+  bool currentToolSupportsFillReferAllLayers() const noexcept;
+  bool currentToolSupportsFillGapClose() const noexcept;
+  bool currentToolSupportsSelectionMode() const noexcept;
+  bool currentToolSupportsAutoSelectThreshold() const noexcept;
+  bool currentToolSupportsAutoSelectContiguous() const noexcept;
+  bool currentToolSupportsAutoSelectReferAllLayers() const noexcept;
 
   void beginStroke(int x, int y);
   void continueStroke(int x, int y);
@@ -200,6 +216,14 @@ public:
   void setBrushLockAlphaRespect(bool enabled);
   void setLineSnapAngle(int snapAngle);
   void setLineSimplifyLevel(int simplifyLevel);
+  void setFillThreshold(int threshold);
+  void setFillContiguous(bool contiguous);
+  void setFillReferAllLayers(bool enabled);
+  void setFillGapClose(int gapClose);
+  void setSelectionMode(app::ui::SelectionMode mode);
+  void setAutoSelectThreshold(int threshold);
+  void setAutoSelectContiguous(bool contiguous);
+  void setAutoSelectReferAllLayers(bool enabled);
 
 signals:
   void documentChanged();
@@ -267,6 +291,8 @@ private:
   core::BrushTool* m_brushTool {nullptr};
   core::EraserTool* m_eraserTool {nullptr};
   core::LineTool* m_lineTool {nullptr};
+  core::RectSelectionTool* m_rectSelectionTool {nullptr};
+  core::FillTool* m_fillTool {nullptr};
 
   app::ui::ToolCatalog m_toolCatalog;
   app::ui::UiState m_uiState;

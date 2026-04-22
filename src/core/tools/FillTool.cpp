@@ -1,5 +1,6 @@
 #include "core/tools/FillTool.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "core/selection/SelectionMask.h"
@@ -9,6 +10,41 @@ namespace core {
 bool FillTool::isSameColor(const Color& a, const Color& b) noexcept {
   return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
 }
+int FillTool::colorDistance(const Color& a, const Color& b) noexcept {
+  const int dr = std::abs(static_cast<int>(a.r) - static_cast<int>(b.r));
+  const int dg = std::abs(static_cast<int>(a.g) - static_cast<int>(b.g));
+  const int db = std::abs(static_cast<int>(a.b) - static_cast<int>(b.b));
+  const int da = std::abs(static_cast<int>(a.a) - static_cast<int>(b.a));
+  return std::max({dr, dg, db, da});
+}
+
+bool FillTool::matchesTarget(const PixelBuffer& source, const Color& target, int x, int y) const noexcept {
+  if (!source.inBounds(x, y)) {
+    return false;
+  }
+  return colorDistance(source.pixel(x, y), target) <= m_settings.threshold;
+}
+
+bool FillTool::hasBridge(const PixelBuffer& source, const Color& target, int x, int y) const noexcept {
+  if (m_settings.gapClose <= 0) {
+    return false;
+  }
+  static constexpr Point kDirs[] = {
+      Point {1, 0}, Point {-1, 0}, Point {0, 1}, Point {0, -1}};
+  for (const Point& dir : kDirs) {
+    for (int d = 1; d <= m_settings.gapClose; ++d) {
+      const int nx = x + dir.x * d;
+      const int ny = y + dir.y * d;
+      if (!source.inBounds(nx, ny)) {
+        break;
+      }
+      if (matchesTarget(source, target, nx, ny)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
@@ -16,8 +52,13 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
     return {};
   }
 
+  const PixelBuffer* source = &active->buffer();
+  if (m_settings.referAllLayers) {
+    source = &context.composited;
+  }
+
   PixelBuffer& buffer = active->buffer();
-  if (!buffer.inBounds(event.point.x, event.point.y)) {
+  if (!source->inBounds(event.point.x, event.point.y)) {
     return {};
   }
   const SelectionMask& selection = context.document.selection();
@@ -26,40 +67,78 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
     return {};
   }
 
-  const Color target = buffer.pixel(event.point.x, event.point.y);
+  const Color target = source->pixel(event.point.x, event.point.y);
   const Color replacement = context.currentColor;
-  if (isSameColor(target, replacement)) {
+  if (m_settings.threshold == 0 && isSameColor(target, replacement)) {
     return {};
   }
 
   const int width = buffer.width();
   const int height = buffer.height();
-  std::vector<Point> stack;
-  stack.reserve(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) / 8 + 1);
-  stack.push_back(event.point);
+  std::vector<std::uint8_t> fillMask(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0U);
+  auto idx = [width](int x, int y) -> std::size_t {
+    return static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+  };
 
-  while (!stack.empty()) {
-    const Point p = stack.back();
-    stack.pop_back();
+  if (m_settings.contiguous) {
+    std::vector<Point> stack;
+    stack.reserve(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) / 8 + 1);
+    stack.push_back(event.point);
 
-    if (!buffer.inBounds(p.x, p.y)) {
-      continue;
+    while (!stack.empty()) {
+      const Point p = stack.back();
+      stack.pop_back();
+
+      if (!source->inBounds(p.x, p.y)) {
+        continue;
+      }
+      const std::size_t i = idx(p.x, p.y);
+      if (fillMask[i] != 0U) {
+        continue;
+      }
+      if (hasSelection && !selection.contains(p.x, p.y)) {
+        continue;
+      }
+      if (!matchesTarget(*source, target, p.x, p.y) && !hasBridge(*source, target, p.x, p.y)) {
+        continue;
+      }
+
+      fillMask[i] = 1U;
+      stack.push_back(Point {p.x + 1, p.y});
+      stack.push_back(Point {p.x - 1, p.y});
+      stack.push_back(Point {p.x, p.y + 1});
+      stack.push_back(Point {p.x, p.y - 1});
     }
-    if (!isSameColor(buffer.pixel(p.x, p.y), target)) {
-      continue;
+  } else {
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        if (hasSelection && !selection.contains(x, y)) {
+          continue;
+        }
+        if (matchesTarget(*source, target, x, y)) {
+          fillMask[idx(x, y)] = 1U;
+        }
+      }
     }
-    if (hasSelection && !selection.contains(p.x, p.y)) {
-      continue;
-    }
-
-    buffer.setPixel(p.x, p.y, replacement);
-
-    stack.push_back(Point {p.x + 1, p.y});
-    stack.push_back(Point {p.x - 1, p.y});
-    stack.push_back(Point {p.x, p.y + 1});
-    stack.push_back(Point {p.x, p.y - 1});
   }
 
+  bool changed = false;
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      if (fillMask[idx(x, y)] == 0U) {
+        continue;
+      }
+      const Color before = buffer.pixel(x, y);
+      if (!isSameColor(before, replacement)) {
+        buffer.setPixel(x, y, replacement);
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) {
+    return {};
+  }
   ToolResult result;
   result.pixelsChanged = true;
   return result;
