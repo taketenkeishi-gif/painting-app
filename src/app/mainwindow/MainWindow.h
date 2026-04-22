@@ -105,6 +105,7 @@ private:
   void updateTopToolInfo();
   void updateColorPanel();
   void updateToolActionState();
+  void updateNavigatorPreview();
   bool openImageFile(const QString& path);
   bool saveImageFile(const QString& path);
   void pushRecentFile(const QString& path);
@@ -148,6 +149,7 @@ private:
   QLabel* m_zoomStatusLabel {nullptr};
   QLabel* m_activeLayerStatusLabel {nullptr};
   QLabel* m_selectionStatusLabel {nullptr};
+  QLabel* m_navigatorImageLabel {nullptr};
   QPushButton* m_foregroundColorButton {nullptr};
   QPushButton* m_backgroundColorButton {nullptr};
   core::Color m_backgroundColor {255, 255, 255, 255};

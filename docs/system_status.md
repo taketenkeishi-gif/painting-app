@@ -40,6 +40,7 @@ Legend: `DONE` / `WIP` / `PARTIAL` / `TODO` / `BLOCKED`
 
 ## Assist / Snap / Ruler / Guide System
 - `PARTIAL`: line snap angle + optional grid/overlay view
+- `PARTIAL`: navigator mini-canvas preview + quick zoom buttons
 - `TODO`: guides/rulers/angle snap UI and snapping presets
 
 ## File / Import / Export System

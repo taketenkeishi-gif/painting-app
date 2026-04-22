@@ -47,11 +47,12 @@
 
 - `QDockWidget` workspace:
   - Left docks: Tool / Sub Tool / Tool Property / Color
-  - Right docks: Layer / Info
+  - Right docks: Layer / Navigator+Info
   - Center: Canvas
   - Bottom: status bar
 - `Window` menu controls panel visibility and supports reset workspace.
 - `Window` menu includes workspace layout save/load/delete and restore-last for dock workflow continuity.
+- Navigator preview uses composited output and provides quick zoom actions (`100%` / `Fit`).
 - Layer panel displays top-most layers at the top row and maps row/index explicitly, so button move and drag/drop reorder match user expectations.
 - Canvas view supports optional grid/overlay toggles through the `View` menu without changing core rendering data.
 - File/Edit menus are wired to controller-level operations (selection fill/delete, merge/rasterize, new-from-clipboard, import-as-layer, clipboard image import/export as raster layer, flattened export).

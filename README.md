@@ -39,7 +39,7 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
 ## Current UI Shell
 
 - Left docks: tool panel / sub-tool panel / tool-property panel / color panel
-- Right docks: layer panel / info panel
+- Right docks: layer panel / navigator+info panel
 - Center: canvas viewport
 - Bottom: status bar (tool, sub-tool, guide, color, size, zoom, selection, active layer)
 
@@ -104,3 +104,4 @@ System-level implementation status is tracked in `docs/system_status.md`.
 - `Ctrl++` / `Ctrl+-` / `Ctrl+0` Zoom in/out/reset
 - `Ctrl+Alt+Shift+S` Save workspace layout
 - `Ctrl+Alt+W` Restore last workspace layout
+- Navigator panel provides mini-canvas preview and quick `100%` / `Fit` buttons.

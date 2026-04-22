@@ -30,6 +30,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMap>
+#include <QPixmap>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
@@ -106,12 +107,15 @@ MainWindow::MainWindow(QWidget* parent)
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateActiveLayerStatus);
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateUndoRedoState);
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateUndoRedoState);
+  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateNavigatorPreview);
+  connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateNavigatorPreview);
 
   onToolStateChanged();
   updateUndoRedoState();
   updateActiveLayerStatus();
   updateTopToolInfo();
   updateColorPanel();
+  updateNavigatorPreview();
 }
 
 void MainWindow::setupShellLayout() {
@@ -162,11 +166,31 @@ void MainWindow::setupShellLayout() {
   infoLayout->setSpacing(6);
   auto* infoTitle = new QLabel("Info", infoPanel);
   infoTitle->setStyleSheet("font-weight: 700;");
+  auto* navigatorTitle = new QLabel("Navigator", infoPanel);
+  navigatorTitle->setStyleSheet("font-weight: 700;");
+  m_navigatorImageLabel = new QLabel(infoPanel);
+  m_navigatorImageLabel->setMinimumSize(180, 120);
+  m_navigatorImageLabel->setAlignment(Qt::AlignCenter);
+  m_navigatorImageLabel->setStyleSheet("background:#14181f; border:1px solid #3a4453;");
+  auto* navigatorButtons = new QHBoxLayout();
+  navigatorButtons->setContentsMargins(0, 0, 0, 0);
+  navigatorButtons->setSpacing(6);
+  auto* zoom100Button = new QPushButton("100%", infoPanel);
+  auto* fitButton = new QPushButton("Fit", infoPanel);
+  zoom100Button->setMinimumHeight(24);
+  fitButton->setMinimumHeight(24);
+  navigatorButtons->addWidget(zoom100Button);
+  navigatorButtons->addWidget(fitButton);
   auto* infoText = new QLabel("Tool, sub tool, and layer constraints are shown in status bar.", infoPanel);
   infoText->setWordWrap(true);
   infoLayout->addWidget(infoTitle);
+  infoLayout->addWidget(navigatorTitle);
+  infoLayout->addWidget(m_navigatorImageLabel);
+  infoLayout->addLayout(navigatorButtons);
   infoLayout->addWidget(infoText);
   infoLayout->addStretch(1);
+  connect(zoom100Button, &QPushButton::clicked, this, &MainWindow::onResetZoomTriggered);
+  connect(fitButton, &QPushButton::clicked, this, &MainWindow::onFitToScreenTriggered);
 
   auto makeDock = [this](const QString& title, QWidget* widget, const char* name) {
     auto* dock = new QDockWidget(title, this);
@@ -725,6 +749,20 @@ void MainWindow::updateTopToolInfo() {
   m_currentToolLabel->setText(QString("Tool: %1").arg(QString::fromStdString(m_controller->currentToolDisplayName())));
   m_currentSubToolLabel->setText(QString("Sub Tool: %1").arg(QString::fromStdString(m_controller->currentSubToolDisplayName())));
   updateToolActionState();
+}
+
+void MainWindow::updateNavigatorPreview() {
+  if (m_navigatorImageLabel == nullptr || m_controller == nullptr) {
+    return;
+  }
+  const QImage image = platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
+  if (image.isNull()) {
+    m_navigatorImageLabel->clear();
+    return;
+  }
+  const QSize target = m_navigatorImageLabel->size().expandedTo(QSize(1, 1));
+  const QPixmap pixmap = QPixmap::fromImage(image).scaled(target, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  m_navigatorImageLabel->setPixmap(pixmap);
 }
 
 void MainWindow::onUndoTriggered() {
