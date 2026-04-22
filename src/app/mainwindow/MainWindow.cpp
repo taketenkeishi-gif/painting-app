@@ -799,6 +799,7 @@ void MainWindow::createToolBar() {
   m_moveLayerDownAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
   m_zoomInAction->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
   m_zoomOutAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
+  m_commandPaletteAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
 
   m_quickToolBar->addAction(m_newCanvasAction);
   m_quickToolBar->addAction(m_openAction);
@@ -807,6 +808,7 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_undoAction);
   m_quickToolBar->addAction(m_redoAction);
+  m_quickToolBar->addAction(m_commandPaletteAction);
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_addRasterLayerAction);
   m_quickToolBar->addAction(m_addVectorLayerAction);

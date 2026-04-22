@@ -131,7 +131,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_addFolderButton->setIcon(style()->standardIcon(QStyle::SP_DirClosedIcon));
   m_duplicateButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
   m_upButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
+  m_upButton->setToolTip("Move selected layer toward the top (front).");
   m_downButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
+  m_downButton->setToolTip("Move selected layer toward the bottom (back).");
   m_deleteButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
   m_clipButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
   m_maskButton->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
