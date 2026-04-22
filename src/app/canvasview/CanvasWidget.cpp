@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
@@ -28,11 +29,18 @@ struct CanvasInteractionState {
   QPoint lastPanPos {0, 0};
   QPoint lastMousePos {0, 0};
   bool hasMousePos {false};
+  QPoint lastStrokeDispatchWidgetPos {0, 0};
+  bool hasLastStrokeDispatchPos {false};
+  qint64 lastStrokeDispatchNs {0};
 };
 
 std::unordered_map<const CanvasWidget*, CanvasInteractionState> g_canvasStates;
+QElapsedTimer g_eventTimer;
 
 CanvasInteractionState& stateFor(const CanvasWidget* widget) {
+  if (!g_eventTimer.isValid()) {
+    g_eventTimer.start();
+  }
   return g_canvasStates[widget];
 }
 
@@ -53,8 +61,8 @@ void drawCheckerboard(QPainter& painter, const QRect& rect, int cellSize) {
     return;
   }
   const int cell = std::max(4, cellSize);
-  const QColor a(58, 62, 70);
-  const QColor b(44, 48, 56);
+  const QColor a(112, 116, 124);
+  const QColor b(86, 90, 98);
   for (int y = rect.top(); y <= rect.bottom(); y += cell) {
     for (int x = rect.left(); x <= rect.right(); x += cell) {
       const bool useA = ((x / cell) + (y / cell)) % 2 == 0;
@@ -213,7 +221,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
   auto& state = stateFor(this);
   QPainter painter(this);
-  painter.fillRect(rect(), QColor(48, 48, 48));
+  painter.fillRect(rect(), QColor(24, 27, 32));
 
   if (m_image.isNull()) {
     return;
@@ -376,6 +384,9 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   }
 
   m_mouseDrawing = true;
+  state.lastStrokeDispatchWidgetPos = event->position().toPoint();
+  state.hasLastStrokeDispatchPos = true;
+  state.lastStrokeDispatchNs = g_eventTimer.nsecsElapsed();
   m_controller->beginStroke(point->x, point->y);
   updateCursorForState(point);
 }
@@ -390,6 +401,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
       event->modifiers().testFlag(Qt::AltModifier));
 
   auto& state = stateFor(this);
+  const QPoint previousMousePos = state.lastMousePos;
   state.lastMousePos = event->position().toPoint();
   state.hasMousePos = true;
   const auto canvasPoint = mapToCanvas(state.lastMousePos);
@@ -419,7 +431,18 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
 
   if (!m_mouseDrawing || !(event->buttons() & Qt::LeftButton)) {
     if (!m_spacePressed) {
-      update();
+      constexpr int kHoverRadiusPx = 48;
+      const QRect prevRect(
+          previousMousePos.x() - kHoverRadiusPx,
+          previousMousePos.y() - kHoverRadiusPx,
+          kHoverRadiusPx * 2 + 1,
+          kHoverRadiusPx * 2 + 1);
+      const QRect nextRect(
+          event->position().toPoint().x() - kHoverRadiusPx,
+          event->position().toPoint().y() - kHoverRadiusPx,
+          kHoverRadiusPx * 2 + 1,
+          kHoverRadiusPx * 2 + 1);
+      update(prevRect.united(nextRect).adjusted(-2, -2, 2, 2));
     }
     return;
   }
@@ -428,6 +451,22 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   if (!point.has_value()) {
     return;
   }
+
+  const QPoint nowPos = event->position().toPoint();
+  const qint64 nowNs = g_eventTimer.nsecsElapsed();
+  bool shouldDispatch = true;
+  if (state.hasLastStrokeDispatchPos) {
+    const QPoint delta = nowPos - state.lastStrokeDispatchWidgetPos;
+    const bool movedEnough = delta.manhattanLength() >= 2;
+    const bool elapsedEnough = (nowNs - state.lastStrokeDispatchNs) >= 3'000'000; // ~333fps cap
+    shouldDispatch = movedEnough || elapsedEnough;
+  }
+  if (!shouldDispatch) {
+    return;
+  }
+  state.lastStrokeDispatchWidgetPos = nowPos;
+  state.hasLastStrokeDispatchPos = true;
+  state.lastStrokeDispatchNs = nowNs;
 
   m_controller->continueStroke(point->x, point->y);
 }
@@ -471,6 +510,7 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
     m_controller->endStroke();
   }
   m_mouseDrawing = false;
+  state.hasLastStrokeDispatchPos = false;
   updateCursorForState(mapToCanvas(state.lastMousePos));
   update();
 }
@@ -533,6 +573,13 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
 }
 
 void CanvasWidget::keyPressEvent(QKeyEvent* event) {
+  if (m_controller != nullptr) {
+    const Qt::KeyboardModifiers modifiers = QApplication::keyboardModifiers();
+    m_controller->setInputModifiers(
+        modifiers.testFlag(Qt::ShiftModifier),
+        modifiers.testFlag(Qt::ControlModifier),
+        modifiers.testFlag(Qt::AltModifier));
+  }
   if (event->isAutoRepeat()) {
     QWidget::keyPressEvent(event);
     return;
@@ -548,6 +595,13 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
 }
 
 void CanvasWidget::keyReleaseEvent(QKeyEvent* event) {
+  if (m_controller != nullptr) {
+    const Qt::KeyboardModifiers modifiers = QApplication::keyboardModifiers();
+    m_controller->setInputModifiers(
+        modifiers.testFlag(Qt::ShiftModifier),
+        modifiers.testFlag(Qt::ControlModifier),
+        modifiers.testFlag(Qt::AltModifier));
+  }
   if (event->isAutoRepeat()) {
     QWidget::keyReleaseEvent(event);
     return;

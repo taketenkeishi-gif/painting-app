@@ -3,12 +3,13 @@
 #include <algorithm>
 #include <vector>
 
-#include <QSignalBlocker>
-#include <QToolButton>
 #include <QGridLayout>
 #include <QLabel>
 #include <QLayoutItem>
+#include <QSignalBlocker>
+#include <QSlider>
 #include <QStyle>
+#include <QToolButton>
 
 #include "app/bridge/AppController.h"
 
@@ -41,7 +42,7 @@ QString toolNameJa(core::ToolKind kind) {
   }
 }
 
-QString toolShortcutJa(core::ToolKind kind) {
+QString toolShortcut(core::ToolKind kind) {
   switch (kind) {
     case core::ToolKind::Brush:
       return "B";
@@ -72,7 +73,7 @@ enum class ToolCategory {
   View,
 };
 
-ToolCategory categoryForTool(core::ToolKind kind) {
+ToolCategory categoryFor(core::ToolKind kind) {
   switch (kind) {
     case core::ToolKind::Brush:
     case core::ToolKind::Eraser:
@@ -91,14 +92,14 @@ ToolCategory categoryForTool(core::ToolKind kind) {
   }
 }
 
-QString categoryNameJa(ToolCategory category) {
+QString categoryName(ToolCategory category) {
   switch (category) {
     case ToolCategory::Paint:
-      return "描画ツール";
+      return "描画";
     case ToolCategory::Select:
-      return "選択・編集";
+      return "選択/移動";
     case ToolCategory::View:
-      return "表示・移動";
+      return "表示";
     default:
       return "ツール";
   }
@@ -114,15 +115,18 @@ ToolPanel::ToolPanel(QWidget* parent)
       "  background: #29303a;"
       "  color: #d8d8d8;"
       "  border-radius: 4px;"
-      "  padding: 5px 5px;"
-      "  min-height: 50px;"
+      "  padding: 3px 3px;"
+      "  min-height: 40px;"
       "}"
       "QToolButton:hover { background: #36404c; border-color: #8aa8cf; }"
       "QToolButton:checked { background: #2d527f; border-color: #8fc2ff; color: #ffffff; }"
-      "QToolButton:disabled { background: #20252d; border-color: #303845; color: #7c8798; }");
+      "QToolButton:disabled { background: #20252d; border-color: #303845; color: #7c8798; }"
+      "QSlider::groove:horizontal { background: #1f2530; border: 1px solid #39485d; height: 5px; border-radius: 3px; }"
+      "QSlider::handle:horizontal { background: #87aee0; width: 12px; margin: -4px 0; border-radius: 6px; }");
   auto* layout = new QGridLayout(this);
-  layout->setContentsMargins(6, 6, 6, 6);
-  layout->setSpacing(5);
+  layout->setContentsMargins(4, 4, 4, 4);
+  layout->setHorizontalSpacing(4);
+  layout->setVerticalSpacing(3);
   layout->setColumnStretch(0, 1);
   layout->setColumnStretch(1, 1);
 }
@@ -152,13 +156,32 @@ void ToolPanel::refreshFromController() {
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
     const bool enabled = m_controller->canUseToolOnActiveLayer(kind);
-    const QString shortcut = toolShortcutJa(kind);
+    const QString shortcut = toolShortcut(kind);
     button->setChecked(kind == current);
     button->setToolTip(
         enabled
-            ? QString("%1 ツール（%2）").arg(toolNameJa(kind), shortcut)
-            : QString("%1ツールは現在のレイヤー（%2）では使用できません").arg(toolNameJa(kind), layerKind));
+            ? QString("%1 [%2]").arg(toolNameJa(kind), shortcut)
+            : QString("%1は現在のレイヤー(%2)では使用できません").arg(toolNameJa(kind), layerKind));
     button->setEnabled(enabled);
+  }
+
+  if (m_sizeSlider != nullptr && m_opacitySlider != nullptr &&
+      m_sizeValueLabel != nullptr && m_opacityValueLabel != nullptr) {
+    const QSignalBlocker b1(m_sizeSlider);
+    const QSignalBlocker b2(m_opacitySlider);
+    m_refreshingSliders = true;
+    const app::bridge::ToolStateViewModel state = m_controller->toolState();
+    m_sizeSlider->setValue(state.size);
+    m_opacitySlider->setValue(state.opacity);
+    m_sizeValueLabel->setText(QString::number(state.size));
+    m_opacityValueLabel->setText(QString("%1%").arg(state.opacity));
+    const bool sizeEnabled = m_controller->currentToolSupportsSize();
+    const bool opacityEnabled = m_controller->currentToolSupportsOpacity();
+    m_sizeSlider->setEnabled(sizeEnabled);
+    m_opacitySlider->setEnabled(opacityEnabled);
+    m_sizeValueLabel->setEnabled(sizeEnabled);
+    m_opacityValueLabel->setEnabled(opacityEnabled);
+    m_refreshingSliders = false;
   }
 }
 
@@ -171,10 +194,22 @@ void ToolPanel::onToolButtonClicked() {
   if (button == nullptr) {
     return;
   }
-
-  const int kindValue = button->property("toolKind").toInt();
-  const core::ToolKind kind = static_cast<core::ToolKind>(kindValue);
+  const core::ToolKind kind = static_cast<core::ToolKind>(button->property("toolKind").toInt());
   m_controller->setCurrentTool(kind);
+}
+
+void ToolPanel::onSizeSliderChanged(int value) {
+  if (m_controller == nullptr || m_refreshingSliders) {
+    return;
+  }
+  m_controller->setBrushSize(value);
+}
+
+void ToolPanel::onOpacitySliderChanged(int value) {
+  if (m_controller == nullptr || m_refreshingSliders) {
+    return;
+  }
+  m_controller->setBrushOpacity(value);
 }
 
 void ToolPanel::rebuildButtons() {
@@ -192,14 +227,17 @@ void ToolPanel::rebuildButtons() {
 
   while (layout->count() > 0) {
     QLayoutItem* item = layout->takeAt(0);
+    if (item->widget() != nullptr) {
+      item->widget()->deleteLater();
+    }
     delete item;
   }
 
   auto* title = new QLabel("ツール", this);
-  title->setStyleSheet("font-weight:700; color:#dfe6f2; padding:2px 2px;");
+  title->setStyleSheet("font-weight:700; color:#dfe6f2; padding:1px 1px;");
   layout->addWidget(title, 0, 0, 1, 2);
 
-  const std::vector<core::ToolKind> orderedTools {
+  const std::vector<core::ToolKind> ordered {
       core::ToolKind::Brush,
       core::ToolKind::Eraser,
       core::ToolKind::Eyedropper,
@@ -209,42 +247,42 @@ void ToolPanel::rebuildButtons() {
       core::ToolKind::MoveLayer,
       core::ToolKind::Hand,
       core::ToolKind::Zoom};
-  const std::vector<ToolCategory> orderedCategories {
+  const std::vector<ToolCategory> categories {
       ToolCategory::Paint,
       ToolCategory::Select,
       ToolCategory::View};
-  const auto availableTools = m_controller->availableTools();
+  const auto available = m_controller->availableTools();
 
   int row = 1;
-  for (const ToolCategory category : orderedCategories) {
-    std::vector<core::ToolKind> toolsInCategory;
-    for (const core::ToolKind kind : orderedTools) {
-      if (categoryForTool(kind) != category) {
+  for (ToolCategory category : categories) {
+    std::vector<core::ToolKind> tools;
+    for (core::ToolKind kind : ordered) {
+      if (categoryFor(kind) != category) {
         continue;
       }
-      if (std::find(availableTools.begin(), availableTools.end(), kind) == availableTools.end()) {
+      if (std::find(available.begin(), available.end(), kind) == available.end()) {
         continue;
       }
-      toolsInCategory.push_back(kind);
+      tools.push_back(kind);
     }
-    if (toolsInCategory.empty()) {
+    if (tools.empty()) {
       continue;
     }
 
-    auto* categoryLabel = new QLabel(categoryNameJa(category), this);
-    categoryLabel->setStyleSheet("font-weight:600; color:#9fb4cf; padding:2px 1px;");
-    layout->addWidget(categoryLabel, row++, 0, 1, 2);
+    auto* label = new QLabel(categoryName(category), this);
+    label->setStyleSheet("font-weight:600; color:#9fb4cf; padding:2px 1px;");
+    layout->addWidget(label, row++, 0, 1, 2);
 
-    for (std::size_t i = 0; i < toolsInCategory.size(); ++i) {
-      const core::ToolKind kind = toolsInCategory[i];
+    for (std::size_t i = 0; i < tools.size(); ++i) {
+      const core::ToolKind kind = tools[i];
       auto* button = new QToolButton(this);
-      const QString shortcut = toolShortcutJa(kind);
-      button->setText(shortcut.isEmpty() ? toolNameJa(kind) : QString("%1\n[%2]").arg(toolNameJa(kind), shortcut));
+      const QString shortKey = toolShortcut(kind);
+      button->setText(QString("%1\n%2").arg(toolNameJa(kind), shortKey));
       button->setCheckable(true);
       button->setAutoExclusive(true);
-      button->setIconSize(QSize(16, 16));
       button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-      button->setMinimumSize(QSize(88, 50));
+      button->setMinimumSize(QSize(64, 44));
+      button->setIconSize(QSize(16, 16));
       button->setProperty("toolKind", static_cast<int>(kind));
 
       switch (kind) {
@@ -261,7 +299,7 @@ void ToolPanel::rebuildButtons() {
           button->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
           break;
         case core::ToolKind::Line:
-          button->setIcon(style()->standardIcon(QStyle::SP_ArrowRight));
+          button->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
           break;
         case core::ToolKind::RectSelection:
           button->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
@@ -283,8 +321,38 @@ void ToolPanel::rebuildButtons() {
       layout->addWidget(button, row + static_cast<int>(i / 2), static_cast<int>(i % 2));
       m_buttons[kind] = button;
     }
-    row += static_cast<int>((toolsInCategory.size() + 1) / 2);
+    row += static_cast<int>((tools.size() + 1) / 2);
   }
+
+  auto* sliderTitle = new QLabel("クイック調整", this);
+  sliderTitle->setStyleSheet("font-weight:600; color:#9fb4cf; padding:2px 1px;");
+  layout->addWidget(sliderTitle, row++, 0, 1, 2);
+
+  auto* sizeLabel = new QLabel("サイズ", this);
+  m_sizeValueLabel = new QLabel("8", this);
+  m_sizeValueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  layout->addWidget(sizeLabel, row, 0);
+  layout->addWidget(m_sizeValueLabel, row, 1);
+  ++row;
+
+  m_sizeSlider = new QSlider(Qt::Horizontal, this);
+  m_sizeSlider->setRange(1, 128);
+  layout->addWidget(m_sizeSlider, row++, 0, 1, 2);
+
+  auto* opacityLabel = new QLabel("不透明度", this);
+  m_opacityValueLabel = new QLabel("100%", this);
+  m_opacityValueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  layout->addWidget(opacityLabel, row, 0);
+  layout->addWidget(m_opacityValueLabel, row, 1);
+  ++row;
+
+  m_opacitySlider = new QSlider(Qt::Horizontal, this);
+  m_opacitySlider->setRange(0, 100);
+  layout->addWidget(m_opacitySlider, row++, 0, 1, 2);
+  layout->setRowStretch(row, 1);
+
+  connect(m_sizeSlider, &QSlider::valueChanged, this, &ToolPanel::onSizeSliderChanged);
+  connect(m_opacitySlider, &QSlider::valueChanged, this, &ToolPanel::onOpacitySliderChanged);
 }
 
 } // namespace app::panels

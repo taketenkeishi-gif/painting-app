@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include <QConicalGradient>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -15,9 +14,10 @@ namespace app::panels {
 namespace {
 
 double hueFromPoint(const QPointF& center, const QPointF& point) {
-  const double angle = std::atan2(point.y() - center.y(), point.x() - center.x());
+  // 0 deg (red) at top, clockwise hue increase.
+  const double angle = std::atan2(center.y() - point.y(), point.x() - center.x());
   const double degrees = angle * 180.0 / 3.14159265358979323846;
-  const double normalized = std::fmod(360.0 - degrees + 90.0 + 360.0, 360.0);
+  const double normalized = std::fmod(90.0 - degrees + 360.0, 360.0);
   return normalized;
 }
 
@@ -35,6 +35,10 @@ void ColorWheelWidget::setColor(const QColor& color) {
     return;
   }
   next = next.toHsv();
+  if (next.hsvHue() < 0) {
+    const int fallbackHue = (m_color.isValid() && m_color.hsvHue() >= 0) ? m_color.hsvHue() : 0;
+    next.setHsv(fallbackHue, 0, next.value(), next.alpha());
+  }
   if (!m_color.isValid() || m_color.toHsv() != next) {
     m_color = next;
     update();
@@ -69,18 +73,18 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   const double outer = outerRadius();
   const double inner = innerRadius();
 
-  QConicalGradient ringGradient(c, 0.0);
-  ringGradient.setColorAt(0.0, QColor::fromHsv(0, 255, 255));
-  ringGradient.setColorAt(1.0 / 6.0, QColor::fromHsv(60, 255, 255));
-  ringGradient.setColorAt(2.0 / 6.0, QColor::fromHsv(120, 255, 255));
-  ringGradient.setColorAt(3.0 / 6.0, QColor::fromHsv(180, 255, 255));
-  ringGradient.setColorAt(4.0 / 6.0, QColor::fromHsv(240, 255, 255));
-  ringGradient.setColorAt(5.0 / 6.0, QColor::fromHsv(300, 255, 255));
-  ringGradient.setColorAt(1.0, QColor::fromHsv(360, 255, 255));
-
-  painter.setPen(Qt::NoPen);
-  painter.setBrush(ringGradient);
-  painter.drawEllipse(c, outer, outer);
+  // Draw the hue ring with the same geometry used by input mapping.
+  const double ringRadius = (outer + inner) * 0.5;
+  const int ringWidth = std::max(2, static_cast<int>(std::lround(outer - inner)));
+  painter.setBrush(Qt::NoBrush);
+  for (int hue = 0; hue < 360; ++hue) {
+    const double a1 = (90.0 - static_cast<double>(hue)) * 3.14159265358979323846 / 180.0;
+    const double a2 = (90.0 - static_cast<double>(hue + 1)) * 3.14159265358979323846 / 180.0;
+    const QPointF p1(c.x() + std::cos(a1) * ringRadius, c.y() - std::sin(a1) * ringRadius);
+    const QPointF p2(c.x() + std::cos(a2) * ringRadius, c.y() - std::sin(a2) * ringRadius);
+    painter.setPen(QPen(QColor::fromHsv(hue, 255, 255), static_cast<qreal>(ringWidth), Qt::SolidLine, Qt::FlatCap));
+    painter.drawLine(p1, p2);
+  }
 
   painter.setCompositionMode(QPainter::CompositionMode_Source);
   painter.setBrush(QColor(30, 34, 40));
@@ -117,7 +121,6 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   painter.drawEllipse(svHandle, 3.5, 3.5);
 
   const double hueRadians = (90.0 - static_cast<double>(hue)) * 3.14159265358979323846 / 180.0;
-  const double ringRadius = (outer + inner) * 0.5;
   const QPointF hueHandle(
       c.x() + std::cos(hueRadians) * ringRadius,
       c.y() - std::sin(hueRadians) * ringRadius);

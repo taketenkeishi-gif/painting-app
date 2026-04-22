@@ -12,6 +12,7 @@
 #include <QAbstractItemModel>
 #include <QList>
 #include <QModelIndex>
+#include <QMenu>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QSizePolicy>
@@ -132,6 +133,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setDropIndicatorShown(true);
   m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
   m_layerList->setDefaultDropAction(Qt::MoveAction);
+  m_layerList->setContextMenuPolicy(Qt::CustomContextMenu);
   m_layerList->setSpacing(2);
   m_layerList->setStyleSheet(
       "QListWidget::item { padding: 5px 8px; border-bottom: 1px solid #313844; }"
@@ -238,6 +240,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
   connect(m_filterEdit, &QLineEdit::textChanged, this, &LayerPanel::onFilterTextChanged);
+  connect(m_layerList, &QListWidget::customContextMenuRequested, this, &LayerPanel::onLayerContextMenuRequested);
   connect(
       m_layerList->model(),
       &QAbstractItemModel::rowsMoved,
@@ -553,6 +556,100 @@ void LayerPanel::onBlendModeChanged(int index) {
 void LayerPanel::onFilterTextChanged(const QString& text) {
   Q_UNUSED(text);
   refreshLayers();
+}
+
+void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
+  if (m_controller == nullptr) {
+    return;
+  }
+
+  QListWidgetItem* item = m_layerList->itemAt(pos);
+  if (item != nullptr) {
+    m_layerList->setCurrentItem(item);
+  }
+
+  const bool hasSelection = m_layerList->currentItem() != nullptr;
+  const bool paperSelected = hasSelection && m_layerList->currentItem()->data(kPaperRole).toBool();
+  const bool canEditLayer = hasSelection && !paperSelected;
+
+  QMenu menu(this);
+  QAction* renameAction = menu.addAction("名前を変更");
+  QAction* duplicateAction = menu.addAction("複製");
+  QAction* deleteAction = menu.addAction("削除");
+  menu.addSeparator();
+  QAction* addRasterAction = menu.addAction("新規ラスターレイヤー");
+  QAction* addVectorAction = menu.addAction("新規ベクターレイヤー");
+  QAction* addFolderAction = menu.addAction("新規フォルダー");
+  menu.addSeparator();
+  QAction* moveUpAction = menu.addAction("上へ移動");
+  QAction* moveDownAction = menu.addAction("下へ移動");
+  QAction* toggleVisibleAction = menu.addAction("表示/非表示を切替");
+  QAction* toggleClipAction = menu.addAction("クリッピング切替");
+  QAction* toggleLockAction = menu.addAction("ロック切替");
+
+  renameAction->setEnabled(canEditLayer);
+  duplicateAction->setEnabled(canEditLayer);
+  deleteAction->setEnabled(canEditLayer);
+  moveUpAction->setEnabled(canEditLayer && m_upButton->isEnabled());
+  moveDownAction->setEnabled(canEditLayer && m_downButton->isEnabled());
+  toggleVisibleAction->setEnabled(hasSelection);
+  toggleClipAction->setEnabled(canEditLayer && m_clipButton->isEnabled());
+  toggleLockAction->setEnabled(canEditLayer && m_lockButton->isEnabled());
+
+  if (paperSelected) {
+    toggleVisibleAction->setText("用紙の表示/非表示を切替");
+  }
+
+  QAction* selected = menu.exec(m_layerList->viewport()->mapToGlobal(pos));
+  if (selected == nullptr) {
+    return;
+  }
+
+  if (selected == renameAction && m_layerList->currentItem() != nullptr) {
+    m_layerList->editItem(m_layerList->currentItem());
+    return;
+  }
+  if (selected == duplicateAction) {
+    onDuplicateLayerClicked();
+    return;
+  }
+  if (selected == deleteAction) {
+    onDeleteLayerClicked();
+    return;
+  }
+  if (selected == addRasterAction) {
+    onAddRasterLayerClicked();
+    return;
+  }
+  if (selected == addVectorAction) {
+    onAddVectorLayerClicked();
+    return;
+  }
+  if (selected == addFolderAction) {
+    onAddFolderLayerClicked();
+    return;
+  }
+  if (selected == moveUpAction) {
+    onMoveLayerUpClicked();
+    return;
+  }
+  if (selected == moveDownAction) {
+    onMoveLayerDownClicked();
+    return;
+  }
+  if (selected == toggleVisibleAction && hasSelection && m_layerList->currentItem() != nullptr) {
+    QListWidgetItem* current = m_layerList->currentItem();
+    current->setCheckState(current->checkState() == Qt::Checked ? Qt::Unchecked : Qt::Checked);
+    return;
+  }
+  if (selected == toggleClipAction) {
+    onToggleClipClicked();
+    return;
+  }
+  if (selected == toggleLockAction) {
+    onToggleLockClicked();
+    return;
+  }
 }
 
 void LayerPanel::onLayerRowsMoved(

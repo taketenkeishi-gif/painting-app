@@ -12,6 +12,7 @@ class QModelIndex;
 class QSlider;
 class QLineEdit;
 class QComboBox;
+class QPoint;
 
 namespace app::bridge {
 class AppController;
@@ -47,6 +48,7 @@ private slots:
   void onOpacityChanged(int value);
   void onBlendModeChanged(int index);
   void onFilterTextChanged(const QString& text);
+  void onLayerContextMenuRequested(const QPoint& pos);
 
 private:
   std::size_t layerIndexFromRow(int row) const;

@@ -387,38 +387,31 @@ void MainWindow::setupShellLayout() {
     return dock;
   };
 
-  auto* leftWorkspace = new QWidget(this);
-  auto* leftWorkspaceLayout = new QHBoxLayout(leftWorkspace);
-  leftWorkspaceLayout->setContentsMargins(0, 0, 0, 0);
-  leftWorkspaceLayout->setSpacing(6);
-  m_toolPanel->setMinimumWidth(106);
-  m_toolPanel->setMaximumWidth(126);
+  m_toolPanel->setMinimumWidth(94);
+  m_toolPanel->setMaximumWidth(132);
 
-  auto* leftDetailSplitter = new QSplitter(Qt::Vertical, leftWorkspace);
-  leftDetailSplitter->setChildrenCollapsible(false);
-  leftDetailSplitter->addWidget(m_subToolPanel);
-  leftDetailSplitter->addWidget(m_toolPropertyPanel);
-  leftDetailSplitter->addWidget(colorPanel);
-  leftDetailSplitter->setStretchFactor(0, 3);
-  leftDetailSplitter->setStretchFactor(1, 4);
-  leftDetailSplitter->setStretchFactor(2, 3);
-
-  leftWorkspaceLayout->addWidget(m_toolPanel, 0);
-  leftWorkspaceLayout->addWidget(leftDetailSplitter, 1);
-
-  m_toolDock = makeDock("左ワークスペース", leftWorkspace, "ToolDock");
-  m_subToolDock = nullptr;
-  m_toolPropertyDock = nullptr;
-  m_colorDock = nullptr;
+  m_toolDock = makeDock("ツール", m_toolPanel, "ToolDock");
+  m_subToolDock = makeDock("サブツール", m_subToolPanel, "SubToolDock");
+  m_toolPropertyDock = makeDock("ツールプロパティ", m_toolPropertyPanel, "ToolPropertyDock");
+  m_colorDock = makeDock("カラー", colorPanel, "ColorDock");
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
+  addDockWidget(Qt::LeftDockWidgetArea, m_subToolDock);
+  addDockWidget(Qt::LeftDockWidgetArea, m_toolPropertyDock);
+  addDockWidget(Qt::LeftDockWidgetArea, m_colorDock);
+  splitDockWidget(m_toolDock, m_subToolDock, Qt::Horizontal);
+  splitDockWidget(m_subToolDock, m_toolPropertyDock, Qt::Vertical);
+  splitDockWidget(m_toolPropertyDock, m_colorDock, Qt::Vertical);
+  resizeDocks({m_toolDock, m_subToolDock}, {112, 320}, Qt::Horizontal);
+  resizeDocks({m_subToolDock, m_toolPropertyDock, m_colorDock}, {300, 340, 240}, Qt::Vertical);
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
 
   m_toolDock->raise();
+  m_subToolDock->raise();
   m_layerDock->raise();
   m_defaultDockState = saveState();
 }
@@ -918,19 +911,19 @@ void MainWindow::applyUiChrome() {
   setStyleSheet(
       "QMainWindow { background: #1a1d22; color: #dfe4ee; }"
       "QDockWidget { color: #d5dbe7; font-size: 12px; }"
-      "QDockWidget::title { background: #242a33; border: 1px solid #394352; padding: 5px 10px; font-weight: 700; }"
+      "QDockWidget::title { background: #242a33; border: 1px solid #394352; padding: 4px 8px; font-weight: 700; }"
       "QDockWidget > QWidget { background: #20252d; }"
-      "QGroupBox { border: 1px solid #394352; border-radius: 4px; margin-top: 12px; padding-top: 10px; }"
+      "QGroupBox { border: 1px solid #394352; border-radius: 4px; margin-top: 10px; padding-top: 8px; }"
       "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #cfd7e4; font-weight: 700; }"
       "QListWidget { background: #181c22; border: 1px solid #36404f; color: #dfe5ef; outline: none; }"
-      "QListWidget::item { min-height: 24px; }"
+      "QListWidget::item { min-height: 22px; }"
       "QListWidget::item:selected { background: #315980; color: #ffffff; }"
       "QPushButton, QToolButton {"
       "  background: #2b313b;"
       "  border: 1px solid #4a5567;"
       "  border-radius: 3px;"
-      "  padding: 4px 8px;"
-      "  min-height: 28px;"
+      "  padding: 3px 6px;"
+      "  min-height: 24px;"
       "  color: #e3e8f2;"
       "}"
       "QPushButton:hover, QToolButton:hover { background: #343b47; border-color: #6b7f9d; }"
@@ -940,7 +933,7 @@ void MainWindow::applyUiChrome() {
       "QMenuBar::item:selected { background: #2f3947; }"
       "QMenu { background: #1f242b; color: #dfe4ee; border: 1px solid #394352; }"
       "QMenu::item:selected { background: #315980; color: #ffffff; }"
-      "QLineEdit, QSpinBox, QComboBox { background: #171b21; border: 1px solid #3e4758; color: #e6ebf3; min-height: 24px; }"
+      "QLineEdit, QSpinBox, QComboBox { background: #171b21; border: 1px solid #3e4758; color: #e6ebf3; min-height: 22px; }"
       "QLineEdit:focus, QSpinBox:focus, QComboBox:focus { border-color: #7ea7d6; }"
       "QSlider::groove:horizontal { background: #20252d; height: 6px; border-radius: 3px; }"
       "QSlider::handle:horizontal { background: #6f92c2; width: 12px; border-radius: 6px; margin: -3px 0; }"
