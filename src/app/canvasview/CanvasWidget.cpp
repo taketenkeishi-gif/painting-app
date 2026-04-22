@@ -23,6 +23,7 @@ struct CanvasInteractionState {
   double zoom {1.0};
   QPointF panOffset {0.0, 0.0};
   bool panning {false};
+  bool panDragging {false};
   bool temporaryMiddlePan {false};
   QPoint lastPanPos {0, 0};
   QPoint lastMousePos {0, 0};
@@ -351,6 +352,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
 
   if (event->button() == Qt::MiddleButton) {
     state.panning = true;
+    state.panDragging = false;
     state.temporaryMiddlePan = true;
     state.lastPanPos = event->position().toPoint();
     m_mouseDrawing = false;
@@ -370,6 +372,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   const bool handPan = g_spacePressed || m_controller->currentTool() == core::ToolKind::Hand;
   if (handPan) {
     state.panning = true;
+    state.panDragging = false;
     state.lastPanPos = event->position().toPoint();
     updateCursorForState(std::nullopt);
     return;
@@ -399,6 +402,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   if (state.panning && (event->buttons() & Qt::LeftButton)) {
     const QPoint current = event->position().toPoint();
     const QPoint delta = current - state.lastPanPos;
+    state.panDragging = state.panDragging || !delta.isNull();
     state.panOffset += QPointF(delta.x(), delta.y());
     state.lastPanPos = current;
     updateCursorForState(std::nullopt);
@@ -409,6 +413,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   if (state.panning && state.temporaryMiddlePan && (event->buttons() & Qt::MiddleButton)) {
     const QPoint current = event->position().toPoint();
     const QPoint delta = current - state.lastPanPos;
+    state.panDragging = state.panDragging || !delta.isNull();
     state.panOffset += QPointF(delta.x(), delta.y());
     state.lastPanPos = current;
     updateCursorForState(std::nullopt);
@@ -442,6 +447,7 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
 
   if (event->button() == Qt::MiddleButton && state.temporaryMiddlePan) {
     state.panning = false;
+    state.panDragging = false;
     state.temporaryMiddlePan = false;
     updateCursorForState(mapToCanvas(state.lastMousePos));
     update();
@@ -454,6 +460,7 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
 
   if (state.panning) {
     state.panning = false;
+    state.panDragging = false;
     state.temporaryMiddlePan = false;
     updateCursorForState(mapToCanvas(state.lastMousePos));
     update();
@@ -569,7 +576,7 @@ std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) co
 void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvasPoint) {
   const auto& state = stateFor(this);
   if (state.panning) {
-    setCursor(Qt::ClosedHandCursor);
+    setCursor(state.panDragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
     return;
   }
   if (g_spacePressed) {

@@ -819,8 +819,9 @@ void MainWindow::createMenus() {
 void MainWindow::createToolBar() {
   m_quickToolBar = addToolBar("クイック操作");
   m_quickToolBar->setMovable(false);
-  m_quickToolBar->setIconSize(QSize(18, 18));
-  m_quickToolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+  m_quickToolBar->setIconSize(QSize(19, 19));
+  m_quickToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+  m_quickToolBar->setToolTip("主要操作（ファイル / 履歴 / レイヤー / 表示）");
 
   m_newCanvasAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
   m_openAction->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
@@ -839,6 +840,20 @@ void MainWindow::createToolBar() {
   m_zoomInAction->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
   m_zoomOutAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
   m_commandPaletteAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
+
+  m_newCanvasAction->setToolTip("新規キャンバス");
+  m_openAction->setToolTip("開く");
+  m_saveAction->setToolTip("保存");
+  m_undoAction->setToolTip("元に戻す");
+  m_redoAction->setToolTip("やり直し");
+  m_commandPaletteAction->setToolTip("コマンドパレット（Ctrl+Shift+P）");
+  m_addRasterLayerAction->setToolTip("新規ラスターレイヤー");
+  m_addVectorLayerAction->setToolTip("新規ベクターレイヤー");
+  m_deleteLayerAction->setToolTip("レイヤー削除");
+  m_zoomInAction->setToolTip("ズームイン");
+  m_zoomOutAction->setToolTip("ズームアウト");
+  m_resetZoomAction->setToolTip("ズームを100%に戻す");
+  m_fitToScreenAction->setToolTip("画面に合わせる");
 
   m_quickToolBar->addAction(m_newCanvasAction);
   m_quickToolBar->addAction(m_openAction);
@@ -1057,7 +1072,7 @@ void MainWindow::onNewFromClipboardTriggered() {
     statusBar()->showMessage("クリップボード画像が不正です", 1800);
     return;
   }
-  m_controller->importFlattenedBuffer(buffer, "Clipboard");
+  m_controller->importFlattenedBuffer(buffer, "クリップボード");
   m_currentFilePath.clear();
   statusBar()->showMessage("クリップボード画像から新規キャンバスを作成しました", 2200);
 }
@@ -1168,7 +1183,7 @@ void MainWindow::onPasteTriggered() {
     return;
   }
   const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
-  if (m_controller->pasteBufferAsNewRasterLayer(buffer, "Pasted Layer")) {
+  if (m_controller->pasteBufferAsNewRasterLayer(buffer, "貼り付けレイヤー")) {
     statusBar()->showMessage("新規ラスターレイヤーとして貼り付けました", 1500);
   }
 }

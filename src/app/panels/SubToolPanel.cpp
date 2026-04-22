@@ -83,12 +83,16 @@ SubToolPanel::SubToolPanel(QWidget* parent)
       m_deleteButton(new QToolButton(this)),
       m_resetButton(new QToolButton(this)),
       m_subToolList(new QListWidget(this)) {
+  setStyleSheet(
+      "QLineEdit { min-height: 28px; }"
+      "QPushButton, QToolButton { min-height: 30px; padding: 3px 8px; }");
   auto* layout = new QVBoxLayout(this);
   layout->setContentsMargins(6, 6, 6, 6);
   layout->setSpacing(6);
 
   m_toolNameLabel->setStyleSheet("font-weight: 700;");
   m_summaryLabel->setStyleSheet("color: #9fb4cf;");
+  m_summaryLabel->setWordWrap(true);
   m_searchEdit->setPlaceholderText("サブツールを検索...");
   m_duplicateButton->setToolTip("現在のプリセットを複製します。");
   m_searchEdit->setMinimumHeight(28);
@@ -121,9 +125,15 @@ SubToolPanel::SubToolPanel(QWidget* parent)
 
   layout->addWidget(m_toolNameLabel);
   layout->addWidget(m_summaryLabel);
+  auto* listTitle = new QLabel("プリセット一覧", this);
+  listTitle->setStyleSheet("font-weight:600; color:#c9d4e4;");
+  layout->addWidget(listTitle);
   layout->addLayout(searchRow);
   layout->addWidget(m_subToolList);
 
+  auto* manageTitle = new QLabel("管理", this);
+  manageTitle->setStyleSheet("font-weight:600; color:#c9d4e4;");
+  layout->addWidget(manageTitle);
   auto* manageRow = new QHBoxLayout();
   manageRow->setContentsMargins(0, 0, 0, 0);
   manageRow->setSpacing(6);
@@ -162,25 +172,34 @@ void SubToolPanel::refreshFromController() {
   const QSignalBlocker blocker(m_subToolList);
   m_refreshing = true;
   m_toolNameLabel->setText(QString("ツール: %1").arg(toolNameJa(m_controller->currentTool())));
-  m_summaryLabel->setText(
-      QString("サブツール: %1").arg(subToolNameJa(QString::fromStdString(m_controller->currentSubToolId()),
-                                                QString::fromStdString(m_controller->currentSubToolDisplayName()))));
+  const QString currentSubToolName = subToolNameJa(
+      QString::fromStdString(m_controller->currentSubToolId()),
+      QString::fromStdString(m_controller->currentSubToolDisplayName()));
+  m_summaryLabel->setText(QString("現在: %1").arg(currentSubToolName));
   m_subToolList->clear();
   const auto items = m_controller->subToolViewModels();
   const QString query = m_searchEdit->text().trimmed();
   bool hasEnabledRow = false;
   for (const auto& item : items) {
     const QString displayName = QString::fromStdString(item.name);
-    if (!query.isEmpty() && !displayName.contains(query, Qt::CaseInsensitive)) {
+    const QString subToolId = QString::fromStdString(item.id);
+    const QString localizedName = subToolNameJa(subToolId, displayName);
+    const bool matches = query.isEmpty()
+        || localizedName.contains(query, Qt::CaseInsensitive)
+        || displayName.contains(query, Qt::CaseInsensitive)
+        || subToolId.contains(query, Qt::CaseInsensitive);
+    if (!matches) {
       continue;
     }
-    const QString subToolId = QString::fromStdString(item.id);
-    auto* row = new QListWidgetItem(subToolNameJa(subToolId, QString::fromStdString(item.name)), m_subToolList);
+    auto* row = new QListWidgetItem(item.enabled ? localizedName : QString("%1（非対応）").arg(localizedName), m_subToolList);
     row->setData(kSubToolIdRole, subToolId);
     row->setData(kSubToolEnabledRole, item.enabled);
     row->setFlags(item.enabled ? (Qt::ItemIsEnabled | Qt::ItemIsSelectable) : Qt::NoItemFlags);
     row->setForeground(item.enabled ? palette().windowText().color() : QColor(130, 136, 148));
-    row->setToolTip(item.hint.empty() ? displayName : QString::fromStdString(item.hint));
+    row->setToolTip(
+        item.enabled
+            ? (item.hint.empty() ? localizedName : QString::fromStdString(item.hint))
+            : "現在のレイヤー種別ではこのサブツールを使用できません。");
     row->setSizeHint(QSize(row->sizeHint().width(), 30));
     hasEnabledRow = hasEnabledRow || item.enabled;
     if (item.active) {

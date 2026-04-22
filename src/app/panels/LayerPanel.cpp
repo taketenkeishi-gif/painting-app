@@ -124,7 +124,7 @@ LayerPanel::LayerPanel(QWidget* parent)
 
   m_opacitySlider->setRange(0, 100);
   m_opacitySlider->setValue(100);
-  m_opacitySlider->setToolTip("Active layer opacity");
+  m_opacitySlider->setToolTip("アクティブレイヤーの不透明度を調整します。");
 
   m_addRasterButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
   m_addVectorButton->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
@@ -168,6 +168,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   layout->addWidget(m_opacityLabel);
   layout->addWidget(m_opacitySlider);
 
+  auto* quickTitle = new QLabel("頻用操作", this);
+  quickTitle->setStyleSheet("font-weight: 600; color: #c9d4e4;");
+  layout->addWidget(quickTitle);
   auto* commandGrid = new QGridLayout();
   commandGrid->setContentsMargins(0, 0, 0, 0);
   commandGrid->setHorizontalSpacing(4);
@@ -182,6 +185,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   commandGrid->setColumnStretch(3, 1);
   layout->addLayout(commandGrid);
 
+  auto* stateTitle = new QLabel("状態操作", this);
+  stateTitle->setStyleSheet("font-weight: 600; color: #c9d4e4;");
+  layout->addWidget(stateTitle);
   auto* stateGrid = new QGridLayout();
   stateGrid->setContentsMargins(0, 0, 0, 0);
   stateGrid->setHorizontalSpacing(4);
@@ -270,7 +276,7 @@ void LayerPanel::refreshLayers() {
     item->setData(kLockedRole, model.locked);
     item->setData(kAlphaLockedRole, model.alphaLocked);
     item->setData(kPositionLockedRole, model.positionLocked);
-    item->setToolTip("Toggle visibility with the checkbox. Double-click name to rename.");
+    item->setToolTip("チェックで表示/非表示、名前のダブルクリックで変更できます。");
     item->setSizeHint(QSize(item->sizeHint().width(), 30));
 
     QFont font = item->font();
@@ -282,7 +288,7 @@ void LayerPanel::refreshLayers() {
       m_layerList->setCurrentItem(item);
       const QSignalBlocker sliderBlocker(m_opacitySlider);
       m_opacitySlider->setValue(model.opacityPercent);
-      m_opacityLabel->setText(QString("Opacity: %1%").arg(model.opacityPercent));
+      m_opacityLabel->setText(QString("不透明度: %1%").arg(model.opacityPercent));
     }
   }
 
