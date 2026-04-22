@@ -4,11 +4,13 @@
 
 #include <QListWidget>
 #include <QPushButton>
+#include <QString>
 #include <QWidget>
 
 class QLabel;
 class QModelIndex;
 class QSlider;
+class QLineEdit;
 
 namespace app::bridge {
 class AppController;
@@ -42,6 +44,7 @@ private slots:
   void onLayerItemChanged(QListWidgetItem* item);
   void onLayerRowsMoved(const QModelIndex& parent, int start, int end, const QModelIndex& destination, int row);
   void onOpacityChanged(int value);
+  void onFilterTextChanged(const QString& text);
 
 private:
   std::size_t layerIndexFromRow(int row) const;
@@ -50,6 +53,7 @@ private:
 
   app::bridge::AppController* m_controller {nullptr};
   QLabel* m_headerLabel {nullptr};
+  QLineEdit* m_filterEdit {nullptr};
   QListWidget* m_layerList {nullptr};
   QLabel* m_opacityLabel {nullptr};
   QSlider* m_opacitySlider {nullptr};

@@ -6,6 +6,7 @@
 #include <QFont>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QAbstractItemModel>
 #include <QList>
 #include <QModelIndex>
@@ -83,6 +84,7 @@ QString stripLayerDecorators(QString text) {
 LayerPanel::LayerPanel(QWidget* parent)
     : QWidget(parent),
       m_headerLabel(new QLabel("Layers", this)),
+      m_filterEdit(new QLineEdit(this)),
       m_layerList(new QListWidget(this)),
       m_opacityLabel(new QLabel("Opacity: 100%", this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
@@ -100,6 +102,8 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_lockAlphaButton(new QPushButton("Alpha", this)),
       m_lockPositionButton(new QPushButton("Pos", this)) {
   m_headerLabel->setStyleSheet("font-weight: 700;");
+  m_filterEdit->setPlaceholderText("Search layers...");
+  m_filterEdit->setClearButtonEnabled(true);
   m_layerList->setAlternatingRowColors(true);
   m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_layerList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
@@ -151,6 +155,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   layout->setContentsMargins(6, 6, 6, 6);
   layout->setSpacing(6);
   layout->addWidget(m_headerLabel);
+  layout->addWidget(m_filterEdit);
   layout->addWidget(m_layerList);
   layout->addWidget(m_opacityLabel);
   layout->addWidget(m_opacitySlider);
@@ -195,6 +200,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_lockPositionButton, &QPushButton::clicked, this, &LayerPanel::onTogglePositionLockClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
+  connect(m_filterEdit, &QLineEdit::textChanged, this, &LayerPanel::onFilterTextChanged);
   connect(
       m_layerList->model(),
       &QAbstractItemModel::rowsMoved,
@@ -225,11 +231,19 @@ void LayerPanel::refreshLayers() {
   const QSignalBlocker signalBlocker(m_layerList);
   m_isRefreshing = true;
   m_layerList->clear();
+  const QString filterText = m_filterEdit->text().trimmed();
+  const bool hasFilter = !filterText.isEmpty();
+  m_layerList->setDragDropMode(hasFilter ? QAbstractItemView::NoDragDrop : QAbstractItemView::InternalMove);
 
   const auto models = m_controller->layerViewModels();
-  for (int row = 0; row < static_cast<int>(models.size()); ++row) {
-    const std::size_t layerIndex = layerIndexFromRow(row);
+  for (std::size_t layerIndex = models.size(); layerIndex-- > 0;) {
     const auto& model = models[layerIndex];
+    if (hasFilter) {
+      const QString layerName = QString::fromStdString(model.name);
+      if (!layerName.contains(filterText, Qt::CaseInsensitive)) {
+        continue;
+      }
+    }
     auto* item = new QListWidgetItem(decorateLayerName(model), m_layerList);
     item->setFlags(
         Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEditable |
@@ -254,7 +268,7 @@ void LayerPanel::refreshLayers() {
     item->setBackground(model.active ? QColor(48, 79, 130) : QColor(Qt::transparent));
 
     if (model.active) {
-      m_layerList->setCurrentRow(rowFromLayerIndex(layerIndex));
+      m_layerList->setCurrentItem(item);
       const QSignalBlocker sliderBlocker(m_opacitySlider);
       m_opacitySlider->setValue(model.opacityPercent);
       m_opacityLabel->setText(QString("Opacity: %1%").arg(model.opacityPercent));
@@ -290,44 +304,60 @@ void LayerPanel::onDuplicateLayerClicked() {
   if (m_controller == nullptr) {
     return;
   }
-  const int row = m_layerList->currentRow();
-  if (row < 0) {
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  if (currentItem == nullptr) {
     return;
   }
-  m_controller->duplicateLayer(layerIndexFromRow(row));
+  const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
+  if (layerIndex < 0) {
+    return;
+  }
+  m_controller->duplicateLayer(static_cast<std::size_t>(layerIndex));
 }
 
 void LayerPanel::onDeleteLayerClicked() {
   if (m_controller == nullptr) {
     return;
   }
-  const int row = m_layerList->currentRow();
-  if (row < 0) {
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  if (currentItem == nullptr) {
     return;
   }
-  m_controller->removeLayer(layerIndexFromRow(row));
+  const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
+  if (layerIndex < 0) {
+    return;
+  }
+  m_controller->removeLayer(static_cast<std::size_t>(layerIndex));
 }
 
 void LayerPanel::onMoveLayerUpClicked() {
   if (m_controller == nullptr) {
     return;
   }
-  const int row = m_layerList->currentRow();
-  if (row < 0) {
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  if (currentItem == nullptr) {
     return;
   }
-  m_controller->moveLayerUp(layerIndexFromRow(row));
+  const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
+  if (layerIndex < 0) {
+    return;
+  }
+  m_controller->moveLayerUp(static_cast<std::size_t>(layerIndex));
 }
 
 void LayerPanel::onMoveLayerDownClicked() {
   if (m_controller == nullptr) {
     return;
   }
-  const int row = m_layerList->currentRow();
-  if (row < 0) {
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  if (currentItem == nullptr) {
     return;
   }
-  m_controller->moveLayerDown(layerIndexFromRow(row));
+  const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
+  if (layerIndex < 0) {
+    return;
+  }
+  m_controller->moveLayerDown(static_cast<std::size_t>(layerIndex));
 }
 
 void LayerPanel::onToggleClipClicked() {
@@ -376,7 +406,15 @@ void LayerPanel::onCurrentLayerChanged(int row) {
   if (m_controller == nullptr || m_isRefreshing || row < 0) {
     return;
   }
-  m_controller->setActiveLayer(layerIndexFromRow(row));
+  QListWidgetItem* item = m_layerList->item(row);
+  if (item == nullptr) {
+    return;
+  }
+  const int layerIndex = item->data(kLayerIndexRole).toInt();
+  if (layerIndex < 0) {
+    return;
+  }
+  m_controller->setActiveLayer(static_cast<std::size_t>(layerIndex));
   refreshButtonState();
 }
 
@@ -433,6 +471,11 @@ void LayerPanel::onOpacityChanged(int value) {
   }
   m_opacityLabel->setText(QString("Opacity: %1%").arg(value));
   m_controller->setActiveLayerOpacity(value);
+}
+
+void LayerPanel::onFilterTextChanged(const QString& text) {
+  Q_UNUSED(text);
+  refreshLayers();
 }
 
 void LayerPanel::onLayerRowsMoved(
@@ -533,15 +576,21 @@ void LayerPanel::refreshButtonState() {
   bool positionLocked = false;
   core::LayerKind kind = core::LayerKind::Raster;
   if (hasSelection) {
-    const core::Layer& layer = m_controller->document().layerAt(layerIndexFromRow(current));
-    kind = layer.kind();
-    canClipOrMask = layer.kind() != core::LayerKind::Folder;
-    hasMask = layer.hasMask();
-    maskEnabled = layer.maskEnabled();
-    clipped = layer.clippedToBelow();
-    locked = layer.locked();
-    alphaLocked = layer.alphaLocked();
-    positionLocked = layer.positionLocked();
+    QListWidgetItem* currentItem = m_layerList->item(current);
+    if (currentItem != nullptr) {
+      const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
+      if (layerIndex >= 0) {
+        const core::Layer& layer = m_controller->document().layerAt(static_cast<std::size_t>(layerIndex));
+        kind = layer.kind();
+        canClipOrMask = layer.kind() != core::LayerKind::Folder;
+        hasMask = layer.hasMask();
+        maskEnabled = layer.maskEnabled();
+        clipped = layer.clippedToBelow();
+        locked = layer.locked();
+        alphaLocked = layer.alphaLocked();
+        positionLocked = layer.positionLocked();
+      }
+    }
   }
   m_clipButton->setEnabled(canClipOrMask);
   m_maskButton->setEnabled(canClipOrMask);
