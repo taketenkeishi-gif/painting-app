@@ -207,7 +207,9 @@ void LayerPanel::refreshLayers() {
     const std::size_t layerIndex = layerIndexFromRow(row);
     const auto& model = models[layerIndex];
     auto* item = new QListWidgetItem(decorateLayerName(model), m_layerList);
-    item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEditable);
+    item->setFlags(
+        Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEditable |
+        Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled);
     item->setCheckState(model.visible ? Qt::Checked : Qt::Unchecked);
     item->setData(kNameRole, QString::fromStdString(model.name));
     item->setData(kVisibilityRole, model.visible);
@@ -397,6 +399,12 @@ void LayerPanel::onLayerRowsMoved(
     return;
   }
   int toRow = row;
+  if (toRow > m_layerList->count()) {
+    toRow = m_layerList->count();
+  }
+  if (toRow == m_layerList->count()) {
+    toRow = m_layerList->count() - 1;
+  }
   if (toRow > start) {
     --toRow;
   }

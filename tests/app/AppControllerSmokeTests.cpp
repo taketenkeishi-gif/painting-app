@@ -49,6 +49,16 @@ int main() {
     expectTrue(controller.document().activeLayerIndex() == 0, "Undo should restore moved layer position.");
     expectTrue(controller.redo(), "Redo should re-apply layer order move.");
     expectTrue(controller.document().activeLayerIndex() == 1, "Redo should move layer again.");
+    controller.newDocument(64, 64);
+    controller.addLayer();
+    controller.addLayer();
+    controller.setActiveLayer(2);
+    expectTrue(controller.moveLayer(2, 0), "Direct moveLayer should support drag/drop style reorder.");
+    expectTrue(controller.document().activeLayerIndex() == 0, "Direct move should keep moved layer active.");
+    expectTrue(controller.undo(), "Direct moveLayer should be undoable.");
+    expectTrue(controller.document().activeLayerIndex() == 2, "Undo should restore moved layer index.");
+    expectTrue(controller.redo(), "Direct moveLayer should be redoable.");
+    expectTrue(controller.document().activeLayerIndex() == 0, "Redo should reapply moved layer index.");
 
     // Drawing + color/size reflection + undo/redo
     controller.addLayer();
