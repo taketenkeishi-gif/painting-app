@@ -25,6 +25,46 @@ constexpr int kNameRole = Qt::UserRole + 1;
 constexpr int kVisibilityRole = Qt::UserRole + 2;
 constexpr int kKindRole = Qt::UserRole + 3;
 constexpr int kLayerIndexRole = Qt::UserRole + 4;
+constexpr int kClippedRole = Qt::UserRole + 5;
+constexpr int kHasMaskRole = Qt::UserRole + 6;
+constexpr int kMaskEnabledRole = Qt::UserRole + 7;
+
+QString kindPrefix(core::LayerKind kind) {
+  switch (kind) {
+    case core::LayerKind::Raster:
+      return "[R] ";
+    case core::LayerKind::Vector:
+      return "[V] ";
+    case core::LayerKind::Folder:
+      return "[F] ";
+    default:
+      return "[?] ";
+  }
+}
+
+QString decorateLayerName(const app::bridge::LayerViewModel& model) {
+  QString text = kindPrefix(model.kind);
+  if (model.clippedToBelow) {
+    text += "[C] ";
+  }
+  if (model.hasMask) {
+    text += model.maskEnabled ? "[M] " : "[m] ";
+  }
+  text += QString::fromStdString(model.name);
+  return text;
+}
+
+QString stripLayerDecorators(QString text) {
+  text = text.trimmed();
+  while (text.startsWith('[')) {
+    const int close = text.indexOf(']');
+    if (close <= 0) {
+      break;
+    }
+    text = text.mid(close + 1).trimmed();
+  }
+  return text;
+}
 
 } // namespace
 
@@ -36,10 +76,14 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
       m_addRasterButton(new QPushButton("New Raster", this)),
       m_addVectorButton(new QPushButton("New Vector", this)),
+      m_addFolderButton(new QPushButton("New Folder", this)),
       m_duplicateButton(new QPushButton("Duplicate", this)),
       m_upButton(new QPushButton("Up", this)),
       m_downButton(new QPushButton("Down", this)),
-      m_deleteButton(new QPushButton("Delete", this)) {
+      m_deleteButton(new QPushButton("Delete", this)),
+      m_clipButton(new QPushButton("Clip", this)),
+      m_maskButton(new QPushButton("Mask", this)),
+      m_removeMaskButton(new QPushButton("Mask Off", this)) {
   m_headerLabel->setStyleSheet("font-weight: 700;");
   m_layerList->setAlternatingRowColors(true);
   m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -61,17 +105,25 @@ LayerPanel::LayerPanel(QWidget* parent)
 
   m_addRasterButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
   m_addVectorButton->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
+  m_addFolderButton->setIcon(style()->standardIcon(QStyle::SP_DirClosedIcon));
   m_duplicateButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
   m_upButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
   m_downButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
   m_deleteButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
+  m_clipButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+  m_maskButton->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
+  m_removeMaskButton->setIcon(style()->standardIcon(QStyle::SP_DialogNoButton));
   const QList<QPushButton*> buttons {
       m_addRasterButton,
       m_addVectorButton,
+      m_addFolderButton,
       m_duplicateButton,
       m_upButton,
       m_downButton,
-      m_deleteButton};
+      m_deleteButton,
+      m_clipButton,
+      m_maskButton,
+      m_removeMaskButton};
   for (QPushButton* button : buttons) {
     button->setMinimumHeight(28);
     button->setIconSize(QSize(14, 14));
@@ -90,20 +142,33 @@ LayerPanel::LayerPanel(QWidget* parent)
   buttonRow->setSpacing(4);
   buttonRow->addWidget(m_addRasterButton);
   buttonRow->addWidget(m_addVectorButton);
+  buttonRow->addWidget(m_addFolderButton);
   buttonRow->addWidget(m_duplicateButton);
   buttonRow->addWidget(m_upButton);
   buttonRow->addWidget(m_downButton);
   buttonRow->addWidget(m_deleteButton);
   layout->addLayout(buttonRow);
 
+  auto* stateRow = new QHBoxLayout();
+  stateRow->setContentsMargins(0, 0, 0, 0);
+  stateRow->setSpacing(4);
+  stateRow->addWidget(m_clipButton);
+  stateRow->addWidget(m_maskButton);
+  stateRow->addWidget(m_removeMaskButton);
+  layout->addLayout(stateRow);
+
   setLayout(layout);
 
   connect(m_addRasterButton, &QPushButton::clicked, this, &LayerPanel::onAddRasterLayerClicked);
   connect(m_addVectorButton, &QPushButton::clicked, this, &LayerPanel::onAddVectorLayerClicked);
+  connect(m_addFolderButton, &QPushButton::clicked, this, &LayerPanel::onAddFolderLayerClicked);
   connect(m_duplicateButton, &QPushButton::clicked, this, &LayerPanel::onDuplicateLayerClicked);
   connect(m_upButton, &QPushButton::clicked, this, &LayerPanel::onMoveLayerUpClicked);
   connect(m_downButton, &QPushButton::clicked, this, &LayerPanel::onMoveLayerDownClicked);
   connect(m_deleteButton, &QPushButton::clicked, this, &LayerPanel::onDeleteLayerClicked);
+  connect(m_clipButton, &QPushButton::clicked, this, &LayerPanel::onToggleClipClicked);
+  connect(m_maskButton, &QPushButton::clicked, this, &LayerPanel::onToggleMaskClicked);
+  connect(m_removeMaskButton, &QPushButton::clicked, this, &LayerPanel::onRemoveMaskClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
   connect(
@@ -141,14 +206,16 @@ void LayerPanel::refreshLayers() {
   for (int row = 0; row < static_cast<int>(models.size()); ++row) {
     const std::size_t layerIndex = layerIndexFromRow(row);
     const auto& model = models[layerIndex];
-    const QString kindPrefix = model.kind == core::LayerKind::Vector ? "[V] " : "[R] ";
-    auto* item = new QListWidgetItem(kindPrefix + QString::fromStdString(model.name), m_layerList);
+    auto* item = new QListWidgetItem(decorateLayerName(model), m_layerList);
     item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEditable);
     item->setCheckState(model.visible ? Qt::Checked : Qt::Unchecked);
     item->setData(kNameRole, QString::fromStdString(model.name));
     item->setData(kVisibilityRole, model.visible);
     item->setData(kKindRole, static_cast<int>(model.kind));
     item->setData(kLayerIndexRole, static_cast<int>(layerIndex));
+    item->setData(kClippedRole, model.clippedToBelow);
+    item->setData(kHasMaskRole, model.hasMask);
+    item->setData(kMaskEnabledRole, model.maskEnabled);
     item->setToolTip("Toggle visibility with the checkbox. Double-click name to rename.");
     item->setSizeHint(QSize(item->sizeHint().width(), 30));
 
@@ -181,6 +248,13 @@ void LayerPanel::onAddVectorLayerClicked() {
     return;
   }
   m_controller->addVectorLayer();
+}
+
+void LayerPanel::onAddFolderLayerClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->addFolderLayer();
 }
 
 void LayerPanel::onDuplicateLayerClicked() {
@@ -227,11 +301,33 @@ void LayerPanel::onMoveLayerDownClicked() {
   m_controller->moveLayerDown(layerIndexFromRow(row));
 }
 
+void LayerPanel::onToggleClipClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->toggleActiveLayerClipToBelow();
+}
+
+void LayerPanel::onToggleMaskClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->toggleActiveLayerMask();
+}
+
+void LayerPanel::onRemoveMaskClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->removeActiveLayerMask();
+}
+
 void LayerPanel::onCurrentLayerChanged(int row) {
   if (m_controller == nullptr || m_isRefreshing || row < 0) {
     return;
   }
   m_controller->setActiveLayer(layerIndexFromRow(row));
+  refreshButtonState();
 }
 
 void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
@@ -247,15 +343,17 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
       layerIndexValue >= 0 ? static_cast<std::size_t>(layerIndexValue) : layerIndexFromRow(row);
 
   const QString oldName = item->data(kNameRole).toString();
-  QString newName = item->text().trimmed();
-  if (newName.startsWith("[R] ", Qt::CaseInsensitive) || newName.startsWith("[V] ", Qt::CaseInsensitive)) {
-    newName = newName.mid(4).trimmed();
-  }
+  QString newName = stripLayerDecorators(item->text());
   if (newName.isEmpty()) {
     const QSignalBlocker signalBlocker(m_layerList);
     const core::LayerKind kind = static_cast<core::LayerKind>(item->data(kKindRole).toInt());
-    const QString kindPrefix = kind == core::LayerKind::Vector ? "[V] " : "[R] ";
-    item->setText(kindPrefix + oldName);
+    app::bridge::LayerViewModel model;
+    model.name = oldName.toStdString();
+    model.kind = kind;
+    model.clippedToBelow = item->data(kClippedRole).toBool();
+    model.hasMask = item->data(kHasMaskRole).toBool();
+    model.maskEnabled = item->data(kMaskEnabledRole).toBool();
+    item->setText(decorateLayerName(model));
     return;
   }
 
@@ -347,6 +445,9 @@ void LayerPanel::refreshButtonState() {
     m_upButton->setEnabled(false);
     m_downButton->setEnabled(false);
     m_opacitySlider->setEnabled(false);
+    m_clipButton->setEnabled(false);
+    m_maskButton->setEnabled(false);
+    m_removeMaskButton->setEnabled(false);
     return;
   }
   const bool hasSelection = m_layerList->currentRow() >= 0;
@@ -360,6 +461,23 @@ void LayerPanel::refreshButtonState() {
   m_upButton->setEnabled(canMoveUp);
   m_downButton->setEnabled(canMoveDown);
   m_opacitySlider->setEnabled(hasSelection);
+
+  bool canClipOrMask = false;
+  bool hasMask = false;
+  bool maskEnabled = false;
+  bool clipped = false;
+  if (hasSelection) {
+    const core::Layer& layer = m_controller->document().layerAt(layerIndexFromRow(current));
+    canClipOrMask = layer.kind() != core::LayerKind::Folder;
+    hasMask = layer.hasMask();
+    maskEnabled = layer.maskEnabled();
+    clipped = layer.clippedToBelow();
+  }
+  m_clipButton->setEnabled(canClipOrMask);
+  m_maskButton->setEnabled(canClipOrMask);
+  m_removeMaskButton->setEnabled(canClipOrMask && hasMask);
+  m_clipButton->setText(clipped ? "Clip On" : "Clip");
+  m_maskButton->setText(maskEnabled ? "Mask On" : "Mask");
 }
 
 } // namespace app::panels

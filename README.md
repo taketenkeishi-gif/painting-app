@@ -19,6 +19,7 @@ Layered paint application foundation with `Qt 6 + C++17 + CMake`.
 
 - New canvas creation
 - Layer add/delete/duplicate/select/rename/visibility toggle/reorder
+- Folder layer creation + clipping toggle + mask toggle/remove (minimum implementation)
 - Layer reorder by drag & drop with active layer tracking (plus Up/Down shortcuts with natural direction)
 - Raster layer + Vector layer coexistence (`LayerKind`)
 - Tool system with switchable tools:
@@ -98,6 +99,8 @@ System-level implementation status is tracked in `docs/system_status.md`.
 - `Ctrl+Shift+V` / `Ctrl+Alt+O` New from clipboard / Import image as layer
 - `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` Open / Save / Save As
 - `Ctrl+Alt+Up` / `Ctrl+Alt+Down` Move layer up/down
+- `Ctrl+Shift+G` New folder layer
+- `Ctrl+Alt+C` / `Ctrl+Alt+M` Toggle clipping / mask on active layer
 - `Ctrl++` / `Ctrl+-` / `Ctrl+0` Zoom in/out/reset
 - `Ctrl+Alt+Shift+S` Save workspace layout
 - `Ctrl+Alt+W` Restore last workspace layout

@@ -28,9 +28,10 @@ Legend: `DONE` / `WIP` / `PARTIAL` / `TODO` / `BLOCKED`
 - `TODO`: rotate/scale/pivot/transform handles
 
 ## Layer / Folder / Mask / Clip System
-- `DONE`: raster/vector layers, visibility, duplicate, merge down, rasterize vector
+- `DONE`: raster/vector/folder layers, visibility, duplicate, merge down, rasterize vector
+- `DONE`: active-layer clipping toggle + mask create/toggle/remove (minimum)
 - `DONE`: drag/drop reorder with undo/redo path
-- `TODO`: folders, clipping, masks, lock modes, multi-layer selection
+- `TODO`: folder hierarchy, clipping groups, editable masks, lock modes, multi-layer selection
 
 ## Vector Editing System
 - `DONE`: vector line storage and compositing

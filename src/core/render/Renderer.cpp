@@ -90,6 +90,16 @@ void rasterizeVectorLayer(const Layer& layer, PixelBuffer& out) {
   }
 }
 
+Color applyLayerMask(const Layer& layer, int x, int y, Color src) {
+  if (!layer.hasMask() || !layer.maskEnabled()) {
+    return src;
+  }
+  const Color mask = layer.maskBuffer().pixel(x, y);
+  const float maskAlpha = static_cast<float>(mask.a) / 255.0F;
+  src.a = static_cast<std::uint8_t>(std::lround(static_cast<float>(src.a) * std::clamp(maskAlpha, 0.0F, 1.0F)));
+  return src;
+}
+
 } // namespace
 
 PixelBuffer Renderer::composite(const Document& document) const {
@@ -98,7 +108,7 @@ PixelBuffer Renderer::composite(const Document& document) const {
 
   for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
     const Layer& layer = document.layerAt(layerIndex);
-    if (!layer.visible() || layer.opacity() <= 0.0F) {
+    if (!layer.visible() || layer.opacity() <= 0.0F || layer.kind() == LayerKind::Folder) {
       continue;
     }
 
@@ -113,7 +123,11 @@ PixelBuffer Renderer::composite(const Document& document) const {
     for (int y = 0; y < size.height; ++y) {
       for (int x = 0; x < size.width; ++x) {
         const Color dst = output.pixel(x, y);
-        const Color src = sourceBuffer->pixel(x, y);
+        Color src = sourceBuffer->pixel(x, y);
+        src = applyLayerMask(layer, x, y, src);
+        if (layer.clippedToBelow() && dst.a == 0) {
+          continue;
+        }
         output.setPixel(x, y, blendOver(dst, src, layer.opacity()));
       }
     }

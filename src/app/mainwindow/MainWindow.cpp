@@ -227,6 +227,7 @@ void MainWindow::createMenus() {
   m_addLayerAction = new QAction("&New Raster Layer", this);
   m_addRasterLayerAction = m_addLayerAction;
   m_addVectorLayerAction = new QAction("New &Vector Layer", this);
+  m_addFolderLayerAction = new QAction("New &Folder Layer", this);
   m_duplicateLayerAction = new QAction("&Duplicate Layer", this);
   m_deleteLayerAction = new QAction("&Delete Layer", this);
   m_moveLayerUpAction = new QAction("Move Layer &Up", this);
@@ -234,6 +235,9 @@ void MainWindow::createMenus() {
   m_toggleLayerVisibilityAction = new QAction("&Toggle Visibility", this);
   m_mergeDownAction = new QAction("&Merge Down", this);
   m_rasterizeLayerAction = new QAction("&Rasterize Layer", this);
+  m_toggleLayerClipAction = new QAction("Toggle &Clipping", this);
+  m_toggleLayerMaskAction = new QAction("Toggle &Mask", this);
+  m_removeLayerMaskAction = new QAction("Remove Mas&k", this);
 
   m_selectAllAction = new QAction("Select &All", this);
   m_deselectAction = new QAction("&Deselect", this);
@@ -282,6 +286,7 @@ void MainWindow::createMenus() {
   m_clearAction->setShortcut(QKeySequence(Qt::Key_Backspace));
   m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
   m_addVectorLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_N));
+  m_addFolderLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
   m_duplicateLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
   m_deleteLayerAction->setShortcut(QKeySequence::Delete);
   m_moveLayerUpAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Up));
@@ -289,6 +294,9 @@ void MainWindow::createMenus() {
   m_toggleLayerVisibilityAction->setShortcut(QKeySequence(Qt::Key_V));
   m_mergeDownAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
   m_rasterizeLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_R));
+  m_toggleLayerClipAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C));
+  m_toggleLayerMaskAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_M));
+  m_removeLayerMaskAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_M));
   m_selectAllAction->setShortcut(QKeySequence::SelectAll);
   m_deselectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
   m_clearSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
@@ -370,10 +378,15 @@ void MainWindow::createMenus() {
 
   layerMenu->addAction(m_addRasterLayerAction);
   layerMenu->addAction(m_addVectorLayerAction);
+  layerMenu->addAction(m_addFolderLayerAction);
   layerMenu->addAction(m_duplicateLayerAction);
   layerMenu->addAction(m_deleteLayerAction);
   layerMenu->addAction(m_mergeDownAction);
   layerMenu->addAction(m_rasterizeLayerAction);
+  layerMenu->addSeparator();
+  layerMenu->addAction(m_toggleLayerClipAction);
+  layerMenu->addAction(m_toggleLayerMaskAction);
+  layerMenu->addAction(m_removeLayerMaskAction);
   layerMenu->addSeparator();
   layerMenu->addAction(m_moveLayerUpAction);
   layerMenu->addAction(m_moveLayerDownAction);
@@ -447,10 +460,14 @@ void MainWindow::createMenus() {
   connect(m_brushSizeUpAction, &QAction::triggered, this, &MainWindow::onIncreaseBrushSizeTriggered);
   connect(m_addRasterLayerAction, &QAction::triggered, this, &MainWindow::onAddRasterLayerTriggered);
   connect(m_addVectorLayerAction, &QAction::triggered, this, &MainWindow::onAddVectorLayerTriggered);
+  connect(m_addFolderLayerAction, &QAction::triggered, this, &MainWindow::onAddFolderLayerTriggered);
   connect(m_duplicateLayerAction, &QAction::triggered, this, &MainWindow::onDuplicateLayerTriggered);
   connect(m_deleteLayerAction, &QAction::triggered, this, &MainWindow::onDeleteLayerTriggered);
   connect(m_mergeDownAction, &QAction::triggered, this, &MainWindow::onMergeDownTriggered);
   connect(m_rasterizeLayerAction, &QAction::triggered, this, &MainWindow::onRasterizeLayerTriggered);
+  connect(m_toggleLayerClipAction, &QAction::triggered, this, &MainWindow::onToggleLayerClipTriggered);
+  connect(m_toggleLayerMaskAction, &QAction::triggered, this, &MainWindow::onToggleLayerMaskTriggered);
+  connect(m_removeLayerMaskAction, &QAction::triggered, this, &MainWindow::onRemoveLayerMaskTriggered);
   connect(m_zoomInAction, &QAction::triggered, this, &MainWindow::onZoomInTriggered);
   connect(m_zoomOutAction, &QAction::triggered, this, &MainWindow::onZoomOutTriggered);
   connect(m_resetZoomAction, &QAction::triggered, this, &MainWindow::onResetZoomTriggered);
@@ -541,6 +558,7 @@ void MainWindow::createMenus() {
   markCommand(m_invertSelectionAction, "select.invert");
   markCommand(m_addRasterLayerAction, "layer.new_raster");
   markCommand(m_addVectorLayerAction, "layer.new_vector");
+  markCommand(m_addFolderLayerAction, "layer.new_folder");
   markCommand(m_duplicateLayerAction, "layer.duplicate");
   markCommand(m_deleteLayerAction, "layer.delete");
   markCommand(m_moveLayerUpAction, "layer.move_up");
@@ -548,6 +566,9 @@ void MainWindow::createMenus() {
   markCommand(m_toggleLayerVisibilityAction, "layer.toggle_visibility");
   markCommand(m_mergeDownAction, "layer.merge_down");
   markCommand(m_rasterizeLayerAction, "layer.rasterize");
+  markCommand(m_toggleLayerClipAction, "layer.toggle_clipping");
+  markCommand(m_toggleLayerMaskAction, "layer.toggle_mask");
+  markCommand(m_removeLayerMaskAction, "layer.remove_mask");
   markCommand(m_zoomInAction, "view.zoom_in");
   markCommand(m_zoomOutAction, "view.zoom_out");
   markCommand(m_resetZoomAction, "view.zoom_reset");
@@ -582,6 +603,7 @@ void MainWindow::createToolBar() {
   m_redoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
   m_addRasterLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
   m_addVectorLayerAction->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
+  m_addFolderLayerAction->setIcon(style()->standardIcon(QStyle::SP_DirClosedIcon));
   m_duplicateLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
   m_deleteLayerAction->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
   m_toggleLayerVisibilityAction->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
@@ -600,6 +622,7 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_addRasterLayerAction);
   m_quickToolBar->addAction(m_addVectorLayerAction);
+  m_quickToolBar->addAction(m_addFolderLayerAction);
   m_quickToolBar->addAction(m_duplicateLayerAction);
   m_quickToolBar->addAction(m_deleteLayerAction);
   m_quickToolBar->addAction(m_moveLayerUpAction);
@@ -682,7 +705,12 @@ void MainWindow::updateActiveLayerStatus() {
   }
   const std::size_t active = doc.activeLayerIndex();
   const core::Layer& layer = doc.layerAt(active);
-  const QString kind = layer.kind() == core::LayerKind::Vector ? "Vector" : "Raster";
+  QString kind = "Raster";
+  if (layer.kind() == core::LayerKind::Vector) {
+    kind = "Vector";
+  } else if (layer.kind() == core::LayerKind::Folder) {
+    kind = "Folder";
+  }
   m_activeLayerStatusLabel->setText(QString("Layer: %1 (%2)").arg(QString::fromStdString(layer.name()), kind));
   if (m_selectionStatusLabel != nullptr) {
     m_selectionStatusLabel->setText(QString("Selection: %1").arg(doc.selection().hasSelection() ? "On" : "Off"));
@@ -967,6 +995,10 @@ void MainWindow::onAddVectorLayerTriggered() {
   m_controller->addVectorLayer();
 }
 
+void MainWindow::onAddFolderLayerTriggered() {
+  m_controller->addFolderLayer();
+}
+
 void MainWindow::onDuplicateLayerTriggered() {
   m_controller->duplicateActiveLayer();
 }
@@ -986,6 +1018,24 @@ void MainWindow::onMergeDownTriggered() {
 
 void MainWindow::onRasterizeLayerTriggered() {
   if (m_controller->rasterizeActiveLayer()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onToggleLayerClipTriggered() {
+  if (m_controller->toggleActiveLayerClipToBelow()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onToggleLayerMaskTriggered() {
+  if (m_controller->toggleActiveLayerMask()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onRemoveLayerMaskTriggered() {
+  if (m_controller->removeActiveLayerMask()) {
     updateUndoRedoState();
   }
 }

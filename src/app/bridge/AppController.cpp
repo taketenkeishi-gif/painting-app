@@ -50,6 +50,15 @@ bool layersEqual(const core::Layer& lhs, const core::Layer& rhs) {
   if (lhs.kind() != rhs.kind()) {
     return false;
   }
+  if (lhs.clippedToBelow() != rhs.clippedToBelow()) {
+    return false;
+  }
+  if (lhs.hasMask() != rhs.hasMask() || lhs.maskEnabled() != rhs.maskEnabled()) {
+    return false;
+  }
+  if (lhs.hasMask() && !pixelBuffersEqual(lhs.maskBuffer(), rhs.maskBuffer())) {
+    return false;
+  }
   if (!pixelBuffersEqual(lhs.buffer(), rhs.buffer())) {
     return false;
   }
@@ -135,7 +144,10 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
         layer.visible(),
         i == m_document.activeLayerIndex(),
         static_cast<int>(std::lround(std::clamp(layer.opacity(), 0.0F, 1.0F) * 100.0F)),
-        layer.kind()});
+        layer.kind(),
+        layer.clippedToBelow(),
+        layer.hasMask(),
+        layer.maskEnabled()});
   }
   return models;
 }
@@ -219,6 +231,17 @@ void AppController::addRasterLayer() {
 void AppController::addVectorLayer() {
   ++m_layerCounter;
   m_document.addVectorLayer("Vector " + std::to_string(m_layerCounter));
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+}
+
+void AppController::addFolderLayer() {
+  ++m_layerCounter;
+  m_document.addFolderLayer("Folder " + std::to_string(m_layerCounter));
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
@@ -475,6 +498,94 @@ bool AppController::toggleActiveLayerVisible() {
   return true;
 }
 
+bool AppController::toggleActiveLayerClipToBelow() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  const std::size_t activeIndex = m_document.activeLayerIndex();
+  core::Layer& active = m_document.layerAt(activeIndex);
+  if (active.kind() == core::LayerKind::Folder) {
+    return false;
+  }
+  const core::Layer before = active;
+  active.setClippedToBelow(!active.clippedToBelow());
+  const core::Layer after = active;
+  if (layersEqual(before, after)) {
+    return false;
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Clipping";
+  entry.layerIndex = activeIndex;
+  entry.beforeLayer = before;
+  entry.afterLayer = after;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::toggleActiveLayerMask() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  const std::size_t activeIndex = m_document.activeLayerIndex();
+  core::Layer& active = m_document.layerAt(activeIndex);
+  if (active.kind() == core::LayerKind::Folder) {
+    return false;
+  }
+  const core::Layer before = active;
+  if (!active.hasMask()) {
+    active.createMask(core::Color::OpaqueWhite());
+  } else {
+    active.setMaskEnabled(!active.maskEnabled());
+  }
+  const core::Layer after = active;
+  if (layersEqual(before, after)) {
+    return false;
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Mask";
+  entry.layerIndex = activeIndex;
+  entry.beforeLayer = before;
+  entry.afterLayer = after;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::removeActiveLayerMask() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  const std::size_t activeIndex = m_document.activeLayerIndex();
+  core::Layer& active = m_document.layerAt(activeIndex);
+  if (!active.hasMask()) {
+    return false;
+  }
+  const core::Layer before = active;
+  active.removeMask();
+  const core::Layer after = active;
+  if (layersEqual(before, after)) {
+    return false;
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Mask Remove";
+  entry.layerIndex = activeIndex;
+  entry.beforeLayer = before;
+  entry.afterLayer = after;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
 bool AppController::clearSelection() {
   const core::SelectionMask before = m_document.selection();
   if (!before.hasSelection()) {
@@ -684,6 +795,9 @@ bool AppController::canUseToolOnActiveLayer(core::ToolKind kind) const {
   if (active == nullptr) {
     return true;
   }
+  if (active->kind() == core::LayerKind::Folder) {
+    return kind == core::ToolKind::Hand || kind == core::ToolKind::Zoom;
+  }
   return firstCompatibleSubTool(kind, active->kind()) != nullptr;
 }
 
@@ -812,7 +926,16 @@ std::string AppController::activeLayerKindDisplayName() const {
   if (layer == nullptr) {
     return "None";
   }
-  return layer->kind() == core::LayerKind::Vector ? "Vector" : "Raster";
+  switch (layer->kind()) {
+    case core::LayerKind::Raster:
+      return "Raster";
+    case core::LayerKind::Vector:
+      return "Vector";
+    case core::LayerKind::Folder:
+      return "Folder";
+    default:
+      return "Unknown";
+  }
 }
 
 bool AppController::canUseCurrentToolOnActiveLayer() const {
@@ -1435,6 +1558,9 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
 bool AppController::isSubToolCompatibleWithLayerKind(
     const app::ui::SubToolDescriptor& subTool,
     core::LayerKind layerKind) const noexcept {
+  if (layerKind == core::LayerKind::Folder) {
+    return false;
+  }
   const app::ui::TargetLayerKind target = subTool.profile.targetLayerKind;
   if (target == app::ui::TargetLayerKind::Both) {
     return true;

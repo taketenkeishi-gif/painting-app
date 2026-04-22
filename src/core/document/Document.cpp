@@ -63,6 +63,10 @@ std::size_t Document::addVectorLayer(const std::string& name) {
   return addLayer(name, LayerKind::Vector);
 }
 
+std::size_t Document::addFolderLayer(const std::string& name) {
+  return addLayer(name, LayerKind::Folder);
+}
+
 std::size_t Document::duplicateLayer(std::size_t index) {
   if (index >= m_layers.size()) {
     return m_activeLayerIndex;

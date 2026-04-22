@@ -29,6 +29,8 @@
 - `Layer` now carries `LayerKind`:
   - `Raster`: pixel buffer-based painting
   - `Vector`: path list (`VectorPath`) rendered at composite time
+  - `Folder`: non-rendering organizational placeholder layer (baseline)
+- Layer flags include `clippedToBelow` and optional mask (`hasMask/maskEnabled` + mask buffer), and renderer applies these during compositing.
 - `LineTool` writes vector paths on vector layers and raster pixels on raster layers.
 - `Renderer` rasterizes vector paths into a temporary buffer and composites it with standard alpha blending.
 - Layer order changes are centralized in `Document::moveLayer` and consumed by both button moves and LayerPanel drag/drop reorder.

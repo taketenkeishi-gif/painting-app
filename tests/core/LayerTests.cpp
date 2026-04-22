@@ -15,6 +15,17 @@ void runLayerTests() {
   expectNear(static_cast<int>(layer.opacity() * 100.0F), 100, 0, "Opacity should clamp to 1.0.");
   layer.setOpacity(-0.5F);
   expectNear(static_cast<int>(layer.opacity() * 100.0F), 0, 0, "Opacity should clamp to 0.0.");
+  expectTrue(!layer.clippedToBelow(), "Layer should not be clipped by default.");
+  layer.setClippedToBelow(true);
+  expectTrue(layer.clippedToBelow(), "Layer clipping flag should update.");
+  expectTrue(!layer.hasMask(), "Layer should not have mask by default.");
+  layer.createMask();
+  expectTrue(layer.hasMask(), "createMask should create mask buffer.");
+  expectTrue(layer.maskEnabled(), "Mask should be enabled after creation.");
+  layer.maskBuffer().setPixel(0, 0, core::Color::Transparent());
+  expectNear(layer.maskBuffer().pixel(0, 0).a, 0, 0, "Mask pixel should be writable.");
+  layer.removeMask();
+  expectTrue(!layer.hasMask(), "removeMask should clear mask state.");
 
   core::PixelBuffer buffer(4, 4, core::Color::Transparent());
   expectTrue(buffer.setPixel(1, 1, core::Color {10, 20, 30, 255}), "setPixel should succeed in bounds.");

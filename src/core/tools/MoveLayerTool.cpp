@@ -53,6 +53,11 @@ ToolResult MoveLayerTool::onPointerRelease(ToolContext& context, const ToolPoint
     result.viewportChanged = true;
     return result;
   }
+  if (active->kind() != LayerKind::Raster) {
+    ToolResult result;
+    result.viewportChanged = true;
+    return result;
+  }
 
   PixelBuffer& source = active->buffer();
   const SelectionMask& selection = context.document.selection();

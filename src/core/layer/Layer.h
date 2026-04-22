@@ -11,7 +11,8 @@ namespace core {
 
 enum class LayerKind {
   Raster,
-  Vector
+  Vector,
+  Folder
 };
 
 struct VectorPath {
@@ -31,6 +32,7 @@ public:
   LayerKind kind() const noexcept { return m_kind; }
   bool isRaster() const noexcept { return m_kind == LayerKind::Raster; }
   bool isVector() const noexcept { return m_kind == LayerKind::Vector; }
+  bool isFolder() const noexcept { return m_kind == LayerKind::Folder; }
   void setKind(LayerKind kind) noexcept { m_kind = kind; }
 
   bool visible() const noexcept { return m_visible; }
@@ -49,12 +51,27 @@ public:
   void moveVectorPathsBy(int dx, int dy) noexcept;
   void resetRasterBuffer(Color fill = Color::Transparent()) noexcept;
 
+  bool clippedToBelow() const noexcept { return m_clippedToBelow; }
+  void setClippedToBelow(bool enabled) noexcept { m_clippedToBelow = enabled; }
+
+  bool hasMask() const noexcept { return m_hasMask; }
+  bool maskEnabled() const noexcept { return m_maskEnabled; }
+  void setMaskEnabled(bool enabled) noexcept { m_maskEnabled = m_hasMask && enabled; }
+  PixelBuffer& maskBuffer() noexcept { return m_maskBuffer; }
+  const PixelBuffer& maskBuffer() const noexcept { return m_maskBuffer; }
+  void createMask(Color fill = Color::OpaqueWhite()) noexcept;
+  void removeMask() noexcept;
+
 private:
   std::string m_name;
   LayerKind m_kind {LayerKind::Raster};
   bool m_visible {true};
   float m_opacity {1.0F};
   PixelBuffer m_buffer;
+  bool m_clippedToBelow {false};
+  bool m_hasMask {false};
+  bool m_maskEnabled {false};
+  PixelBuffer m_maskBuffer;
   std::vector<VectorPath> m_vectorPaths;
 };
 

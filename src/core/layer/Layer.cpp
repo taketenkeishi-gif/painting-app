@@ -8,7 +8,8 @@ namespace core {
 Layer::Layer(std::string name, int width, int height, LayerKind kind)
     : m_name(std::move(name)),
       m_kind(kind),
-      m_buffer(width, height, Color::Transparent()) {}
+      m_buffer(width, height, Color::Transparent()),
+      m_maskBuffer(width, height, Color::OpaqueWhite()) {}
 
 void Layer::setName(std::string name) {
   m_name = std::move(name);
@@ -45,6 +46,18 @@ void Layer::moveVectorPathsBy(int dx, int dy) noexcept {
 
 void Layer::resetRasterBuffer(Color fill) noexcept {
   m_buffer.fill(fill);
+}
+
+void Layer::createMask(Color fill) noexcept {
+  m_hasMask = true;
+  m_maskEnabled = true;
+  m_maskBuffer.resize(m_buffer.width(), m_buffer.height(), fill);
+}
+
+void Layer::removeMask() noexcept {
+  m_hasMask = false;
+  m_maskEnabled = false;
+  m_maskBuffer.resize(m_buffer.width(), m_buffer.height(), Color::OpaqueWhite());
 }
 
 } // namespace core

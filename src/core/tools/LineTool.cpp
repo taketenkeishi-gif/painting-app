@@ -41,8 +41,10 @@ ToolResult LineTool::onPointerRelease(ToolContext& context, const ToolPointerEve
 
   if (active->kind() == LayerKind::Vector) {
     addVectorLine(*active, m_start, m_current, context.currentColor, context.brushSize);
-  } else {
+  } else if (active->kind() == LayerKind::Raster) {
     drawLine(*active, m_start, m_current, context.currentColor, context.brushSize);
+  } else {
+    return {};
   }
   ToolResult result;
   result.pixelsChanged = true;

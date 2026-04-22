@@ -33,6 +33,9 @@ struct LayerViewModel {
   bool active {false};
   int opacityPercent {100};
   core::LayerKind kind {core::LayerKind::Raster};
+  bool clippedToBelow {false};
+  bool hasMask {false};
+  bool maskEnabled {false};
 };
 
 struct SubToolViewModel {
@@ -90,6 +93,7 @@ public:
   void addLayer();
   void addRasterLayer();
   void addVectorLayer();
+  void addFolderLayer();
   bool duplicateLayer(std::size_t index);
   bool duplicateActiveLayer();
   bool removeLayer(std::size_t index);
@@ -109,6 +113,9 @@ public:
   void setActiveLayerOpacity(int opacityPercent);
   int activeLayerOpacity() const noexcept;
   bool toggleActiveLayerVisible();
+  bool toggleActiveLayerClipToBelow();
+  bool toggleActiveLayerMask();
+  bool removeActiveLayerMask();
 
   bool clearSelection();
   bool selectAll();

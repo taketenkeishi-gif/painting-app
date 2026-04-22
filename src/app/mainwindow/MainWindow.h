@@ -69,10 +69,14 @@ private slots:
   void onMoveLayerDownTriggered();
   void onAddRasterLayerTriggered();
   void onAddVectorLayerTriggered();
+  void onAddFolderLayerTriggered();
   void onDuplicateLayerTriggered();
   void onDeleteLayerTriggered();
   void onMergeDownTriggered();
   void onRasterizeLayerTriggered();
+  void onToggleLayerClipTriggered();
+  void onToggleLayerMaskTriggered();
+  void onRemoveLayerMaskTriggered();
   void onDecreaseBrushSizeTriggered();
   void onIncreaseBrushSizeTriggered();
   void onZoomInTriggered();
@@ -167,6 +171,7 @@ private:
   QAction* m_addLayerAction {nullptr};
   QAction* m_addRasterLayerAction {nullptr};
   QAction* m_addVectorLayerAction {nullptr};
+  QAction* m_addFolderLayerAction {nullptr};
   QAction* m_duplicateLayerAction {nullptr};
   QAction* m_deleteLayerAction {nullptr};
   QAction* m_moveLayerUpAction {nullptr};
@@ -190,6 +195,9 @@ private:
   QAction* m_restoreLastWorkspaceAction {nullptr};
   QAction* m_mergeDownAction {nullptr};
   QAction* m_rasterizeLayerAction {nullptr};
+  QAction* m_toggleLayerClipAction {nullptr};
+  QAction* m_toggleLayerMaskAction {nullptr};
+  QAction* m_removeLayerMaskAction {nullptr};
   QAction* m_shortcutSummaryAction {nullptr};
   QAction* m_openDocsAction {nullptr};
   QAction* m_shortcutSettingsAction {nullptr};
