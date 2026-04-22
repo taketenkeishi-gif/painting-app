@@ -42,9 +42,9 @@ public:
 
 private:
   Point applyStabilization(const Point& from, const Point& to) const;
-  void stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const;
-  void stampSquare(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const;
-  void blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, float strength) const;
+  void stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color, bool lockAlpha) const;
+  void stampSquare(PixelBuffer& buffer, const Point& center, int radius, const Color& color, bool lockAlpha) const;
+  void blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, float strength, bool lockAlpha) const;
 
   BrushSettings m_settings;
   bool m_drawing {false};

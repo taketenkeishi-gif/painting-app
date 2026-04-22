@@ -38,6 +38,9 @@ ToolResult LineTool::onPointerRelease(ToolContext& context, const ToolPointerEve
   if (active == nullptr) {
     return {};
   }
+  if (active->locked()) {
+    return {};
+  }
 
   if (active->kind() == LayerKind::Vector) {
     addVectorLine(*active, m_start, m_current, context.currentColor, context.brushSize);
@@ -101,6 +104,10 @@ ToolOverlayState LineTool::overlay() const {
 }
 
 void LineTool::drawLine(Layer& layer, const Point& from, const Point& to, const Color& color, int size) const {
+  if (layer.locked()) {
+    return;
+  }
+  const bool lockAlpha = layer.alphaLocked();
   PixelBuffer& buffer = layer.buffer();
   const int radius = std::max(1, size) / 2;
   const int dx = to.x - from.x;
@@ -108,7 +115,7 @@ void LineTool::drawLine(Layer& layer, const Point& from, const Point& to, const 
   const int steps = std::max(std::abs(dx), std::abs(dy));
 
   if (steps == 0) {
-    stampCircle(buffer, from, radius, color);
+    stampCircle(buffer, from, radius, color, lockAlpha);
     return;
   }
 
@@ -117,7 +124,7 @@ void LineTool::drawLine(Layer& layer, const Point& from, const Point& to, const 
     const Point p {
         static_cast<int>(std::lround(static_cast<float>(from.x) + static_cast<float>(dx) * t)),
         static_cast<int>(std::lround(static_cast<float>(from.y) + static_cast<float>(dy) * t))};
-    stampCircle(buffer, p, radius, color);
+    stampCircle(buffer, p, radius, color, lockAlpha);
   }
 }
 
@@ -131,28 +138,31 @@ void LineTool::addVectorLine(Layer& layer, const Point& from, const Point& to, c
   layer.addVectorPath(std::move(path));
 }
 
-void LineTool::stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const {
+void LineTool::stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color, bool lockAlpha) const {
   const int r2 = radius * radius;
   for (int y = center.y - radius; y <= center.y + radius; ++y) {
     for (int x = center.x - radius; x <= center.x + radius; ++x) {
       const int dx = x - center.x;
       const int dy = y - center.y;
       if ((dx * dx + dy * dy) <= r2) {
-        blendPixel(buffer, x, y, color);
+        blendPixel(buffer, x, y, color, lockAlpha);
       }
     }
   }
 }
 
-void LineTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src) const {
+void LineTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, bool lockAlpha) const {
   if (!buffer.inBounds(x, y)) {
     return;
   }
 
   const Color dst = buffer.pixel(x, y);
+  if (lockAlpha && dst.a == 0) {
+    return;
+  }
   const float srcA = static_cast<float>(src.a) / 255.0F;
   const float dstA = static_cast<float>(dst.a) / 255.0F;
-  const float outA = srcA + dstA * (1.0F - srcA);
+  const float outA = lockAlpha ? dstA : srcA + dstA * (1.0F - srcA);
   if (outA <= 0.0F) {
     buffer.setPixel(x, y, Color::Transparent());
     return;
@@ -165,9 +175,9 @@ void LineTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src) c
   const float dstG = static_cast<float>(dst.g) / 255.0F;
   const float dstB = static_cast<float>(dst.b) / 255.0F;
 
-  const float outR = (srcR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
-  const float outG = (srcG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
-  const float outB = (srcB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
+  const float outR = lockAlpha ? dstR + (srcR - dstR) * srcA : (srcR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
+  const float outG = lockAlpha ? dstG + (srcG - dstG) * srcA : (srcG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
+  const float outB = lockAlpha ? dstB + (srcB - dstB) * srcA : (srcB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
 
   buffer.setPixel(
       x,

@@ -28,6 +28,9 @@ constexpr int kLayerIndexRole = Qt::UserRole + 4;
 constexpr int kClippedRole = Qt::UserRole + 5;
 constexpr int kHasMaskRole = Qt::UserRole + 6;
 constexpr int kMaskEnabledRole = Qt::UserRole + 7;
+constexpr int kLockedRole = Qt::UserRole + 8;
+constexpr int kAlphaLockedRole = Qt::UserRole + 9;
+constexpr int kPositionLockedRole = Qt::UserRole + 10;
 
 QString kindPrefix(core::LayerKind kind) {
   switch (kind) {
@@ -49,6 +52,15 @@ QString decorateLayerName(const app::bridge::LayerViewModel& model) {
   }
   if (model.hasMask) {
     text += model.maskEnabled ? "[M] " : "[m] ";
+  }
+  if (model.locked) {
+    text += "[L] ";
+  }
+  if (model.alphaLocked) {
+    text += "[A] ";
+  }
+  if (model.positionLocked) {
+    text += "[P] ";
   }
   text += QString::fromStdString(model.name);
   return text;
@@ -83,7 +95,10 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_deleteButton(new QPushButton("Delete", this)),
       m_clipButton(new QPushButton("Clip", this)),
       m_maskButton(new QPushButton("Mask", this)),
-      m_removeMaskButton(new QPushButton("Mask Off", this)) {
+      m_removeMaskButton(new QPushButton("Mask Off", this)),
+      m_lockButton(new QPushButton("Lock", this)),
+      m_lockAlphaButton(new QPushButton("Alpha", this)),
+      m_lockPositionButton(new QPushButton("Pos", this)) {
   m_headerLabel->setStyleSheet("font-weight: 700;");
   m_layerList->setAlternatingRowColors(true);
   m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -123,7 +138,10 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_deleteButton,
       m_clipButton,
       m_maskButton,
-      m_removeMaskButton};
+      m_removeMaskButton,
+      m_lockButton,
+      m_lockAlphaButton,
+      m_lockPositionButton};
   for (QPushButton* button : buttons) {
     button->setMinimumHeight(28);
     button->setIconSize(QSize(14, 14));
@@ -155,6 +173,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   stateRow->addWidget(m_clipButton);
   stateRow->addWidget(m_maskButton);
   stateRow->addWidget(m_removeMaskButton);
+  stateRow->addWidget(m_lockButton);
+  stateRow->addWidget(m_lockAlphaButton);
+  stateRow->addWidget(m_lockPositionButton);
   layout->addLayout(stateRow);
 
   setLayout(layout);
@@ -169,6 +190,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_clipButton, &QPushButton::clicked, this, &LayerPanel::onToggleClipClicked);
   connect(m_maskButton, &QPushButton::clicked, this, &LayerPanel::onToggleMaskClicked);
   connect(m_removeMaskButton, &QPushButton::clicked, this, &LayerPanel::onRemoveMaskClicked);
+  connect(m_lockButton, &QPushButton::clicked, this, &LayerPanel::onToggleLockClicked);
+  connect(m_lockAlphaButton, &QPushButton::clicked, this, &LayerPanel::onToggleAlphaLockClicked);
+  connect(m_lockPositionButton, &QPushButton::clicked, this, &LayerPanel::onTogglePositionLockClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
   connect(
@@ -218,6 +242,9 @@ void LayerPanel::refreshLayers() {
     item->setData(kClippedRole, model.clippedToBelow);
     item->setData(kHasMaskRole, model.hasMask);
     item->setData(kMaskEnabledRole, model.maskEnabled);
+    item->setData(kLockedRole, model.locked);
+    item->setData(kAlphaLockedRole, model.alphaLocked);
+    item->setData(kPositionLockedRole, model.positionLocked);
     item->setToolTip("Toggle visibility with the checkbox. Double-click name to rename.");
     item->setSizeHint(QSize(item->sizeHint().width(), 30));
 
@@ -324,6 +351,27 @@ void LayerPanel::onRemoveMaskClicked() {
   m_controller->removeActiveLayerMask();
 }
 
+void LayerPanel::onToggleLockClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->toggleActiveLayerLock();
+}
+
+void LayerPanel::onToggleAlphaLockClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->toggleActiveLayerAlphaLock();
+}
+
+void LayerPanel::onTogglePositionLockClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->toggleActiveLayerPositionLock();
+}
+
 void LayerPanel::onCurrentLayerChanged(int row) {
   if (m_controller == nullptr || m_isRefreshing || row < 0) {
     return;
@@ -355,6 +403,9 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
     model.clippedToBelow = item->data(kClippedRole).toBool();
     model.hasMask = item->data(kHasMaskRole).toBool();
     model.maskEnabled = item->data(kMaskEnabledRole).toBool();
+    model.locked = item->data(kLockedRole).toBool();
+    model.alphaLocked = item->data(kAlphaLockedRole).toBool();
+    model.positionLocked = item->data(kPositionLockedRole).toBool();
     item->setText(decorateLayerName(model));
     return;
   }
@@ -456,6 +507,9 @@ void LayerPanel::refreshButtonState() {
     m_clipButton->setEnabled(false);
     m_maskButton->setEnabled(false);
     m_removeMaskButton->setEnabled(false);
+    m_lockButton->setEnabled(false);
+    m_lockAlphaButton->setEnabled(false);
+    m_lockPositionButton->setEnabled(false);
     return;
   }
   const bool hasSelection = m_layerList->currentRow() >= 0;
@@ -474,18 +528,32 @@ void LayerPanel::refreshButtonState() {
   bool hasMask = false;
   bool maskEnabled = false;
   bool clipped = false;
+  bool locked = false;
+  bool alphaLocked = false;
+  bool positionLocked = false;
+  core::LayerKind kind = core::LayerKind::Raster;
   if (hasSelection) {
     const core::Layer& layer = m_controller->document().layerAt(layerIndexFromRow(current));
+    kind = layer.kind();
     canClipOrMask = layer.kind() != core::LayerKind::Folder;
     hasMask = layer.hasMask();
     maskEnabled = layer.maskEnabled();
     clipped = layer.clippedToBelow();
+    locked = layer.locked();
+    alphaLocked = layer.alphaLocked();
+    positionLocked = layer.positionLocked();
   }
   m_clipButton->setEnabled(canClipOrMask);
   m_maskButton->setEnabled(canClipOrMask);
   m_removeMaskButton->setEnabled(canClipOrMask && hasMask);
+  m_lockButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
+  m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
+  m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
   m_clipButton->setText(clipped ? "Clip On" : "Clip");
   m_maskButton->setText(maskEnabled ? "Mask On" : "Mask");
+  m_lockButton->setText(locked ? "Lock On" : "Lock");
+  m_lockAlphaButton->setText(alphaLocked ? "Alpha On" : "Alpha");
+  m_lockPositionButton->setText(positionLocked ? "Pos On" : "Pos");
 }
 
 } // namespace app::panels

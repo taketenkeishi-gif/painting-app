@@ -36,6 +36,9 @@ struct LayerViewModel {
   bool clippedToBelow {false};
   bool hasMask {false};
   bool maskEnabled {false};
+  bool locked {false};
+  bool alphaLocked {false};
+  bool positionLocked {false};
 };
 
 struct SubToolViewModel {
@@ -124,6 +127,9 @@ public:
   bool toggleActiveLayerClipToBelow();
   bool toggleActiveLayerMask();
   bool removeActiveLayerMask();
+  bool toggleActiveLayerLock();
+  bool toggleActiveLayerAlphaLock();
+  bool toggleActiveLayerPositionLock();
 
   bool clearSelection();
   bool selectAll();

@@ -7,7 +7,10 @@ namespace core {
 
 ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() == LayerKind::Folder) {
+  if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
+    return {};
+  }
+  if (active->kind() == LayerKind::Raster && active->alphaLocked()) {
     return {};
   }
 
@@ -29,7 +32,11 @@ ToolResult EraserTool::onPointerMove(ToolContext& context, const ToolPointerEven
   }
 
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() == LayerKind::Folder) {
+  if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
+    m_erasing = false;
+    return {};
+  }
+  if (active->kind() == LayerKind::Raster && active->alphaLocked()) {
     m_erasing = false;
     return {};
   }
@@ -53,7 +60,10 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
 
   m_erasing = false;
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() == LayerKind::Folder) {
+  if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
+    return {};
+  }
+  if (active->kind() == LayerKind::Raster && active->alphaLocked()) {
     return {};
   }
 

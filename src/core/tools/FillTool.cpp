@@ -48,7 +48,7 @@ bool FillTool::hasBridge(const PixelBuffer& source, const Color& target, int x, 
 
 ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() != LayerKind::Raster) {
+  if (active == nullptr || active->kind() != LayerKind::Raster || active->locked()) {
     return {};
   }
 
@@ -129,8 +129,15 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
         continue;
       }
       const Color before = buffer.pixel(x, y);
-      if (!isSameColor(before, replacement)) {
-        buffer.setPixel(x, y, replacement);
+      if (active->alphaLocked() && before.a == 0) {
+        continue;
+      }
+      Color output = replacement;
+      if (active->alphaLocked()) {
+        output.a = before.a;
+      }
+      if (!isSameColor(before, output)) {
+        buffer.setPixel(x, y, output);
         changed = true;
       }
     }

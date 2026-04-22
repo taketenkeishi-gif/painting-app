@@ -37,6 +37,11 @@ ToolResult MoveLayerTool::onPointerRelease(ToolContext& context, const ToolPoint
   if (active == nullptr) {
     return {};
   }
+  if (active->locked() || active->positionLocked()) {
+    ToolResult result;
+    result.viewportChanged = true;
+    return result;
+  }
 
   const int dx = m_current.x - m_start.x;
   const int dy = m_current.y - m_start.y;

@@ -7,7 +7,7 @@ namespace core {
 
 ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() != LayerKind::Raster) {
+  if (active == nullptr || active->kind() != LayerKind::Raster || active->locked()) {
     return {};
   }
 
@@ -25,7 +25,7 @@ ToolResult BrushTool::onPointerMove(ToolContext& context, const ToolPointerEvent
   }
 
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() != LayerKind::Raster) {
+  if (active == nullptr || active->kind() != LayerKind::Raster || active->locked()) {
     m_drawing = false;
     return {};
   }
@@ -45,7 +45,7 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
 
   m_drawing = false;
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() != LayerKind::Raster) {
+  if (active == nullptr || active->kind() != LayerKind::Raster || active->locked()) {
     return {};
   }
 
@@ -102,7 +102,11 @@ Point BrushTool::applyStabilization(const Point& from, const Point& to) const {
 }
 
 void BrushTool::stroke(Layer& layer, const Point& from, const Point& to) const {
+  if (layer.locked()) {
+    return;
+  }
   PixelBuffer& buffer = layer.buffer();
+  const bool lockAlpha = m_settings.lockAlphaRespect || layer.alphaLocked();
   const int radius = std::max(1, m_settings.size) / 2;
   const int dx = to.x - from.x;
   const int dy = to.y - from.y;
@@ -112,9 +116,9 @@ void BrushTool::stroke(Layer& layer, const Point& from, const Point& to) const {
 
   if (distance <= 0.001F) {
     if (m_settings.shapeType == BrushShapeType::Square) {
-      stampSquare(buffer, from, radius, m_settings.color);
+      stampSquare(buffer, from, radius, m_settings.color, lockAlpha);
     } else {
-      stampCircle(buffer, from, radius, m_settings.color);
+      stampCircle(buffer, from, radius, m_settings.color, lockAlpha);
     }
     return;
   }
@@ -125,14 +129,14 @@ void BrushTool::stroke(Layer& layer, const Point& from, const Point& to) const {
         static_cast<int>(std::lround(static_cast<float>(from.x) + static_cast<float>(dx) * t)),
         static_cast<int>(std::lround(static_cast<float>(from.y) + static_cast<float>(dy) * t))};
     if (m_settings.shapeType == BrushShapeType::Square) {
-      stampSquare(buffer, p, radius, m_settings.color);
+      stampSquare(buffer, p, radius, m_settings.color, lockAlpha);
     } else {
-      stampCircle(buffer, p, radius, m_settings.color);
+      stampCircle(buffer, p, radius, m_settings.color, lockAlpha);
     }
   }
 }
 
-void BrushTool::stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const {
+void BrushTool::stampCircle(PixelBuffer& buffer, const Point& center, int radius, const Color& color, bool lockAlpha) const {
   const int r2 = radius * radius;
   const float radiusF = static_cast<float>(std::max(1, radius));
   const float hardEdge = std::clamp(m_settings.hardness, 0.0F, 1.0F);
@@ -155,14 +159,14 @@ void BrushTool::stampCircle(PixelBuffer& buffer, const Point& center, int radius
         }
         strength *= std::clamp(m_settings.opacity * m_settings.flow, 0.0F, 1.0F);
         if (strength > 0.001F) {
-          blendPixel(buffer, x, y, color, strength);
+          blendPixel(buffer, x, y, color, strength, lockAlpha);
         }
       }
     }
   }
 }
 
-void BrushTool::stampSquare(PixelBuffer& buffer, const Point& center, int radius, const Color& color) const {
+void BrushTool::stampSquare(PixelBuffer& buffer, const Point& center, int radius, const Color& color, bool lockAlpha) const {
   const float radiusF = static_cast<float>(std::max(1, radius));
   const float hardEdge = std::clamp(m_settings.hardness, 0.0F, 1.0F);
   for (int y = center.y - radius; y <= center.y + radius; ++y) {
@@ -185,19 +189,19 @@ void BrushTool::stampSquare(PixelBuffer& buffer, const Point& center, int radius
 
       strength *= std::clamp(m_settings.opacity * m_settings.flow, 0.0F, 1.0F);
       if (strength > 0.001F) {
-        blendPixel(buffer, x, y, color, strength);
+        blendPixel(buffer, x, y, color, strength, lockAlpha);
       }
     }
   }
 }
 
-void BrushTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, float strength) const {
+void BrushTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, float strength, bool lockAlpha) const {
   if (!buffer.inBounds(x, y)) {
     return;
   }
 
   const Color dst = buffer.pixel(x, y);
-  if (m_settings.lockAlphaRespect && dst.a == 0) {
+  if (lockAlpha && dst.a == 0) {
     return;
   }
 
@@ -227,7 +231,7 @@ void BrushTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, 
 
   const float srcA = static_cast<float>(effectiveSrc.a) / 255.0F;
   const float dstA = static_cast<float>(dst.a) / 255.0F;
-  const float outA = srcA + dstA * (1.0F - srcA);
+  const float outA = lockAlpha ? dstA : srcA + dstA * (1.0F - srcA);
   if (outA <= 0.0F) {
     buffer.setPixel(x, y, Color::Transparent());
     return;
@@ -248,25 +252,43 @@ void BrushTool::blendPixel(PixelBuffer& buffer, int x, int y, const Color& src, 
       const float mulR = dstR * srcR;
       const float mulG = dstG * srcG;
       const float mulB = dstB * srcB;
-      outR = (mulR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
-      outG = (mulG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
-      outB = (mulB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
+      if (lockAlpha) {
+        outR = dstR + (mulR - dstR) * srcA;
+        outG = dstG + (mulG - dstG) * srcA;
+        outB = dstB + (mulB - dstB) * srcA;
+      } else {
+        outR = (mulR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
+        outG = (mulG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
+        outB = (mulB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
+      }
       break;
     }
     case BlendMode::Add: {
       const float premulR = std::clamp(dstR * dstA + srcR * srcA, 0.0F, 1.0F);
       const float premulG = std::clamp(dstG * dstA + srcG * srcA, 0.0F, 1.0F);
       const float premulB = std::clamp(dstB * dstA + srcB * srcA, 0.0F, 1.0F);
-      outR = premulR / outA;
-      outG = premulG / outA;
-      outB = premulB / outA;
+      if (lockAlpha) {
+        outR = std::clamp(dstR + srcR * srcA, 0.0F, 1.0F);
+        outG = std::clamp(dstG + srcG * srcA, 0.0F, 1.0F);
+        outB = std::clamp(dstB + srcB * srcA, 0.0F, 1.0F);
+      } else {
+        outR = premulR / outA;
+        outG = premulG / outA;
+        outB = premulB / outA;
+      }
       break;
     }
     case BlendMode::Normal:
     default:
-      outR = (srcR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
-      outG = (srcG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
-      outB = (srcB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
+      if (lockAlpha) {
+        outR = dstR + (srcR - dstR) * srcA;
+        outG = dstG + (srcG - dstG) * srcA;
+        outB = dstB + (srcB - dstB) * srcA;
+      } else {
+        outR = (srcR * srcA + dstR * dstA * (1.0F - srcA)) / outA;
+        outG = (srcG * srcA + dstG * dstA * (1.0F - srcA)) / outA;
+        outB = (srcB * srcA + dstB * dstA * (1.0F - srcA)) / outA;
+      }
       break;
   }
 

@@ -35,6 +35,9 @@ private slots:
   void onToggleClipClicked();
   void onToggleMaskClicked();
   void onRemoveMaskClicked();
+  void onToggleLockClicked();
+  void onToggleAlphaLockClicked();
+  void onTogglePositionLockClicked();
   void onCurrentLayerChanged(int row);
   void onLayerItemChanged(QListWidgetItem* item);
   void onLayerRowsMoved(const QModelIndex& parent, int start, int end, const QModelIndex& destination, int row);
@@ -60,6 +63,9 @@ private:
   QPushButton* m_clipButton {nullptr};
   QPushButton* m_maskButton {nullptr};
   QPushButton* m_removeMaskButton {nullptr};
+  QPushButton* m_lockButton {nullptr};
+  QPushButton* m_lockAlphaButton {nullptr};
+  QPushButton* m_lockPositionButton {nullptr};
   bool m_isRefreshing {false};
   bool m_isDraggingLayer {false};
 };

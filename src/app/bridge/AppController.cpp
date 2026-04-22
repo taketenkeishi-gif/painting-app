@@ -53,6 +53,10 @@ bool layersEqual(const core::Layer& lhs, const core::Layer& rhs) {
   if (lhs.clippedToBelow() != rhs.clippedToBelow()) {
     return false;
   }
+  if (lhs.locked() != rhs.locked() || lhs.alphaLocked() != rhs.alphaLocked() ||
+      lhs.positionLocked() != rhs.positionLocked()) {
+    return false;
+  }
   if (lhs.hasMask() != rhs.hasMask() || lhs.maskEnabled() != rhs.maskEnabled()) {
     return false;
   }
@@ -151,7 +155,10 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
         layer.kind(),
         layer.clippedToBelow(),
         layer.hasMask(),
-        layer.maskEnabled()});
+        layer.maskEnabled(),
+        layer.locked(),
+        layer.alphaLocked(),
+        layer.positionLocked()});
   }
   return models;
 }
@@ -588,6 +595,87 @@ bool AppController::removeActiveLayerMask() {
   StrokeHistoryEntry entry;
   entry.kind = HistoryKind::Stroke;
   entry.actionName = "Mask Remove";
+  entry.layerIndex = activeIndex;
+  entry.beforeLayer = before;
+  entry.afterLayer = after;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::toggleActiveLayerLock() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  const std::size_t activeIndex = m_document.activeLayerIndex();
+  core::Layer& active = m_document.layerAt(activeIndex);
+  const core::Layer before = active;
+  active.setLocked(!active.locked());
+  const core::Layer after = active;
+  if (layersEqual(before, after)) {
+    return false;
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Layer Lock";
+  entry.layerIndex = activeIndex;
+  entry.beforeLayer = before;
+  entry.afterLayer = after;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::toggleActiveLayerAlphaLock() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  const std::size_t activeIndex = m_document.activeLayerIndex();
+  core::Layer& active = m_document.layerAt(activeIndex);
+  if (active.kind() != core::LayerKind::Raster) {
+    return false;
+  }
+  const core::Layer before = active;
+  active.setAlphaLocked(!active.alphaLocked());
+  const core::Layer after = active;
+  if (layersEqual(before, after)) {
+    return false;
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Alpha Lock";
+  entry.layerIndex = activeIndex;
+  entry.beforeLayer = before;
+  entry.afterLayer = after;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::toggleActiveLayerPositionLock() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  const std::size_t activeIndex = m_document.activeLayerIndex();
+  core::Layer& active = m_document.layerAt(activeIndex);
+  if (active.kind() == core::LayerKind::Folder) {
+    return false;
+  }
+  const core::Layer before = active;
+  active.setPositionLocked(!active.positionLocked());
+  const core::Layer after = active;
+  if (layersEqual(before, after)) {
+    return false;
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Position Lock";
   entry.layerIndex = activeIndex;
   entry.beforeLayer = before;
   entry.afterLayer = after;

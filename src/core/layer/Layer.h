@@ -54,6 +54,13 @@ public:
   bool clippedToBelow() const noexcept { return m_clippedToBelow; }
   void setClippedToBelow(bool enabled) noexcept { m_clippedToBelow = enabled; }
 
+  bool locked() const noexcept { return m_locked; }
+  void setLocked(bool enabled) noexcept { m_locked = enabled; }
+  bool alphaLocked() const noexcept { return m_alphaLocked; }
+  void setAlphaLocked(bool enabled) noexcept { m_alphaLocked = enabled; }
+  bool positionLocked() const noexcept { return m_positionLocked; }
+  void setPositionLocked(bool enabled) noexcept { m_positionLocked = enabled; }
+
   bool hasMask() const noexcept { return m_hasMask; }
   bool maskEnabled() const noexcept { return m_maskEnabled; }
   void setMaskEnabled(bool enabled) noexcept { m_maskEnabled = m_hasMask && enabled; }
@@ -69,6 +76,9 @@ private:
   float m_opacity {1.0F};
   PixelBuffer m_buffer;
   bool m_clippedToBelow {false};
+  bool m_locked {false};
+  bool m_alphaLocked {false};
+  bool m_positionLocked {false};
   bool m_hasMask {false};
   bool m_maskEnabled {false};
   PixelBuffer m_maskBuffer;

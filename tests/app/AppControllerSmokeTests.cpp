@@ -39,6 +39,51 @@ int main() {
     expectTrue(!controller.removeLayer(0), "Deleting the last layer should be rejected.");
     expectTrue(!controller.canUndo(), "Undo should be unavailable after history reset operations.");
 
+    controller.newDocument(32, 32);
+    controller.setActiveLayer(0);
+    controller.setCurrentTool(core::ToolKind::Brush);
+    controller.setBrushColor(core::Color {255, 0, 0, 255});
+    controller.beginStroke(6, 6);
+    controller.endStroke();
+    expectTrue(controller.toggleActiveLayerLock(), "Full layer lock should toggle on.");
+    controller.beginStroke(10, 10);
+    controller.endStroke();
+    expectTrue(
+        controller.document().layerAt(0).buffer().pixel(10, 10).a == 0,
+        "Locked layer should reject additional brush stroke.");
+    expectTrue(controller.toggleActiveLayerLock(), "Full layer lock should toggle off.");
+    controller.beginStroke(10, 10);
+    controller.endStroke();
+    expectTrue(
+        controller.document().layerAt(0).buffer().pixel(10, 10).a > 0,
+        "Unlocked layer should accept brush stroke again.");
+    expectTrue(controller.toggleActiveLayerAlphaLock(), "Alpha lock should toggle on for raster layer.");
+    controller.setCurrentTool(core::ToolKind::Fill);
+    controller.setBrushColor(core::Color {0, 255, 0, 255});
+    controller.beginStroke(0, 0);
+    controller.endStroke();
+    expectTrue(
+        controller.document().layerAt(0).buffer().pixel(0, 0).a == 0,
+        "Alpha locked layer should keep transparent pixels unfilled.");
+    expectTrue(controller.toggleActiveLayerAlphaLock(), "Alpha lock should toggle off.");
+    controller.newDocument(32, 32);
+    controller.setActiveLayer(0);
+    controller.setCurrentTool(core::ToolKind::Brush);
+    controller.setBrushColor(core::Color {255, 0, 0, 255});
+    controller.setBrushSize(1);
+    controller.beginStroke(4, 4);
+    controller.endStroke();
+    controller.setCurrentTool(core::ToolKind::MoveLayer);
+    expectTrue(controller.toggleActiveLayerPositionLock(), "Position lock should toggle on.");
+    controller.beginStroke(0, 0);
+    controller.continueStroke(5, 5);
+    controller.endStroke();
+    expectTrue(
+        controller.document().layerAt(0).buffer().pixel(4, 4).a > 0 &&
+            controller.document().layerAt(0).buffer().pixel(9, 9).a == 0,
+        "Position locked layer should reject move-layer translation.");
+    expectTrue(controller.toggleActiveLayerPositionLock(), "Position lock should toggle off.");
+
     controller.addLayer();
     controller.addLayer();
     controller.setActiveLayer(0);
@@ -61,6 +106,7 @@ int main() {
     expectTrue(controller.document().activeLayerIndex() == 0, "Redo should reapply moved layer index.");
 
     // Drawing + color/size reflection + undo/redo
+    controller.setCurrentTool(core::ToolKind::Brush);
     controller.addLayer();
     controller.setActiveLayer(1);
     controller.beginStroke(-100, -100);
