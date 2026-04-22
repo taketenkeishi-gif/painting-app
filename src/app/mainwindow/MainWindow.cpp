@@ -17,6 +17,7 @@
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QFrame>
+#include <QGridLayout>
 #include <QGuiApplication>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -34,12 +35,14 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
+#include <QSlider>
 #include <QSplitter>
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QStyle>
 #include <QTabWidget>
 #include <QToolBar>
+#include <QVariant>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QUrl>
@@ -133,11 +136,27 @@ void MainWindow::setupShellLayout() {
   auto* swapColorButton = new QPushButton("Swap", colorPanel);
   auto* resetColorButton = new QPushButton("Reset B/W", colorPanel);
   auto* transparentColorButton = new QPushButton("Transparent", colorPanel);
+  m_hueSlider = new QSlider(Qt::Horizontal, colorPanel);
+  m_satSlider = new QSlider(Qt::Horizontal, colorPanel);
+  m_valSlider = new QSlider(Qt::Horizontal, colorPanel);
+  m_alphaSlider = new QSlider(Qt::Horizontal, colorPanel);
+  m_hueSpin = new QSpinBox(colorPanel);
+  m_satSpin = new QSpinBox(colorPanel);
+  m_valSpin = new QSpinBox(colorPanel);
+  m_alphaSpin = new QSpinBox(colorPanel);
   m_foregroundColorButton->setMinimumHeight(30);
   m_backgroundColorButton->setMinimumHeight(30);
   swapColorButton->setMinimumHeight(28);
   resetColorButton->setMinimumHeight(28);
   transparentColorButton->setMinimumHeight(28);
+  m_hueSlider->setRange(0, 359);
+  m_satSlider->setRange(0, 255);
+  m_valSlider->setRange(0, 255);
+  m_alphaSlider->setRange(0, 255);
+  m_hueSpin->setRange(0, 359);
+  m_satSpin->setRange(0, 255);
+  m_valSpin->setRange(0, 255);
+  m_alphaSpin->setRange(0, 255);
   m_foregroundColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
   m_backgroundColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
   swapColorButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
@@ -148,17 +167,135 @@ void MainWindow::setupShellLayout() {
   colorButtons->setSpacing(6);
   colorButtons->addWidget(m_foregroundColorButton);
   colorButtons->addWidget(m_backgroundColorButton);
+  auto addHsvRow = [colorPanel](const QString& name, QSlider* slider, QSpinBox* spin) {
+    auto* row = new QHBoxLayout();
+    row->setContentsMargins(0, 0, 0, 0);
+    row->setSpacing(6);
+    auto* label = new QLabel(name, colorPanel);
+    label->setMinimumWidth(18);
+    row->addWidget(label);
+    row->addWidget(slider, 1);
+    row->addWidget(spin);
+    return row;
+  };
+  auto* historyTitle = new QLabel("Recent", colorPanel);
+  historyTitle->setStyleSheet("font-weight: 600;");
+  auto* historyLayout = new QGridLayout();
+  historyLayout->setContentsMargins(0, 0, 0, 0);
+  historyLayout->setSpacing(4);
+  m_colorHistoryButtons.clear();
+  m_colorHistoryButtons.reserve(8);
+  for (int i = 0; i < 8; ++i) {
+    auto* chip = new QPushButton(colorPanel);
+    chip->setMinimumSize(22, 22);
+    chip->setMaximumSize(32, 24);
+    chip->setToolTip("Recent color");
+    chip->setEnabled(false);
+    historyLayout->addWidget(chip, i / 4, i % 4);
+    m_colorHistoryButtons.push_back(chip);
+  }
   colorLayout->addWidget(colorTitle);
   colorLayout->addLayout(colorButtons);
   colorLayout->addWidget(swapColorButton);
   colorLayout->addWidget(resetColorButton);
   colorLayout->addWidget(transparentColorButton);
+  colorLayout->addLayout(addHsvRow("H", m_hueSlider, m_hueSpin));
+  colorLayout->addLayout(addHsvRow("S", m_satSlider, m_satSpin));
+  colorLayout->addLayout(addHsvRow("V", m_valSlider, m_valSpin));
+  colorLayout->addLayout(addHsvRow("A", m_alphaSlider, m_alphaSpin));
+  colorLayout->addWidget(historyTitle);
+  colorLayout->addLayout(historyLayout);
   colorLayout->addStretch(1);
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
   connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
   connect(resetColorButton, &QPushButton::clicked, this, &MainWindow::onResetBlackWhiteColors);
   connect(transparentColorButton, &QPushButton::clicked, this, &MainWindow::onUseTransparentColor);
+  connect(m_hueSlider, &QSlider::valueChanged, this, [this](int value) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_updatingColorControls = true;
+    m_hueSpin->setValue(value);
+    m_updatingColorControls = false;
+    applyForegroundFromHsvControls();
+  });
+  connect(m_hueSpin, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_updatingColorControls = true;
+    m_hueSlider->setValue(value);
+    m_updatingColorControls = false;
+    applyForegroundFromHsvControls();
+  });
+  connect(m_satSlider, &QSlider::valueChanged, this, [this](int value) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_updatingColorControls = true;
+    m_satSpin->setValue(value);
+    m_updatingColorControls = false;
+    applyForegroundFromHsvControls();
+  });
+  connect(m_satSpin, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_updatingColorControls = true;
+    m_satSlider->setValue(value);
+    m_updatingColorControls = false;
+    applyForegroundFromHsvControls();
+  });
+  connect(m_valSlider, &QSlider::valueChanged, this, [this](int value) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_updatingColorControls = true;
+    m_valSpin->setValue(value);
+    m_updatingColorControls = false;
+    applyForegroundFromHsvControls();
+  });
+  connect(m_valSpin, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_updatingColorControls = true;
+    m_valSlider->setValue(value);
+    m_updatingColorControls = false;
+    applyForegroundFromHsvControls();
+  });
+  connect(m_alphaSlider, &QSlider::valueChanged, this, [this](int value) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_updatingColorControls = true;
+    m_alphaSpin->setValue(value);
+    m_updatingColorControls = false;
+    applyForegroundFromHsvControls();
+  });
+  connect(m_alphaSpin, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+    if (m_updatingColorControls) {
+      return;
+    }
+    m_updatingColorControls = true;
+    m_alphaSlider->setValue(value);
+    m_updatingColorControls = false;
+    applyForegroundFromHsvControls();
+  });
+  for (QPushButton* chip : m_colorHistoryButtons) {
+    connect(chip, &QPushButton::clicked, this, [this, chip]() {
+      const QVariant value = chip->property("coreColor");
+      if (!value.isValid()) {
+        return;
+      }
+      const QColor color = value.value<QColor>();
+      if (!color.isValid()) {
+        return;
+      }
+      m_controller->setBrushColor(toCoreColor(color));
+    });
+  }
 
   auto* infoPanel = new QWidget(this);
   auto* infoLayout = new QVBoxLayout(infoPanel);
@@ -806,6 +943,11 @@ void MainWindow::onNewCanvas() {
 
 void MainWindow::onToolStateChanged() {
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
+  if (m_lastForegroundColor.r != state.color.r || m_lastForegroundColor.g != state.color.g ||
+      m_lastForegroundColor.b != state.color.b || m_lastForegroundColor.a != state.color.a) {
+    m_lastForegroundColor = state.color;
+    pushForegroundColorHistory(state.color);
+  }
 
   if (m_sizeStatusLabel != nullptr) {
     m_sizeStatusLabel->setText(QString("Size: %1").arg(state.size));
@@ -829,6 +971,7 @@ void MainWindow::onToolStateChanged() {
   }
 
   updateColorPanel();
+  syncForegroundHsvControlsFromColor(state.color);
   updateTopToolInfo();
 }
 
@@ -1344,6 +1487,87 @@ void MainWindow::updateColorPanel() {
   m_backgroundColorButton->setText(QString("BG %1").arg(bg.name(QColor::HexRgb).toUpper()));
   m_foregroundColorButton->setStyleSheet(makeStyle(fg));
   m_backgroundColorButton->setStyleSheet(makeStyle(bg));
+  refreshColorHistoryButtons();
+}
+
+void MainWindow::pushForegroundColorHistory(const core::Color& color) {
+  const auto sameColor = [&color](const core::Color& existing) {
+    return existing.r == color.r && existing.g == color.g && existing.b == color.b && existing.a == color.a;
+  };
+  m_colorHistory.erase(std::remove_if(m_colorHistory.begin(), m_colorHistory.end(), sameColor), m_colorHistory.end());
+  m_colorHistory.insert(m_colorHistory.begin(), color);
+  constexpr std::size_t kHistoryMax = 8;
+  if (m_colorHistory.size() > kHistoryMax) {
+    m_colorHistory.resize(kHistoryMax);
+  }
+}
+
+void MainWindow::syncForegroundHsvControlsFromColor(const core::Color& color) {
+  if (m_hueSlider == nullptr || m_satSlider == nullptr || m_valSlider == nullptr || m_alphaSlider == nullptr ||
+      m_hueSpin == nullptr || m_satSpin == nullptr || m_valSpin == nullptr || m_alphaSpin == nullptr) {
+    return;
+  }
+
+  const QColor qcolor = toQColor(color);
+  int hue = 0;
+  int saturation = 0;
+  int value = 0;
+  qcolor.getHsv(&hue, &saturation, &value);
+  if (hue < 0) {
+    hue = 0;
+  }
+
+  m_updatingColorControls = true;
+  m_hueSlider->setValue(hue);
+  m_hueSpin->setValue(hue);
+  m_satSlider->setValue(saturation);
+  m_satSpin->setValue(saturation);
+  m_valSlider->setValue(value);
+  m_valSpin->setValue(value);
+  m_alphaSlider->setValue(qcolor.alpha());
+  m_alphaSpin->setValue(qcolor.alpha());
+  m_updatingColorControls = false;
+}
+
+void MainWindow::applyForegroundFromHsvControls() {
+  if (m_hueSpin == nullptr || m_satSpin == nullptr || m_valSpin == nullptr || m_alphaSpin == nullptr) {
+    return;
+  }
+  const QColor color = QColor::fromHsv(m_hueSpin->value(), m_satSpin->value(), m_valSpin->value(), m_alphaSpin->value());
+  m_controller->setBrushColor(toCoreColor(color));
+}
+
+void MainWindow::refreshColorHistoryButtons() {
+  if (m_colorHistoryButtons.empty()) {
+    return;
+  }
+  for (std::size_t i = 0; i < m_colorHistoryButtons.size(); ++i) {
+    QPushButton* chip = m_colorHistoryButtons[i];
+    if (chip == nullptr) {
+      continue;
+    }
+    if (i >= m_colorHistory.size()) {
+      chip->setEnabled(false);
+      chip->setText({});
+      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; }");
+      chip->setProperty("coreColor", QVariant {});
+      continue;
+    }
+    const QColor color = toQColor(m_colorHistory[i]);
+    const int luminance = (299 * color.red() + 587 * color.green() + 114 * color.blue()) / 1000;
+    const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
+    chip->setEnabled(true);
+    chip->setText(color.alpha() == 0 ? "T" : "");
+    chip->setToolTip(color.alpha() == 0 ? "Transparent" : color.name(QColor::HexRgb).toUpper());
+    chip->setStyleSheet(
+        QString("QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #596476; }")
+            .arg(color.red())
+            .arg(color.green())
+            .arg(color.blue())
+            .arg(color.alpha())
+            .arg(textColor));
+    chip->setProperty("coreColor", color);
+  }
 }
 
 void MainWindow::updateToolActionState() {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <vector>
 
 #include <QMainWindow>
 #include <QByteArray>
@@ -16,7 +17,9 @@ class QMenu;
 class QKeySequence;
 class QDockWidget;
 class QPushButton;
+class QSpinBox;
 class QSplitter;
+class QSlider;
 class QTabWidget;
 class QToolBar;
 class QWidget;
@@ -106,6 +109,10 @@ private:
   void updateColorPanel();
   void updateToolActionState();
   void updateNavigatorPreview();
+  void pushForegroundColorHistory(const core::Color& color);
+  void syncForegroundHsvControlsFromColor(const core::Color& color);
+  void applyForegroundFromHsvControls();
+  void refreshColorHistoryButtons();
   bool openImageFile(const QString& path);
   bool saveImageFile(const QString& path);
   void pushRecentFile(const QString& path);
@@ -152,7 +159,19 @@ private:
   QLabel* m_navigatorImageLabel {nullptr};
   QPushButton* m_foregroundColorButton {nullptr};
   QPushButton* m_backgroundColorButton {nullptr};
+  QSlider* m_hueSlider {nullptr};
+  QSlider* m_satSlider {nullptr};
+  QSlider* m_valSlider {nullptr};
+  QSlider* m_alphaSlider {nullptr};
+  QSpinBox* m_hueSpin {nullptr};
+  QSpinBox* m_satSpin {nullptr};
+  QSpinBox* m_valSpin {nullptr};
+  QSpinBox* m_alphaSpin {nullptr};
+  std::vector<QPushButton*> m_colorHistoryButtons;
+  std::vector<core::Color> m_colorHistory;
   core::Color m_backgroundColor {255, 255, 255, 255};
+  core::Color m_lastForegroundColor {0, 0, 0, 255};
+  bool m_updatingColorControls {false};
   QAction* m_newCanvasAction {nullptr};
   QAction* m_openAction {nullptr};
   QAction* m_newFromClipboardAction {nullptr};
