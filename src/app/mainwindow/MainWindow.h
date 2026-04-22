@@ -80,6 +80,9 @@ private slots:
   void onToggleLayerClipTriggered();
   void onToggleLayerMaskTriggered();
   void onRemoveLayerMaskTriggered();
+  void onToggleLayerLockTriggered();
+  void onToggleLayerAlphaLockTriggered();
+  void onToggleLayerPositionLockTriggered();
   void onDecreaseBrushSizeTriggered();
   void onIncreaseBrushSizeTriggered();
   void onZoomInTriggered();
@@ -219,6 +222,9 @@ private:
   QAction* m_toggleLayerClipAction {nullptr};
   QAction* m_toggleLayerMaskAction {nullptr};
   QAction* m_removeLayerMaskAction {nullptr};
+  QAction* m_toggleLayerLockAction {nullptr};
+  QAction* m_toggleLayerAlphaLockAction {nullptr};
+  QAction* m_toggleLayerPositionLockAction {nullptr};
   QAction* m_shortcutSummaryAction {nullptr};
   QAction* m_openDocsAction {nullptr};
   QAction* m_shortcutSettingsAction {nullptr};

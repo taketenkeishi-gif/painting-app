@@ -399,6 +399,9 @@ void MainWindow::createMenus() {
   m_toggleLayerClipAction = new QAction("Toggle &Clipping", this);
   m_toggleLayerMaskAction = new QAction("Toggle &Mask", this);
   m_removeLayerMaskAction = new QAction("Remove Mas&k", this);
+  m_toggleLayerLockAction = new QAction("Toggle &Lock", this);
+  m_toggleLayerAlphaLockAction = new QAction("Toggle A&lpha Lock", this);
+  m_toggleLayerPositionLockAction = new QAction("Toggle &Position Lock", this);
 
   m_selectAllAction = new QAction("Select &All", this);
   m_deselectAction = new QAction("&Deselect", this);
@@ -458,6 +461,9 @@ void MainWindow::createMenus() {
   m_toggleLayerClipAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C));
   m_toggleLayerMaskAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_M));
   m_removeLayerMaskAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_M));
+  m_toggleLayerLockAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_L));
+  m_toggleLayerAlphaLockAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_L));
+  m_toggleLayerPositionLockAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_P));
   m_selectAllAction->setShortcut(QKeySequence::SelectAll);
   m_deselectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
   m_clearSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
@@ -548,6 +554,9 @@ void MainWindow::createMenus() {
   layerMenu->addAction(m_toggleLayerClipAction);
   layerMenu->addAction(m_toggleLayerMaskAction);
   layerMenu->addAction(m_removeLayerMaskAction);
+  layerMenu->addAction(m_toggleLayerLockAction);
+  layerMenu->addAction(m_toggleLayerAlphaLockAction);
+  layerMenu->addAction(m_toggleLayerPositionLockAction);
   layerMenu->addSeparator();
   layerMenu->addAction(m_moveLayerUpAction);
   layerMenu->addAction(m_moveLayerDownAction);
@@ -629,6 +638,13 @@ void MainWindow::createMenus() {
   connect(m_toggleLayerClipAction, &QAction::triggered, this, &MainWindow::onToggleLayerClipTriggered);
   connect(m_toggleLayerMaskAction, &QAction::triggered, this, &MainWindow::onToggleLayerMaskTriggered);
   connect(m_removeLayerMaskAction, &QAction::triggered, this, &MainWindow::onRemoveLayerMaskTriggered);
+  connect(m_toggleLayerLockAction, &QAction::triggered, this, &MainWindow::onToggleLayerLockTriggered);
+  connect(m_toggleLayerAlphaLockAction, &QAction::triggered, this, &MainWindow::onToggleLayerAlphaLockTriggered);
+  connect(
+      m_toggleLayerPositionLockAction,
+      &QAction::triggered,
+      this,
+      &MainWindow::onToggleLayerPositionLockTriggered);
   connect(m_zoomInAction, &QAction::triggered, this, &MainWindow::onZoomInTriggered);
   connect(m_zoomOutAction, &QAction::triggered, this, &MainWindow::onZoomOutTriggered);
   connect(m_resetZoomAction, &QAction::triggered, this, &MainWindow::onResetZoomTriggered);
@@ -730,6 +746,9 @@ void MainWindow::createMenus() {
   markCommand(m_toggleLayerClipAction, "layer.toggle_clipping");
   markCommand(m_toggleLayerMaskAction, "layer.toggle_mask");
   markCommand(m_removeLayerMaskAction, "layer.remove_mask");
+  markCommand(m_toggleLayerLockAction, "layer.toggle_lock");
+  markCommand(m_toggleLayerAlphaLockAction, "layer.toggle_alpha_lock");
+  markCommand(m_toggleLayerPositionLockAction, "layer.toggle_position_lock");
   markCommand(m_zoomInAction, "view.zoom_in");
   markCommand(m_zoomOutAction, "view.zoom_out");
   markCommand(m_resetZoomAction, "view.zoom_reset");
@@ -1217,6 +1236,24 @@ void MainWindow::onToggleLayerMaskTriggered() {
 
 void MainWindow::onRemoveLayerMaskTriggered() {
   if (m_controller->removeActiveLayerMask()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onToggleLayerLockTriggered() {
+  if (m_controller->toggleActiveLayerLock()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onToggleLayerAlphaLockTriggered() {
+  if (m_controller->toggleActiveLayerAlphaLock()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onToggleLayerPositionLockTriggered() {
+  if (m_controller->toggleActiveLayerPositionLock()) {
     updateUndoRedoState();
   }
 }
