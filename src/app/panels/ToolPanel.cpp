@@ -4,12 +4,14 @@
 #include <vector>
 
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLayoutItem>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QStyle>
 #include <QToolButton>
+#include <QVBoxLayout>
 
 #include "app/bridge/AppController.h"
 
@@ -20,25 +22,25 @@ namespace {
 QString toolNameJa(core::ToolKind kind) {
   switch (kind) {
     case core::ToolKind::Brush:
-      return "ブラシ";
+      return QString::fromUtf8(u8"ブラシ");
     case core::ToolKind::Eraser:
-      return "消しゴム";
+      return QString::fromUtf8(u8"消しゴム");
     case core::ToolKind::Eyedropper:
-      return "スポイト";
+      return QString::fromUtf8(u8"スポイト");
     case core::ToolKind::Fill:
-      return "塗りつぶし";
+      return QString::fromUtf8(u8"塗りつぶし");
     case core::ToolKind::Line:
-      return "直線";
+      return QString::fromUtf8(u8"直線");
     case core::ToolKind::RectSelection:
-      return "選択";
+      return QString::fromUtf8(u8"選択");
     case core::ToolKind::MoveLayer:
-      return "移動";
+      return QString::fromUtf8(u8"移動");
     case core::ToolKind::Hand:
-      return "手のひら";
+      return QString::fromUtf8(u8"手のひら");
     case core::ToolKind::Zoom:
-      return "ズーム";
+      return QString::fromUtf8(u8"ズーム");
     default:
-      return "ツール";
+      return QString::fromUtf8(u8"ツール");
   }
 }
 
@@ -67,42 +69,70 @@ QString toolShortcut(core::ToolKind kind) {
   }
 }
 
-enum class ToolCategory {
-  Paint,
-  Select,
-  View,
-};
-
-ToolCategory categoryFor(core::ToolKind kind) {
+QIcon toolIcon(QWidget* owner, core::ToolKind kind) {
   switch (kind) {
     case core::ToolKind::Brush:
+      return owner->style()->standardIcon(QStyle::SP_DriveFDIcon);
     case core::ToolKind::Eraser:
+      return owner->style()->standardIcon(QStyle::SP_DialogResetButton);
     case core::ToolKind::Eyedropper:
+      return owner->style()->standardIcon(QStyle::SP_BrowserReload);
     case core::ToolKind::Fill:
+      return owner->style()->standardIcon(QStyle::SP_DialogApplyButton);
     case core::ToolKind::Line:
-      return ToolCategory::Paint;
+      return owner->style()->standardIcon(QStyle::SP_ArrowForward);
     case core::ToolKind::RectSelection:
+      return owner->style()->standardIcon(QStyle::SP_DialogOpenButton);
     case core::ToolKind::MoveLayer:
-      return ToolCategory::Select;
+      return owner->style()->standardIcon(QStyle::SP_ArrowUp);
     case core::ToolKind::Hand:
+      return owner->style()->standardIcon(QStyle::SP_TitleBarNormalButton);
     case core::ToolKind::Zoom:
-      return ToolCategory::View;
+      return owner->style()->standardIcon(QStyle::SP_FileDialogDetailedView);
     default:
-      return ToolCategory::Paint;
+      return QIcon {};
   }
 }
 
-QString categoryName(ToolCategory category) {
-  switch (category) {
-    case ToolCategory::Paint:
-      return "描画";
-    case ToolCategory::Select:
-      return "選択/移動";
-    case ToolCategory::View:
-      return "表示";
-    default:
-      return "ツール";
-  }
+QWidget* makeQuickSliderBlock(
+    QWidget* parent,
+    const QString& labelText,
+    QSlider*& sliderOut,
+    QLabel*& valueLabelOut,
+    int min,
+    int max) {
+  auto* block = new QWidget(parent);
+  auto* blockLayout = new QVBoxLayout(block);
+  blockLayout->setContentsMargins(0, 0, 0, 0);
+  blockLayout->setSpacing(2);
+
+  auto* top = new QHBoxLayout();
+  top->setContentsMargins(0, 0, 0, 0);
+  top->setSpacing(2);
+  auto* label = new QLabel(labelText, block);
+  label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+  valueLabelOut = new QLabel("0", block);
+  valueLabelOut->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  valueLabelOut->setMinimumWidth(20);
+  top->addWidget(label);
+  top->addWidget(valueLabelOut, 1);
+
+  sliderOut = new QSlider(Qt::Vertical, block);
+  sliderOut->setRange(min, max);
+  sliderOut->setInvertedAppearance(true);
+  sliderOut->setFixedSize(12, 98);
+  sliderOut->setFocusPolicy(Qt::StrongFocus);
+
+  auto* sliderHolder = new QHBoxLayout();
+  sliderHolder->setContentsMargins(0, 0, 0, 0);
+  sliderHolder->setSpacing(0);
+  sliderHolder->addStretch(1);
+  sliderHolder->addWidget(sliderOut);
+  sliderHolder->addStretch(1);
+
+  blockLayout->addLayout(top);
+  blockLayout->addLayout(sliderHolder);
+  return block;
 }
 
 } // namespace
@@ -111,24 +141,26 @@ ToolPanel::ToolPanel(QWidget* parent)
     : QWidget(parent) {
   setStyleSheet(
       "QToolButton {"
-      "  border: 1px solid #445163;"
-      "  background: #29303a;"
-      "  color: #d8d8d8;"
-      "  border-radius: 4px;"
-      "  padding: 3px 3px;"
-      "  min-height: 40px;"
+      "  border: 1px solid #3f4a59;"
+      "  background: #262c35;"
+      "  color: #d8deea;"
+      "  border-radius: 3px;"
+      "  padding: 0;"
+      "  min-width: 24px;"
+      "  min-height: 24px;"
       "}"
-      "QToolButton:hover { background: #36404c; border-color: #8aa8cf; }"
-      "QToolButton:checked { background: #2d527f; border-color: #8fc2ff; color: #ffffff; }"
-      "QToolButton:disabled { background: #20252d; border-color: #303845; color: #7c8798; }"
-      "QSlider::groove:horizontal { background: #1f2530; border: 1px solid #39485d; height: 5px; border-radius: 3px; }"
-      "QSlider::handle:horizontal { background: #87aee0; width: 12px; margin: -4px 0; border-radius: 6px; }");
+      "QToolButton:hover { background: #323a46; border-color: #7995ba; }"
+      "QToolButton:checked { background: #2b4d73; border-color: #8ec0ff; color: #ffffff; }"
+      "QToolButton:disabled { background: #1f232b; border-color: #2d3441; color: #6d7888; }"
+      "QLabel { color: #c9d2df; }"
+      "QSlider::groove:vertical { background: #161b23; border: 1px solid #343d4d; width: 4px; border-radius: 2px; }"
+      "QSlider::handle:vertical { background: #82abd9; height: 10px; margin: 0 -4px; border-radius: 5px; }");
+
   auto* layout = new QGridLayout(this);
-  layout->setContentsMargins(4, 4, 4, 4);
-  layout->setHorizontalSpacing(4);
-  layout->setVerticalSpacing(3);
+  layout->setContentsMargins(2, 2, 2, 2);
+  layout->setHorizontalSpacing(2);
+  layout->setVerticalSpacing(2);
   layout->setColumnStretch(0, 1);
-  layout->setColumnStretch(1, 1);
 }
 
 void ToolPanel::setController(app::bridge::AppController* controller) {
@@ -156,13 +188,13 @@ void ToolPanel::refreshFromController() {
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
     const bool enabled = m_controller->canUseToolOnActiveLayer(kind);
-    const QString shortcut = toolShortcut(kind);
+    QString tip = QString("%1  [%2]").arg(toolNameJa(kind), toolShortcut(kind));
+    if (!enabled) {
+      tip = QString("%1（%2では使用不可）").arg(toolNameJa(kind), layerKind);
+    }
     button->setChecked(kind == current);
-    button->setToolTip(
-        enabled
-            ? QString("%1 [%2]").arg(toolNameJa(kind), shortcut)
-            : QString("%1は現在のレイヤー(%2)では使用できません").arg(toolNameJa(kind), layerKind));
     button->setEnabled(enabled);
+    button->setToolTip(tip);
   }
 
   if (m_sizeSlider != nullptr && m_opacitySlider != nullptr &&
@@ -174,7 +206,7 @@ void ToolPanel::refreshFromController() {
     m_sizeSlider->setValue(state.size);
     m_opacitySlider->setValue(state.opacity);
     m_sizeValueLabel->setText(QString::number(state.size));
-    m_opacityValueLabel->setText(QString("%1%").arg(state.opacity));
+    m_opacityValueLabel->setText(QString::number(state.opacity));
     const bool sizeEnabled = m_controller->currentToolSupportsSize();
     const bool opacityEnabled = m_controller->currentToolSupportsOpacity();
     m_sizeSlider->setEnabled(sizeEnabled);
@@ -189,7 +221,6 @@ void ToolPanel::onToolButtonClicked() {
   if (m_controller == nullptr) {
     return;
   }
-
   auto* button = qobject_cast<QToolButton*>(sender());
   if (button == nullptr) {
     return;
@@ -233,10 +264,6 @@ void ToolPanel::rebuildButtons() {
     delete item;
   }
 
-  auto* title = new QLabel("ツール", this);
-  title->setStyleSheet("font-weight:700; color:#dfe6f2; padding:1px 1px;");
-  layout->addWidget(title, 0, 0, 1, 2);
-
   const std::vector<core::ToolKind> ordered {
       core::ToolKind::Brush,
       core::ToolKind::Eraser,
@@ -247,108 +274,42 @@ void ToolPanel::rebuildButtons() {
       core::ToolKind::MoveLayer,
       core::ToolKind::Hand,
       core::ToolKind::Zoom};
-  const std::vector<ToolCategory> categories {
-      ToolCategory::Paint,
-      ToolCategory::Select,
-      ToolCategory::View};
   const auto available = m_controller->availableTools();
 
-  int row = 1;
-  for (ToolCategory category : categories) {
-    std::vector<core::ToolKind> tools;
-    for (core::ToolKind kind : ordered) {
-      if (categoryFor(kind) != category) {
-        continue;
-      }
-      if (std::find(available.begin(), available.end(), kind) == available.end()) {
-        continue;
-      }
-      tools.push_back(kind);
-    }
-    if (tools.empty()) {
+  int row = 0;
+  for (core::ToolKind kind : ordered) {
+    if (std::find(available.begin(), available.end(), kind) == available.end()) {
       continue;
     }
-
-    auto* label = new QLabel(categoryName(category), this);
-    label->setStyleSheet("font-weight:600; color:#9fb4cf; padding:2px 1px;");
-    layout->addWidget(label, row++, 0, 1, 2);
-
-    for (std::size_t i = 0; i < tools.size(); ++i) {
-      const core::ToolKind kind = tools[i];
-      auto* button = new QToolButton(this);
-      const QString shortKey = toolShortcut(kind);
-      button->setText(QString("%1\n%2").arg(toolNameJa(kind), shortKey));
-      button->setCheckable(true);
-      button->setAutoExclusive(true);
-      button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-      button->setMinimumSize(QSize(64, 44));
-      button->setIconSize(QSize(16, 16));
-      button->setProperty("toolKind", static_cast<int>(kind));
-
-      switch (kind) {
-        case core::ToolKind::Brush:
-          button->setIcon(style()->standardIcon(QStyle::SP_DriveFDIcon));
-          break;
-        case core::ToolKind::Eraser:
-          button->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
-          break;
-        case core::ToolKind::Eyedropper:
-          button->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
-          break;
-        case core::ToolKind::Fill:
-          button->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
-          break;
-        case core::ToolKind::Line:
-          button->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
-          break;
-        case core::ToolKind::RectSelection:
-          button->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
-          break;
-        case core::ToolKind::MoveLayer:
-          button->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
-          break;
-        case core::ToolKind::Hand:
-          button->setIcon(style()->standardIcon(QStyle::SP_DialogHelpButton));
-          break;
-        case core::ToolKind::Zoom:
-          button->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
-          break;
-        default:
-          break;
-      }
-
-      connect(button, &QToolButton::clicked, this, &ToolPanel::onToolButtonClicked);
-      layout->addWidget(button, row + static_cast<int>(i / 2), static_cast<int>(i % 2));
-      m_buttons[kind] = button;
-    }
-    row += static_cast<int>((tools.size() + 1) / 2);
+    auto* button = new QToolButton(this);
+    button->setCheckable(true);
+    button->setAutoExclusive(true);
+    button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    button->setIcon(toolIcon(this, kind));
+    button->setIconSize(QSize(14, 14));
+    button->setFixedSize(24, 24);
+    button->setProperty("toolKind", static_cast<int>(kind));
+    connect(button, &QToolButton::clicked, this, &ToolPanel::onToolButtonClicked);
+    layout->addWidget(button, row++, 0, Qt::AlignHCenter);
+    m_buttons[kind] = button;
   }
 
-  auto* sliderTitle = new QLabel("クイック調整", this);
-  sliderTitle->setStyleSheet("font-weight:600; color:#9fb4cf; padding:2px 1px;");
-  layout->addWidget(sliderTitle, row++, 0, 1, 2);
+  auto* divider = new QLabel(this);
+  divider->setFixedSize(20, 1);
+  divider->setStyleSheet("background:#3a4352;");
+  layout->addWidget(divider, row++, 0, Qt::AlignHCenter);
 
-  auto* sizeLabel = new QLabel("サイズ", this);
-  m_sizeValueLabel = new QLabel("8", this);
-  m_sizeValueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  layout->addWidget(sizeLabel, row, 0);
-  layout->addWidget(m_sizeValueLabel, row, 1);
-  ++row;
+  auto* quickWrap = new QHBoxLayout();
+  quickWrap->setContentsMargins(0, 0, 0, 0);
+  quickWrap->setSpacing(4);
 
-  m_sizeSlider = new QSlider(Qt::Horizontal, this);
-  m_sizeSlider->setRange(1, 128);
-  layout->addWidget(m_sizeSlider, row++, 0, 1, 2);
+  quickWrap->addWidget(makeQuickSliderBlock(this, "S", m_sizeSlider, m_sizeValueLabel, 1, 128));
+  quickWrap->addWidget(makeQuickSliderBlock(this, "O", m_opacitySlider, m_opacityValueLabel, 0, 100));
 
-  auto* opacityLabel = new QLabel("不透明度", this);
-  m_opacityValueLabel = new QLabel("100%", this);
-  m_opacityValueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  layout->addWidget(opacityLabel, row, 0);
-  layout->addWidget(m_opacityValueLabel, row, 1);
-  ++row;
+  auto* quickContainer = new QWidget(this);
+  quickContainer->setLayout(quickWrap);
+  layout->addWidget(quickContainer, row++, 0, Qt::AlignHCenter);
 
-  m_opacitySlider = new QSlider(Qt::Horizontal, this);
-  m_opacitySlider->setRange(0, 100);
-  layout->addWidget(m_opacitySlider, row++, 0, 1, 2);
   layout->setRowStretch(row, 1);
 
   connect(m_sizeSlider, &QSlider::valueChanged, this, &ToolPanel::onSizeSliderChanged);

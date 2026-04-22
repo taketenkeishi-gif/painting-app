@@ -169,15 +169,15 @@ void MainWindow::setupShellLayout() {
   auto* colorPanel = new QWidget(this);
   m_colorPanelWidget = colorPanel;
   auto* colorLayout = new QVBoxLayout(colorPanel);
-  colorLayout->setContentsMargins(8, 8, 8, 8);
-  colorLayout->setSpacing(6);
+  colorLayout->setContentsMargins(3, 3, 3, 3);
+  colorLayout->setSpacing(2);
   auto* colorTitle = new QLabel("カラー", colorPanel);
   colorTitle->setStyleSheet("font-weight: 700;");
-  m_foregroundColorButton = new QPushButton("描画色", colorPanel);
-  m_backgroundColorButton = new QPushButton("背景色", colorPanel);
-  auto* swapColorButton = new QPushButton("入れ替え", colorPanel);
-  auto* resetColorButton = new QPushButton("白黒に戻す", colorPanel);
-  auto* transparentColorButton = new QPushButton("透明色", colorPanel);
+  m_foregroundColorButton = new QPushButton("FG", colorPanel);
+  m_backgroundColorButton = new QPushButton("BG", colorPanel);
+  auto* swapColorButton = new QPushButton("↔", colorPanel);
+  auto* resetColorButton = new QPushButton("B/W", colorPanel);
+  auto* transparentColorButton = new QPushButton("T", colorPanel);
   m_hueSlider = new QSlider(Qt::Horizontal, colorPanel);
   m_satSlider = new QSlider(Qt::Horizontal, colorPanel);
   m_valSlider = new QSlider(Qt::Horizontal, colorPanel);
@@ -187,11 +187,12 @@ void MainWindow::setupShellLayout() {
   m_valSpin = new QSpinBox(colorPanel);
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
-  m_foregroundColorButton->setMinimumHeight(30);
-  m_backgroundColorButton->setMinimumHeight(30);
-  swapColorButton->setMinimumHeight(28);
-  resetColorButton->setMinimumHeight(28);
-  transparentColorButton->setMinimumHeight(28);
+  m_colorWheelWidget->setMinimumSize(152, 152);
+  m_foregroundColorButton->setFixedSize(28, 20);
+  m_backgroundColorButton->setFixedSize(28, 20);
+  swapColorButton->setFixedSize(20, 20);
+  resetColorButton->setFixedSize(34, 20);
+  transparentColorButton->setFixedSize(20, 20);
   m_hueSlider->setRange(0, 359);
   m_satSlider->setRange(0, 255);
   m_valSlider->setRange(0, 255);
@@ -200,56 +201,61 @@ void MainWindow::setupShellLayout() {
   m_satSpin->setRange(0, 255);
   m_valSpin->setRange(0, 255);
   m_alphaSpin->setRange(0, 255);
-  m_foregroundColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
-  m_backgroundColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogResetButton));
-  swapColorButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
-  resetColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogCancelButton));
-  transparentColorButton->setIcon(style()->standardIcon(QStyle::SP_DialogDiscardButton));
+  swapColorButton->setToolTip("描画色と背景色を入れ替え");
+  resetColorButton->setToolTip("描画色/背景色を白黒に戻す");
+  transparentColorButton->setToolTip("前景色を透明にする");
   auto* colorButtons = new QHBoxLayout();
   colorButtons->setContentsMargins(0, 0, 0, 0);
-  colorButtons->setSpacing(6);
+  colorButtons->setSpacing(2);
   colorButtons->addWidget(m_foregroundColorButton);
   colorButtons->addWidget(m_backgroundColorButton);
+  colorButtons->addStretch(1);
+  auto* colorOps = new QHBoxLayout();
+  colorOps->setContentsMargins(0, 0, 0, 0);
+  colorOps->setSpacing(2);
+  colorOps->addWidget(swapColorButton);
+  colorOps->addWidget(resetColorButton);
+  colorOps->addWidget(transparentColorButton);
+  colorOps->addStretch(1);
   auto addHsvRow = [colorPanel](const QString& name, QSlider* slider, QSpinBox* spin) {
     auto* row = new QHBoxLayout();
     row->setContentsMargins(0, 0, 0, 0);
-    row->setSpacing(6);
+    row->setSpacing(2);
     auto* label = new QLabel(name, colorPanel);
-    label->setMinimumWidth(18);
+    label->setMinimumWidth(10);
+    spin->setFixedWidth(42);
+    spin->setMaximumHeight(18);
+    slider->setMaximumHeight(12);
     row->addWidget(label);
     row->addWidget(slider, 1);
     row->addWidget(spin);
     return row;
   };
-  auto* historyTitle = new QLabel("最近使った色", colorPanel);
+  auto* historyTitle = new QLabel("最近色", colorPanel);
   historyTitle->setStyleSheet("font-weight: 600;");
   auto* historyLayout = new QGridLayout();
   historyLayout->setContentsMargins(0, 0, 0, 0);
-  historyLayout->setSpacing(4);
+  historyLayout->setSpacing(1);
   m_colorHistoryButtons.clear();
-  m_colorHistoryButtons.reserve(8);
-  for (int i = 0; i < 8; ++i) {
+  m_colorHistoryButtons.reserve(16);
+  for (int i = 0; i < 16; ++i) {
     auto* chip = new QPushButton(colorPanel);
-    chip->setMinimumSize(22, 22);
-    chip->setMaximumSize(32, 24);
+    chip->setFixedSize(14, 14);
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
-    historyLayout->addWidget(chip, i / 4, i % 4);
+    historyLayout->addWidget(chip, i / 8, i % 8);
     m_colorHistoryButtons.push_back(chip);
   }
   colorLayout->addWidget(colorTitle);
   colorLayout->addLayout(colorButtons);
+  colorLayout->addLayout(colorOps);
   colorLayout->addWidget(m_colorWheelWidget, 1);
-  colorLayout->addWidget(swapColorButton);
-  colorLayout->addWidget(resetColorButton);
-  colorLayout->addWidget(transparentColorButton);
   colorLayout->addLayout(addHsvRow("H", m_hueSlider, m_hueSpin));
   colorLayout->addLayout(addHsvRow("S", m_satSlider, m_satSpin));
   colorLayout->addLayout(addHsvRow("V", m_valSlider, m_valSpin));
   colorLayout->addLayout(addHsvRow("A", m_alphaSlider, m_alphaSpin));
   colorLayout->addWidget(historyTitle);
   colorLayout->addLayout(historyLayout);
-  colorLayout->addStretch(1);
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
   connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
@@ -1770,7 +1776,9 @@ void MainWindow::updateColorPanel() {
   const auto makeStyle = [](const QColor& color) {
     const int luminance = (299 * color.red() + 587 * color.green() + 114 * color.blue()) / 1000;
     const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
-    return QString("QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #505866; min-height:24px; }")
+    return QString(
+               "QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #505866; "
+               "min-height:18px; padding:0 3px; }")
         .arg(color.red())
         .arg(color.green())
         .arg(color.blue())
@@ -1778,9 +1786,11 @@ void MainWindow::updateColorPanel() {
         .arg(textColor);
   };
 
-  const QString fgPrefix = fg.alpha() == 0 ? "描画色 透明" : "描画色";
-  m_foregroundColorButton->setText(QString("%1 %2").arg(fgPrefix, fg.name(QColor::HexRgb).toUpper()));
-  m_backgroundColorButton->setText(QString("背景色 %1").arg(bg.name(QColor::HexRgb).toUpper()));
+  m_foregroundColorButton->setText("FG");
+  m_backgroundColorButton->setText("BG");
+  m_foregroundColorButton->setToolTip(
+      fg.alpha() == 0 ? "前景色: 透明" : QString("前景色: %1").arg(fg.name(QColor::HexArgb).toUpper()));
+  m_backgroundColorButton->setToolTip(QString("背景色: %1").arg(bg.name(QColor::HexArgb).toUpper()));
   m_foregroundColorButton->setStyleSheet(makeStyle(fg));
   m_backgroundColorButton->setStyleSheet(makeStyle(bg));
   refreshColorHistoryButtons();
@@ -1792,7 +1802,7 @@ void MainWindow::pushForegroundColorHistory(const core::Color& color) {
   };
   m_colorHistory.erase(std::remove_if(m_colorHistory.begin(), m_colorHistory.end(), sameColor), m_colorHistory.end());
   m_colorHistory.insert(m_colorHistory.begin(), color);
-  constexpr std::size_t kHistoryMax = 8;
+  constexpr std::size_t kHistoryMax = 16;
   if (m_colorHistory.size() > kHistoryMax) {
     m_colorHistory.resize(kHistoryMax);
   }
@@ -1848,7 +1858,7 @@ void MainWindow::refreshColorHistoryButtons() {
     if (i >= m_colorHistory.size()) {
       chip->setEnabled(false);
       chip->setText({});
-      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; }");
+      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; padding:0; border-radius:1px; }");
       chip->setProperty("coreColor", QVariant {});
       continue;
     }
@@ -1859,7 +1869,9 @@ void MainWindow::refreshColorHistoryButtons() {
     chip->setText(color.alpha() == 0 ? "T" : "");
     chip->setToolTip(color.alpha() == 0 ? "透明色" : color.name(QColor::HexRgb).toUpper());
     chip->setStyleSheet(
-        QString("QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #596476; }")
+        QString(
+            "QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #596476; "
+            "padding:0; border-radius:1px; }")
             .arg(color.red())
             .arg(color.green())
             .arg(color.blue())
