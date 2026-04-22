@@ -109,7 +109,13 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   "Soft",
                   BrushPreset {22, 55, 25, 70, 28, true, 55, true, true, core::BrushShapeType::Circle, core::BlendMode::Normal, true, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Brush},
                   {ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::EraseMode},
-                  "Erase softly with feathered edge.")},
+                  "Erase softly with feathered edge."),
+              makeSubTool(
+                  "eraser_vector_whole",
+                  "Vector Erase Whole",
+                  BrushPreset {18, 100, 100, 100, 30, true, 30, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, true, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross},
+                  {ToolPropertyKey::Size, ToolPropertyKey::Spacing, ToolPropertyKey::Stabilization},
+                  "Erase touched vector paths.")},
           {ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::EraseMode},
           "Erase pixels on active layer."},
       ToolDescriptor {

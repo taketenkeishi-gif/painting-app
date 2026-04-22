@@ -315,6 +315,23 @@ int main() {
                    std::abs(snappedPath.points[1].x - snappedPath.points[0].x) ==
                        std::abs(snappedPath.points[1].y - snappedPath.points[0].y),
                "Snap angle should quantize vector line direction.");
+    controller.setCurrentTool(core::ToolKind::Eraser);
+    expectTrue(controller.setCurrentSubTool("eraser_vector_whole"), "Vector eraser preset should be selectable.");
+    expectTrue(controller.canUseCurrentToolOnActiveLayer(), "Vector eraser should be available on vector layer.");
+    const std::size_t pathCountBeforeErase = controller.document().layerAt(1).vectorPaths().size();
+    controller.beginStroke(6, 6);
+    controller.continueStroke(24, 24);
+    controller.endStroke();
+    const std::size_t pathCountAfterErase = controller.document().layerAt(1).vectorPaths().size();
+    expectTrue(pathCountAfterErase < pathCountBeforeErase, "Vector eraser should remove touched vector paths.");
+    expectTrue(controller.undo(), "Vector erase should be undoable.");
+    expectTrue(
+        controller.document().layerAt(1).vectorPaths().size() == pathCountBeforeErase,
+        "Undo should restore erased vector paths.");
+    expectTrue(controller.redo(), "Vector erase should be redoable.");
+    expectTrue(
+        controller.document().layerAt(1).vectorPaths().size() == pathCountAfterErase,
+        "Redo should remove vector paths again.");
 
     const auto brushSubToolsOnVector = controller.subToolViewModels();
     expectTrue(!brushSubToolsOnVector.empty(), "Sub tool list should remain available on vector layer.");
