@@ -1,4 +1,4 @@
-#include "app/ui/IconLoader.h"
+﻿#include "app/ui/IconLoader.h"
 
 #include <QFile>
 

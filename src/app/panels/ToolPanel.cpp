@@ -411,3 +411,4 @@ void ToolPanel::relayoutButtons() {
 }
 
 } // namespace app::panels
+
