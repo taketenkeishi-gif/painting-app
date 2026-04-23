@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <cmath>
 
-#include <QImage>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPaintEvent>
 #include <QPen>
 
@@ -69,7 +69,7 @@ QPointF ColorWheelWidget::centerPoint() const {
 }
 
 double ColorWheelWidget::outerRadius() const {
-  return std::max(10.0, std::min(width(), height()) * 0.5 - 3.0);
+  return std::max(10.0, std::min(width(), height()) * 0.5 - 2.0);
 }
 
 double ColorWheelWidget::innerRadius() const {
@@ -81,13 +81,13 @@ double ColorWheelWidget::ringRadius() const {
 }
 
 double ColorWheelWidget::ringThickness() const {
-  return std::clamp(outerRadius() * 0.105, 6.0, 11.0);
+  return std::clamp(outerRadius() * 0.09, 5.0, 8.0);
 }
 
 QRectF ColorWheelWidget::squareRect() const {
-  const double gapFromRing = 2.5;
+  const double gapFromRing = 1.5;
   const double safeRadius = std::max(8.0, innerRadius() - gapFromRing);
-  const double size = safeRadius * std::sqrt(2.0);
+  const double size = safeRadius * std::sqrt(2.0) * 0.985;
   const QPointF c = centerPoint();
   return QRectF(c.x() - size / 2.0, c.y() - size / 2.0, size, size);
 }
@@ -105,37 +105,27 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
 
   QImage ringImage(size(), QImage::Format_ARGB32_Premultiplied);
   ringImage.fill(Qt::transparent);
-  const int minX = std::max(0, static_cast<int>(std::floor(c.x() - outer - 1.0)));
-  const int maxX = std::min(width() - 1, static_cast<int>(std::ceil(c.x() + outer + 1.0)));
-  const int minY = std::max(0, static_cast<int>(std::floor(c.y() - outer - 1.0)));
-  const int maxY = std::min(height() - 1, static_cast<int>(std::ceil(c.y() + outer + 1.0)));
-  const double edgeSoftness = 0.85;
+  const QRectF ringBounds(c.x() - outer, c.y() - outer, outer * 2.0, outer * 2.0);
+  const int xBegin = std::max(0, static_cast<int>(std::floor(ringBounds.left())));
+  const int yBegin = std::max(0, static_cast<int>(std::floor(ringBounds.top())));
+  const int xEnd = std::min(width() - 1, static_cast<int>(std::ceil(ringBounds.right())));
+  const int yEnd = std::min(height() - 1, static_cast<int>(std::ceil(ringBounds.bottom())));
 
-  for (int y = minY; y <= maxY; ++y) {
+  for (int y = yBegin; y <= yEnd; ++y) {
     QRgb* scan = reinterpret_cast<QRgb*>(ringImage.scanLine(y));
-    for (int x = minX; x <= maxX; ++x) {
-      const double dx = static_cast<double>(x) + 0.5 - c.x();
-      const double dy = static_cast<double>(y) + 0.5 - c.y();
+    for (int x = xBegin; x <= xEnd; ++x) {
+      const QPointF p(static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5);
+      const double dx = p.x() - c.x();
+      const double dy = p.y() - c.y();
       const double dist = std::sqrt(dx * dx + dy * dy);
-      if (dist < inner - edgeSoftness || dist > outer + edgeSoftness) {
+      if (dist < inner || dist > outer) {
         continue;
       }
-      const int hue =
-          static_cast<int>(std::lround(hueFromPoint(c, QPointF(static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5)))) %
-          360;
-      QColor ringColor = QColor::fromHsv(hue, 255, 255);
-
-      double alphaScale = 1.0;
-      if (dist < inner) {
-        alphaScale = std::clamp((dist - (inner - edgeSoftness)) / edgeSoftness, 0.0, 1.0);
-      } else if (dist > outer) {
-        alphaScale = std::clamp(((outer + edgeSoftness) - dist) / edgeSoftness, 0.0, 1.0);
-      }
-      const int alpha = static_cast<int>(std::lround(alphaScale * 255.0));
-      scan[x] = qRgba(ringColor.red(), ringColor.green(), ringColor.blue(), alpha);
+      const int hue = static_cast<int>(std::lround(hueFromPoint(c, p))) % 360;
+      scan[x] = QColor::fromHsv(hue, 255, 255).rgba();
     }
   }
-  painter.drawImage(0, 0, ringImage);
+  painter.drawImage(QPoint(0, 0), ringImage);
 
   painter.setPen(QPen(QColor(14, 17, 22, 235), 1.0));
   painter.setBrush(Qt::NoBrush);
@@ -168,16 +158,16 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   const QPointF svHandle(
       svRect.left() + (static_cast<double>(saturation) / 255.0) * svRect.width(),
       svRect.top() + (1.0 - static_cast<double>(value) / 255.0) * svRect.height());
-  painter.setPen(QPen(QColor(10, 10, 10, 220), 1.3));
+  painter.setPen(QPen(QColor(10, 10, 10, 220), 1.2));
   painter.setBrush(Qt::NoBrush);
-  painter.drawEllipse(svHandle, 2.9, 2.9);
-  painter.setPen(QPen(QColor(245, 245, 245, 230), 1.0));
-  painter.drawEllipse(svHandle, 2.1, 2.1);
+  painter.drawEllipse(svHandle, 2.6, 2.6);
+  painter.setPen(QPen(QColor(245, 245, 245, 230), 0.9));
+  painter.drawEllipse(svHandle, 1.9, 1.9);
 
   const QPointF hueHandle = pointFromHue(c, ringMid, hue);
-  painter.setPen(QPen(QColor(10, 10, 10, 220), 1.2));
+  painter.setPen(QPen(QColor(10, 10, 10, 220), 1.1));
   painter.setBrush(QColor(240, 240, 240, 220));
-  painter.drawEllipse(hueHandle, 2.6, 2.6);
+  painter.drawEllipse(hueHandle, 2.2, 2.2);
 }
 
 bool ColorWheelWidget::updateHueFromPoint(const QPointF& point) {
