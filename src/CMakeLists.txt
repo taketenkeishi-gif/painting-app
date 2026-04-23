@@ -38,6 +38,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AppController.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/ToolDescriptor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/UiState.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/IconLoader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/mainwindow/MainWindow.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/CanvasWidget.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/LayerPanel.cpp
@@ -45,6 +46,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/SubToolPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPropertyPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ColorWheelWidget.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
 )
 
 if(PAINT_BUILD_APP)

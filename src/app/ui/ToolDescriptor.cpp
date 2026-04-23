@@ -39,6 +39,8 @@ ToolBehaviorProfile makeProfile(const BrushPreset& preset) {
   profile.blendMode = preset.blendMode;
   profile.eraseMode = preset.eraseMode;
   profile.lockAlphaRespect = preset.lockAlphaRespect;
+  profile.vectorEraseMode = preset.vectorEraseMode;
+  profile.vectorTrimOutside = preset.vectorTrimOutside;
   profile.targetLayerKind = preset.targetLayerKind;
   profile.cursorStyle = preset.cursorStyle;
   return profile;
@@ -111,11 +113,49 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   {ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::EraseMode},
                   "Erase softly with feathered edge."),
               makeSubTool(
+                  "eraser_vector_touch",
+                  "Vector Erase (Touched)",
+                  []() {
+                    BrushPreset p {18, 100, 100, 100, 30, true, 30, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, true, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross};
+                    p.vectorEraseMode = VectorEraserMode::TouchedOnly;
+                    p.vectorTrimOutside = false;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::Size, ToolPropertyKey::Spacing, ToolPropertyKey::Stabilization, ToolPropertyKey::VectorEraseMode, ToolPropertyKey::VectorTrimOutside},
+                  "Erase touched part of vector strokes."),
+              makeSubTool(
+                  "eraser_vector_intersection",
+                  "Vector Erase (To Intersection)",
+                  []() {
+                    BrushPreset p {18, 100, 100, 100, 30, true, 30, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, true, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross};
+                    p.vectorEraseMode = VectorEraserMode::ToIntersection;
+                    p.vectorTrimOutside = false;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::Size, ToolPropertyKey::Spacing, ToolPropertyKey::Stabilization, ToolPropertyKey::VectorEraseMode, ToolPropertyKey::VectorTrimOutside},
+                  "Erase from touched point to nearest intersections."),
+              makeSubTool(
+                  "eraser_vector_trim",
+                  "Vector Erase (Trim Outside)",
+                  []() {
+                    BrushPreset p {18, 100, 100, 100, 30, true, 30, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, true, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross};
+                    p.vectorEraseMode = VectorEraserMode::TrimOutside;
+                    p.vectorTrimOutside = true;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::Size, ToolPropertyKey::Spacing, ToolPropertyKey::Stabilization, ToolPropertyKey::VectorEraseMode, ToolPropertyKey::VectorTrimOutside},
+                  "Trim protruding vector segments."),
+              makeSubTool(
                   "eraser_vector_whole",
                   "Vector Erase Whole",
-                  BrushPreset {18, 100, 100, 100, 30, true, 30, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, true, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross},
-                  {ToolPropertyKey::Size, ToolPropertyKey::Spacing, ToolPropertyKey::Stabilization},
-                  "Erase touched vector paths.")},
+                  []() {
+                    BrushPreset p {18, 100, 100, 100, 30, true, 30, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, true, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross};
+                    p.vectorEraseMode = VectorEraserMode::TouchedOnly;
+                    p.vectorTrimOutside = false;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::Size, ToolPropertyKey::Spacing, ToolPropertyKey::Stabilization, ToolPropertyKey::VectorEraseMode, ToolPropertyKey::VectorTrimOutside},
+                  "Legacy vector eraser preset.")},
           {ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::EraseMode},
           "Erase pixels on active layer."},
       ToolDescriptor {
@@ -345,6 +385,19 @@ bool ToolCatalog::duplicateSubTool(core::ToolKind kind, std::string_view sourceS
   const std::string normalized = normalizeName(newDisplayName);
   duplicated.displayName = normalized.empty() ? (duplicated.displayName + " Copy") : normalized;
   tool->subTools.push_back(std::move(duplicated));
+  return true;
+}
+
+bool ToolCatalog::createSubTool(core::ToolKind kind, const std::string& newDisplayName) {
+  ToolDescriptor* tool = findToolMutable(kind);
+  if (tool == nullptr || tool->subTools.empty()) {
+    return false;
+  }
+  SubToolDescriptor created = tool->subTools.front();
+  created.id = makeSubToolId(tool->id + "_custom", tool->subTools);
+  const std::string normalized = normalizeName(newDisplayName);
+  created.displayName = normalized.empty() ? "New Sub Tool" : normalized;
+  tool->subTools.push_back(std::move(created));
   return true;
 }
 

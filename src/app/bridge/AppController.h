@@ -83,6 +83,8 @@ struct ToolStateViewModel {
   core::BlendMode blendMode {core::BlendMode::Normal};
   bool eraseMode {false};
   bool lockAlphaRespect {false};
+  app::ui::VectorEraserMode vectorEraseMode {app::ui::VectorEraserMode::TouchedOnly};
+  bool vectorTrimOutside {false};
 };
 
 struct CanvasOverlayViewModel {
@@ -161,10 +163,12 @@ public:
   core::ToolKind currentTool() const noexcept;
   bool setCurrentSubTool(const std::string& subToolId);
   std::string currentSubToolId() const;
+  bool createCurrentSubTool();
   bool duplicateCurrentSubTool();
   bool renameCurrentSubTool(const std::string& displayName);
   bool deleteCurrentSubTool();
   bool resetCurrentSubTool();
+  bool saveSubToolSettings();
 
   std::string currentToolDisplayName() const;
   std::string currentSubToolDisplayName() const;
@@ -193,6 +197,8 @@ public:
   bool currentToolSupportsLockAlphaRespect() const noexcept;
   bool currentToolSupportsSnapAngle() const noexcept;
   bool currentToolSupportsSimplifyLevel() const noexcept;
+  bool currentToolSupportsVectorEraseMode() const noexcept;
+  bool currentToolSupportsVectorTrimOutside() const noexcept;
   bool currentToolSupportsFillThreshold() const noexcept;
   bool currentToolSupportsFillContiguous() const noexcept;
   bool currentToolSupportsFillReferAllLayers() const noexcept;
@@ -236,6 +242,8 @@ public:
   void setBrushLockAlphaRespect(bool enabled);
   void setLineSnapAngle(int snapAngle);
   void setLineSimplifyLevel(int simplifyLevel);
+  void setVectorEraseMode(app::ui::VectorEraserMode mode);
+  void setVectorTrimOutside(bool enabled);
   void setFillThreshold(int threshold);
   void setFillContiguous(bool contiguous);
   void setFillReferAllLayers(bool enabled);
@@ -296,6 +304,9 @@ private:
   bool selectSubToolInternal(std::string_view subToolId, bool emitSignal);
   void applyUiStateToTools();
   void resetToolStateFromDescriptor(const app::ui::SubToolDescriptor& subTool);
+  void syncCurrentSubToolFromUiState();
+  void loadSubToolCatalogFromSettings();
+  void saveSubToolCatalogToSettings() const;
 
   core::ToolContext makeToolContext();
   void applyToolResult(const core::ToolResult& result);

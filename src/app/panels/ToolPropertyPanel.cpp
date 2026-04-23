@@ -98,6 +98,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_taperEndLabel(new QLabel("入り抜き（終点）", this)),
       m_snapAngleLabel(new QLabel("角度スナップ", this)),
       m_simplifyLabel(new QLabel("単純化", this)),
+      m_vectorEraseModeLabel(new QLabel("ベクター消去", this)),
       m_fillThresholdLabel(new QLabel("しきい値", this)),
       m_fillGapCloseLabel(new QLabel("隙間閉じ", this)),
       m_selectionModeLabel(new QLabel("選択モード", this)),
@@ -130,6 +131,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_snapAngleSpin(new QSpinBox(this)),
       m_simplifySlider(new QSlider(Qt::Horizontal, this)),
       m_simplifySpin(new QSpinBox(this)),
+      m_vectorEraseModeCombo(new QComboBox(this)),
+      m_vectorTrimOutsideCheck(new QCheckBox("はみ出し削除", this)),
       m_fillThresholdSlider(new QSlider(Qt::Horizontal, this)),
       m_fillThresholdSpin(new QSpinBox(this)),
       m_fillContiguousCheck(new QCheckBox("連結領域のみ", this)),
@@ -193,6 +196,9 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_selectionModeCombo->addItem("矩形", static_cast<int>(app::ui::SelectionMode::Rectangle));
   m_selectionModeCombo->addItem("なげなわ", static_cast<int>(app::ui::SelectionMode::Lasso));
   m_selectionModeCombo->addItem("自動選択", static_cast<int>(app::ui::SelectionMode::AutoSelect));
+  m_vectorEraseModeCombo->addItem("触れた部分を削除", static_cast<int>(app::ui::VectorEraserMode::TouchedOnly));
+  m_vectorEraseModeCombo->addItem("交点まで削除", static_cast<int>(app::ui::VectorEraserMode::ToIntersection));
+  m_vectorEraseModeCombo->addItem("はみ出し部分を削除", static_cast<int>(app::ui::VectorEraserMode::TrimOutside));
 
   auto* contentLayout = new QVBoxLayout(m_contentWidget);
   contentLayout->setContentsMargins(2, 2, 2, 2);
@@ -346,6 +352,9 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   vectorLayout->addLayout(snapAngleRow);
   vectorLayout->addWidget(m_simplifyLabel);
   vectorLayout->addLayout(simplifyRow);
+  vectorLayout->addWidget(m_vectorEraseModeLabel);
+  vectorLayout->addWidget(m_vectorEraseModeCombo);
+  vectorLayout->addWidget(m_vectorTrimOutsideCheck);
   contentLayout->addWidget(vectorGroup);
   m_vectorSection = vectorGroup;
 
@@ -424,6 +433,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_snapAngleSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSnapAngleSpinChanged);
   connect(m_simplifySlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onSimplifySliderChanged);
   connect(m_simplifySpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSimplifySpinChanged);
+  connect(m_vectorEraseModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onVectorEraseModeChanged);
+  connect(m_vectorTrimOutsideCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onVectorTrimOutsideToggled);
   connect(m_fillThresholdSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onFillThresholdSliderChanged);
   connect(m_fillThresholdSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onFillThresholdSpinChanged);
   connect(m_fillContiguousCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onFillContiguousToggled);
@@ -495,28 +506,44 @@ QString ToolPropertyPanel::currentToolSettingsKey() const {
   if (m_controller == nullptr) {
     return QStringLiteral("none");
   }
+  const QString subToolId = QString::fromStdString(m_controller->currentSubToolId());
+  QString toolKey;
   switch (m_controller->currentTool()) {
     case core::ToolKind::Brush:
-      return QStringLiteral("brush");
+      toolKey = QStringLiteral("brush");
+      break;
     case core::ToolKind::Eraser:
-      return QStringLiteral("eraser");
+      toolKey = QStringLiteral("eraser");
+      break;
     case core::ToolKind::Eyedropper:
-      return QStringLiteral("eyedropper");
+      toolKey = QStringLiteral("eyedropper");
+      break;
     case core::ToolKind::Fill:
-      return QStringLiteral("fill");
+      toolKey = QStringLiteral("fill");
+      break;
     case core::ToolKind::Line:
-      return QStringLiteral("line");
+      toolKey = QStringLiteral("line");
+      break;
     case core::ToolKind::RectSelection:
-      return QStringLiteral("selection");
+      toolKey = QStringLiteral("selection");
+      break;
     case core::ToolKind::MoveLayer:
-      return QStringLiteral("move_layer");
+      toolKey = QStringLiteral("move_layer");
+      break;
     case core::ToolKind::Hand:
-      return QStringLiteral("hand");
+      toolKey = QStringLiteral("hand");
+      break;
     case core::ToolKind::Zoom:
-      return QStringLiteral("zoom");
+      toolKey = QStringLiteral("zoom");
+      break;
     default:
-      return QStringLiteral("tool");
+      toolKey = QStringLiteral("tool");
+      break;
   }
+  if (subToolId.isEmpty()) {
+    return toolKey;
+  }
+  return QStringLiteral("%1/%2").arg(toolKey, subToolId);
 }
 
 bool ToolPropertyPanel::isPinned(const QString& key) const {
@@ -593,7 +620,9 @@ void ToolPropertyPanel::onConfigurePinnedRequested() {
       {QStringLiteral("hardness"), QStringLiteral("硬さ")},
       {QStringLiteral("blend"), QStringLiteral("合成モード")},
       {QStringLiteral("antialias"), QStringLiteral("アンチエイリアス")},
-      {QStringLiteral("stabilization"), QStringLiteral("手ブレ補正")}};
+      {QStringLiteral("stabilization"), QStringLiteral("手ブレ補正")},
+      {QStringLiteral("vector_mode"), QStringLiteral("ベクター消去モード")},
+      {QStringLiteral("vector_trim"), QStringLiteral("はみ出し削除")}};
 
   QList<QCheckBox*> checks;
   for (const PinRow& row : rows) {
@@ -662,6 +691,8 @@ void ToolPropertyPanel::refreshFromController() {
   const bool supportsLockAlpha = m_controller->currentToolSupportsLockAlphaRespect();
   const bool supportsSnapAngle = m_controller->currentToolSupportsSnapAngle();
   const bool supportsSimplify = m_controller->currentToolSupportsSimplifyLevel();
+  const bool supportsVectorEraseMode = m_controller->currentToolSupportsVectorEraseMode();
+  const bool supportsVectorTrimOutside = m_controller->currentToolSupportsVectorTrimOutside();
   const bool supportsFillThreshold = m_controller->currentToolSupportsFillThreshold();
   const bool supportsFillContiguous = m_controller->currentToolSupportsFillContiguous();
   const bool supportsFillReferAllLayers = m_controller->currentToolSupportsFillReferAllLayers();
@@ -681,6 +712,8 @@ void ToolPropertyPanel::refreshFromController() {
   const bool showBlend = pinnedOrDetail(supportsBlend, QStringLiteral("blend"));
   const bool showAntiAlias = pinnedOrDetail(supportsAntiAlias, QStringLiteral("antialias"));
   const bool showStabilization = pinnedOrDetail(supportsStabilization, QStringLiteral("stabilization"));
+  const bool showVectorMode = pinnedOrDetail(supportsVectorEraseMode, QStringLiteral("vector_mode"));
+  const bool showVectorTrim = pinnedOrDetail(supportsVectorTrimOutside, QStringLiteral("vector_trim"));
 
   m_colorLabel->setVisible(showColor);
   m_colorButton->setVisible(showColor);
@@ -731,6 +764,9 @@ void ToolPropertyPanel::refreshFromController() {
   m_simplifyLabel->setVisible(supportsSimplify);
   m_simplifySlider->setVisible(supportsSimplify);
   m_simplifySpin->setVisible(supportsSimplify);
+  m_vectorEraseModeLabel->setVisible(showVectorMode);
+  m_vectorEraseModeCombo->setVisible(showVectorMode);
+  m_vectorTrimOutsideCheck->setVisible(showVectorTrim);
   m_fillThresholdLabel->setVisible(supportsFillThreshold);
   m_fillThresholdSlider->setVisible(supportsFillThreshold);
   m_fillThresholdSpin->setVisible(supportsFillThreshold);
@@ -747,7 +783,8 @@ void ToolPropertyPanel::refreshFromController() {
   m_autoSelectContiguousCheck->setVisible(supportsAutoSelectContiguous);
   m_autoSelectReferAllLayersCheck->setVisible(supportsAutoSelectReferAllLayers);
   m_drawingControlSection->setVisible(showBlend || (m_showDetails && (supportsEraseMode || supportsLockAlpha)));
-  m_vectorSection->setVisible(m_showDetails && (supportsSnapAngle || supportsSimplify));
+  m_vectorSection->setVisible(
+      m_showDetails && (supportsSnapAngle || supportsSimplify || showVectorMode || showVectorTrim));
   m_fillSection->setVisible(
       m_showDetails && (supportsFillThreshold || supportsFillContiguous || supportsFillReferAllLayers || supportsFillGapClose));
   m_selectionSection->setVisible(
@@ -797,6 +834,8 @@ void ToolPropertyPanel::refreshFromController() {
   const QSignalBlocker blocker39(m_autoSelectThresholdSpin);
   const QSignalBlocker blocker40(m_autoSelectContiguousCheck);
   const QSignalBlocker blocker41(m_autoSelectReferAllLayersCheck);
+  const QSignalBlocker blocker42(m_vectorEraseModeCombo);
+  const QSignalBlocker blocker43(m_vectorTrimOutsideCheck);
   m_sizeSpin->setValue(state.size);
   m_opacitySlider->setValue(state.opacity);
   m_opacitySpin->setValue(state.opacity);
@@ -838,6 +877,8 @@ void ToolPropertyPanel::refreshFromController() {
   m_autoSelectThresholdSpin->setValue(state.autoSelectThreshold);
   m_autoSelectContiguousCheck->setChecked(state.autoSelectContiguous);
   m_autoSelectReferAllLayersCheck->setChecked(state.autoSelectReferAllLayers);
+  m_vectorEraseModeCombo->setCurrentIndex(m_vectorEraseModeCombo->findData(static_cast<int>(state.vectorEraseMode)));
+  m_vectorTrimOutsideCheck->setChecked(state.vectorTrimOutside);
   updateColorButton();
 }
 
@@ -1088,6 +1129,24 @@ void ToolPropertyPanel::onSimplifySpinChanged(int value) {
   const QSignalBlocker blocker(m_simplifySlider);
   m_simplifySlider->setValue(value);
   m_controller->setLineSimplifyLevel(value);
+}
+
+void ToolPropertyPanel::onVectorEraseModeChanged(int index) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsVectorEraseMode()) {
+    return;
+  }
+  const QVariant value = m_vectorEraseModeCombo->itemData(index);
+  if (!value.isValid()) {
+    return;
+  }
+  m_controller->setVectorEraseMode(static_cast<app::ui::VectorEraserMode>(value.toInt()));
+}
+
+void ToolPropertyPanel::onVectorTrimOutsideToggled(bool checked) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsVectorTrimOutside()) {
+    return;
+  }
+  m_controller->setVectorTrimOutside(checked);
 }
 
 void ToolPropertyPanel::onFillThresholdSliderChanged(int value) {

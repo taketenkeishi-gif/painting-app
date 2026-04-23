@@ -15,6 +15,12 @@ enum class BlendMode {
   Add
 };
 
+enum class VectorEraseMode {
+  TouchedOnly,
+  ToIntersection,
+  TrimOutside
+};
+
 struct BrushSettings {
   Color color {0, 0, 0, 255};
   int size {8};

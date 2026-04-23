@@ -43,6 +43,8 @@ enum class ToolPropertyKey {
   StrokeWidth,
   SnapAngle,
   SimplifyLevel,
+  VectorEraseMode,
+  VectorTrimOutside,
   BlendMode,
   EraseMode,
   LockAlphaRespect,
@@ -98,6 +100,12 @@ enum class SelectionMode {
   AutoSelect
 };
 
+enum class VectorEraserMode {
+  TouchedOnly,
+  ToIntersection,
+  TrimOutside
+};
+
 struct SelectionSettings {
   SelectionMode mode {SelectionMode::Rectangle};
   int autoSelectThreshold {16};
@@ -115,6 +123,8 @@ struct ToolBehaviorProfile {
   core::BlendMode blendMode {core::BlendMode::Normal};
   bool eraseMode {false};
   bool lockAlphaRespect {false};
+  VectorEraserMode vectorEraseMode {VectorEraserMode::TouchedOnly};
+  bool vectorTrimOutside {false};
   TargetLayerKind targetLayerKind {TargetLayerKind::Both};
   CursorStyle cursorStyle {CursorStyle::Default};
 };
@@ -150,6 +160,8 @@ struct BrushPreset {
   int autoSelectThreshold {16};
   bool autoSelectContiguous {true};
   bool autoSelectReferAllLayers {true};
+  VectorEraserMode vectorEraseMode {VectorEraserMode::TouchedOnly};
+  bool vectorTrimOutside {false};
 };
 
 struct SubToolDescriptor {
@@ -181,6 +193,7 @@ public:
   SubToolDescriptor* findSubToolMutable(core::ToolKind kind, std::string_view subToolId) noexcept;
   const SubToolDescriptor* defaultSubTool(core::ToolKind kind) const noexcept;
   bool duplicateSubTool(core::ToolKind kind, std::string_view sourceSubToolId, const std::string& newDisplayName);
+  bool createSubTool(core::ToolKind kind, const std::string& newDisplayName);
   bool renameSubTool(core::ToolKind kind, std::string_view subToolId, const std::string& newDisplayName);
   bool removeSubTool(core::ToolKind kind, std::string_view subToolId);
   bool resetSubTool(core::ToolKind kind, std::string_view subToolId);

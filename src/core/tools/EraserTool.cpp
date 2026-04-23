@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace core {
 
@@ -18,6 +19,150 @@ Rect strokeDirtyRect(const Point& from, const Point& to, int size) {
 
 Rect fullLayerRect(const Layer& layer) {
   return Rect {0, 0, layer.buffer().width(), layer.buffer().height()};
+}
+
+Point interpolatePoint(const Point& a, const Point& b, float t) {
+  return Point {
+      static_cast<int>(std::lround(static_cast<float>(a.x) + static_cast<float>(b.x - a.x) * t)),
+      static_cast<int>(std::lround(static_cast<float>(a.y) + static_cast<float>(b.y - a.y) * t))};
+}
+
+Point samplePathPoint(const VectorPath& path, float position) {
+  if (path.points.empty()) {
+    return Point {0, 0};
+  }
+  if (path.points.size() == 1) {
+    return path.points.front();
+  }
+  const float clamped = std::clamp(position, 0.0F, static_cast<float>(path.points.size() - 1));
+  const int index = static_cast<int>(std::floor(clamped));
+  const int next = std::min(index + 1, static_cast<int>(path.points.size() - 1));
+  const float t = clamped - static_cast<float>(index);
+  return interpolatePoint(path.points[static_cast<std::size_t>(index)], path.points[static_cast<std::size_t>(next)], t);
+}
+
+std::vector<Point> slicePath(const VectorPath& path, float startPos, float endPos) {
+  std::vector<Point> points;
+  if (path.points.size() < 2) {
+    return points;
+  }
+  if (endPos < startPos) {
+    std::swap(startPos, endPos);
+  }
+  const float maxPos = static_cast<float>(path.points.size() - 1);
+  startPos = std::clamp(startPos, 0.0F, maxPos);
+  endPos = std::clamp(endPos, 0.0F, maxPos);
+  points.push_back(samplePathPoint(path, startPos));
+  const int first = static_cast<int>(std::ceil(startPos));
+  const int last = static_cast<int>(std::floor(endPos));
+  for (int i = first; i <= last; ++i) {
+    if (i <= 0 || i >= static_cast<int>(path.points.size() - 1)) {
+      continue;
+    }
+    points.push_back(path.points[static_cast<std::size_t>(i)]);
+  }
+  points.push_back(samplePathPoint(path, endPos));
+  if (points.size() >= 2 &&
+      points.front().x == points.back().x &&
+      points.front().y == points.back().y) {
+    points.pop_back();
+  }
+  return points;
+}
+
+bool segmentIntersection(
+    const Point& a0,
+    const Point& a1,
+    const Point& b0,
+    const Point& b1,
+    float& outT,
+    float& outU) {
+  const float ax = static_cast<float>(a0.x);
+  const float ay = static_cast<float>(a0.y);
+  const float bx = static_cast<float>(a1.x);
+  const float by = static_cast<float>(a1.y);
+  const float cx = static_cast<float>(b0.x);
+  const float cy = static_cast<float>(b0.y);
+  const float dx = static_cast<float>(b1.x);
+  const float dy = static_cast<float>(b1.y);
+
+  const float rX = bx - ax;
+  const float rY = by - ay;
+  const float sX = dx - cx;
+  const float sY = dy - cy;
+  const float denom = rX * sY - rY * sX;
+  if (std::abs(denom) < 0.0001F) {
+    return false;
+  }
+  const float qpx = cx - ax;
+  const float qpy = cy - ay;
+  const float t = (qpx * sY - qpy * sX) / denom;
+  const float u = (qpx * rY - qpy * rX) / denom;
+  if (t < 0.0F || t > 1.0F || u < 0.0F || u > 1.0F) {
+    return false;
+  }
+  outT = t;
+  outU = u;
+  return true;
+}
+
+std::vector<float> collectIntersectionPositions(
+    const VectorPath& target,
+    const std::vector<VectorPath>& allPaths,
+    std::size_t targetIndex) {
+  std::vector<float> intersections;
+  if (target.points.size() < 2) {
+    return intersections;
+  }
+  for (std::size_t i = 1; i < target.points.size(); ++i) {
+    const Point& a0 = target.points[i - 1];
+    const Point& a1 = target.points[i];
+    for (std::size_t p = 0; p < allPaths.size(); ++p) {
+      if (p == targetIndex) {
+        continue;
+      }
+      const VectorPath& other = allPaths[p];
+      if (other.points.size() < 2) {
+        continue;
+      }
+      for (std::size_t j = 1; j < other.points.size(); ++j) {
+        float t = 0.0F;
+        float u = 0.0F;
+        if (!segmentIntersection(a0, a1, other.points[j - 1], other.points[j], t, u)) {
+          continue;
+        }
+        intersections.push_back(static_cast<float>(i - 1) + t);
+      }
+    }
+  }
+  std::sort(intersections.begin(), intersections.end());
+  intersections.erase(
+      std::unique(intersections.begin(), intersections.end(), [](float lhs, float rhs) {
+        return std::abs(lhs - rhs) < 0.01F;
+      }),
+      intersections.end());
+  return intersections;
+}
+
+std::optional<float> nearestLower(const std::vector<float>& values, float pivot) {
+  std::optional<float> out;
+  for (float value : values) {
+    if (value <= pivot) {
+      out = value;
+    } else {
+      break;
+    }
+  }
+  return out;
+}
+
+std::optional<float> nearestUpper(const std::vector<float>& values, float pivot) {
+  for (float value : values) {
+    if (value >= pivot) {
+      return value;
+    }
+  }
+  return std::nullopt;
 }
 
 } // namespace
@@ -190,10 +335,11 @@ void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) c
 }
 
 void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point& to) const {
-  std::vector<VectorPath>& paths = layer.vectorPaths();
-  if (paths.empty()) {
+  std::vector<VectorPath>& editablePaths = layer.vectorPaths();
+  if (editablePaths.empty()) {
     return;
   }
+  const std::vector<VectorPath> originalPaths = editablePaths;
 
   const int radius = std::max(1, m_size) / 2;
   const int dx = to.x - from.x;
@@ -212,32 +358,121 @@ void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point&
   }
 
   const float radiusF = static_cast<float>(radius);
-  auto hitPath = [&](const VectorPath& path) {
+  const auto collectHitPositions = [&](const VectorPath& path) {
+    std::vector<float> hits;
     if (path.points.empty()) {
-      return false;
+      return hits;
     }
+    const float widthRadius = static_cast<float>(std::max(1, path.width)) * 0.5F;
     for (const Point& stamp : stamps) {
       for (const Point& pt : path.points) {
         const float px = static_cast<float>(pt.x - stamp.x);
         const float py = static_cast<float>(pt.y - stamp.y);
-        const float allowance = radiusF + static_cast<float>(std::max(1, path.width)) * 0.5F;
+        const float allowance = radiusF + widthRadius;
         if ((px * px + py * py) <= (allowance * allowance)) {
-          return true;
+          hits.push_back(0.0F);
         }
       }
       for (std::size_t i = 1; i < path.points.size(); ++i) {
-        const float allowance = radiusF + static_cast<float>(std::max(1, path.width)) * 0.5F;
-        if (distancePointToSegment(stamp, path.points[i - 1], path.points[i]) <= allowance) {
-          return true;
+        const float allowance = radiusF + widthRadius;
+        if (distancePointToSegment(stamp, path.points[i - 1], path.points[i]) > allowance) {
+          continue;
         }
+        const float ax = static_cast<float>(path.points[i - 1].x);
+        const float ay = static_cast<float>(path.points[i - 1].y);
+        const float bx = static_cast<float>(path.points[i].x);
+        const float by = static_cast<float>(path.points[i].y);
+        const float px = static_cast<float>(stamp.x);
+        const float py = static_cast<float>(stamp.y);
+        const float vx = bx - ax;
+        const float vy = by - ay;
+        const float lenSq = vx * vx + vy * vy;
+        float t = 0.0F;
+        if (lenSq > 0.0001F) {
+          t = std::clamp(((px - ax) * vx + (py - ay) * vy) / lenSq, 0.0F, 1.0F);
+        }
+        hits.push_back(static_cast<float>(i - 1) + t);
       }
     }
-    return false;
+    std::sort(hits.begin(), hits.end());
+    return hits;
   };
 
-  paths.erase(
-      std::remove_if(paths.begin(), paths.end(), [&](const VectorPath& path) { return hitPath(path); }),
-      paths.end());
+  std::vector<VectorPath> result;
+  result.reserve(originalPaths.size());
+
+  for (std::size_t pathIndex = 0; pathIndex < originalPaths.size(); ++pathIndex) {
+    const VectorPath& path = originalPaths[pathIndex];
+    const std::vector<float> hitPositions = collectHitPositions(path);
+    if (hitPositions.empty()) {
+      result.push_back(path);
+      continue;
+    }
+    if (path.points.size() < 2) {
+      continue;
+    }
+
+    const float lastPos = static_cast<float>(path.points.size() - 1);
+    const float hitPos = hitPositions[hitPositions.size() / 2];
+    const std::vector<float> intersections = collectIntersectionPositions(path, originalPaths, pathIndex);
+
+    auto appendSlice = [&](float startPos, float endPos) {
+      std::vector<Point> points = slicePath(path, startPos, endPos);
+      if (points.size() < 2) {
+        return;
+      }
+      VectorPath kept = path;
+      kept.points = std::move(points);
+      result.push_back(std::move(kept));
+    };
+
+    if (m_vectorEraseMode == VectorEraseMode::TouchedOnly) {
+      continue;
+    }
+
+    if (m_vectorEraseMode == VectorEraseMode::ToIntersection) {
+      const std::optional<float> lower = nearestLower(intersections, hitPos);
+      const std::optional<float> upper = nearestUpper(intersections, hitPos);
+      if (lower.has_value() && upper.has_value() && std::abs(*upper - *lower) > 0.01F) {
+        appendSlice(0.0F, *lower);
+        appendSlice(*upper, lastPos);
+        continue;
+      }
+      if (lower.has_value()) {
+        appendSlice(0.0F, *lower);
+        continue;
+      }
+      if (upper.has_value()) {
+        appendSlice(*upper, lastPos);
+        continue;
+      }
+      const float removeStart = std::clamp(hitPos - 0.55F, 0.0F, lastPos);
+      const float removeEnd = std::clamp(hitPos + 0.55F, 0.0F, lastPos);
+      appendSlice(0.0F, removeStart);
+      appendSlice(removeEnd, lastPos);
+      continue;
+    }
+
+    if (m_vectorEraseMode == VectorEraseMode::TrimOutside) {
+      if (!m_vectorTrimOutside) {
+        continue;
+      }
+      const float distanceToStart = std::abs(hitPos - 0.0F);
+      const float distanceToEnd = std::abs(lastPos - hitPos);
+      if (distanceToStart <= distanceToEnd) {
+        const std::optional<float> lower = nearestLower(intersections, hitPos);
+        const float cut = lower.value_or(hitPos);
+        appendSlice(cut, lastPos);
+      } else {
+        const std::optional<float> upper = nearestUpper(intersections, hitPos);
+        const float cut = upper.value_or(hitPos);
+        appendSlice(0.0F, cut);
+      }
+      continue;
+    }
+  }
+
+  editablePaths = std::move(result);
 }
 
 float EraserTool::distancePointToSegment(const Point& p, const Point& a, const Point& b) noexcept {

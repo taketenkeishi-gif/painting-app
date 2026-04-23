@@ -5,6 +5,13 @@
 #include <memory>
 #include <utility>
 
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QCoreApplication>
+#include <QSettings>
+#include <QString>
+
 namespace app::bridge {
 
 namespace {
@@ -93,6 +100,110 @@ int clampPercent(int value) {
   return std::clamp(value, 0, 100);
 }
 
+QString toolKindSettingsKey(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return QStringLiteral("brush");
+    case core::ToolKind::Eraser:
+      return QStringLiteral("eraser");
+    case core::ToolKind::Eyedropper:
+      return QStringLiteral("eyedropper");
+    case core::ToolKind::Fill:
+      return QStringLiteral("fill");
+    case core::ToolKind::Line:
+      return QStringLiteral("line");
+    case core::ToolKind::RectSelection:
+      return QStringLiteral("selection");
+    case core::ToolKind::MoveLayer:
+      return QStringLiteral("move_layer");
+    case core::ToolKind::Hand:
+      return QStringLiteral("hand");
+    case core::ToolKind::Zoom:
+      return QStringLiteral("zoom");
+    default:
+      return QStringLiteral("tool");
+  }
+}
+
+QJsonObject toJson(const app::ui::BrushPreset& preset) {
+  QJsonObject json;
+  json.insert(QStringLiteral("size"), preset.size);
+  json.insert(QStringLiteral("opacity"), preset.opacity);
+  json.insert(QStringLiteral("hardness"), preset.hardness);
+  json.insert(QStringLiteral("flow"), preset.flow);
+  json.insert(QStringLiteral("spacing"), preset.spacing);
+  json.insert(QStringLiteral("antiAlias"), preset.antiAlias);
+  json.insert(QStringLiteral("stabilization"), preset.stabilization);
+  json.insert(QStringLiteral("postCorrection"), preset.postCorrection);
+  json.insert(QStringLiteral("velocityBasedCorrection"), preset.velocityBasedCorrection);
+  json.insert(QStringLiteral("shapeType"), static_cast<int>(preset.shapeType));
+  json.insert(QStringLiteral("blendMode"), static_cast<int>(preset.blendMode));
+  json.insert(QStringLiteral("eraseMode"), preset.eraseMode);
+  json.insert(QStringLiteral("lockAlphaRespect"), preset.lockAlphaRespect);
+  json.insert(QStringLiteral("vectorEraseMode"), static_cast<int>(preset.vectorEraseMode));
+  json.insert(QStringLiteral("vectorTrimOutside"), preset.vectorTrimOutside);
+  json.insert(QStringLiteral("angle"), preset.angle);
+  json.insert(QStringLiteral("roundness"), preset.roundness);
+  json.insert(QStringLiteral("taperStart"), preset.taperStart);
+  json.insert(QStringLiteral("taperEnd"), preset.taperEnd);
+  json.insert(QStringLiteral("targetLayerKind"), static_cast<int>(preset.targetLayerKind));
+  json.insert(QStringLiteral("cursorStyle"), static_cast<int>(preset.cursorStyle));
+  json.insert(QStringLiteral("snapAngle"), preset.snapAngle);
+  json.insert(QStringLiteral("simplifyLevel"), preset.simplifyLevel);
+  json.insert(QStringLiteral("strokeWidth"), preset.strokeWidth);
+  json.insert(QStringLiteral("fillThreshold"), preset.fillThreshold);
+  json.insert(QStringLiteral("fillContiguous"), preset.fillContiguous);
+  json.insert(QStringLiteral("fillReferAllLayers"), preset.fillReferAllLayers);
+  json.insert(QStringLiteral("fillGapClose"), preset.fillGapClose);
+  json.insert(QStringLiteral("selectionMode"), static_cast<int>(preset.selectionMode));
+  json.insert(QStringLiteral("autoSelectThreshold"), preset.autoSelectThreshold);
+  json.insert(QStringLiteral("autoSelectContiguous"), preset.autoSelectContiguous);
+  json.insert(QStringLiteral("autoSelectReferAllLayers"), preset.autoSelectReferAllLayers);
+  return json;
+}
+
+app::ui::BrushPreset presetFromJson(const QJsonObject& json, const app::ui::BrushPreset& fallback) {
+  app::ui::BrushPreset preset = fallback;
+  preset.size = json.value(QStringLiteral("size")).toInt(preset.size);
+  preset.opacity = json.value(QStringLiteral("opacity")).toInt(preset.opacity);
+  preset.hardness = json.value(QStringLiteral("hardness")).toInt(preset.hardness);
+  preset.flow = json.value(QStringLiteral("flow")).toInt(preset.flow);
+  preset.spacing = json.value(QStringLiteral("spacing")).toInt(preset.spacing);
+  preset.antiAlias = json.value(QStringLiteral("antiAlias")).toBool(preset.antiAlias);
+  preset.stabilization = json.value(QStringLiteral("stabilization")).toInt(preset.stabilization);
+  preset.postCorrection = json.value(QStringLiteral("postCorrection")).toBool(preset.postCorrection);
+  preset.velocityBasedCorrection =
+      json.value(QStringLiteral("velocityBasedCorrection")).toBool(preset.velocityBasedCorrection);
+  preset.shapeType = static_cast<core::BrushShapeType>(json.value(QStringLiteral("shapeType")).toInt(static_cast<int>(preset.shapeType)));
+  preset.blendMode = static_cast<core::BlendMode>(json.value(QStringLiteral("blendMode")).toInt(static_cast<int>(preset.blendMode)));
+  preset.eraseMode = json.value(QStringLiteral("eraseMode")).toBool(preset.eraseMode);
+  preset.lockAlphaRespect = json.value(QStringLiteral("lockAlphaRespect")).toBool(preset.lockAlphaRespect);
+  preset.vectorEraseMode =
+      static_cast<app::ui::VectorEraserMode>(json.value(QStringLiteral("vectorEraseMode")).toInt(static_cast<int>(preset.vectorEraseMode)));
+  preset.vectorTrimOutside = json.value(QStringLiteral("vectorTrimOutside")).toBool(preset.vectorTrimOutside);
+  preset.angle = json.value(QStringLiteral("angle")).toInt(preset.angle);
+  preset.roundness = json.value(QStringLiteral("roundness")).toInt(preset.roundness);
+  preset.taperStart = json.value(QStringLiteral("taperStart")).toInt(preset.taperStart);
+  preset.taperEnd = json.value(QStringLiteral("taperEnd")).toInt(preset.taperEnd);
+  preset.targetLayerKind =
+      static_cast<app::ui::TargetLayerKind>(json.value(QStringLiteral("targetLayerKind")).toInt(static_cast<int>(preset.targetLayerKind)));
+  preset.cursorStyle = static_cast<app::ui::CursorStyle>(json.value(QStringLiteral("cursorStyle")).toInt(static_cast<int>(preset.cursorStyle)));
+  preset.snapAngle = json.value(QStringLiteral("snapAngle")).toInt(preset.snapAngle);
+  preset.simplifyLevel = json.value(QStringLiteral("simplifyLevel")).toInt(preset.simplifyLevel);
+  preset.strokeWidth = json.value(QStringLiteral("strokeWidth")).toInt(preset.strokeWidth);
+  preset.fillThreshold = json.value(QStringLiteral("fillThreshold")).toInt(preset.fillThreshold);
+  preset.fillContiguous = json.value(QStringLiteral("fillContiguous")).toBool(preset.fillContiguous);
+  preset.fillReferAllLayers = json.value(QStringLiteral("fillReferAllLayers")).toBool(preset.fillReferAllLayers);
+  preset.fillGapClose = json.value(QStringLiteral("fillGapClose")).toInt(preset.fillGapClose);
+  preset.selectionMode =
+      static_cast<app::ui::SelectionMode>(json.value(QStringLiteral("selectionMode")).toInt(static_cast<int>(preset.selectionMode)));
+  preset.autoSelectThreshold = json.value(QStringLiteral("autoSelectThreshold")).toInt(preset.autoSelectThreshold);
+  preset.autoSelectContiguous = json.value(QStringLiteral("autoSelectContiguous")).toBool(preset.autoSelectContiguous);
+  preset.autoSelectReferAllLayers =
+      json.value(QStringLiteral("autoSelectReferAllLayers")).toBool(preset.autoSelectReferAllLayers);
+  return preset;
+}
+
 } // namespace
 
 AppController::AppController(QObject* parent)
@@ -122,6 +233,21 @@ AppController::AppController(QObject* parent)
 
   for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
     if (!tool.subTools.empty()) {
+      m_selectedSubToolByTool[tool.kind] = tool.subTools.front().id;
+    }
+  }
+  loadSubToolCatalogFromSettings();
+  for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
+    if (tool.subTools.empty()) {
+      continue;
+    }
+    auto selectedIt = m_selectedSubToolByTool.find(tool.kind);
+    const bool selectedMissing = selectedIt == m_selectedSubToolByTool.end();
+    const bool selectedExists = !selectedMissing &&
+        std::any_of(tool.subTools.begin(), tool.subTools.end(), [&](const app::ui::SubToolDescriptor& sub) {
+          return sub.id == selectedIt->second;
+        });
+    if (selectedMissing || !selectedExists) {
       m_selectedSubToolByTool[tool.kind] = tool.subTools.front().id;
     }
   }
@@ -235,7 +361,9 @@ ToolStateViewModel AppController::toolState() const noexcept {
       m_uiState.shapeType,
       m_uiState.blendMode,
       m_uiState.eraseMode,
-      m_uiState.lockAlphaRespect};
+      m_uiState.lockAlphaRespect,
+      m_uiState.vectorEraseMode,
+      m_uiState.vectorTrimOutside};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -1000,6 +1128,7 @@ bool AppController::setCurrentTool(core::ToolKind kind) {
 
   ensureCurrentSubToolCompatibility();
   selectSubToolInternal(currentSubToolId(), false);
+  saveSubToolCatalogToSettings();
   emit toolStateChanged();
   emit documentChanged();
   return true;
@@ -1017,6 +1146,7 @@ bool AppController::setCurrentSubTool(const std::string& subToolId) {
     ensureCurrentSubToolCompatibility();
     emit toolStateChanged();
   }
+  saveSubToolCatalogToSettings();
   emit documentChanged();
   return true;
 }
@@ -1028,6 +1158,21 @@ std::string AppController::currentSubToolId() const {
   }
   const app::ui::SubToolDescriptor* sub = m_toolCatalog.defaultSubTool(currentTool());
   return sub == nullptr ? std::string {} : sub->id;
+}
+
+bool AppController::createCurrentSubTool() {
+  const app::ui::SubToolDescriptor* source = currentSubToolDescriptor();
+  const std::string baseName = source == nullptr ? std::string {"New Sub Tool"} : (source->displayName + " New");
+  if (!m_toolCatalog.createSubTool(currentTool(), baseName)) {
+    return false;
+  }
+  const app::ui::ToolDescriptor* tool = currentToolDescriptor();
+  if (tool == nullptr || tool->subTools.empty()) {
+    return false;
+  }
+  const app::ui::SubToolDescriptor& created = tool->subTools.back();
+  saveSubToolCatalogToSettings();
+  return setCurrentSubTool(created.id);
 }
 
 bool AppController::duplicateCurrentSubTool() {
@@ -1044,6 +1189,7 @@ bool AppController::duplicateCurrentSubTool() {
     return false;
   }
   const app::ui::SubToolDescriptor& created = tool->subTools.back();
+  saveSubToolCatalogToSettings();
   return setCurrentSubTool(created.id);
 }
 
@@ -1051,6 +1197,7 @@ bool AppController::renameCurrentSubTool(const std::string& displayName) {
   if (!m_toolCatalog.renameSubTool(currentTool(), currentSubToolId(), displayName)) {
     return false;
   }
+  saveSubToolCatalogToSettings();
   emit toolStateChanged();
   return true;
 }
@@ -1065,6 +1212,7 @@ bool AppController::deleteCurrentSubTool() {
     m_selectedSubToolByTool[currentTool()] = fallback->id;
     selectSubToolInternal(fallback->id, true);
   }
+  saveSubToolCatalogToSettings();
   emit documentChanged();
   return true;
 }
@@ -1075,7 +1223,13 @@ bool AppController::resetCurrentSubTool() {
     return false;
   }
   selectSubToolInternal(id, true);
+  saveSubToolCatalogToSettings();
   emit documentChanged();
+  return true;
+}
+
+bool AppController::saveSubToolSettings() {
+  saveSubToolCatalogToSettings();
   return true;
 }
 
@@ -1299,6 +1453,26 @@ bool AppController::currentToolSupportsSimplifyLevel() const noexcept {
     return false;
   }
   return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::SimplifyLevel);
+}
+
+bool AppController::currentToolSupportsVectorEraseMode() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(
+      currentToolDescriptor(),
+      currentSubToolDescriptor(),
+      app::ui::ToolPropertyKey::VectorEraseMode);
+}
+
+bool AppController::currentToolSupportsVectorTrimOutside() const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) {
+    return false;
+  }
+  return containsProperty(
+      currentToolDescriptor(),
+      currentSubToolDescriptor(),
+      app::ui::ToolPropertyKey::VectorTrimOutside);
 }
 
 bool AppController::currentToolSupportsFillThreshold() const noexcept {
@@ -1726,6 +1900,7 @@ void AppController::setBrushAngle(int angle) {
     return;
   }
   m_uiState.angle = normalized;
+  syncCurrentSubToolFromUiState();
   emit toolStateChanged();
 }
 
@@ -1735,6 +1910,7 @@ void AppController::setBrushRoundness(int roundness) {
     return;
   }
   m_uiState.roundness = normalized;
+  syncCurrentSubToolFromUiState();
   emit toolStateChanged();
 }
 
@@ -1744,6 +1920,7 @@ void AppController::setBrushTaperStart(int taperStart) {
     return;
   }
   m_uiState.taperStart = normalized;
+  syncCurrentSubToolFromUiState();
   emit toolStateChanged();
 }
 
@@ -1753,6 +1930,7 @@ void AppController::setBrushTaperEnd(int taperEnd) {
     return;
   }
   m_uiState.taperEnd = normalized;
+  syncCurrentSubToolFromUiState();
   emit toolStateChanged();
 }
 
@@ -1799,6 +1977,27 @@ void AppController::setLineSimplifyLevel(int simplifyLevel) {
     return;
   }
   m_uiState.simplifyLevel = normalized;
+  syncCurrentSubToolFromUiState();
+  emit toolStateChanged();
+}
+
+void AppController::setVectorEraseMode(app::ui::VectorEraserMode mode) {
+  if (m_uiState.vectorEraseMode == mode) {
+    return;
+  }
+  m_uiState.vectorEraseMode = mode;
+  applyUiStateToTools();
+  syncCurrentSubToolFromUiState();
+  emit toolStateChanged();
+}
+
+void AppController::setVectorTrimOutside(bool enabled) {
+  if (m_uiState.vectorTrimOutside == enabled) {
+    return;
+  }
+  m_uiState.vectorTrimOutside = enabled;
+  applyUiStateToTools();
+  syncCurrentSubToolFromUiState();
   emit toolStateChanged();
 }
 
@@ -2034,6 +2233,20 @@ void AppController::applyUiStateToTools() {
     m_eraserTool->setPostCorrection(m_uiState.postCorrection);
     m_eraserTool->setVelocityBasedCorrection(m_uiState.velocityBasedCorrection);
     m_eraserTool->setShapeType(m_uiState.shapeType);
+    core::VectorEraseMode mode = core::VectorEraseMode::TouchedOnly;
+    switch (m_uiState.vectorEraseMode) {
+      case app::ui::VectorEraserMode::TouchedOnly:
+        mode = core::VectorEraseMode::TouchedOnly;
+        break;
+      case app::ui::VectorEraserMode::ToIntersection:
+        mode = core::VectorEraseMode::ToIntersection;
+        break;
+      case app::ui::VectorEraserMode::TrimOutside:
+        mode = core::VectorEraseMode::TrimOutside;
+        break;
+    }
+    m_eraserTool->setVectorEraseMode(mode);
+    m_eraserTool->setVectorTrimOutside(m_uiState.vectorTrimOutside);
   }
 
   if (m_lineTool != nullptr) {
@@ -2057,6 +2270,8 @@ void AppController::applyUiStateToTools() {
     m_rectSelectionTool->setAutoSelectContiguous(m_uiState.autoSelectContiguous);
     m_rectSelectionTool->setAutoSelectReferAllLayers(m_uiState.autoSelectReferAllLayers);
   }
+
+  syncCurrentSubToolFromUiState();
 }
 
 void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescriptor& subTool) {
@@ -2089,6 +2304,240 @@ void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescripto
   m_uiState.blendMode = profile.blendMode;
   m_uiState.eraseMode = profile.eraseMode;
   m_uiState.lockAlphaRespect = profile.lockAlphaRespect;
+  m_uiState.vectorEraseMode = profile.vectorEraseMode;
+  m_uiState.vectorTrimOutside = profile.vectorTrimOutside;
+}
+
+void AppController::syncCurrentSubToolFromUiState() {
+  app::ui::SubToolDescriptor* subTool = m_toolCatalog.findSubToolMutable(currentTool(), currentSubToolId());
+  if (subTool == nullptr) {
+    return;
+  }
+  app::ui::BrushPreset& preset = subTool->preset;
+  app::ui::ToolBehaviorProfile& profile = subTool->profile;
+
+  preset.size = m_uiState.size;
+  preset.opacity = m_uiState.opacity;
+  preset.hardness = m_uiState.hardness;
+  preset.flow = m_uiState.flow;
+  preset.spacing = m_uiState.spacing;
+  preset.antiAlias = m_uiState.antiAlias;
+  preset.stabilization = m_uiState.stabilization;
+  preset.postCorrection = m_uiState.postCorrection;
+  preset.velocityBasedCorrection = m_uiState.velocityBasedCorrection;
+  preset.shapeType = m_uiState.shapeType;
+  preset.blendMode = m_uiState.blendMode;
+  preset.eraseMode = m_uiState.eraseMode;
+  preset.lockAlphaRespect = m_uiState.lockAlphaRespect;
+  preset.vectorEraseMode = m_uiState.vectorEraseMode;
+  preset.vectorTrimOutside = m_uiState.vectorTrimOutside;
+  preset.angle = m_uiState.angle;
+  preset.roundness = m_uiState.roundness;
+  preset.taperStart = m_uiState.taperStart;
+  preset.taperEnd = m_uiState.taperEnd;
+  preset.snapAngle = m_uiState.snapAngle;
+  preset.simplifyLevel = m_uiState.simplifyLevel;
+  preset.strokeWidth = m_uiState.size;
+  preset.fillThreshold = m_uiState.fillThreshold;
+  preset.fillContiguous = m_uiState.fillContiguous;
+  preset.fillReferAllLayers = m_uiState.fillReferAllLayers;
+  preset.fillGapClose = m_uiState.fillGapClose;
+  preset.selectionMode = m_uiState.selectionMode;
+  preset.autoSelectThreshold = m_uiState.autoSelectThreshold;
+  preset.autoSelectContiguous = m_uiState.autoSelectContiguous;
+  preset.autoSelectReferAllLayers = m_uiState.autoSelectReferAllLayers;
+
+  profile.stroke.size = m_uiState.size;
+  profile.stroke.opacity = m_uiState.opacity;
+  profile.stroke.flow = m_uiState.flow;
+  profile.stroke.spacing = m_uiState.spacing;
+  profile.stroke.antiAlias = m_uiState.antiAlias;
+  profile.shape.shapeType = m_uiState.shapeType;
+  profile.shape.hardness = m_uiState.hardness;
+  profile.shape.angle = m_uiState.angle;
+  profile.shape.roundness = m_uiState.roundness;
+  profile.shape.taperStart = m_uiState.taperStart;
+  profile.shape.taperEnd = m_uiState.taperEnd;
+  profile.stabilizer.stabilization = m_uiState.stabilization;
+  profile.stabilizer.postCorrection = m_uiState.postCorrection;
+  profile.stabilizer.velocityBasedCorrection = m_uiState.velocityBasedCorrection;
+  profile.vector.strokeWidth = m_uiState.size;
+  profile.vector.snapAngle = m_uiState.snapAngle;
+  profile.vector.simplifyLevel = m_uiState.simplifyLevel;
+  profile.fill.threshold = m_uiState.fillThreshold;
+  profile.fill.contiguous = m_uiState.fillContiguous;
+  profile.fill.referAllLayers = m_uiState.fillReferAllLayers;
+  profile.fill.gapClose = m_uiState.fillGapClose;
+  profile.selection.mode = m_uiState.selectionMode;
+  profile.selection.autoSelectThreshold = m_uiState.autoSelectThreshold;
+  profile.selection.autoSelectContiguous = m_uiState.autoSelectContiguous;
+  profile.selection.autoSelectReferAllLayers = m_uiState.autoSelectReferAllLayers;
+  profile.blendMode = m_uiState.blendMode;
+  profile.eraseMode = m_uiState.eraseMode;
+  profile.lockAlphaRespect = m_uiState.lockAlphaRespect;
+  profile.vectorEraseMode = m_uiState.vectorEraseMode;
+  profile.vectorTrimOutside = m_uiState.vectorTrimOutside;
+
+  saveSubToolCatalogToSettings();
+}
+
+void AppController::loadSubToolCatalogFromSettings() {
+  if (QCoreApplication::instance() == nullptr) {
+    return;
+  }
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  const QByteArray catalogBytes = settings.value(QStringLiteral("subToolsV2/catalog")).toByteArray();
+  if (!catalogBytes.isEmpty()) {
+    const QJsonDocument doc = QJsonDocument::fromJson(catalogBytes);
+    if (doc.isArray()) {
+      const QJsonArray tools = doc.array();
+      for (const QJsonValue& toolValue : tools) {
+        if (!toolValue.isObject()) {
+          continue;
+        }
+        const QJsonObject toolObj = toolValue.toObject();
+        const core::ToolKind kind = static_cast<core::ToolKind>(toolObj.value(QStringLiteral("kind")).toInt(-1));
+        app::ui::ToolDescriptor* mutableTool = m_toolCatalog.findToolMutable(kind);
+        const app::ui::ToolDescriptor* defaultTool = m_toolCatalog.findTool(kind);
+        if (mutableTool == nullptr || defaultTool == nullptr) {
+          continue;
+        }
+        const QJsonArray subTools = toolObj.value(QStringLiteral("subTools")).toArray();
+        if (subTools.isEmpty()) {
+          continue;
+        }
+        std::vector<app::ui::SubToolDescriptor> loaded;
+        loaded.reserve(static_cast<std::size_t>(subTools.size()));
+        for (const QJsonValue& subValue : subTools) {
+          if (!subValue.isObject()) {
+            continue;
+          }
+          const QJsonObject subObj = subValue.toObject();
+          const QString id = subObj.value(QStringLiteral("id")).toString();
+          const QString name = subObj.value(QStringLiteral("displayName")).toString();
+          if (id.isEmpty() || name.isEmpty()) {
+            continue;
+          }
+          const app::ui::SubToolDescriptor* fallback = nullptr;
+          for (const auto& candidate : defaultTool->subTools) {
+            if (candidate.id == id.toStdString()) {
+              fallback = &candidate;
+              break;
+            }
+          }
+          if (fallback == nullptr && !defaultTool->subTools.empty()) {
+            fallback = &defaultTool->subTools.front();
+          }
+          if (fallback == nullptr) {
+            continue;
+          }
+          app::ui::SubToolDescriptor loadedSub = *fallback;
+          loadedSub.id = id.toStdString();
+          loadedSub.displayName = name.toStdString();
+          loadedSub.preset = presetFromJson(subObj.value(QStringLiteral("preset")).toObject(), fallback->preset);
+          loadedSub.profile.stroke.size = loadedSub.preset.size;
+          loadedSub.profile.stroke.opacity = loadedSub.preset.opacity;
+          loadedSub.profile.stroke.flow = loadedSub.preset.flow;
+          loadedSub.profile.stroke.spacing = loadedSub.preset.spacing;
+          loadedSub.profile.stroke.antiAlias = loadedSub.preset.antiAlias;
+          loadedSub.profile.shape.shapeType = loadedSub.preset.shapeType;
+          loadedSub.profile.shape.hardness = loadedSub.preset.hardness;
+          loadedSub.profile.shape.angle = loadedSub.preset.angle;
+          loadedSub.profile.shape.roundness = loadedSub.preset.roundness;
+          loadedSub.profile.shape.taperStart = loadedSub.preset.taperStart;
+          loadedSub.profile.shape.taperEnd = loadedSub.preset.taperEnd;
+          loadedSub.profile.stabilizer.stabilization = loadedSub.preset.stabilization;
+          loadedSub.profile.stabilizer.postCorrection = loadedSub.preset.postCorrection;
+          loadedSub.profile.stabilizer.velocityBasedCorrection = loadedSub.preset.velocityBasedCorrection;
+          loadedSub.profile.vector.strokeWidth = loadedSub.preset.strokeWidth > 0 ? loadedSub.preset.strokeWidth : loadedSub.preset.size;
+          loadedSub.profile.vector.snapAngle = loadedSub.preset.snapAngle;
+          loadedSub.profile.vector.simplifyLevel = loadedSub.preset.simplifyLevel;
+          loadedSub.profile.fill.threshold = loadedSub.preset.fillThreshold;
+          loadedSub.profile.fill.contiguous = loadedSub.preset.fillContiguous;
+          loadedSub.profile.fill.referAllLayers = loadedSub.preset.fillReferAllLayers;
+          loadedSub.profile.fill.gapClose = loadedSub.preset.fillGapClose;
+          loadedSub.profile.selection.mode = loadedSub.preset.selectionMode;
+          loadedSub.profile.selection.autoSelectThreshold = loadedSub.preset.autoSelectThreshold;
+          loadedSub.profile.selection.autoSelectContiguous = loadedSub.preset.autoSelectContiguous;
+          loadedSub.profile.selection.autoSelectReferAllLayers = loadedSub.preset.autoSelectReferAllLayers;
+          loadedSub.profile.blendMode = loadedSub.preset.blendMode;
+          loadedSub.profile.eraseMode = loadedSub.preset.eraseMode;
+          loadedSub.profile.lockAlphaRespect = loadedSub.preset.lockAlphaRespect;
+          loadedSub.profile.vectorEraseMode = loadedSub.preset.vectorEraseMode;
+          loadedSub.profile.vectorTrimOutside = loadedSub.preset.vectorTrimOutside;
+          loadedSub.profile.targetLayerKind = loadedSub.preset.targetLayerKind;
+          loadedSub.profile.cursorStyle = loadedSub.preset.cursorStyle;
+          const QString guideValue = subObj.value(QStringLiteral("guide")).toString();
+          if (!guideValue.isEmpty()) {
+            loadedSub.guide = guideValue.toStdString();
+          }
+
+          QJsonArray editable = subObj.value(QStringLiteral("editableProperties")).toArray();
+          if (!editable.isEmpty()) {
+            loadedSub.editableProperties.clear();
+            loadedSub.editableProperties.reserve(static_cast<std::size_t>(editable.size()));
+            for (const QJsonValue& value : editable) {
+              loadedSub.editableProperties.push_back(static_cast<app::ui::ToolPropertyKey>(value.toInt()));
+            }
+          }
+          loaded.push_back(std::move(loadedSub));
+        }
+        if (!loaded.empty()) {
+          mutableTool->subTools = std::move(loaded);
+        }
+      }
+    }
+  }
+
+  const QByteArray selectedBytes = settings.value(QStringLiteral("subToolsV2/selected")).toByteArray();
+  if (!selectedBytes.isEmpty()) {
+    const QJsonDocument selectedDoc = QJsonDocument::fromJson(selectedBytes);
+    if (selectedDoc.isObject()) {
+      const QJsonObject selectedObj = selectedDoc.object();
+      for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
+        const QString toolKey = toolKindSettingsKey(tool.kind);
+        const QString selectedId = selectedObj.value(toolKey).toString();
+        if (!selectedId.isEmpty()) {
+          m_selectedSubToolByTool[tool.kind] = selectedId.toStdString();
+        }
+      }
+    }
+  }
+}
+
+void AppController::saveSubToolCatalogToSettings() const {
+  if (QCoreApplication::instance() == nullptr) {
+    return;
+  }
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  QJsonArray toolsArray;
+  for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
+    QJsonObject toolObj;
+    toolObj.insert(QStringLiteral("kind"), static_cast<int>(tool.kind));
+    QJsonArray subToolsArray;
+    for (const app::ui::SubToolDescriptor& sub : tool.subTools) {
+      QJsonObject subObj;
+      subObj.insert(QStringLiteral("id"), QString::fromStdString(sub.id));
+      subObj.insert(QStringLiteral("displayName"), QString::fromStdString(sub.displayName));
+      subObj.insert(QStringLiteral("guide"), QString::fromStdString(sub.guide));
+      subObj.insert(QStringLiteral("preset"), toJson(sub.preset));
+      QJsonArray editable;
+      for (app::ui::ToolPropertyKey key : sub.editableProperties) {
+        editable.push_back(static_cast<int>(key));
+      }
+      subObj.insert(QStringLiteral("editableProperties"), editable);
+      subToolsArray.push_back(subObj);
+    }
+    toolObj.insert(QStringLiteral("subTools"), subToolsArray);
+    toolsArray.push_back(toolObj);
+  }
+  settings.setValue(QStringLiteral("subToolsV2/catalog"), QJsonDocument(toolsArray).toJson(QJsonDocument::Compact));
+
+  QJsonObject selectedObj;
+  for (const auto& [kind, subToolId] : m_selectedSubToolByTool) {
+    selectedObj.insert(toolKindSettingsKey(kind), QString::fromStdString(subToolId));
+  }
+  settings.setValue(QStringLiteral("subToolsV2/selected"), QJsonDocument(selectedObj).toJson(QJsonDocument::Compact));
 }
 
 core::ToolContext AppController::makeToolContext() {

@@ -31,6 +31,8 @@ struct UiState {
   core::BlendMode blendMode {core::BlendMode::Normal};
   bool eraseMode {false};
   bool lockAlphaRespect {false};
+  VectorEraserMode vectorEraseMode {VectorEraserMode::TouchedOnly};
+  bool vectorTrimOutside {false};
   int fillThreshold {0};
   bool fillContiguous {true};
   bool fillReferAllLayers {false};

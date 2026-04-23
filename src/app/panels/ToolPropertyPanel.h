@@ -59,6 +59,8 @@ private slots:
   void onSnapAngleSpinChanged(int value);
   void onSimplifySliderChanged(int value);
   void onSimplifySpinChanged(int value);
+  void onVectorEraseModeChanged(int index);
+  void onVectorTrimOutsideToggled(bool checked);
   void onFillThresholdSliderChanged(int value);
   void onFillThresholdSpinChanged(int value);
   void onFillContiguousToggled(bool checked);
@@ -113,6 +115,7 @@ private:
   QLabel* m_taperEndLabel {nullptr};
   QLabel* m_snapAngleLabel {nullptr};
   QLabel* m_simplifyLabel {nullptr};
+  QLabel* m_vectorEraseModeLabel {nullptr};
   QLabel* m_fillThresholdLabel {nullptr};
   QLabel* m_fillGapCloseLabel {nullptr};
   QLabel* m_selectionModeLabel {nullptr};
@@ -145,6 +148,8 @@ private:
   QSpinBox* m_snapAngleSpin {nullptr};
   QSlider* m_simplifySlider {nullptr};
   QSpinBox* m_simplifySpin {nullptr};
+  QComboBox* m_vectorEraseModeCombo {nullptr};
+  QCheckBox* m_vectorTrimOutsideCheck {nullptr};
   QSlider* m_fillThresholdSlider {nullptr};
   QSpinBox* m_fillThresholdSpin {nullptr};
   QCheckBox* m_fillContiguousCheck {nullptr};

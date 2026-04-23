@@ -380,7 +380,7 @@ int main() {
                        std::abs(snappedPath.points[1].y - snappedPath.points[0].y),
                "Snap angle should quantize vector line direction.");
     controller.setCurrentTool(core::ToolKind::Eraser);
-    expectTrue(controller.setCurrentSubTool("eraser_vector_whole"), "Vector eraser preset should be selectable.");
+    expectTrue(controller.setCurrentSubTool("eraser_vector_touch"), "Vector eraser touched preset should be selectable.");
     expectTrue(controller.canUseCurrentToolOnActiveLayer(), "Vector eraser should be available on vector layer.");
     const std::size_t pathCountBeforeErase = controller.document().layerAt(1).vectorPaths().size();
     controller.beginStroke(6, 6);
@@ -396,6 +396,17 @@ int main() {
     expectTrue(
         controller.document().layerAt(1).vectorPaths().size() == pathCountAfterErase,
         "Redo should remove vector paths again.");
+    expectTrue(controller.setCurrentSubTool("eraser_vector_intersection"), "Vector eraser intersection preset should be selectable.");
+    expectTrue(controller.currentToolSupportsVectorEraseMode(), "Vector eraser mode property should be exposed.");
+    controller.setVectorEraseMode(app::ui::VectorEraserMode::ToIntersection);
+    controller.beginStroke(10, 10);
+    controller.continueStroke(22, 22);
+    controller.endStroke();
+    expectTrue(controller.canUndo(), "Intersection mode erase should create undo history.");
+    expectTrue(controller.setCurrentSubTool("eraser_vector_trim"), "Vector eraser trim preset should be selectable.");
+    expectTrue(controller.currentToolSupportsVectorTrimOutside(), "Vector trim property should be exposed.");
+    controller.setVectorTrimOutside(true);
+    expectTrue(controller.toolState().vectorTrimOutside, "Vector trim setting should be reflected in tool state.");
 
     const auto brushSubToolsOnVector = controller.subToolViewModels();
     expectTrue(!brushSubToolsOnVector.empty(), "Sub tool list should remain available on vector layer.");
@@ -403,6 +414,9 @@ int main() {
     // Sub-tool management operations
     controller.setCurrentTool(core::ToolKind::Brush);
     const std::string originalSubTool = controller.currentSubToolId();
+    expectTrue(controller.createCurrentSubTool(), "Create sub-tool should create a new editable preset.");
+    const std::string createdSubTool = controller.currentSubToolId();
+    expectTrue(createdSubTool != originalSubTool, "Created preset should become active.");
     expectTrue(controller.duplicateCurrentSubTool(), "Duplicate sub-tool should create a new editable preset.");
     const std::string duplicatedSubTool = controller.currentSubToolId();
     expectTrue(duplicatedSubTool != originalSubTool, "Duplicated preset should become active with new id.");
@@ -412,6 +426,7 @@ int main() {
     expectTrue(controller.currentSubToolId() != duplicatedSubTool, "After delete, active sub-tool should switch to an existing one.");
     expectTrue(controller.setCurrentSubTool("brush_hard"), "Built-in hard brush sub-tool should be selectable.");
     controller.setBrushSize(77);
+    expectTrue(controller.saveSubToolSettings(), "Sub-tool settings save should succeed.");
     expectTrue(controller.resetCurrentSubTool(), "Reset sub-tool should restore default descriptor values.");
     expectTrue(controller.toolState().size == 6, "Reset hard brush should restore default size.");
 

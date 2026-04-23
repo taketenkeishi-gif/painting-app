@@ -22,6 +22,8 @@ public:
   void setPostCorrection(bool postCorrection) noexcept { m_postCorrection = postCorrection; }
   void setVelocityBasedCorrection(bool enabled) noexcept { m_velocityBasedCorrection = enabled; }
   void setShapeType(BrushShapeType shapeType) noexcept { m_shapeType = shapeType; }
+  void setVectorEraseMode(VectorEraseMode mode) noexcept { m_vectorEraseMode = mode; }
+  void setVectorTrimOutside(bool enabled) noexcept { m_vectorTrimOutside = enabled; }
   int size() const noexcept { return m_size; }
 
   ToolKind kind() const noexcept override { return ToolKind::Eraser; }
@@ -52,6 +54,8 @@ private:
   bool m_postCorrection {false};
   bool m_velocityBasedCorrection {false};
   BrushShapeType m_shapeType {BrushShapeType::Circle};
+  VectorEraseMode m_vectorEraseMode {VectorEraseMode::TouchedOnly};
+  bool m_vectorTrimOutside {false};
   bool m_erasing {false};
   Point m_lastPoint {0, 0};
 };
