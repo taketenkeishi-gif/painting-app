@@ -23,8 +23,18 @@ class ToolPanel : public QWidget {
   Q_OBJECT
 
 public:
+  enum class Section : unsigned {
+    Buttons = 0x1,
+    QuickSliders = 0x2
+  };
+  using Sections = unsigned;
+  static constexpr Sections ButtonsOnly = static_cast<Sections>(Section::Buttons);
+  static constexpr Sections QuickSlidersOnly = static_cast<Sections>(Section::QuickSliders);
+  static constexpr Sections Combined = ButtonsOnly | QuickSlidersOnly;
+
   explicit ToolPanel(QWidget* parent = nullptr);
   void setController(app::bridge::AppController* controller);
+  void setSections(Sections sections) noexcept;
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
@@ -52,6 +62,7 @@ private:
   QLabel* m_sizeValueLabel {nullptr};
   QLabel* m_opacityValueLabel {nullptr};
   bool m_refreshingSliders {false};
+  Sections m_sections {Combined};
 };
 
 } // namespace app::panels

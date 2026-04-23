@@ -130,6 +130,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
       m_layerPanel(new app::panels::LayerPanel(this)),
       m_toolPanel(new app::panels::ToolPanel(this)),
+      m_quickSliderPanel(new app::panels::ToolPanel(this)),
       m_subToolPanel(new app::panels::SubToolPanel(this)),
       m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
   setWindowTitle("自作イラストアプリ");
@@ -138,8 +139,11 @@ MainWindow::MainWindow(QWidget* parent)
   m_canvasWidget->setController(m_controller);
   m_layerPanel->setController(m_controller);
   m_toolPanel->setController(m_controller);
+  m_quickSliderPanel->setController(m_controller);
   m_subToolPanel->setController(m_controller);
   m_toolPropertyPanel->setController(m_controller);
+  m_toolPanel->setSections(app::panels::ToolPanel::ButtonsOnly);
+  m_quickSliderPanel->setSections(app::panels::ToolPanel::QuickSlidersOnly);
 
   setupShellLayout();
   createMenus();
@@ -406,6 +410,7 @@ void MainWindow::setupShellLayout() {
   };
 
   m_toolDock = makeDock("ツール", makeScrollable(m_toolPanel), "ToolDock");
+  m_toolSliderDock = makeDock("ツールスライダー", makeScrollable(m_quickSliderPanel), "ToolSliderDock");
   m_subToolDock = makeDock("サブツール", makeScrollable(m_subToolPanel), "SubToolDock");
   m_toolPropertyDock = makeDock("ツールプロパティ", makeScrollable(m_toolPropertyPanel), "ToolPropertyDock");
   m_colorDock = makeDock("カラー", makeScrollable(colorPanel), "ColorDock");
@@ -413,21 +418,22 @@ void MainWindow::setupShellLayout() {
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
+  addDockWidget(Qt::LeftDockWidgetArea, m_toolSliderDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_subToolDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolPropertyDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_colorDock);
-  splitDockWidget(m_toolDock, m_subToolDock, Qt::Horizontal);
-  splitDockWidget(m_subToolDock, m_toolPropertyDock, Qt::Vertical);
-  splitDockWidget(m_toolPropertyDock, m_colorDock, Qt::Vertical);
-  resizeDocks({m_toolDock, m_subToolDock}, {96, 320}, Qt::Horizontal);
-  resizeDocks({m_subToolDock, m_toolPropertyDock, m_colorDock}, {280, 330, 230}, Qt::Vertical);
+  splitDockWidget(m_toolDock, m_toolSliderDock, Qt::Horizontal);
+  splitDockWidget(m_toolSliderDock, m_subToolDock, Qt::Horizontal);
+  tabifyDockWidget(m_subToolDock, m_toolPropertyDock);
+  tabifyDockWidget(m_subToolDock, m_colorDock);
+  resizeDocks({m_toolDock, m_toolSliderDock, m_subToolDock}, {88, 88, 320}, Qt::Horizontal);
+  m_subToolDock->raise();
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
   resizeDocks({m_layerDock, m_infoDock}, {620, 210}, Qt::Vertical);
 
   m_toolDock->raise();
-  m_subToolDock->raise();
   m_layerDock->raise();
   m_defaultDockState = saveState();
   adjustRightDockLayout();
@@ -650,6 +656,9 @@ void MainWindow::createMenus() {
 
   if (m_toolDock != nullptr) {
     windowMenu->addAction(m_toolDock->toggleViewAction());
+  }
+  if (m_toolSliderDock != nullptr) {
+    windowMenu->addAction(m_toolSliderDock->toggleViewAction());
   }
   if (m_subToolDock != nullptr) {
     windowMenu->addAction(m_subToolDock->toggleViewAction());

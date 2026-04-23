@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <QGridLayout>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLayoutItem>
@@ -99,46 +100,62 @@ QString iconName(core::ToolKind kind) {
 QWidget* makeQuickSliderBlock(
     QWidget* parent,
     const QString& labelText,
+    const QString& swatchStyle,
+    const QString& grooveColor,
+    const QString& fillColor,
+    const QString& emptyColor,
     QSlider*& sliderOut,
     QLabel*& valueLabelOut,
     int min,
     int max) {
   auto* block = new QWidget(parent);
+  block->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
   auto* blockLayout = new QVBoxLayout(block);
   blockLayout->setContentsMargins(0, 0, 0, 0);
-  blockLayout->setSpacing(1);
+  blockLayout->setSpacing(2);
 
   auto* top = new QHBoxLayout();
   top->setContentsMargins(0, 0, 0, 0);
-  top->setSpacing(1);
+  top->setSpacing(2);
+  auto* swatch = new QFrame(block);
+  swatch->setFixedSize(10, 10);
+  swatch->setStyleSheet(swatchStyle);
   auto* label = new QLabel(labelText, block);
   label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   label->setStyleSheet("font-size: 10px; color: #b7c2d3;");
   valueLabelOut = new QLabel("0", block);
   valueLabelOut->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  valueLabelOut->setMinimumWidth(18);
+  valueLabelOut->setMinimumWidth(20);
   valueLabelOut->setStyleSheet("font-size: 10px; color: #dbe4f3;");
+  top->addWidget(swatch, 0, Qt::AlignVCenter);
   top->addWidget(label);
   top->addWidget(valueLabelOut, 1);
 
   sliderOut = new QSlider(Qt::Vertical, block);
   sliderOut->setRange(min, max);
   sliderOut->setInvertedAppearance(true);
-  sliderOut->setFixedWidth(10);
-  sliderOut->setMinimumHeight(160);
-  sliderOut->setMaximumHeight(280);
+  sliderOut->setInvertedControls(false);
+  sliderOut->setFixedWidth(8);
+  sliderOut->setMinimumHeight(120);
   sliderOut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
   sliderOut->setFocusPolicy(Qt::StrongFocus);
+  sliderOut->setStyleSheet(
+      QString(
+          "QSlider::groove:vertical { background: %1; border: 1px solid #343d4d; width: 4px; border-radius: 2px; }"
+          "QSlider::sub-page:vertical { background: %2; border-radius: 2px; }"
+          "QSlider::add-page:vertical { background: %3; border-radius: 2px; }"
+          "QSlider::handle:vertical { background: #edf2fb; height: 8px; margin: 0 -4px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.25); }")
+          .arg(grooveColor, emptyColor, fillColor));
 
   auto* sliderHolder = new QHBoxLayout();
-  sliderHolder->setContentsMargins(0, 0, 0, 0);
+  sliderHolder->setContentsMargins(0, 2, 0, 2);
   sliderHolder->setSpacing(0);
   sliderHolder->addStretch(1);
   sliderHolder->addWidget(sliderOut);
   sliderHolder->addStretch(1);
 
   blockLayout->addLayout(top);
-  blockLayout->addLayout(sliderHolder);
+  blockLayout->addLayout(sliderHolder, 1);
   return block;
 }
 
@@ -163,9 +180,7 @@ ToolPanel::ToolPanel(QWidget* parent)
       "QToolButton:hover { background: #303846; border-color: #6f8fb7; }"
       "QToolButton:checked { background: #2d4f74; border-color: #93c1f3; color: #ffffff; }"
       "QToolButton:disabled { background: #1f232b; border-color: #2d3441; color: #6d7888; }"
-      "QLabel { color: #c9d2df; }"
-      "QSlider::groove:vertical { background: #161b23; border: 1px solid #343d4d; width: 4px; border-radius: 2px; }"
-      "QSlider::handle:vertical { background: #89b0de; height: 9px; margin: 0 -4px; border-radius: 4px; }");
+      "QLabel { color: #c9d2df; }");
 
   m_rootLayout->setContentsMargins(1, 1, 1, 1);
   m_rootLayout->setSpacing(2);
@@ -177,12 +192,34 @@ ToolPanel::ToolPanel(QWidget* parent)
   m_rootLayout->addWidget(m_buttonGridHost);
 
   auto* quickWrap = new QHBoxLayout(m_quickHost);
-  quickWrap->setContentsMargins(0, 0, 0, 0);
+  quickWrap->setContentsMargins(0, 2, 0, 2);
   quickWrap->setSpacing(2);
-  quickWrap->addWidget(makeQuickSliderBlock(this, "px", m_sizeSlider, m_sizeValueLabel, 1, 128));
-  quickWrap->addWidget(makeQuickSliderBlock(this, "%", m_opacitySlider, m_opacityValueLabel, 0, 100));
-  m_rootLayout->addWidget(m_quickHost, 0, Qt::AlignHCenter);
-  m_rootLayout->addStretch(1);
+  quickWrap->addWidget(
+      makeQuickSliderBlock(
+          this,
+          "px",
+          "QFrame { background: #79a8f5; border: 1px solid #9ec2ff; border-radius: 2px; }",
+          "#161b23",
+          "#5f8fda",
+          "#2e3540",
+          m_sizeSlider,
+          m_sizeValueLabel,
+          1,
+          128));
+  quickWrap->addWidget(
+      makeQuickSliderBlock(
+          this,
+          "%",
+          "QFrame { background: #9098a6; border: 1px solid #b6becd; border-radius: 2px; }",
+          "#161b23",
+          "#8d96a3",
+          "#2e3540",
+          m_opacitySlider,
+          m_opacityValueLabel,
+          0,
+          100));
+  m_quickHost->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+  m_rootLayout->addWidget(m_quickHost, 1, Qt::AlignHCenter);
 
   connect(m_sizeSlider, &QSlider::valueChanged, this, &ToolPanel::onSizeSliderChanged);
   connect(m_opacitySlider, &QSlider::valueChanged, this, &ToolPanel::onOpacitySliderChanged);
@@ -205,7 +242,21 @@ void ToolPanel::setController(app::bridge::AppController* controller) {
 
 void ToolPanel::resizeEvent(QResizeEvent* event) {
   QWidget::resizeEvent(event);
+  if ((m_sections & ButtonsOnly) == 0U) {
+    return;
+  }
   relayoutButtons();
+}
+
+void ToolPanel::setSections(Sections sections) noexcept {
+  m_sections = sections;
+  const bool showButtons = (m_sections & ButtonsOnly) != 0U;
+  const bool showQuick = (m_sections & QuickSlidersOnly) != 0U;
+  m_buttonGridHost->setVisible(showButtons);
+  m_quickHost->setVisible(showQuick);
+  if (showButtons) {
+    relayoutButtons();
+  }
 }
 
 int ToolPanel::columnCountForWidth(int width) const noexcept {

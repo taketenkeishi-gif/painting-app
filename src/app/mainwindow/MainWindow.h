@@ -143,6 +143,7 @@ private:
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
   app::panels::LayerPanel* m_layerPanel {nullptr};
   app::panels::ToolPanel* m_toolPanel {nullptr};
+  app::panels::ToolPanel* m_quickSliderPanel {nullptr};
   app::panels::SubToolPanel* m_subToolPanel {nullptr};
   app::panels::ToolPropertyPanel* m_toolPropertyPanel {nullptr};
   QWidget* m_leftToolHost {nullptr};
@@ -153,6 +154,7 @@ private:
   QSplitter* m_rightSplitter {nullptr};
   QTabWidget* m_rightTabWidget {nullptr};
   QDockWidget* m_toolDock {nullptr};
+  QDockWidget* m_toolSliderDock {nullptr};
   QDockWidget* m_subToolDock {nullptr};
   QDockWidget* m_toolPropertyDock {nullptr};
   QDockWidget* m_colorDock {nullptr};
