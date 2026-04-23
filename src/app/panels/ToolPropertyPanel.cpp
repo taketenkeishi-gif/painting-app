@@ -10,6 +10,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -141,7 +142,9 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   m_guideLabel->setWordWrap(true);
   m_compatibilityLabel->setWordWrap(true);
+  m_guideLabel->setStyleSheet("color: #aeb8c8; font-size: 10px;");
   m_compatibilityLabel->setStyleSheet("color: #f3bf58; font-weight: 600;");
+  m_guideLabel->setVisible(false);
   m_sizeSpin->setRange(1, 128);
   m_opacitySlider->setRange(0, 100);
   m_opacitySpin->setRange(0, 100);
@@ -184,13 +187,19 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_selectionModeCombo->addItem("自動選択", static_cast<int>(app::ui::SelectionMode::AutoSelect));
 
   auto* contentLayout = new QVBoxLayout(m_contentWidget);
-  contentLayout->setContentsMargins(6, 6, 6, 6);
-  contentLayout->setSpacing(8);
+  contentLayout->setContentsMargins(2, 2, 2, 2);
+  contentLayout->setSpacing(2);
+
+  auto markResponsiveRow = [](QHBoxLayout* row) {
+    row->setContentsMargins(0, 0, 0, 0);
+    row->setSpacing(4);
+    row->setProperty("responsiveRow", true);
+  };
 
   auto* titleFrame = new QFrame(m_contentWidget);
   auto* titleLayout = new QVBoxLayout(titleFrame);
-  titleLayout->setContentsMargins(8, 8, 8, 8);
-  titleLayout->setSpacing(4);
+  titleLayout->setContentsMargins(3, 3, 3, 3);
+  titleLayout->setSpacing(2);
   titleLayout->addWidget(m_toolNameLabel);
   titleLayout->addWidget(m_compatibilityLabel);
   titleLayout->addWidget(m_guideLabel);
@@ -198,18 +207,16 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* basicGroup = new QGroupBox("基本", m_contentWidget);
   auto* basicLayout = new QVBoxLayout(basicGroup);
-  basicLayout->setContentsMargins(8, 8, 8, 8);
-  basicLayout->setSpacing(6);
+  basicLayout->setContentsMargins(4, 4, 4, 4);
+  basicLayout->setSpacing(4);
 
   auto* opacityRow = new QHBoxLayout();
-  opacityRow->setContentsMargins(0, 0, 0, 0);
-  opacityRow->setSpacing(6);
+  markResponsiveRow(opacityRow);
   opacityRow->addWidget(m_opacitySlider, 1);
   opacityRow->addWidget(m_opacitySpin);
 
   auto* hardnessRow = new QHBoxLayout();
-  hardnessRow->setContentsMargins(0, 0, 0, 0);
-  hardnessRow->setSpacing(6);
+  markResponsiveRow(hardnessRow);
   hardnessRow->addWidget(m_hardnessSlider, 1);
   hardnessRow->addWidget(m_hardnessSpin);
 
@@ -225,18 +232,16 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* dynamicsGroup = new QGroupBox("ブラシ特性", m_contentWidget);
   auto* dynamicsLayout = new QVBoxLayout(dynamicsGroup);
-  dynamicsLayout->setContentsMargins(8, 8, 8, 8);
-  dynamicsLayout->setSpacing(6);
+  dynamicsLayout->setContentsMargins(4, 4, 4, 4);
+  dynamicsLayout->setSpacing(4);
 
   auto* flowRow = new QHBoxLayout();
-  flowRow->setContentsMargins(0, 0, 0, 0);
-  flowRow->setSpacing(6);
+  markResponsiveRow(flowRow);
   flowRow->addWidget(m_flowSlider, 1);
   flowRow->addWidget(m_flowSpin);
 
   auto* spacingRow = new QHBoxLayout();
-  spacingRow->setContentsMargins(0, 0, 0, 0);
-  spacingRow->setSpacing(6);
+  markResponsiveRow(spacingRow);
   spacingRow->addWidget(m_spacingSlider, 1);
   spacingRow->addWidget(m_spacingSpin);
 
@@ -249,12 +254,11 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* correctionGroup = new QGroupBox("補正", m_contentWidget);
   auto* correctionLayout = new QVBoxLayout(correctionGroup);
-  correctionLayout->setContentsMargins(8, 8, 8, 8);
-  correctionLayout->setSpacing(6);
+  correctionLayout->setContentsMargins(4, 4, 4, 4);
+  correctionLayout->setSpacing(4);
 
   auto* stabilizationRow = new QHBoxLayout();
-  stabilizationRow->setContentsMargins(0, 0, 0, 0);
-  stabilizationRow->setSpacing(6);
+  markResponsiveRow(stabilizationRow);
   stabilizationRow->addWidget(m_stabilizationSlider, 1);
   stabilizationRow->addWidget(m_stabilizationSpin);
 
@@ -268,26 +272,22 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* shapeGroup = new QGroupBox("形状", m_contentWidget);
   auto* shapeLayout = new QVBoxLayout(shapeGroup);
-  shapeLayout->setContentsMargins(8, 8, 8, 8);
-  shapeLayout->setSpacing(6);
+  shapeLayout->setContentsMargins(4, 4, 4, 4);
+  shapeLayout->setSpacing(4);
   auto* angleRow = new QHBoxLayout();
-  angleRow->setContentsMargins(0, 0, 0, 0);
-  angleRow->setSpacing(6);
+  markResponsiveRow(angleRow);
   angleRow->addWidget(m_angleSlider, 1);
   angleRow->addWidget(m_angleSpin);
   auto* roundnessRow = new QHBoxLayout();
-  roundnessRow->setContentsMargins(0, 0, 0, 0);
-  roundnessRow->setSpacing(6);
+  markResponsiveRow(roundnessRow);
   roundnessRow->addWidget(m_roundnessSlider, 1);
   roundnessRow->addWidget(m_roundnessSpin);
   auto* taperStartRow = new QHBoxLayout();
-  taperStartRow->setContentsMargins(0, 0, 0, 0);
-  taperStartRow->setSpacing(6);
+  markResponsiveRow(taperStartRow);
   taperStartRow->addWidget(m_taperStartSlider, 1);
   taperStartRow->addWidget(m_taperStartSpin);
   auto* taperEndRow = new QHBoxLayout();
-  taperEndRow->setContentsMargins(0, 0, 0, 0);
-  taperEndRow->setSpacing(6);
+  markResponsiveRow(taperEndRow);
   taperEndRow->addWidget(m_taperEndSlider, 1);
   taperEndRow->addWidget(m_taperEndSpin);
   shapeLayout->addWidget(m_shapeTypeCombo);
@@ -304,8 +304,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* drawControlGroup = new QGroupBox("描画制御", m_contentWidget);
   auto* drawControlLayout = new QVBoxLayout(drawControlGroup);
-  drawControlLayout->setContentsMargins(8, 8, 8, 8);
-  drawControlLayout->setSpacing(6);
+  drawControlLayout->setContentsMargins(4, 4, 4, 4);
+  drawControlLayout->setSpacing(4);
   drawControlLayout->addWidget(m_blendModeCombo);
   drawControlLayout->addWidget(m_eraseModeCheck);
   drawControlLayout->addWidget(m_lockAlphaRespectCheck);
@@ -314,16 +314,14 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* vectorGroup = new QGroupBox("ベクター", m_contentWidget);
   auto* vectorLayout = new QVBoxLayout(vectorGroup);
-  vectorLayout->setContentsMargins(8, 8, 8, 8);
-  vectorLayout->setSpacing(6);
+  vectorLayout->setContentsMargins(4, 4, 4, 4);
+  vectorLayout->setSpacing(4);
   auto* snapAngleRow = new QHBoxLayout();
-  snapAngleRow->setContentsMargins(0, 0, 0, 0);
-  snapAngleRow->setSpacing(6);
+  markResponsiveRow(snapAngleRow);
   snapAngleRow->addWidget(m_snapAngleSlider, 1);
   snapAngleRow->addWidget(m_snapAngleSpin);
   auto* simplifyRow = new QHBoxLayout();
-  simplifyRow->setContentsMargins(0, 0, 0, 0);
-  simplifyRow->setSpacing(6);
+  markResponsiveRow(simplifyRow);
   simplifyRow->addWidget(m_simplifySlider, 1);
   simplifyRow->addWidget(m_simplifySpin);
   vectorLayout->addWidget(m_snapAngleLabel);
@@ -335,16 +333,14 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* fillGroup = new QGroupBox("塗りつぶし", m_contentWidget);
   auto* fillLayout = new QVBoxLayout(fillGroup);
-  fillLayout->setContentsMargins(8, 8, 8, 8);
-  fillLayout->setSpacing(6);
+  fillLayout->setContentsMargins(4, 4, 4, 4);
+  fillLayout->setSpacing(4);
   auto* fillThresholdRow = new QHBoxLayout();
-  fillThresholdRow->setContentsMargins(0, 0, 0, 0);
-  fillThresholdRow->setSpacing(6);
+  markResponsiveRow(fillThresholdRow);
   fillThresholdRow->addWidget(m_fillThresholdSlider, 1);
   fillThresholdRow->addWidget(m_fillThresholdSpin);
   auto* fillGapCloseRow = new QHBoxLayout();
-  fillGapCloseRow->setContentsMargins(0, 0, 0, 0);
-  fillGapCloseRow->setSpacing(6);
+  markResponsiveRow(fillGapCloseRow);
   fillGapCloseRow->addWidget(m_fillGapCloseSlider, 1);
   fillGapCloseRow->addWidget(m_fillGapCloseSpin);
   fillLayout->addWidget(m_fillThresholdLabel);
@@ -358,11 +354,10 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* selectionGroup = new QGroupBox("選択", m_contentWidget);
   auto* selectionLayout = new QVBoxLayout(selectionGroup);
-  selectionLayout->setContentsMargins(8, 8, 8, 8);
-  selectionLayout->setSpacing(6);
+  selectionLayout->setContentsMargins(4, 4, 4, 4);
+  selectionLayout->setSpacing(4);
   auto* autoSelectThresholdRow = new QHBoxLayout();
-  autoSelectThresholdRow->setContentsMargins(0, 0, 0, 0);
-  autoSelectThresholdRow->setSpacing(6);
+  markResponsiveRow(autoSelectThresholdRow);
   autoSelectThresholdRow->addWidget(m_autoSelectThresholdSlider, 1);
   autoSelectThresholdRow->addWidget(m_autoSelectThresholdSpin);
   selectionLayout->addWidget(m_selectionModeLabel);
@@ -435,6 +430,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onBlendModeChanged);
   connect(m_eraseModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onEraseModeToggled);
   connect(m_lockAlphaRespectCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onLockAlphaRespectToggled);
+  applyResponsiveLayout();
 }
 
 void ToolPropertyPanel::setController(app::bridge::AppController* controller) {
@@ -451,6 +447,28 @@ void ToolPropertyPanel::setController(app::bridge::AppController* controller) {
   refreshFromController();
 }
 
+void ToolPropertyPanel::resizeEvent(QResizeEvent* event) {
+  QWidget::resizeEvent(event);
+  applyResponsiveLayout();
+}
+
+void ToolPropertyPanel::applyResponsiveLayout() {
+  const bool compact = width() < 260;
+  if (compact == m_compactLayout || m_contentWidget == nullptr) {
+    return;
+  }
+  m_compactLayout = compact;
+
+  const auto rows = m_contentWidget->findChildren<QHBoxLayout*>();
+  for (QHBoxLayout* row : rows) {
+    if (row == nullptr || !row->property("responsiveRow").toBool()) {
+      continue;
+    }
+    row->setDirection(compact ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    row->setSpacing(compact ? 2 : 4);
+  }
+}
+
 void ToolPropertyPanel::refreshFromController() {
   if (m_controller == nullptr) {
     return;
@@ -460,7 +478,9 @@ void ToolPropertyPanel::refreshFromController() {
   const QString compatibilityHint = QString::fromStdString(m_controller->currentLayerCompatibilityHint());
   m_compatibilityLabel->setVisible(!compatibilityHint.isEmpty());
   m_compatibilityLabel->setText(compatibilityHint);
-  m_guideLabel->setText(QString("操作: %1").arg(QString::fromStdString(m_controller->currentToolGuide())));
+  const QString guideText = QString::fromStdString(m_controller->currentToolGuide()).trimmed();
+  m_guideLabel->setText(guideText);
+  m_guideLabel->setVisible(!guideText.isEmpty());
 
   const bool supportsColor = m_controller->currentToolSupportsColor();
   const bool supportsSize = m_controller->currentToolSupportsSize();

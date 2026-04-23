@@ -1,4 +1,4 @@
-#include "app/panels/ToolPanel.h"
+﻿#include "app/panels/ToolPanel.h"
 
 #include <algorithm>
 #include <vector>
@@ -7,13 +7,14 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLayoutItem>
+#include <QResizeEvent>
 #include <QSignalBlocker>
 #include <QSlider>
-#include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include "app/bridge/AppController.h"
+#include "app/ui/IconLoader.h"
 
 namespace app::panels {
 
@@ -22,25 +23,25 @@ namespace {
 QString toolNameJa(core::ToolKind kind) {
   switch (kind) {
     case core::ToolKind::Brush:
-      return QString::fromUtf8(u8"ブラシ");
+      return QStringLiteral("ブラシ");
     case core::ToolKind::Eraser:
-      return QString::fromUtf8(u8"消しゴム");
+      return QStringLiteral("消しゴム");
     case core::ToolKind::Eyedropper:
-      return QString::fromUtf8(u8"スポイト");
+      return QStringLiteral("スポイト");
     case core::ToolKind::Fill:
-      return QString::fromUtf8(u8"塗りつぶし");
+      return QStringLiteral("塗りつぶし");
     case core::ToolKind::Line:
-      return QString::fromUtf8(u8"直線");
+      return QStringLiteral("直線");
     case core::ToolKind::RectSelection:
-      return QString::fromUtf8(u8"選択");
+      return QStringLiteral("選択");
     case core::ToolKind::MoveLayer:
-      return QString::fromUtf8(u8"移動");
+      return QStringLiteral("移動");
     case core::ToolKind::Hand:
-      return QString::fromUtf8(u8"手のひら");
+      return QStringLiteral("手のひら");
     case core::ToolKind::Zoom:
-      return QString::fromUtf8(u8"ズーム");
+      return QStringLiteral("ズーム");
     default:
-      return QString::fromUtf8(u8"ツール");
+      return QStringLiteral("ツール");
   }
 }
 
@@ -69,28 +70,28 @@ QString toolShortcut(core::ToolKind kind) {
   }
 }
 
-QIcon toolIcon(QWidget* owner, core::ToolKind kind) {
+QString iconName(core::ToolKind kind) {
   switch (kind) {
     case core::ToolKind::Brush:
-      return owner->style()->standardIcon(QStyle::SP_DriveFDIcon);
+      return "brush";
     case core::ToolKind::Eraser:
-      return owner->style()->standardIcon(QStyle::SP_DialogResetButton);
+      return "eraser";
     case core::ToolKind::Eyedropper:
-      return owner->style()->standardIcon(QStyle::SP_BrowserReload);
+      return "eyedropper";
     case core::ToolKind::Fill:
-      return owner->style()->standardIcon(QStyle::SP_DialogApplyButton);
+      return "fill";
     case core::ToolKind::Line:
-      return owner->style()->standardIcon(QStyle::SP_ArrowForward);
+      return "line";
     case core::ToolKind::RectSelection:
-      return owner->style()->standardIcon(QStyle::SP_DialogOpenButton);
+      return "select";
     case core::ToolKind::MoveLayer:
-      return owner->style()->standardIcon(QStyle::SP_ArrowUp);
+      return "move";
     case core::ToolKind::Hand:
-      return owner->style()->standardIcon(QStyle::SP_TitleBarNormalButton);
+      return "hand";
     case core::ToolKind::Zoom:
-      return owner->style()->standardIcon(QStyle::SP_FileDialogDetailedView);
+      return "zoom";
     default:
-      return QIcon {};
+      return "brush";
   }
 }
 
@@ -104,23 +105,25 @@ QWidget* makeQuickSliderBlock(
   auto* block = new QWidget(parent);
   auto* blockLayout = new QVBoxLayout(block);
   blockLayout->setContentsMargins(0, 0, 0, 0);
-  blockLayout->setSpacing(2);
+  blockLayout->setSpacing(1);
 
   auto* top = new QHBoxLayout();
   top->setContentsMargins(0, 0, 0, 0);
-  top->setSpacing(2);
+  top->setSpacing(1);
   auto* label = new QLabel(labelText, block);
   label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+  label->setStyleSheet("font-size: 10px; color: #b7c2d3;");
   valueLabelOut = new QLabel("0", block);
   valueLabelOut->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  valueLabelOut->setMinimumWidth(20);
+  valueLabelOut->setMinimumWidth(18);
+  valueLabelOut->setStyleSheet("font-size: 10px; color: #dbe4f3;");
   top->addWidget(label);
   top->addWidget(valueLabelOut, 1);
 
   sliderOut = new QSlider(Qt::Vertical, block);
   sliderOut->setRange(min, max);
   sliderOut->setInvertedAppearance(true);
-  sliderOut->setFixedSize(12, 98);
+  sliderOut->setFixedSize(10, 84);
   sliderOut->setFocusPolicy(Qt::StrongFocus);
 
   auto* sliderHolder = new QHBoxLayout();
@@ -138,29 +141,47 @@ QWidget* makeQuickSliderBlock(
 } // namespace
 
 ToolPanel::ToolPanel(QWidget* parent)
-    : QWidget(parent) {
+    : QWidget(parent),
+      m_buttonGridHost(new QWidget(this)),
+      m_buttonGrid(new QGridLayout()),
+      m_quickHost(new QWidget(this)),
+      m_rootLayout(new QVBoxLayout(this)) {
   setStyleSheet(
       "QToolButton {"
-      "  border: 1px solid #3f4a59;"
-      "  background: #262c35;"
+      "  border: 1px solid #394251;"
+      "  background: #242a32;"
       "  color: #d8deea;"
       "  border-radius: 3px;"
       "  padding: 0;"
-      "  min-width: 24px;"
-      "  min-height: 24px;"
+      "  min-width: 30px;"
+      "  min-height: 30px;"
       "}"
-      "QToolButton:hover { background: #323a46; border-color: #7995ba; }"
-      "QToolButton:checked { background: #2b4d73; border-color: #8ec0ff; color: #ffffff; }"
+      "QToolButton:hover { background: #303846; border-color: #6f8fb7; }"
+      "QToolButton:checked { background: #2d4f74; border-color: #93c1f3; color: #ffffff; }"
       "QToolButton:disabled { background: #1f232b; border-color: #2d3441; color: #6d7888; }"
       "QLabel { color: #c9d2df; }"
       "QSlider::groove:vertical { background: #161b23; border: 1px solid #343d4d; width: 4px; border-radius: 2px; }"
-      "QSlider::handle:vertical { background: #82abd9; height: 10px; margin: 0 -4px; border-radius: 5px; }");
+      "QSlider::handle:vertical { background: #89b0de; height: 9px; margin: 0 -4px; border-radius: 4px; }");
 
-  auto* layout = new QGridLayout(this);
-  layout->setContentsMargins(2, 2, 2, 2);
-  layout->setHorizontalSpacing(2);
-  layout->setVerticalSpacing(2);
-  layout->setColumnStretch(0, 1);
+  m_rootLayout->setContentsMargins(1, 1, 1, 1);
+  m_rootLayout->setSpacing(2);
+
+  m_buttonGrid->setContentsMargins(0, 0, 0, 0);
+  m_buttonGrid->setHorizontalSpacing(1);
+  m_buttonGrid->setVerticalSpacing(1);
+  m_buttonGridHost->setLayout(m_buttonGrid);
+  m_rootLayout->addWidget(m_buttonGridHost);
+
+  auto* quickWrap = new QHBoxLayout(m_quickHost);
+  quickWrap->setContentsMargins(0, 0, 0, 0);
+  quickWrap->setSpacing(2);
+  quickWrap->addWidget(makeQuickSliderBlock(this, "px", m_sizeSlider, m_sizeValueLabel, 1, 128));
+  quickWrap->addWidget(makeQuickSliderBlock(this, "%", m_opacitySlider, m_opacityValueLabel, 0, 100));
+  m_rootLayout->addWidget(m_quickHost, 0, Qt::AlignHCenter);
+  m_rootLayout->addStretch(1);
+
+  connect(m_sizeSlider, &QSlider::valueChanged, this, &ToolPanel::onSizeSliderChanged);
+  connect(m_opacitySlider, &QSlider::valueChanged, this, &ToolPanel::onOpacitySliderChanged);
 }
 
 void ToolPanel::setController(app::bridge::AppController* controller) {
@@ -178,6 +199,24 @@ void ToolPanel::setController(app::bridge::AppController* controller) {
   refreshFromController();
 }
 
+void ToolPanel::resizeEvent(QResizeEvent* event) {
+  QWidget::resizeEvent(event);
+  relayoutButtons();
+}
+
+int ToolPanel::columnCountForWidth(int width) const noexcept {
+  if (width < 60) {
+    return 1;
+  }
+  if (width < 100) {
+    return 2;
+  }
+  if (width < 160) {
+    return 3;
+  }
+  return 4;
+}
+
 void ToolPanel::refreshFromController() {
   if (m_controller == nullptr) {
     return;
@@ -188,7 +227,7 @@ void ToolPanel::refreshFromController() {
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
     const bool enabled = m_controller->canUseToolOnActiveLayer(kind);
-    QString tip = QString("%1  [%2]").arg(toolNameJa(kind), toolShortcut(kind));
+    QString tip = QString("%1 [%2]").arg(toolNameJa(kind), toolShortcut(kind));
     if (!enabled) {
       tip = QString("%1（%2では使用不可）").arg(toolNameJa(kind), layerKind);
     }
@@ -244,20 +283,20 @@ void ToolPanel::onOpacitySliderChanged(int value) {
 }
 
 void ToolPanel::rebuildButtons() {
-  auto* layout = qobject_cast<QGridLayout*>(this->layout());
-  if (layout == nullptr || m_controller == nullptr) {
+  if (m_buttonGrid == nullptr || m_controller == nullptr) {
     return;
   }
 
   for (const auto& [kind, button] : m_buttons) {
     Q_UNUSED(kind);
-    layout->removeWidget(button);
+    m_buttonGrid->removeWidget(button);
     button->deleteLater();
   }
   m_buttons.clear();
+  m_buttonOrder.clear();
 
-  while (layout->count() > 0) {
-    QLayoutItem* item = layout->takeAt(0);
+  while (m_buttonGrid->count() > 0) {
+    QLayoutItem* item = m_buttonGrid->takeAt(0);
     if (item->widget() != nullptr) {
       item->widget()->deleteLater();
     }
@@ -276,7 +315,6 @@ void ToolPanel::rebuildButtons() {
       core::ToolKind::Zoom};
   const auto available = m_controller->availableTools();
 
-  int row = 0;
   for (core::ToolKind kind : ordered) {
     if (std::find(available.begin(), available.end(), kind) == available.end()) {
       continue;
@@ -285,35 +323,36 @@ void ToolPanel::rebuildButtons() {
     button->setCheckable(true);
     button->setAutoExclusive(true);
     button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    button->setIcon(toolIcon(this, kind));
-    button->setIconSize(QSize(14, 14));
-    button->setFixedSize(24, 24);
+    button->setIcon(app::ui::icon(iconName(kind)));
+    button->setIconSize(QSize(18, 18));
+    button->setFixedSize(32, 32);
     button->setProperty("toolKind", static_cast<int>(kind));
     connect(button, &QToolButton::clicked, this, &ToolPanel::onToolButtonClicked);
-    layout->addWidget(button, row++, 0, Qt::AlignHCenter);
     m_buttons[kind] = button;
+    m_buttonOrder.push_back(button);
   }
 
-  auto* divider = new QLabel(this);
-  divider->setFixedSize(20, 1);
-  divider->setStyleSheet("background:#3a4352;");
-  layout->addWidget(divider, row++, 0, Qt::AlignHCenter);
+  relayoutButtons();
+}
 
-  auto* quickWrap = new QHBoxLayout();
-  quickWrap->setContentsMargins(0, 0, 0, 0);
-  quickWrap->setSpacing(4);
+void ToolPanel::relayoutButtons() {
+  if (m_buttonGrid == nullptr) {
+    return;
+  }
+  while (m_buttonGrid->count() > 0) {
+    QLayoutItem* item = m_buttonGrid->takeAt(0);
+    delete item;
+  }
 
-  quickWrap->addWidget(makeQuickSliderBlock(this, "S", m_sizeSlider, m_sizeValueLabel, 1, 128));
-  quickWrap->addWidget(makeQuickSliderBlock(this, "O", m_opacitySlider, m_opacityValueLabel, 0, 100));
-
-  auto* quickContainer = new QWidget(this);
-  quickContainer->setLayout(quickWrap);
-  layout->addWidget(quickContainer, row++, 0, Qt::AlignHCenter);
-
-  layout->setRowStretch(row, 1);
-
-  connect(m_sizeSlider, &QSlider::valueChanged, this, &ToolPanel::onSizeSliderChanged);
-  connect(m_opacitySlider, &QSlider::valueChanged, this, &ToolPanel::onOpacitySliderChanged);
+  const int columns = columnCountForWidth(m_buttonGridHost->width());
+  for (int i = 0; i < static_cast<int>(m_buttonOrder.size()); ++i) {
+    const int row = i / columns;
+    const int col = i % columns;
+    m_buttonGrid->addWidget(m_buttonOrder[static_cast<std::size_t>(i)], row, col);
+  }
+  for (int c = 0; c < columns; ++c) {
+    m_buttonGrid->setColumnStretch(c, 1);
+  }
 }
 
 } // namespace app::panels

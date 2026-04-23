@@ -56,6 +56,7 @@
 #include "app/panels/ToolPanel.h"
 #include "app/panels/ToolPropertyPanel.h"
 #include "app/panels/ColorWheelWidget.h"
+#include "app/ui/IconLoader.h"
 #include "platform/qt/QtImageConverter.h"
 
 namespace app::mainwindow {
@@ -169,15 +170,15 @@ void MainWindow::setupShellLayout() {
   auto* colorPanel = new QWidget(this);
   m_colorPanelWidget = colorPanel;
   auto* colorLayout = new QVBoxLayout(colorPanel);
-  colorLayout->setContentsMargins(3, 3, 3, 3);
-  colorLayout->setSpacing(2);
+  colorLayout->setContentsMargins(2, 2, 2, 2);
+  colorLayout->setSpacing(1);
   auto* colorTitle = new QLabel("カラー", colorPanel);
-  colorTitle->setStyleSheet("font-weight: 700;");
+  colorTitle->setStyleSheet("font-weight: 700; font-size: 11px;");
   m_foregroundColorButton = new QPushButton("FG", colorPanel);
   m_backgroundColorButton = new QPushButton("BG", colorPanel);
   auto* swapColorButton = new QPushButton("↔", colorPanel);
-  auto* resetColorButton = new QPushButton("B/W", colorPanel);
-  auto* transparentColorButton = new QPushButton("T", colorPanel);
+  auto* resetColorButton = new QPushButton("白黒", colorPanel);
+  auto* transparentColorButton = new QPushButton("透", colorPanel);
   m_hueSlider = new QSlider(Qt::Horizontal, colorPanel);
   m_satSlider = new QSlider(Qt::Horizontal, colorPanel);
   m_valSlider = new QSlider(Qt::Horizontal, colorPanel);
@@ -187,12 +188,12 @@ void MainWindow::setupShellLayout() {
   m_valSpin = new QSpinBox(colorPanel);
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
-  m_colorWheelWidget->setMinimumSize(152, 152);
-  m_foregroundColorButton->setFixedSize(28, 20);
-  m_backgroundColorButton->setFixedSize(28, 20);
-  swapColorButton->setFixedSize(20, 20);
-  resetColorButton->setFixedSize(34, 20);
-  transparentColorButton->setFixedSize(20, 20);
+  m_colorWheelWidget->setMinimumSize(164, 164);
+  m_foregroundColorButton->setFixedSize(24, 18);
+  m_backgroundColorButton->setFixedSize(24, 18);
+  swapColorButton->setFixedSize(18, 18);
+  resetColorButton->setFixedSize(28, 18);
+  transparentColorButton->setFixedSize(18, 18);
   m_hueSlider->setRange(0, 359);
   m_satSlider->setRange(0, 255);
   m_valSlider->setRange(0, 255);
@@ -206,41 +207,43 @@ void MainWindow::setupShellLayout() {
   transparentColorButton->setToolTip("前景色を透明にする");
   auto* colorButtons = new QHBoxLayout();
   colorButtons->setContentsMargins(0, 0, 0, 0);
-  colorButtons->setSpacing(2);
+  colorButtons->setSpacing(1);
   colorButtons->addWidget(m_foregroundColorButton);
   colorButtons->addWidget(m_backgroundColorButton);
-  colorButtons->addStretch(1);
   auto* colorOps = new QHBoxLayout();
   colorOps->setContentsMargins(0, 0, 0, 0);
-  colorOps->setSpacing(2);
+  colorOps->setSpacing(1);
+  colorOps->addStretch(1);
   colorOps->addWidget(swapColorButton);
   colorOps->addWidget(resetColorButton);
   colorOps->addWidget(transparentColorButton);
-  colorOps->addStretch(1);
+  colorButtons->addLayout(colorOps, 1);
   auto addHsvRow = [colorPanel](const QString& name, QSlider* slider, QSpinBox* spin) {
     auto* row = new QHBoxLayout();
     row->setContentsMargins(0, 0, 0, 0);
-    row->setSpacing(2);
+    row->setSpacing(1);
     auto* label = new QLabel(name, colorPanel);
-    label->setMinimumWidth(10);
-    spin->setFixedWidth(42);
-    spin->setMaximumHeight(18);
-    slider->setMaximumHeight(12);
+    label->setMinimumWidth(9);
+    label->setMaximumWidth(9);
+    label->setStyleSheet("font-size:10px; color:#9ea8b8;");
+    spin->setFixedWidth(38);
+    spin->setMaximumHeight(17);
+    slider->setMaximumHeight(8);
     row->addWidget(label);
     row->addWidget(slider, 1);
     row->addWidget(spin);
     return row;
   };
   auto* historyTitle = new QLabel("最近色", colorPanel);
-  historyTitle->setStyleSheet("font-weight: 600;");
+  historyTitle->setStyleSheet("font-weight: 600; font-size: 10px;");
   auto* historyLayout = new QGridLayout();
   historyLayout->setContentsMargins(0, 0, 0, 0);
   historyLayout->setSpacing(1);
   m_colorHistoryButtons.clear();
-  m_colorHistoryButtons.reserve(16);
-  for (int i = 0; i < 16; ++i) {
+  m_colorHistoryButtons.reserve(24);
+  for (int i = 0; i < 24; ++i) {
     auto* chip = new QPushButton(colorPanel);
-    chip->setFixedSize(14, 14);
+    chip->setFixedSize(12, 12);
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
     historyLayout->addWidget(chip, i / 8, i % 8);
@@ -393,13 +396,18 @@ void MainWindow::setupShellLayout() {
     return dock;
   };
 
-  m_toolPanel->setMinimumWidth(94);
-  m_toolPanel->setMaximumWidth(132);
+  auto makeScrollable = [this](QWidget* content) {
+    auto* scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidget(content);
+    return scroll;
+  };
 
-  m_toolDock = makeDock("ツール", m_toolPanel, "ToolDock");
-  m_subToolDock = makeDock("サブツール", m_subToolPanel, "SubToolDock");
-  m_toolPropertyDock = makeDock("ツールプロパティ", m_toolPropertyPanel, "ToolPropertyDock");
-  m_colorDock = makeDock("カラー", colorPanel, "ColorDock");
+  m_toolDock = makeDock("ツール", makeScrollable(m_toolPanel), "ToolDock");
+  m_subToolDock = makeDock("サブツール", makeScrollable(m_subToolPanel), "SubToolDock");
+  m_toolPropertyDock = makeDock("ツールプロパティ", makeScrollable(m_toolPropertyPanel), "ToolPropertyDock");
+  m_colorDock = makeDock("カラー", makeScrollable(colorPanel), "ColorDock");
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
 
@@ -410,8 +418,8 @@ void MainWindow::setupShellLayout() {
   splitDockWidget(m_toolDock, m_subToolDock, Qt::Horizontal);
   splitDockWidget(m_subToolDock, m_toolPropertyDock, Qt::Vertical);
   splitDockWidget(m_toolPropertyDock, m_colorDock, Qt::Vertical);
-  resizeDocks({m_toolDock, m_subToolDock}, {112, 320}, Qt::Horizontal);
-  resizeDocks({m_subToolDock, m_toolPropertyDock, m_colorDock}, {300, 340, 240}, Qt::Vertical);
+  resizeDocks({m_toolDock, m_subToolDock}, {96, 320}, Qt::Horizontal);
+  resizeDocks({m_subToolDock, m_toolPropertyDock, m_colorDock}, {280, 330, 230}, Qt::Vertical);
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
@@ -863,23 +871,23 @@ void MainWindow::createToolBar() {
   m_quickToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
   m_quickToolBar->setToolTip("主要操作（ファイル / 履歴 / レイヤー / 表示）");
 
-  m_newCanvasAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
-  m_openAction->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
-  m_saveAction->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
-  m_exportPngAction->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
-  m_undoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
-  m_redoAction->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
-  m_addRasterLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
-  m_addVectorLayerAction->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
-  m_addFolderLayerAction->setIcon(style()->standardIcon(QStyle::SP_DirClosedIcon));
-  m_duplicateLayerAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
-  m_deleteLayerAction->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
-  m_toggleLayerVisibilityAction->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
-  m_moveLayerUpAction->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
-  m_moveLayerDownAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
-  m_zoomInAction->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
-  m_zoomOutAction->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
-  m_commandPaletteAction->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
+  m_newCanvasAction->setIcon(app::ui::icon("new_file"));
+  m_openAction->setIcon(app::ui::icon("open"));
+  m_saveAction->setIcon(app::ui::icon("save"));
+  m_exportPngAction->setIcon(app::ui::icon("export"));
+  m_undoAction->setIcon(app::ui::icon("undo"));
+  m_redoAction->setIcon(app::ui::icon("redo"));
+  m_addRasterLayerAction->setIcon(app::ui::icon("layer_add"));
+  m_addVectorLayerAction->setIcon(app::ui::icon("vector_add"));
+  m_addFolderLayerAction->setIcon(app::ui::icon("folder"));
+  m_duplicateLayerAction->setIcon(app::ui::icon("duplicate"));
+  m_deleteLayerAction->setIcon(app::ui::icon("delete"));
+  m_toggleLayerVisibilityAction->setIcon(app::ui::icon("visibility"));
+  m_moveLayerUpAction->setIcon(app::ui::icon("up"));
+  m_moveLayerDownAction->setIcon(app::ui::icon("down"));
+  m_zoomInAction->setIcon(app::ui::icon("zoom"));
+  m_zoomOutAction->setIcon(app::ui::icon("zoom"));
+  m_commandPaletteAction->setIcon(app::ui::icon("command_palette"));
 
   m_newCanvasAction->setToolTip("新規キャンバス");
   m_openAction->setToolTip("開く");
@@ -1778,7 +1786,7 @@ void MainWindow::updateColorPanel() {
     const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
     return QString(
                "QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #505866; "
-               "min-height:18px; padding:0 3px; }")
+               "min-height:16px; padding:0 2px; border-radius:2px; }")
         .arg(color.red())
         .arg(color.green())
         .arg(color.blue())
@@ -1858,7 +1866,7 @@ void MainWindow::refreshColorHistoryButtons() {
     if (i >= m_colorHistory.size()) {
       chip->setEnabled(false);
       chip->setText({});
-      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; padding:0; border-radius:1px; }");
+      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; padding:0; border-radius:0px; }");
       chip->setProperty("coreColor", QVariant {});
       continue;
     }
@@ -1871,7 +1879,7 @@ void MainWindow::refreshColorHistoryButtons() {
     chip->setStyleSheet(
         QString(
             "QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #596476; "
-            "padding:0; border-radius:1px; }")
+            "padding:0; border-radius:0px; }")
             .arg(color.red())
             .arg(color.green())
             .arg(color.blue())
