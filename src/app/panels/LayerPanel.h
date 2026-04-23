@@ -13,6 +13,9 @@ class QSlider;
 class QLineEdit;
 class QComboBox;
 class QPoint;
+class QResizeEvent;
+class QGridLayout;
+class QGroupBox;
 
 namespace app::bridge {
 class AppController;
@@ -26,6 +29,9 @@ class LayerPanel : public QWidget {
 public:
   explicit LayerPanel(QWidget* parent = nullptr);
   void setController(app::bridge::AppController* controller);
+
+protected:
+  void resizeEvent(QResizeEvent* event) override;
 
 private slots:
   void refreshLayers();
@@ -54,6 +60,8 @@ private:
   std::size_t layerIndexFromRow(int row) const;
   int rowFromLayerIndex(std::size_t layerIndex) const;
   void refreshButtonState();
+  void applyResponsiveMode();
+  void applyButtonCompactMode(bool compact);
 
   app::bridge::AppController* m_controller {nullptr};
   QLabel* m_headerLabel {nullptr};
@@ -75,6 +83,11 @@ private:
   QPushButton* m_lockButton {nullptr};
   QPushButton* m_lockAlphaButton {nullptr};
   QPushButton* m_lockPositionButton {nullptr};
+  QGroupBox* m_primaryGroup {nullptr};
+  QGroupBox* m_stateGroup {nullptr};
+  QGridLayout* m_primaryGrid {nullptr};
+  QGridLayout* m_stateGrid {nullptr};
+  bool m_compactButtons {false};
   bool m_isRefreshing {false};
   bool m_isDraggingLayer {false};
 };

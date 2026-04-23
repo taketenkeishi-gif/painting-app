@@ -9,6 +9,7 @@
 #include <QLayoutItem>
 #include <QResizeEvent>
 #include <QSignalBlocker>
+#include <QSizePolicy>
 #include <QSlider>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -123,7 +124,10 @@ QWidget* makeQuickSliderBlock(
   sliderOut = new QSlider(Qt::Vertical, block);
   sliderOut->setRange(min, max);
   sliderOut->setInvertedAppearance(true);
-  sliderOut->setFixedSize(10, 84);
+  sliderOut->setFixedWidth(10);
+  sliderOut->setMinimumHeight(160);
+  sliderOut->setMaximumHeight(280);
+  sliderOut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
   sliderOut->setFocusPolicy(Qt::StrongFocus);
 
   auto* sliderHolder = new QHBoxLayout();

@@ -34,6 +34,7 @@
 #include <QMap>
 #include <QPixmap>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QScrollArea>
 #include <QSettings>
 #include <QSlider>
@@ -423,11 +424,13 @@ void MainWindow::setupShellLayout() {
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
+  resizeDocks({m_layerDock, m_infoDock}, {620, 210}, Qt::Vertical);
 
   m_toolDock->raise();
   m_subToolDock->raise();
   m_layerDock->raise();
   m_defaultDockState = saveState();
+  adjustRightDockLayout();
 }
 
 void MainWindow::createMenus() {
@@ -867,9 +870,15 @@ void MainWindow::createMenus() {
 void MainWindow::createToolBar() {
   m_quickToolBar = addToolBar("クイック操作");
   m_quickToolBar->setMovable(false);
-  m_quickToolBar->setIconSize(QSize(19, 19));
+  m_quickToolBar->setFloatable(false);
+  m_quickToolBar->setAllowedAreas(Qt::TopToolBarArea);
+  m_quickToolBar->setIconSize(QSize(18, 18));
   m_quickToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+  m_quickToolBar->setContentsMargins(2, 1, 2, 1);
   m_quickToolBar->setToolTip("主要操作（ファイル / 履歴 / レイヤー / 表示）");
+  m_quickToolBar->setStyleSheet(
+      "QToolBar { spacing: 2px; border: none; }"
+      "QToolButton { min-width: 24px; min-height: 24px; padding: 2px; border-radius: 3px; }");
 
   m_newCanvasAction->setIcon(app::ui::icon("new_file"));
   m_openAction->setIcon(app::ui::icon("open"));
@@ -887,6 +896,8 @@ void MainWindow::createToolBar() {
   m_moveLayerDownAction->setIcon(app::ui::icon("down"));
   m_zoomInAction->setIcon(app::ui::icon("zoom"));
   m_zoomOutAction->setIcon(app::ui::icon("zoom"));
+  m_resetZoomAction->setIcon(app::ui::icon("fit"));
+  m_fitToScreenAction->setIcon(app::ui::icon("fit"));
   m_commandPaletteAction->setIcon(app::ui::icon("command_palette"));
 
   m_newCanvasAction->setToolTip("新規キャンバス");
@@ -913,12 +924,34 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_addRasterLayerAction);
   m_quickToolBar->addAction(m_addVectorLayerAction);
+  m_quickToolBar->addAction(m_addFolderLayerAction);
+  m_quickToolBar->addAction(m_duplicateLayerAction);
   m_quickToolBar->addAction(m_deleteLayerAction);
   m_quickToolBar->addSeparator();
   m_quickToolBar->addAction(m_zoomInAction);
   m_quickToolBar->addAction(m_zoomOutAction);
   m_quickToolBar->addAction(m_resetZoomAction);
   m_quickToolBar->addAction(m_fitToScreenAction);
+}
+
+void MainWindow::adjustRightDockLayout() {
+  if (m_layerDock == nullptr || m_infoDock == nullptr) {
+    return;
+  }
+
+  const int availableHeight = std::max(240, height() - menuBar()->height() - statusBar()->height());
+  if (availableHeight < 680) {
+    m_infoDock->setMaximumHeight(150);
+    resizeDocks({m_layerDock, m_infoDock}, {availableHeight - 160, 140}, Qt::Vertical);
+  } else {
+    m_infoDock->setMaximumHeight(QWIDGETSIZE_MAX);
+    resizeDocks({m_layerDock, m_infoDock}, {static_cast<int>(availableHeight * 0.72), static_cast<int>(availableHeight * 0.28)}, Qt::Vertical);
+  }
+}
+
+void MainWindow::resizeEvent(QResizeEvent* event) {
+  QMainWindow::resizeEvent(event);
+  adjustRightDockLayout();
 }
 
 void MainWindow::applyUiChrome() {
@@ -1810,7 +1843,7 @@ void MainWindow::pushForegroundColorHistory(const core::Color& color) {
   };
   m_colorHistory.erase(std::remove_if(m_colorHistory.begin(), m_colorHistory.end(), sameColor), m_colorHistory.end());
   m_colorHistory.insert(m_colorHistory.begin(), color);
-  constexpr std::size_t kHistoryMax = 16;
+  constexpr std::size_t kHistoryMax = 24;
   if (m_colorHistory.size() > kHistoryMax) {
     m_colorHistory.resize(kHistoryMax);
   }

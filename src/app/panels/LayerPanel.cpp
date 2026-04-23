@@ -1,26 +1,27 @@
-#include "app/panels/LayerPanel.h"
+﻿#include "app/panels/LayerPanel.h"
 
 #include <algorithm>
 
+#include <QAbstractItemModel>
+#include <QAbstractItemView>
 #include <QColor>
+#include <QComboBox>
 #include <QFont>
 #include <QGridLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QComboBox>
 #include <QLineEdit>
-#include <QAbstractItemModel>
-#include <QList>
-#include <QModelIndex>
 #include <QMenu>
+#include <QResizeEvent>
 #include <QSignalBlocker>
 #include <QSlider>
-#include <QSizePolicy>
 #include <QStyle>
-#include <QSize>
 #include <QVBoxLayout>
+#include <QListWidgetItem>
 
 #include "app/bridge/AppController.h"
+#include "app/ui/IconLoader.h"
 
 namespace app::panels {
 
@@ -39,90 +40,116 @@ constexpr int kPositionLockedRole = Qt::UserRole + 10;
 constexpr int kBlendModeRole = Qt::UserRole + 11;
 constexpr int kPaperRole = Qt::UserRole + 12;
 
-QString kindPrefix(core::LayerKind kind) {
+QString layerKindText(core::LayerKind kind) {
   switch (kind) {
     case core::LayerKind::Raster:
-      return "[R] ";
+      return QStringLiteral("ラスタ");
     case core::LayerKind::Vector:
-      return "[V] ";
+      return QStringLiteral("ベクター");
     case core::LayerKind::Folder:
-      return "[F] ";
+      return QStringLiteral("フォルダー");
     default:
-      return "[?] ";
+      return QStringLiteral("不明");
   }
 }
 
 QString blendModeName(core::BlendMode mode) {
   switch (mode) {
     case core::BlendMode::Multiply:
-      return "乗算";
+      return QStringLiteral("乗算");
     case core::BlendMode::Add:
-      return "加算";
+      return QStringLiteral("加算");
     case core::BlendMode::Normal:
     default:
-      return "通常";
+      return QStringLiteral("通常");
+  }
+}
+
+QString layerIconName(const app::bridge::LayerViewModel& model) {
+  if (model.paperLayer) {
+    return model.visible ? QStringLiteral("visibility") : QStringLiteral("visibility_off");
+  }
+  switch (model.kind) {
+    case core::LayerKind::Raster:
+      return QStringLiteral("layer_add");
+    case core::LayerKind::Vector:
+      return QStringLiteral("vector_add");
+    case core::LayerKind::Folder:
+      return QStringLiteral("folder");
+    default:
+      return QStringLiteral("layer_add");
   }
 }
 
 QString decorateLayerName(const app::bridge::LayerViewModel& model) {
-  QString text = model.paperLayer ? "[P] " : kindPrefix(model.kind);
+  if (model.paperLayer) {
+    return QStringLiteral("用紙");
+  }
+  QString suffix;
   if (model.clippedToBelow) {
-    text += "[C] ";
+    suffix += QStringLiteral(" C");
   }
   if (model.hasMask) {
-    text += model.maskEnabled ? "[M] " : "[m] ";
+    suffix += model.maskEnabled ? QStringLiteral(" M") : QStringLiteral(" m");
   }
   if (model.locked) {
-    text += "[L] ";
+    suffix += QStringLiteral(" L");
   }
   if (model.alphaLocked) {
-    text += "[A] ";
+    suffix += QStringLiteral(" α");
   }
   if (model.positionLocked) {
-    text += "[P] ";
+    suffix += QStringLiteral(" P");
   }
-  text += QString::fromStdString(model.name);
-  return text;
+
+  QString name = QString::fromStdString(model.name).trimmed();
+  if (name.isEmpty()) {
+    name = QStringLiteral("レイヤー");
+  }
+  return suffix.isEmpty() ? name : QStringLiteral("%1  [%2]").arg(name, suffix.trimmed());
 }
 
-QString stripLayerDecorators(QString text) {
-  text = text.trimmed();
-  while (text.startsWith('[')) {
-    const int close = text.indexOf(']');
-    if (close <= 0) {
-      break;
-    }
-    text = text.mid(close + 1).trimmed();
+QString stripLayerDecorators(const QString& text) {
+  QString next = text;
+  const int marker = next.indexOf("  [");
+  if (marker > 0) {
+    next = next.left(marker);
   }
-  return text;
+  return next.trimmed();
 }
 
 } // namespace
 
 LayerPanel::LayerPanel(QWidget* parent)
     : QWidget(parent),
-      m_headerLabel(new QLabel("レイヤー", this)),
+      m_headerLabel(new QLabel(QStringLiteral("レイヤー"), this)),
       m_filterEdit(new QLineEdit(this)),
       m_layerList(new QListWidget(this)),
-      m_opacityLabel(new QLabel("不透明度: 100%", this)),
+      m_opacityLabel(new QLabel(QStringLiteral("不透明度: 100%"), this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
       m_blendModeCombo(new QComboBox(this)),
-      m_addRasterButton(new QPushButton("ラスタ追加", this)),
-      m_addVectorButton(new QPushButton("ベクター追加", this)),
-      m_addFolderButton(new QPushButton("フォルダ追加", this)),
-      m_duplicateButton(new QPushButton("複製", this)),
-      m_upButton(new QPushButton("上へ", this)),
-      m_downButton(new QPushButton("下へ", this)),
-      m_deleteButton(new QPushButton("削除", this)),
-      m_clipButton(new QPushButton("クリップ", this)),
-      m_maskButton(new QPushButton("マスク", this)),
-      m_removeMaskButton(new QPushButton("マスク解除", this)),
-      m_lockButton(new QPushButton("ロック", this)),
-      m_lockAlphaButton(new QPushButton("透明保護", this)),
-      m_lockPositionButton(new QPushButton("位置固定", this)) {
-  m_headerLabel->setStyleSheet("font-weight: 700;");
-  m_filterEdit->setPlaceholderText("レイヤーを検索...");
+      m_addRasterButton(new QPushButton(QStringLiteral("ラスタ追加"), this)),
+      m_addVectorButton(new QPushButton(QStringLiteral("ベクター追加"), this)),
+      m_addFolderButton(new QPushButton(QStringLiteral("フォルダ追加"), this)),
+      m_duplicateButton(new QPushButton(QStringLiteral("複製"), this)),
+      m_upButton(new QPushButton(QStringLiteral("上へ"), this)),
+      m_downButton(new QPushButton(QStringLiteral("下へ"), this)),
+      m_deleteButton(new QPushButton(QStringLiteral("削除"), this)),
+      m_clipButton(new QPushButton(QStringLiteral("クリップ"), this)),
+      m_maskButton(new QPushButton(QStringLiteral("マスク"), this)),
+      m_removeMaskButton(new QPushButton(QStringLiteral("マスク解除"), this)),
+      m_lockButton(new QPushButton(QStringLiteral("ロック"), this)),
+      m_lockAlphaButton(new QPushButton(QStringLiteral("透明保護"), this)),
+      m_lockPositionButton(new QPushButton(QStringLiteral("位置固定"), this)),
+      m_primaryGroup(new QGroupBox(QStringLiteral("頻用操作"), this)),
+      m_stateGroup(new QGroupBox(QStringLiteral("状態操作"), this)),
+      m_primaryGrid(new QGridLayout()),
+      m_stateGrid(new QGridLayout()) {
+  m_headerLabel->setStyleSheet("font-weight:700;");
+
+  m_filterEdit->setPlaceholderText(QStringLiteral("レイヤーを検索..."));
   m_filterEdit->setClearButtonEnabled(true);
+
   m_layerList->setAlternatingRowColors(true);
   m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_layerList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
@@ -134,94 +161,83 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
   m_layerList->setDefaultDropAction(Qt::MoveAction);
   m_layerList->setContextMenuPolicy(Qt::CustomContextMenu);
-  m_layerList->setSpacing(2);
+  m_layerList->setSpacing(1);
+  m_layerList->setMinimumHeight(140);
   m_layerList->setStyleSheet(
-      "QListWidget::item { padding: 5px 8px; border-bottom: 1px solid #313844; }"
+      "QListWidget::item { min-height: 22px; padding: 3px 6px; border-bottom: 1px solid #313844; }"
       "QListWidget::item:selected { background: #2e4f79; color: #ffffff; }"
       "QListWidget::item:drop { border-top: 2px solid #7fb3ff; }");
 
   m_opacitySlider->setRange(0, 100);
   m_opacitySlider->setValue(100);
-  m_opacitySlider->setToolTip("アクティブレイヤーの不透明度を調整します。");
-  m_blendModeCombo->addItem("合成: 通常", static_cast<int>(core::BlendMode::Normal));
-  m_blendModeCombo->addItem("合成: 乗算", static_cast<int>(core::BlendMode::Multiply));
-  m_blendModeCombo->addItem("合成: 加算", static_cast<int>(core::BlendMode::Add));
+  m_opacitySlider->setToolTip(QStringLiteral("アクティブレイヤーの不透明度を調整"));
 
-  m_addRasterButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogNewFolder));
-  m_addVectorButton->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
-  m_addFolderButton->setIcon(style()->standardIcon(QStyle::SP_DirClosedIcon));
-  m_duplicateButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
-  m_upButton->setIcon(style()->standardIcon(QStyle::SP_ArrowUp));
-  m_upButton->setToolTip("選択中レイヤーを前面側（上）へ移動します。");
-  m_downButton->setIcon(style()->standardIcon(QStyle::SP_ArrowDown));
-  m_downButton->setToolTip("選択中レイヤーを背面側（下）へ移動します。");
-  m_deleteButton->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
-  m_clipButton->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
-  m_maskButton->setIcon(style()->standardIcon(QStyle::SP_DialogYesButton));
-  m_removeMaskButton->setIcon(style()->standardIcon(QStyle::SP_DialogNoButton));
-  const QList<QPushButton*> buttons {
-      m_addRasterButton,
-      m_addVectorButton,
-      m_addFolderButton,
-      m_duplicateButton,
-      m_upButton,
-      m_downButton,
-      m_deleteButton,
-      m_clipButton,
-      m_maskButton,
-      m_removeMaskButton,
-      m_lockButton,
-      m_lockAlphaButton,
-      m_lockPositionButton};
-  for (QPushButton* button : buttons) {
-    button->setMinimumHeight(30);
-    button->setMinimumWidth(90);
+  m_blendModeCombo->addItem(QStringLiteral("合成: 通常"), static_cast<int>(core::BlendMode::Normal));
+  m_blendModeCombo->addItem(QStringLiteral("合成: 乗算"), static_cast<int>(core::BlendMode::Multiply));
+  m_blendModeCombo->addItem(QStringLiteral("合成: 加算"), static_cast<int>(core::BlendMode::Add));
+
+  auto initButton = [](QPushButton* button, const QString& iconName, const QString& fullText) {
+    button->setIcon(app::ui::icon(iconName));
+    button->setProperty("fullText", fullText);
+    button->setProperty("shortText", QString());
     button->setIconSize(QSize(14, 14));
     button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-  }
+    button->setMinimumHeight(24);
+    button->setText(fullText);
+  };
+
+  initButton(m_addRasterButton, QStringLiteral("layer_add"), QStringLiteral("ラスタ追加"));
+  initButton(m_addVectorButton, QStringLiteral("vector_add"), QStringLiteral("ベクター追加"));
+  initButton(m_addFolderButton, QStringLiteral("folder"), QStringLiteral("フォルダ追加"));
+  initButton(m_duplicateButton, QStringLiteral("duplicate"), QStringLiteral("複製"));
+  initButton(m_upButton, QStringLiteral("up"), QStringLiteral("上へ"));
+  initButton(m_downButton, QStringLiteral("down"), QStringLiteral("下へ"));
+  initButton(m_deleteButton, QStringLiteral("delete"), QStringLiteral("削除"));
+  initButton(m_clipButton, QStringLiteral("clip"), QStringLiteral("クリップ"));
+  initButton(m_maskButton, QStringLiteral("mask"), QStringLiteral("マスク"));
+  initButton(m_removeMaskButton, QStringLiteral("mask_remove"), QStringLiteral("マスク解除"));
+  initButton(m_lockButton, QStringLiteral("lock"), QStringLiteral("ロック"));
+  initButton(m_lockAlphaButton, QStringLiteral("lock"), QStringLiteral("透明保護"));
+  initButton(m_lockPositionButton, QStringLiteral("move"), QStringLiteral("位置固定"));
+
+  m_upButton->setToolTip(QStringLiteral("選択中レイヤーを上（前面）へ移動"));
+  m_downButton->setToolTip(QStringLiteral("選択中レイヤーを下（背面）へ移動"));
+
+  m_primaryGrid->setContentsMargins(2, 2, 2, 2);
+  m_primaryGrid->setHorizontalSpacing(3);
+  m_primaryGrid->setVerticalSpacing(3);
+  m_primaryGrid->addWidget(m_addRasterButton, 0, 0);
+  m_primaryGrid->addWidget(m_addVectorButton, 0, 1);
+  m_primaryGrid->addWidget(m_addFolderButton, 0, 2);
+  m_primaryGrid->addWidget(m_duplicateButton, 0, 3);
+  m_primaryGrid->addWidget(m_upButton, 1, 0);
+  m_primaryGrid->addWidget(m_downButton, 1, 1);
+  m_primaryGrid->addWidget(m_deleteButton, 1, 2);
+  m_primaryGrid->setColumnStretch(3, 1);
+  m_primaryGroup->setLayout(m_primaryGrid);
+
+  m_stateGrid->setContentsMargins(2, 2, 2, 2);
+  m_stateGrid->setHorizontalSpacing(3);
+  m_stateGrid->setVerticalSpacing(3);
+  m_stateGrid->addWidget(m_clipButton, 0, 0);
+  m_stateGrid->addWidget(m_maskButton, 0, 1);
+  m_stateGrid->addWidget(m_removeMaskButton, 0, 2);
+  m_stateGrid->addWidget(m_lockButton, 1, 0);
+  m_stateGrid->addWidget(m_lockAlphaButton, 1, 1);
+  m_stateGrid->addWidget(m_lockPositionButton, 1, 2);
+  m_stateGroup->setLayout(m_stateGrid);
 
   auto* layout = new QVBoxLayout(this);
-  layout->setContentsMargins(6, 6, 6, 6);
-  layout->setSpacing(6);
+  layout->setContentsMargins(4, 4, 4, 4);
+  layout->setSpacing(4);
   layout->addWidget(m_headerLabel);
   layout->addWidget(m_filterEdit);
-  layout->addWidget(m_layerList);
+  layout->addWidget(m_layerList, 1);
   layout->addWidget(m_opacityLabel);
   layout->addWidget(m_opacitySlider);
   layout->addWidget(m_blendModeCombo);
-
-  auto* quickTitle = new QLabel("頻用操作", this);
-  quickTitle->setStyleSheet("font-weight: 600; color: #c9d4e4;");
-  layout->addWidget(quickTitle);
-  auto* commandGrid = new QGridLayout();
-  commandGrid->setContentsMargins(0, 0, 0, 0);
-  commandGrid->setHorizontalSpacing(4);
-  commandGrid->setVerticalSpacing(4);
-  commandGrid->addWidget(m_addRasterButton, 0, 0);
-  commandGrid->addWidget(m_addVectorButton, 0, 1);
-  commandGrid->addWidget(m_addFolderButton, 0, 2);
-  commandGrid->addWidget(m_duplicateButton, 0, 3);
-  commandGrid->addWidget(m_upButton, 1, 0);
-  commandGrid->addWidget(m_downButton, 1, 1);
-  commandGrid->addWidget(m_deleteButton, 1, 2);
-  commandGrid->setColumnStretch(3, 1);
-  layout->addLayout(commandGrid);
-
-  auto* stateTitle = new QLabel("状態操作", this);
-  stateTitle->setStyleSheet("font-weight: 600; color: #c9d4e4;");
-  layout->addWidget(stateTitle);
-  auto* stateGrid = new QGridLayout();
-  stateGrid->setContentsMargins(0, 0, 0, 0);
-  stateGrid->setHorizontalSpacing(4);
-  stateGrid->setVerticalSpacing(4);
-  stateGrid->addWidget(m_clipButton, 0, 0);
-  stateGrid->addWidget(m_maskButton, 0, 1);
-  stateGrid->addWidget(m_removeMaskButton, 0, 2);
-  stateGrid->addWidget(m_lockButton, 1, 0);
-  stateGrid->addWidget(m_lockAlphaButton, 1, 1);
-  stateGrid->addWidget(m_lockPositionButton, 1, 2);
-  layout->addLayout(stateGrid);
-
+  layout->addWidget(m_primaryGroup);
+  layout->addWidget(m_stateGroup);
   setLayout(layout);
 
   connect(m_addRasterButton, &QPushButton::clicked, this, &LayerPanel::onAddRasterLayerClicked);
@@ -241,13 +257,70 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
   connect(m_filterEdit, &QLineEdit::textChanged, this, &LayerPanel::onFilterTextChanged);
   connect(m_layerList, &QListWidget::customContextMenuRequested, this, &LayerPanel::onLayerContextMenuRequested);
-  connect(
-      m_layerList->model(),
-      &QAbstractItemModel::rowsMoved,
-      this,
-      &LayerPanel::onLayerRowsMoved);
+  connect(m_layerList->model(), &QAbstractItemModel::rowsMoved, this, &LayerPanel::onLayerRowsMoved);
   connect(m_opacitySlider, &QSlider::valueChanged, this, &LayerPanel::onOpacityChanged);
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &LayerPanel::onBlendModeChanged);
+
+  applyResponsiveMode();
+}
+
+void LayerPanel::resizeEvent(QResizeEvent* event) {
+  QWidget::resizeEvent(event);
+  applyResponsiveMode();
+}
+
+void LayerPanel::applyButtonCompactMode(bool compact) {
+  if (m_compactButtons == compact) {
+    return;
+  }
+  m_compactButtons = compact;
+
+  const QList<QPushButton*> buttons {
+      m_addRasterButton,
+      m_addVectorButton,
+      m_addFolderButton,
+      m_duplicateButton,
+      m_upButton,
+      m_downButton,
+      m_deleteButton,
+      m_clipButton,
+      m_maskButton,
+      m_removeMaskButton,
+      m_lockButton,
+      m_lockAlphaButton,
+      m_lockPositionButton};
+
+  for (QPushButton* button : buttons) {
+    const QString full = button->property("fullText").toString();
+    button->setText(compact ? QString() : full);
+    button->setToolTip(full);
+    button->setMinimumHeight(22);
+    button->setMaximumHeight(compact ? 24 : 26);
+    button->setMinimumWidth(compact ? 24 : 64);
+  }
+}
+
+void LayerPanel::applyResponsiveMode() {
+  const bool compactWidth = width() < 330;
+  const bool compactHeight = height() < 560;
+
+  applyButtonCompactMode(compactWidth);
+
+  if (m_stateGroup != nullptr) {
+    m_stateGroup->setVisible(!compactHeight);
+  }
+
+  if (m_primaryGrid != nullptr) {
+    const int columns = compactWidth ? 3 : 4;
+    m_primaryGrid->setColumnStretch(0, 1);
+    m_primaryGrid->setColumnStretch(1, 1);
+    m_primaryGrid->setColumnStretch(2, 1);
+    m_primaryGrid->setColumnStretch(3, columns == 4 ? 1 : 0);
+  }
+
+  if (m_layerList != nullptr) {
+    m_layerList->setMinimumHeight(compactHeight ? 90 : 140);
+  }
 }
 
 void LayerPanel::setController(app::bridge::AppController* controller) {
@@ -281,11 +354,15 @@ void LayerPanel::refreshLayers() {
     const auto& model = models[layerIndex];
     if (hasFilter) {
       const QString layerName = QString::fromStdString(model.name);
-      if (!layerName.contains(filterText, Qt::CaseInsensitive)) {
+      if (!layerName.contains(filterText, Qt::CaseInsensitive) && !(model.paperLayer && QStringLiteral("用紙").contains(filterText))) {
         continue;
       }
     }
-    auto* item = new QListWidgetItem(decorateLayerName(model), m_layerList);
+
+    auto* item = new QListWidgetItem(m_layerList);
+    item->setText(decorateLayerName(model));
+    item->setIcon(app::ui::icon(layerIconName(model)));
+
     Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable;
     if (!model.paperLayer) {
       flags |= Qt::ItemIsEditable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
@@ -304,11 +381,12 @@ void LayerPanel::refreshLayers() {
     item->setData(kPositionLockedRole, model.positionLocked);
     item->setData(kBlendModeRole, static_cast<int>(model.blendMode));
     item->setData(kPaperRole, model.paperLayer);
-    item->setToolTip(
-        model.paperLayer
-            ? "用紙レイヤーです。チェックで表示/非表示を切り替えられます。"
-            : "チェックで表示/非表示、名前のダブルクリックで変更できます。");
-    item->setSizeHint(QSize(item->sizeHint().width(), 30));
+
+    const QString tooltip = model.paperLayer
+        ? QStringLiteral("用紙レイヤー: 表示/非表示のみ変更できます")
+        : QStringLiteral("%1 / 合成: %2").arg(layerKindText(model.kind), blendModeName(model.blendMode));
+    item->setToolTip(tooltip);
+    item->setSizeHint(QSize(item->sizeHint().width(), 24));
 
     QFont font = item->font();
     font.setBold(model.active);
@@ -320,7 +398,7 @@ void LayerPanel::refreshLayers() {
       const QSignalBlocker sliderBlocker(m_opacitySlider);
       const QSignalBlocker blendBlocker(m_blendModeCombo);
       m_opacitySlider->setValue(model.opacityPercent);
-      m_opacityLabel->setText(QString("不透明度: %1%").arg(model.opacityPercent));
+      m_opacityLabel->setText(QStringLiteral("不透明度: %1%").arg(model.opacityPercent));
       const int blendIndex = m_blendModeCombo->findData(static_cast<int>(model.blendMode));
       if (blendIndex >= 0) {
         m_blendModeCombo->setCurrentIndex(blendIndex);
@@ -488,6 +566,7 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
     refreshButtonState();
     return;
   }
+
   const std::size_t layerIndex =
       layerIndexValue >= 0 ? static_cast<std::size_t>(layerIndexValue) : layerIndexFromRow(row);
 
@@ -534,7 +613,7 @@ void LayerPanel::onOpacityChanged(int value) {
   if (currentItem != nullptr && currentItem->data(kPaperRole).toBool()) {
     return;
   }
-  m_opacityLabel->setText(QString("不透明度: %1%").arg(value));
+  m_opacityLabel->setText(QStringLiteral("不透明度: %1%").arg(value));
   m_controller->setActiveLayerOpacity(value);
 }
 
@@ -573,19 +652,19 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
   const bool canEditLayer = hasSelection && !paperSelected;
 
   QMenu menu(this);
-  QAction* renameAction = menu.addAction("名前を変更");
-  QAction* duplicateAction = menu.addAction("複製");
-  QAction* deleteAction = menu.addAction("削除");
+  QAction* renameAction = menu.addAction(QStringLiteral("名前変更"));
+  QAction* duplicateAction = menu.addAction(QStringLiteral("複製"));
+  QAction* deleteAction = menu.addAction(QStringLiteral("削除"));
   menu.addSeparator();
-  QAction* addRasterAction = menu.addAction("新規ラスターレイヤー");
-  QAction* addVectorAction = menu.addAction("新規ベクターレイヤー");
-  QAction* addFolderAction = menu.addAction("新規フォルダー");
+  QAction* addRasterAction = menu.addAction(QStringLiteral("新規ラスターレイヤー"));
+  QAction* addVectorAction = menu.addAction(QStringLiteral("新規ベクターレイヤー"));
+  QAction* addFolderAction = menu.addAction(QStringLiteral("新規フォルダー"));
   menu.addSeparator();
-  QAction* moveUpAction = menu.addAction("上へ移動");
-  QAction* moveDownAction = menu.addAction("下へ移動");
-  QAction* toggleVisibleAction = menu.addAction("表示/非表示を切替");
-  QAction* toggleClipAction = menu.addAction("クリッピング切替");
-  QAction* toggleLockAction = menu.addAction("ロック切替");
+  QAction* moveUpAction = menu.addAction(QStringLiteral("上へ移動"));
+  QAction* moveDownAction = menu.addAction(QStringLiteral("下へ移動"));
+  QAction* toggleVisibleAction = menu.addAction(QStringLiteral("表示/非表示を切替"));
+  QAction* toggleClipAction = menu.addAction(QStringLiteral("クリッピング切替"));
+  QAction* toggleLockAction = menu.addAction(QStringLiteral("ロック切替"));
 
   renameAction->setEnabled(canEditLayer);
   duplicateAction->setEnabled(canEditLayer);
@@ -597,7 +676,7 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
   toggleLockAction->setEnabled(canEditLayer && m_lockButton->isEnabled());
 
   if (paperSelected) {
-    toggleVisibleAction->setText("用紙の表示/非表示を切替");
+    toggleVisibleAction->setText(QStringLiteral("用紙の表示/非表示を切替"));
   }
 
   QAction* selected = menu.exec(m_layerList->viewport()->mapToGlobal(pos));
@@ -666,6 +745,7 @@ void LayerPanel::onLayerRowsMoved(
   if (start < 0 || end != start) {
     return;
   }
+
   int toRow = row;
   if (toRow > m_layerList->count()) {
     toRow = m_layerList->count();
@@ -729,6 +809,7 @@ void LayerPanel::refreshButtonState() {
     m_upButton->setEnabled(false);
     m_downButton->setEnabled(false);
     m_opacitySlider->setEnabled(false);
+    m_blendModeCombo->setEnabled(false);
     m_clipButton->setEnabled(false);
     m_maskButton->setEnabled(false);
     m_removeMaskButton->setEnabled(false);
@@ -737,22 +818,26 @@ void LayerPanel::refreshButtonState() {
     m_lockPositionButton->setEnabled(false);
     return;
   }
+
   const bool hasSelection = m_layerList->currentRow() >= 0;
   const bool canDelete = m_controller->document().layerCount() > 1;
   const int current = m_layerList->currentRow();
   const int lastRow = static_cast<int>(m_controller->document().layerCount()) - 1;
   QListWidgetItem* currentItem = current >= 0 ? m_layerList->item(current) : nullptr;
   const bool paperSelected = currentItem != nullptr && currentItem->data(kPaperRole).toBool();
+
   const bool canMoveUp = current > 0;
   const bool canMoveDown = current >= 0 && current < lastRow;
+
   m_deleteButton->setEnabled(hasSelection && canDelete && !paperSelected);
   m_duplicateButton->setEnabled(hasSelection && !paperSelected);
   m_upButton->setEnabled(canMoveUp && !paperSelected);
   m_downButton->setEnabled(canMoveDown && !paperSelected);
   m_opacitySlider->setEnabled(hasSelection && !paperSelected);
   m_blendModeCombo->setEnabled(hasSelection && !paperSelected);
+
   if (paperSelected) {
-    m_opacityLabel->setText("用紙レイヤー（背景色）");
+    m_opacityLabel->setText(QStringLiteral("用紙レイヤー（背景色）"));
   }
 
   bool canClipOrMask = false;
@@ -763,10 +848,11 @@ void LayerPanel::refreshButtonState() {
   bool alphaLocked = false;
   bool positionLocked = false;
   core::LayerKind kind = core::LayerKind::Raster;
+
   if (hasSelection && !paperSelected) {
-    QListWidgetItem* currentItem = m_layerList->item(current);
-    if (currentItem != nullptr) {
-      const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
+    QListWidgetItem* activeItem = m_layerList->item(current);
+    if (activeItem != nullptr) {
+      const int layerIndex = activeItem->data(kLayerIndexRole).toInt();
       if (layerIndex >= 0) {
         const core::Layer& layer = m_controller->document().layerAt(static_cast<std::size_t>(layerIndex));
         kind = layer.kind();
@@ -785,17 +871,21 @@ void LayerPanel::refreshButtonState() {
       }
     }
   }
+
   m_clipButton->setEnabled(canClipOrMask);
   m_maskButton->setEnabled(canClipOrMask);
   m_removeMaskButton->setEnabled(canClipOrMask && hasMask);
   m_lockButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
   m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
   m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
-  m_clipButton->setText(clipped ? "クリップON" : "クリップ");
-  m_maskButton->setText(maskEnabled ? "マスクON" : "マスク");
-  m_lockButton->setText(locked ? "ロックON" : "ロック");
-  m_lockAlphaButton->setText(alphaLocked ? "透明保護ON" : "透明保護");
-  m_lockPositionButton->setText(positionLocked ? "位置固定ON" : "位置固定");
+
+  if (!m_compactButtons) {
+    m_clipButton->setText(clipped ? QStringLiteral("クリップON") : QStringLiteral("クリップ"));
+    m_maskButton->setText(maskEnabled ? QStringLiteral("マスクON") : QStringLiteral("マスク"));
+    m_lockButton->setText(locked ? QStringLiteral("ロックON") : QStringLiteral("ロック"));
+    m_lockAlphaButton->setText(alphaLocked ? QStringLiteral("透明保護ON") : QStringLiteral("透明保護"));
+    m_lockPositionButton->setText(positionLocked ? QStringLiteral("位置固定ON") : QStringLiteral("位置固定"));
+  }
 }
 
 } // namespace app::panels

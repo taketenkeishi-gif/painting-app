@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <QMainWindow>
+#include <QColor>
 #include <QByteArray>
 #include <QString>
 #include <QStringList>
@@ -23,6 +24,7 @@ class QSlider;
 class QTabWidget;
 class QToolBar;
 class QWidget;
+class QResizeEvent;
 
 namespace app::bridge {
 class AppController;
@@ -45,6 +47,9 @@ class MainWindow : public QMainWindow {
 
 public:
   explicit MainWindow(QWidget* parent = nullptr);
+
+protected:
+  void resizeEvent(QResizeEvent* event) override;
 
 private slots:
   void onNewCanvas();
@@ -108,6 +113,7 @@ private:
   void createMenus();
   void createToolBar();
   void applyUiChrome();
+  void adjustRightDockLayout();
   void updateUndoRedoState();
   void updateActiveLayerStatus();
   void updateTopToolInfo();
@@ -116,6 +122,8 @@ private:
   void updateNavigatorPreview();
   void pushForegroundColorHistory(const core::Color& color);
   void syncForegroundHsvControlsFromColor(const core::Color& color);
+  void syncColorUiFromForeground(const QColor& color);
+  void applyForegroundColor(const QColor& color, bool pushHistory = true);
   void applyForegroundFromHsvControls();
   void refreshColorHistoryButtons();
   bool openImageFile(const QString& path);
