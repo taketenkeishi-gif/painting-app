@@ -5,7 +5,6 @@
 
 #include <QGridLayout>
 #include <QFrame>
-#include <QColor>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLayoutItem>
@@ -412,7 +411,6 @@ void ToolPanel::relayoutButtons() {
 }
 
 } // namespace app::panels
-
 
 
 
