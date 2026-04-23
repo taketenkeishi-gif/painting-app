@@ -16,16 +16,29 @@ Rect strokeDirtyRect(const Point& from, const Point& to, int size) {
   return Rect {minX, minY, maxX - minX + 1, maxY - minY + 1};
 }
 
+Rect fullLayerRect(const Layer& layer) {
+  return Rect {0, 0, layer.buffer().width(), layer.buffer().height()};
+}
+
 } // namespace
 
 ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() != LayerKind::Raster || active->locked()) {
+  if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
     return {};
   }
 
   m_drawing = true;
   m_lastPoint = event.point;
+
+  if (active->kind() == LayerKind::Vector) {
+    m_vectorPoints.clear();
+    m_vectorPoints.push_back(m_lastPoint);
+    ToolResult result;
+    result.viewportChanged = true;
+    return result;
+  }
+
   stroke(*active, m_lastPoint, m_lastPoint);
   ToolResult result;
   result.pixelsChanged = true;
@@ -39,13 +52,28 @@ ToolResult BrushTool::onPointerMove(ToolContext& context, const ToolPointerEvent
   }
 
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() != LayerKind::Raster || active->locked()) {
+  if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
     m_drawing = false;
+    m_vectorPoints.clear();
     return {};
   }
 
   const Point previous = m_lastPoint;
   const Point stabilizedPoint = applyStabilization(m_lastPoint, event.point);
+
+  if (active->kind() == LayerKind::Vector) {
+    if (m_vectorPoints.empty()) {
+      m_vectorPoints.push_back(previous);
+    }
+    if (m_vectorPoints.back().x != stabilizedPoint.x || m_vectorPoints.back().y != stabilizedPoint.y) {
+      m_vectorPoints.push_back(stabilizedPoint);
+    }
+    m_lastPoint = stabilizedPoint;
+    ToolResult result;
+    result.viewportChanged = true;
+    return result;
+  }
+
   stroke(*active, previous, stabilizedPoint);
   m_lastPoint = stabilizedPoint;
   ToolResult result;
@@ -61,11 +89,45 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
 
   m_drawing = false;
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() != LayerKind::Raster || active->locked()) {
+  if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
+    m_vectorPoints.clear();
     return {};
   }
 
   const Point stabilizedPoint = applyStabilization(m_lastPoint, event.point);
+
+  if (active->kind() == LayerKind::Vector) {
+    if (m_vectorPoints.empty()) {
+      m_vectorPoints.push_back(m_lastPoint);
+    }
+    if (m_vectorPoints.back().x != stabilizedPoint.x || m_vectorPoints.back().y != stabilizedPoint.y) {
+      m_vectorPoints.push_back(stabilizedPoint);
+    }
+    if (m_settings.postCorrection &&
+        (stabilizedPoint.x != event.point.x || stabilizedPoint.y != event.point.y) &&
+        (m_vectorPoints.back().x != event.point.x || m_vectorPoints.back().y != event.point.y)) {
+      m_vectorPoints.push_back(event.point);
+    }
+    if (m_vectorPoints.size() >= 2) {
+      VectorPath path;
+      path.points = m_vectorPoints;
+      path.color = m_settings.color;
+      path.width = std::max(1, m_settings.size);
+      const float alpha = (static_cast<float>(m_settings.color.a) / 255.0F) *
+          std::clamp(m_settings.opacity * m_settings.flow, 0.0F, 1.0F);
+      path.opacity = std::clamp(alpha, 0.0F, 1.0F);
+      active->addVectorPath(std::move(path));
+      m_vectorPoints.clear();
+      ToolResult result;
+      result.pixelsChanged = true;
+      result.viewportChanged = true;
+      result.dirtyRect = fullLayerRect(*active);
+      return result;
+    }
+    m_vectorPoints.clear();
+    return {};
+  }
+
   if (m_lastPoint.x == stabilizedPoint.x && m_lastPoint.y == stabilizedPoint.y &&
       (!m_settings.postCorrection ||
        (stabilizedPoint.x == event.point.x && stabilizedPoint.y == event.point.y))) {
@@ -96,6 +158,7 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
 ToolResult BrushTool::onCancel(ToolContext& context) {
   static_cast<void>(context);
   m_drawing = false;
+  m_vectorPoints.clear();
   return {};
 }
 

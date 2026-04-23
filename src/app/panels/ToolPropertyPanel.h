@@ -1,9 +1,11 @@
 #pragma once
 
 #include <QWidget>
+#include <QSet>
 
 class QLabel;
 class QPushButton;
+class QResizeEvent;
 class QSpinBox;
 class QSlider;
 class QScrollArea;
@@ -23,6 +25,9 @@ class ToolPropertyPanel : public QWidget {
 public:
   explicit ToolPropertyPanel(QWidget* parent = nullptr);
   void setController(app::bridge::AppController* controller);
+
+protected:
+  void resizeEvent(QResizeEvent* event) override;
 
 private slots:
   void refreshFromController();
@@ -68,9 +73,17 @@ private slots:
   void onBlendModeChanged(int index);
   void onEraseModeToggled(bool checked);
   void onLockAlphaRespectToggled(bool checked);
+  void onToggleDetailRequested();
+  void onConfigurePinnedRequested();
 
 private:
+  void applyResponsiveLayout();
   void updateColorButton();
+  QString currentToolSettingsKey() const;
+  bool isPinned(const QString& key) const;
+  void loadPinnedForCurrentTool();
+  void savePinnedForCurrentTool() const;
+  void refreshDetailToggleText();
 
   app::bridge::AppController* m_controller {nullptr};
   QScrollArea* m_scrollArea {nullptr};
@@ -85,6 +98,8 @@ private:
   QLabel* m_toolNameLabel {nullptr};
   QLabel* m_guideLabel {nullptr};
   QLabel* m_compatibilityLabel {nullptr};
+  QPushButton* m_detailToggleButton {nullptr};
+  QPushButton* m_pinConfigButton {nullptr};
   QLabel* m_colorLabel {nullptr};
   QLabel* m_sizeLabel {nullptr};
   QLabel* m_opacityLabel {nullptr};
@@ -144,6 +159,10 @@ private:
   QComboBox* m_blendModeCombo {nullptr};
   QCheckBox* m_eraseModeCheck {nullptr};
   QCheckBox* m_lockAlphaRespectCheck {nullptr};
+  bool m_compactLayout {false};
+  bool m_showDetails {false};
+  QSet<QString> m_pinnedKeys;
+  QString m_lastPinnedToolKey;
 };
 
 } // namespace app::panels

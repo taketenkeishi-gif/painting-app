@@ -1,10 +1,14 @@
 ﻿#include "app/panels/ToolPropertyPanel.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <vector>
 
 #include <QColorDialog>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QFrame>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -12,7 +16,9 @@
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollArea>
+#include <QSettings>
 #include <QSignalBlocker>
+#include <QSizePolicy>
 #include <QSlider>
 #include <QSpinBox>
 #include <QVariant>
@@ -77,6 +83,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_toolNameLabel(new QLabel("ツール: -", this)),
       m_guideLabel(new QLabel("", this)),
       m_compatibilityLabel(new QLabel("", this)),
+      m_detailToggleButton(new QPushButton("詳細を表示", this)),
+      m_pinConfigButton(new QPushButton("常設項目", this)),
       m_colorLabel(new QLabel("色", this)),
       m_sizeLabel(new QLabel("サイズ", this)),
       m_opacityLabel(new QLabel("不透明度", this)),
@@ -200,7 +208,17 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto* titleLayout = new QVBoxLayout(titleFrame);
   titleLayout->setContentsMargins(3, 3, 3, 3);
   titleLayout->setSpacing(2);
+  auto* titleActions = new QHBoxLayout();
+  titleActions->setContentsMargins(0, 0, 0, 0);
+  titleActions->setSpacing(4);
+  m_detailToggleButton->setMinimumHeight(20);
+  m_pinConfigButton->setMinimumHeight(20);
+  m_detailToggleButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  m_pinConfigButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  titleActions->addWidget(m_detailToggleButton);
+  titleActions->addWidget(m_pinConfigButton);
   titleLayout->addWidget(m_toolNameLabel);
+  titleLayout->addLayout(titleActions);
   titleLayout->addWidget(m_compatibilityLabel);
   titleLayout->addWidget(m_guideLabel);
   contentLayout->addWidget(titleFrame);
@@ -376,6 +394,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_scrollArea->setWidget(m_contentWidget);
   hostLayout->addWidget(m_scrollArea);
 
+  connect(m_detailToggleButton, &QPushButton::clicked, this, &ToolPropertyPanel::onToggleDetailRequested);
+  connect(m_pinConfigButton, &QPushButton::clicked, this, &ToolPropertyPanel::onConfigurePinnedRequested);
   connect(m_colorButton, &QPushButton::clicked, this, &ToolPropertyPanel::onChooseColor);
   connect(m_sizeSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSizeChanged);
   connect(m_opacitySlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onOpacitySliderChanged);
@@ -444,6 +464,8 @@ void ToolPropertyPanel::setController(app::bridge::AppController* controller) {
   }
 
   connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &ToolPropertyPanel::refreshFromController);
+  loadPinnedForCurrentTool();
+  refreshDetailToggleText();
   refreshFromController();
 }
 
@@ -469,10 +491,148 @@ void ToolPropertyPanel::applyResponsiveLayout() {
   }
 }
 
+QString ToolPropertyPanel::currentToolSettingsKey() const {
+  if (m_controller == nullptr) {
+    return QStringLiteral("none");
+  }
+  switch (m_controller->currentTool()) {
+    case core::ToolKind::Brush:
+      return QStringLiteral("brush");
+    case core::ToolKind::Eraser:
+      return QStringLiteral("eraser");
+    case core::ToolKind::Eyedropper:
+      return QStringLiteral("eyedropper");
+    case core::ToolKind::Fill:
+      return QStringLiteral("fill");
+    case core::ToolKind::Line:
+      return QStringLiteral("line");
+    case core::ToolKind::RectSelection:
+      return QStringLiteral("selection");
+    case core::ToolKind::MoveLayer:
+      return QStringLiteral("move_layer");
+    case core::ToolKind::Hand:
+      return QStringLiteral("hand");
+    case core::ToolKind::Zoom:
+      return QStringLiteral("zoom");
+    default:
+      return QStringLiteral("tool");
+  }
+}
+
+bool ToolPropertyPanel::isPinned(const QString& key) const {
+  return m_pinnedKeys.contains(key);
+}
+
+void ToolPropertyPanel::loadPinnedForCurrentTool() {
+  const QString toolKey = currentToolSettingsKey();
+  m_lastPinnedToolKey = toolKey;
+
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("toolPropertyPinned");
+  const QStringList stored = settings.value(
+      toolKey,
+      QStringList {QStringLiteral("size"), QStringLiteral("opacity"), QStringLiteral("hardness"), QStringLiteral("blend")})
+                                 .toStringList();
+  settings.endGroup();
+
+  m_pinnedKeys.clear();
+  for (const QString& key : stored) {
+    if (!key.isEmpty()) {
+      m_pinnedKeys.insert(key);
+    }
+  }
+}
+
+void ToolPropertyPanel::savePinnedForCurrentTool() const {
+  const QString toolKey = currentToolSettingsKey();
+  QStringList out;
+  out.reserve(m_pinnedKeys.size());
+  for (const QString& key : m_pinnedKeys) {
+    out.push_back(key);
+  }
+  std::sort(out.begin(), out.end(), [](const QString& lhs, const QString& rhs) { return lhs < rhs; });
+
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  settings.beginGroup("toolPropertyPinned");
+  settings.setValue(toolKey, out);
+  settings.endGroup();
+}
+
+void ToolPropertyPanel::refreshDetailToggleText() {
+  if (m_detailToggleButton == nullptr) {
+    return;
+  }
+  m_detailToggleButton->setText(m_showDetails ? QStringLiteral("詳細を隠す") : QStringLiteral("詳細を表示"));
+}
+
+void ToolPropertyPanel::onToggleDetailRequested() {
+  m_showDetails = !m_showDetails;
+  refreshDetailToggleText();
+  refreshFromController();
+}
+
+void ToolPropertyPanel::onConfigurePinnedRequested() {
+  QDialog dialog(this);
+  dialog.setWindowTitle(QStringLiteral("常設項目の設定"));
+  auto* layout = new QVBoxLayout(&dialog);
+  layout->setContentsMargins(10, 10, 10, 10);
+  layout->setSpacing(8);
+
+  auto* info = new QLabel(QStringLiteral("常設表示したい項目を選択してください。"), &dialog);
+  info->setWordWrap(true);
+  layout->addWidget(info);
+
+  struct PinRow {
+    QString key;
+    QString label;
+  };
+  const std::vector<PinRow> rows {
+      {QStringLiteral("color"), QStringLiteral("色")},
+      {QStringLiteral("size"), QStringLiteral("サイズ")},
+      {QStringLiteral("opacity"), QStringLiteral("不透明度")},
+      {QStringLiteral("hardness"), QStringLiteral("硬さ")},
+      {QStringLiteral("blend"), QStringLiteral("合成モード")},
+      {QStringLiteral("antialias"), QStringLiteral("アンチエイリアス")},
+      {QStringLiteral("stabilization"), QStringLiteral("手ブレ補正")}};
+
+  QList<QCheckBox*> checks;
+  for (const PinRow& row : rows) {
+    auto* check = new QCheckBox(row.label, &dialog);
+    check->setProperty("pinKey", row.key);
+    check->setChecked(m_pinnedKeys.contains(row.key));
+    checks.push_back(check);
+    layout->addWidget(check);
+  }
+
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+  layout->addWidget(buttons);
+  connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  m_pinnedKeys.clear();
+  for (QCheckBox* check : checks) {
+    if (check != nullptr && check->isChecked()) {
+      m_pinnedKeys.insert(check->property("pinKey").toString());
+    }
+  }
+  savePinnedForCurrentTool();
+  refreshFromController();
+}
+
 void ToolPropertyPanel::refreshFromController() {
   if (m_controller == nullptr) {
     return;
   }
+
+  const QString toolKey = currentToolSettingsKey();
+  if (toolKey != m_lastPinnedToolKey) {
+    loadPinnedForCurrentTool();
+  }
+  refreshDetailToggleText();
 
   m_toolNameLabel->setText(QString("ツール: %1").arg(toolNameJa(m_controller->currentTool())));
   const QString compatibilityHint = QString::fromStdString(m_controller->currentLayerCompatibilityHint());
@@ -510,31 +670,43 @@ void ToolPropertyPanel::refreshFromController() {
   const bool supportsAutoSelectThreshold = m_controller->currentToolSupportsAutoSelectThreshold();
   const bool supportsAutoSelectContiguous = m_controller->currentToolSupportsAutoSelectContiguous();
   const bool supportsAutoSelectReferAllLayers = m_controller->currentToolSupportsAutoSelectReferAllLayers();
+  const auto pinnedOrDetail = [this](bool supports, const QString& key) {
+    return supports && (m_showDetails || isPinned(key));
+  };
   m_sizeLabel->setText((supportsSnapAngle || supportsSimplify) ? "Stroke Width" : "Size");
-  m_colorLabel->setVisible(supportsColor);
-  m_colorButton->setVisible(supportsColor);
-  m_sizeLabel->setVisible(supportsSize);
-  m_sizeSpin->setVisible(supportsSize);
-  m_opacityLabel->setVisible(supportsOpacity);
-  m_opacitySlider->setVisible(supportsOpacity);
-  m_opacitySpin->setVisible(supportsOpacity);
-  m_hardnessLabel->setVisible(supportsHardness);
-  m_hardnessSlider->setVisible(supportsHardness);
-  m_hardnessSpin->setVisible(supportsHardness);
-  m_flowLabel->setVisible(supportsFlow);
-  m_flowSlider->setVisible(supportsFlow);
-  m_flowSpin->setVisible(supportsFlow);
-  m_spacingLabel->setVisible(supportsSpacing);
-  m_spacingSlider->setVisible(supportsSpacing);
-  m_spacingSpin->setVisible(supportsSpacing);
-  m_brushDynamicsSection->setVisible(supportsFlow || supportsSpacing);
-  m_antiAliasCheck->setVisible(supportsAntiAlias);
-  m_stabilizationLabel->setVisible(supportsStabilization);
-  m_stabilizationSlider->setVisible(supportsStabilization);
-  m_stabilizationSpin->setVisible(supportsStabilization);
-  m_postCorrectionCheck->setVisible(supportsPostCorrection);
-  m_velocityCorrectionCheck->setVisible(supportsVelocityCorrection);
-  m_correctionSection->setVisible(supportsAntiAlias || supportsStabilization || supportsPostCorrection || supportsVelocityCorrection);
+  const bool showColor = pinnedOrDetail(supportsColor, QStringLiteral("color"));
+  const bool showSize = pinnedOrDetail(supportsSize, QStringLiteral("size"));
+  const bool showOpacity = pinnedOrDetail(supportsOpacity, QStringLiteral("opacity"));
+  const bool showHardness = pinnedOrDetail(supportsHardness, QStringLiteral("hardness"));
+  const bool showBlend = pinnedOrDetail(supportsBlend, QStringLiteral("blend"));
+  const bool showAntiAlias = pinnedOrDetail(supportsAntiAlias, QStringLiteral("antialias"));
+  const bool showStabilization = pinnedOrDetail(supportsStabilization, QStringLiteral("stabilization"));
+
+  m_colorLabel->setVisible(showColor);
+  m_colorButton->setVisible(showColor);
+  m_sizeLabel->setVisible(showSize);
+  m_sizeSpin->setVisible(showSize);
+  m_opacityLabel->setVisible(showOpacity);
+  m_opacitySlider->setVisible(showOpacity);
+  m_opacitySpin->setVisible(showOpacity);
+  m_hardnessLabel->setVisible(showHardness);
+  m_hardnessSlider->setVisible(showHardness);
+  m_hardnessSpin->setVisible(showHardness);
+  m_flowLabel->setVisible(m_showDetails && supportsFlow);
+  m_flowSlider->setVisible(m_showDetails && supportsFlow);
+  m_flowSpin->setVisible(m_showDetails && supportsFlow);
+  m_spacingLabel->setVisible(m_showDetails && supportsSpacing);
+  m_spacingSlider->setVisible(m_showDetails && supportsSpacing);
+  m_spacingSpin->setVisible(m_showDetails && supportsSpacing);
+  m_brushDynamicsSection->setVisible(m_showDetails && (supportsFlow || supportsSpacing));
+  m_antiAliasCheck->setVisible(showAntiAlias);
+  m_stabilizationLabel->setVisible(showStabilization);
+  m_stabilizationSlider->setVisible(showStabilization);
+  m_stabilizationSpin->setVisible(showStabilization);
+  m_postCorrectionCheck->setVisible(m_showDetails && supportsPostCorrection);
+  m_velocityCorrectionCheck->setVisible(m_showDetails && supportsVelocityCorrection);
+  m_correctionSection->setVisible(
+      showAntiAlias || showStabilization || (m_showDetails && (supportsPostCorrection || supportsVelocityCorrection)));
   m_shapeTypeCombo->setVisible(supportsShape);
   m_angleLabel->setVisible(supportsAngle);
   m_angleSlider->setVisible(supportsAngle);
@@ -549,10 +721,10 @@ void ToolPropertyPanel::refreshFromController() {
   m_taperEndSlider->setVisible(supportsTaperEnd);
   m_taperEndSpin->setVisible(supportsTaperEnd);
   m_shapeSection->setVisible(
-      supportsShape || supportsAngle || supportsRoundness || supportsTaperStart || supportsTaperEnd);
-  m_blendModeCombo->setVisible(supportsBlend);
-  m_eraseModeCheck->setVisible(supportsEraseMode);
-  m_lockAlphaRespectCheck->setVisible(supportsLockAlpha);
+      m_showDetails && (supportsShape || supportsAngle || supportsRoundness || supportsTaperStart || supportsTaperEnd));
+  m_blendModeCombo->setVisible(showBlend);
+  m_eraseModeCheck->setVisible(m_showDetails && supportsEraseMode);
+  m_lockAlphaRespectCheck->setVisible(m_showDetails && supportsLockAlpha);
   m_snapAngleLabel->setVisible(supportsSnapAngle);
   m_snapAngleSlider->setVisible(supportsSnapAngle);
   m_snapAngleSpin->setVisible(supportsSnapAngle);
@@ -574,12 +746,14 @@ void ToolPropertyPanel::refreshFromController() {
   m_autoSelectThresholdSpin->setVisible(supportsAutoSelectThreshold);
   m_autoSelectContiguousCheck->setVisible(supportsAutoSelectContiguous);
   m_autoSelectReferAllLayersCheck->setVisible(supportsAutoSelectReferAllLayers);
-  m_drawingControlSection->setVisible(supportsBlend || supportsEraseMode || supportsLockAlpha);
-  m_vectorSection->setVisible(supportsSnapAngle || supportsSimplify);
-  m_fillSection->setVisible(supportsFillThreshold || supportsFillContiguous || supportsFillReferAllLayers || supportsFillGapClose);
+  m_drawingControlSection->setVisible(showBlend || (m_showDetails && (supportsEraseMode || supportsLockAlpha)));
+  m_vectorSection->setVisible(m_showDetails && (supportsSnapAngle || supportsSimplify));
+  m_fillSection->setVisible(
+      m_showDetails && (supportsFillThreshold || supportsFillContiguous || supportsFillReferAllLayers || supportsFillGapClose));
   m_selectionSection->setVisible(
-      supportsSelectionMode || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
-      supportsAutoSelectReferAllLayers);
+      m_showDetails &&
+      (supportsSelectionMode || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
+       supportsAutoSelectReferAllLayers));
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);

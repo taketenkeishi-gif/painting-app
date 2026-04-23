@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <string_view>
+#include <vector>
 
 #include "core/common/Point.h"
 #include "core/layer/Layer.h"
@@ -49,6 +50,7 @@ private:
   BrushSettings m_settings;
   bool m_drawing {false};
   Point m_lastPoint {0, 0};
+  std::vector<Point> m_vectorPoints;
 };
 
 } // namespace core
