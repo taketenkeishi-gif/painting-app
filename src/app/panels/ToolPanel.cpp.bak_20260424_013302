@@ -116,7 +116,7 @@ QWidget* makeQuickSliderBlock(
 
   auto* top = new QHBoxLayout();
   top->setContentsMargins(0, 0, 0, 0);
-  top->setSpacing(4);
+  top->setSpacing(2);
   auto* swatch = new QFrame(block);
   swatch->setFixedSize(10, 10);
   swatch->setStyleSheet(swatchStyle);
@@ -411,5 +411,4 @@ void ToolPanel::relayoutButtons() {
 }
 
 } // namespace app::panels
-
 
