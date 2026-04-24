@@ -257,7 +257,7 @@ void MainWindow::setupShellLayout() {
   m_colorHistoryButtons.reserve(24);
   for (int i = 0; i < 24; ++i) {
     auto* chip = new QPushButton(colorPanel);
-    chip->setFixedSize(15, 15);
+    chip->setFixedSize(18, 18);
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
     historyLayout->addWidget(chip, i / 8, i % 8);
@@ -266,12 +266,21 @@ void MainWindow::setupShellLayout() {
   colorLayout->addWidget(colorTitle);
   colorLayout->addLayout(colorButtons);
   colorLayout->addWidget(m_colorWheelWidget, 1);
-  colorLayout->addLayout(addHsvRow("H", m_hueSlider, m_hueSpin));
-  colorLayout->addLayout(addHsvRow("S", m_satSlider, m_satSpin));
-  colorLayout->addLayout(addHsvRow("V", m_valSlider, m_valSpin));
-  colorLayout->addLayout(addHsvRow("A", m_alphaSlider, m_alphaSpin));
-  colorLayout->addWidget(historyTitle);
-  colorLayout->addLayout(historyLayout);
+  auto* hsvWidget = new QWidget(colorPanel);
+  auto* hsvLayout = new QVBoxLayout(hsvWidget);
+  hsvLayout->setContentsMargins(0, 0, 0, 0);
+  hsvLayout->setSpacing(2);
+  hsvLayout->addLayout(addHsvRow("H", m_hueSlider, m_hueSpin));
+  hsvLayout->addLayout(addHsvRow("S", m_satSlider, m_satSpin));
+  hsvLayout->addLayout(addHsvRow("V", m_valSlider, m_valSpin));
+  hsvLayout->addLayout(addHsvRow("A", m_alphaSlider, m_alphaSpin));
+  colorLayout->addWidget(makePanelGroup("カラースライダー", hsvWidget, colorPanel));
+  auto* historyWidget = new QWidget(colorPanel);
+  auto* historyWrap = new QVBoxLayout(historyWidget);
+  historyWrap->setContentsMargins(0, 0, 0, 0);
+  historyWrap->setSpacing(2);
+  historyWrap->addLayout(historyLayout);
+  colorLayout->addWidget(makePanelGroup("最近色", historyWidget, colorPanel));
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
   connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
@@ -1916,7 +1925,9 @@ void MainWindow::refreshColorHistoryButtons() {
     if (i >= m_colorHistory.size()) {
       chip->setEnabled(false);
       chip->setText({});
-      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; padding:0; border-radius:2px; }");
+      chip->setStyleSheet(
+          "QPushButton { border: 1px solid #3b4452; background: #262c35; padding:0; border-radius:3px; }"
+          "QPushButton:hover { border:1px solid #7f9fc8; }");
       chip->setProperty("coreColor", QVariant {});
       continue;
     }
@@ -1929,7 +1940,9 @@ void MainWindow::refreshColorHistoryButtons() {
     chip->setStyleSheet(
         QString(
             "QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #596476; "
-            "padding:0; border-radius:2px; }")
+            "padding:0; border-radius:3px; font-size:10px; font-weight:700; }"
+            "QPushButton:hover { border:1px solid #9fbfff; }"
+            "QPushButton:pressed { border:1px solid #ffffff; }")
             .arg(color.red())
             .arg(color.green())
             .arg(color.blue())
