@@ -37,6 +37,7 @@
     <file>icons/16/vector_add.svg</file>
     <file>icons/16/visibility.svg</file>
     <file>icons/16/visibility_off.svg</file>
+    <file>icons/16/pen_active.svg</file>
     <file>icons/16/zoom.svg</file>
   </qresource>
   <qresource prefix="/icons/20">
