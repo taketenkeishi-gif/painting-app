@@ -236,42 +236,136 @@ void MainWindow::setupShellLayout() {
   colorOps->addWidget(resetColorButton);
   colorOps->addWidget(transparentColorButton);
   colorButtons->addLayout(colorOps, 1);
-  auto addHsvRow = [colorPanel](const QString& name, QSlider* slider, QSpinBox* spin) {
+  auto addHsvRow = [this, colorPanel](const QString& label, QSlider* slider, QSpinBox* spin) {
     auto* row = new QHBoxLayout();
-    row->setContentsMargins(0, 0, 0, 0);
-    row->setSpacing(1);
-    auto* label = new QLabel(name, colorPanel);
-    label->setMinimumWidth(8);
-    label->setMaximumWidth(8);
-    label->setStyleSheet("font-size:10px; color:#9ea8b8;");
-    spin->setFixedWidth(36);
-    spin->setMaximumHeight(16);
-    slider->setMaximumHeight(7);
-    row->addWidget(label);
-    row->addWidget(slider, 1);
-    row->addWidget(spin);
+    row->setContentsMargins(4, 1, 4, 1);
+    row->setSpacing(5);
+
+    const QString accent =
+        label == QStringLiteral("H") ? QStringLiteral("#ff5a8a") :
+        label == QStringLiteral("S") ? QStringLiteral("#57d68d") :
+        label == QStringLiteral("V") ? QStringLiteral("#f2c45d") :
+        QStringLiteral("#8fb5ff");
+
+    const QString accentSoft =
+        label == QStringLiteral("H") ? QStringLiteral("#8a3552") :
+        label == QStringLiteral("S") ? QStringLiteral("#2f7450") :
+        label == QStringLiteral("V") ? QStringLiteral("#7b6531") :
+        QStringLiteral("#415d8c");
+
+    auto* nameLabel = new QLabel(label, colorPanel);
+    nameLabel->setFixedWidth(24);
+    nameLabel->setMinimumHeight(18);
+    nameLabel->setAlignment(Qt::AlignCenter);
+    nameLabel->setStyleSheet(QStringLiteral(
+        "QLabel {"
+        "  color: %1;"
+        "  background: #202936;"
+        "  border: 1px solid %2;"
+        "  border-radius: 2px;"
+        "  font-weight: 800;"
+        "  padding: 0px;"
+        "}").arg(accent, accentSoft));
+
+    slider->setMinimumWidth(185);
+    slider->setFixedHeight(18);
+    slider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    slider->setStyleSheet(QStringLiteral(
+        "QSlider::groove:horizontal {"
+        "  height: 7px;"
+        "  border-radius: 3px;"
+        "  background: #202630;"
+        "}"
+        "QSlider::sub-page:horizontal {"
+        "  height: 7px;"
+        "  border-radius: 3px;"
+        "  background: %1;"
+        "}"
+        "QSlider::add-page:horizontal {"
+        "  height: 7px;"
+        "  border-radius: 3px;"
+        "  background: #141a22;"
+        "}"
+        "QSlider::handle:horizontal {"
+        "  width: 12px;"
+        "  height: 12px;"
+        "  margin: -4px 0px;"
+        "  border-radius: 6px;"
+        "  border: 1px solid #dce6f2;"
+        "  background: %1;"
+        "}"
+        "QSlider::handle:horizontal:hover {"
+        "  border: 1px solid #ffffff;"
+        "}").arg(accent));
+
+    spin->setMinimumWidth(62);
+    spin->setMaximumWidth(66);
+    spin->setFixedWidth(64);
+    spin->setButtonSymbols(QAbstractSpinBox::UpDownArrows);
+    spin->setStyleSheet(QStringLiteral(
+        "QSpinBox {"
+        "  min-height: 22px;"
+        "  padding-left: 4px;"
+        "  padding-right: 17px;"
+        "  border: 1px solid #455166;"
+        "  background: #121820;"
+        "  color: #eef3fb;"
+        "}"
+        "QSpinBox::up-button, QSpinBox::down-button {"
+        "  width: 15px;"
+        "  subcontrol-origin: border;"
+        "  background: #1d2632;"
+        "  border-left: 1px solid #3f4a5d;"
+        "}"
+        "QSpinBox::up-button:hover, QSpinBox::down-button:hover {"
+        "  background: #2b3544;"
+        "}"
+        "QSpinBox::up-arrow, QSpinBox::down-arrow {"
+        "  width: 7px;"
+        "  height: 7px;"
+        "}"));
+
+    row->addWidget(nameLabel, 0, Qt::AlignVCenter);
+    row->addWidget(slider, 1, Qt::AlignVCenter);
+    row->addWidget(spin, 0, Qt::AlignVCenter);
     return row;
   };
-  auto* historyTitle = new QLabel("最近色", colorPanel);
+  auto* historyTitle = new QLabel("カラーヒストリー", colorPanel);
   historyTitle->setStyleSheet("font-weight: 600; font-size: 10px;");
-  auto* historyLayout = new QGridLayout();
+  auto* historyGridWidget = new QWidget(nullptr);
+  historyGridWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  auto* historyLayout = new QGridLayout(historyGridWidget);
   historyLayout->setContentsMargins(0, 0, 0, 0);
-  historyLayout->setSpacing(1);
+  historyLayout->setSpacing(0);
+  historyLayout->setHorizontalSpacing(0);
+  historyLayout->setVerticalSpacing(0);
+  historyLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  historyLayout->setSizeConstraint(QLayout::SetFixedSize);
   m_colorHistoryButtons.clear();
-  m_colorHistoryButtons.reserve(80);
-  for (int i = 0; i < 80; ++i) {
+  m_colorHistoryButtons.reserve(84);
+  for (int i = 0; i < 84; ++i) {
     auto* chip = new QPushButton(nullptr);
-    chip->setFixedSize(12, 12);
-    chip->setMinimumSize(12, 12);
-    chip->setMaximumSize(12, 12);
+    chip->setFixedSize(24, 24);
+    chip->setMinimumSize(24, 24);
+    chip->setMaximumSize(24, 24);
     chip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     chip->setProperty("colorHistoryChip", true);
-    chip->setStyleSheet("QPushButton { min-width: 12px; max-width: 12px; min-height: 12px; max-height: 12px; padding: 0px; margin: 0px; border: 1px solid #445064; border-radius: 2px; background: #202833; }");
+    chip->setStyleSheet("QPushButton { min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px; padding: 0px; margin: 0px; border: 1px solid #2f3746; border-radius: 0px; background: #202833; }QPushButton:disabled { min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px; padding: 0px; margin: 0px; border: 1px solid #2f3746; border-radius: 0px; background: #202833; }QPushButton:hover { border: 1px solid #9fb5d6; }");
+    chip->setStyleSheet("QPushButton { min-width: 18px; max-width: 18px; min-height: 18px; max-height: 18px; padding: 0px; margin: 0px; border: 1px solid #343d4d; border-radius: 0px; background: #202833; }");
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
-    historyLayout->addWidget(chip, i / 10, i % 10);
+    historyLayout->addWidget(chip, i / 14, i % 14);
     m_colorHistoryButtons.push_back(chip);
   }
+  for (int col = 0; col < 14; ++col) {
+    historyLayout->setColumnMinimumWidth(col, 24);
+    historyLayout->setColumnStretch(col, 0);
+  }
+  for (int row = 0; row < 6; ++row) {
+    historyLayout->setRowMinimumHeight(row, 24);
+    historyLayout->setRowStretch(row, 0);
+  }
+  historyGridWidget->setFixedSize(24 * 14, 24 * 6);
   auto* colorMainWidget = new QWidget(nullptr);
   auto* colorMainLayout = new QVBoxLayout(colorMainWidget);
   colorMainLayout->setContentsMargins(0, 0, 0, 0);
@@ -282,7 +376,7 @@ void MainWindow::setupShellLayout() {
 
   auto* hsvWidget = new QWidget(nullptr);
   hsvWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-  hsvWidget->setMinimumWidth(280);
+  hsvWidget->setMinimumWidth(330);
   auto* hsvLayout = new QVBoxLayout(hsvWidget);
   hsvLayout->setContentsMargins(0, 0, 0, 0);
   hsvLayout->setSpacing(2);
@@ -293,11 +387,26 @@ void MainWindow::setupShellLayout() {
 
   auto* historyWidget = new QWidget(nullptr);
   historyWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+  historyWidget->setMaximumHeight(174);
   auto* historyWrap = new QVBoxLayout(historyWidget);
   historyWrap->setContentsMargins(0, 0, 0, 0);
-  historyWrap->setSpacing(1);
+  historyWrap->setSpacing(2);
   historyWrap->addWidget(historyTitle);
-  historyWrap->addLayout(historyLayout);
+  historyWrap->addWidget(historyGridWidget, 0, Qt::AlignLeft | Qt::AlignTop);
+  m_hueSpin->setMinimumWidth(58);
+  m_satSpin->setMinimumWidth(58);
+  m_valSpin->setMinimumWidth(58);
+  m_alphaSpin->setMinimumWidth(58);
+  m_hueSpin->setMaximumWidth(62);
+  m_satSpin->setMaximumWidth(62);
+  m_valSpin->setMaximumWidth(62);
+  m_alphaSpin->setMaximumWidth(62);
+
+  m_hueSpin->setStyleSheet("QSpinBox { padding-right: 14px; } QSpinBox::up-button, QSpinBox::down-button { width: 16px; }");
+  m_satSpin->setStyleSheet("QSpinBox { padding-right: 14px; } QSpinBox::up-button, QSpinBox::down-button { width: 16px; }");
+  m_valSpin->setStyleSheet("QSpinBox { padding-right: 14px; } QSpinBox::up-button, QSpinBox::down-button { width: 16px; }");
+  m_alphaSpin->setStyleSheet("QSpinBox { padding-right: 14px; } QSpinBox::up-button, QSpinBox::down-button { width: 16px; }");
+
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
   connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
@@ -449,8 +558,8 @@ void MainWindow::setupShellLayout() {
   m_toolPropertyDock = makeDock("ツールプロパティ", makeScrollable(m_toolPropertyPanel), "ToolPropertyDock");
   m_colorDock = makeDock("カラー", makeScrollable(colorMainWidget), "ColorDock");
   auto* colorSliderDock = makeDock("カラースライダー", makeScrollable(hsvWidget), "ColorSliderDock");
-  colorSliderDock->setMinimumWidth(300);
-  auto* colorHistoryDock = makeDock("最近色", makeScrollable(historyWidget), "ColorHistoryDock");
+  colorSliderDock->setMinimumWidth(350);
+  auto* colorHistoryDock = makeDock("カラーヒストリー", makeScrollable(historyWidget), "ColorHistoryDock");
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
 
@@ -1892,7 +2001,7 @@ void MainWindow::pushForegroundColorHistory(const core::Color& color) {
   };
   m_colorHistory.erase(std::remove_if(m_colorHistory.begin(), m_colorHistory.end(), sameColor), m_colorHistory.end());
   m_colorHistory.insert(m_colorHistory.begin(), color);
-  constexpr std::size_t kHistoryMax = 80;
+  constexpr std::size_t kHistoryMax = 84;
   if (m_colorHistory.size() > kHistoryMax) {
     m_colorHistory.resize(kHistoryMax);
   }
@@ -1937,48 +2046,46 @@ void MainWindow::applyForegroundFromHsvControls() {
 }
 
 void MainWindow::refreshColorHistoryButtons() {
-  if (m_colorHistoryButtons.empty()) {
-    return;
-  }
+  constexpr int kChipSize = 24;
+  const QString emptyStyle = QStringLiteral(
+      "QPushButton { min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px; "
+      "padding: 0px; margin: 0px; border: 1px solid #2f3746; border-radius: 0px; background: #202833; }"
+      "QPushButton:disabled { min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px; "
+      "padding: 0px; margin: 0px; border: 1px solid #2f3746; border-radius: 0px; background: #202833; }"
+      "QPushButton:hover { border: 1px solid #9fb5d6; }");
+
   for (std::size_t i = 0; i < m_colorHistoryButtons.size(); ++i) {
-    QPushButton* chip = m_colorHistoryButtons[i];
+    auto* chip = m_colorHistoryButtons[i];
     if (chip == nullptr) {
       continue;
     }
+
+    chip->setFixedSize(kChipSize, kChipSize);
+    chip->setMinimumSize(kChipSize, kChipSize);
+    chip->setMaximumSize(kChipSize, kChipSize);
+    chip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
     if (i >= m_colorHistory.size()) {
       chip->setEnabled(false);
-      chip->setText({});
-      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; padding:0; border-radius:2px; }");
-      chip->setProperty("coreColor", QVariant {});
+      chip->setStyleSheet(emptyStyle);
+      chip->setToolTip(QStringLiteral("未使用"));
       continue;
     }
-    const QColor color = toQColor(m_colorHistory[i]);
-    const int luminance = (299 * color.red() + 587 * color.green() + 114 * color.blue()) / 1000;
-    const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
-    chip->setEnabled(true);
-    chip->setText(color.alpha() == 0 ? "T" : "");
-    chip->setToolTip(color.alpha() == 0 ? "透明色" : color.name(QColor::HexRgb).toUpper());
-    chip->setStyleSheet(
-        QString(
-            "QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #596476; "
-            "padding:0; border-radius:2px; }")
-            .arg(color.red())
-            .arg(color.green())
-            .arg(color.blue())
-            .arg(color.alpha())
-            .arg(textColor));
-    chip->setProperty("coreColor", color);
-  }
 
-  // colorHistoryChip compact enforcement
-  for (auto* chip : m_colorHistoryButtons) {
-    if (chip == nullptr) {
-      continue;
-    }
-    chip->setFixedSize(12, 12);
-    chip->setMinimumSize(12, 12);
-    chip->setMaximumSize(12, 12);
-    chip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    const core::Color& color = m_colorHistory[i];
+    const QString rgb = QStringLiteral("rgb(%1,%2,%3)").arg(color.r).arg(color.g).arg(color.b);
+    chip->setEnabled(true);
+    chip->setStyleSheet(QStringLiteral(
+        "QPushButton { min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px; "
+        "padding: 0px; margin: 0px; border: 1px solid #1f2632; border-radius: 0px; background: %1; }"
+        "QPushButton:hover { border: 1px solid #ffffff; }"
+        "QPushButton:pressed { border: 1px solid #9fb5d6; }")
+        .arg(rgb));
+    chip->setToolTip(QStringLiteral("#%1%2%3 A%4")
+        .arg(color.r, 2, 16, QChar('0'))
+        .arg(color.g, 2, 16, QChar('0'))
+        .arg(color.b, 2, 16, QChar('0'))
+        .arg(color.a));
   }
 }
 
