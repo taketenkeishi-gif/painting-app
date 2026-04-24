@@ -142,8 +142,8 @@ public:
     QPen pen(stroke, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     painter->setPen(pen);
 
-    const int fixedPreviewWidth = 132;
-    const int fixedPreviewWidth = 128;
+    
+    
     QRectF r(
         option.rect.left() + 8,
         option.rect.top() + 5,
@@ -498,5 +498,6 @@ void SubToolPanel::onResetClicked() {
 }
 
 } // namespace app::panels
+
 
 
