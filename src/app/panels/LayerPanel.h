@@ -10,6 +10,7 @@
 class QLabel;
 class QModelIndex;
 class QSlider;
+class QSpinBox;
 class QLineEdit;
 class QComboBox;
 class QPoint;
@@ -69,6 +70,7 @@ private:
   QListWidget* m_layerList {nullptr};
   QLabel* m_opacityLabel {nullptr};
   QSlider* m_opacitySlider {nullptr};
+  QSpinBox* m_opacitySpin {nullptr};
   QComboBox* m_blendModeCombo {nullptr};
   QPushButton* m_addRasterButton {nullptr};
   QPushButton* m_addVectorButton {nullptr};

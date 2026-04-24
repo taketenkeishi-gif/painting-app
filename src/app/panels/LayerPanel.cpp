@@ -1,6 +1,7 @@
 ﻿#include "app/panels/LayerPanel.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
@@ -10,12 +11,15 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QImage>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QPainter>
 #include <QResizeEvent>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStyle>
 #include <QVBoxLayout>
 #include <QListWidgetItem>
@@ -65,19 +69,93 @@ QString blendModeName(core::BlendMode mode) {
   }
 }
 
-QString layerIconName(const app::bridge::LayerViewModel& model) {
+QColor toQColor(const core::Color& c) {
+  return QColor(c.r, c.g, c.b, c.a);
+}
+
+QColor alphaBlend(const QColor& under, const core::Color& over) {
+  const float a = static_cast<float>(over.a) / 255.0F;
+  const float inv = 1.0F - a;
+  return QColor(
+      static_cast<int>(std::lround(static_cast<float>(over.r) * a + under.redF() * 255.0F * inv)),
+      static_cast<int>(std::lround(static_cast<float>(over.g) * a + under.greenF() * 255.0F * inv)),
+      static_cast<int>(std::lround(static_cast<float>(over.b) * a + under.blueF() * 255.0F * inv)));
+}
+
+QColor checkerColor(int x, int y) {
+  const bool dark = (((x / 4) + (y / 4)) % 2) == 0;
+  return dark ? QColor(62, 68, 78) : QColor(84, 92, 104);
+}
+
+QIcon layerThumbnailIcon(
+    const app::bridge::AppController* controller,
+    const app::bridge::LayerViewModel& model,
+    std::size_t layerIndex) {
+  constexpr int thumbW = 26;
+  constexpr int thumbH = 16;
+  QImage image(thumbW, thumbH, QImage::Format_ARGB32_Premultiplied);
+  for (int y = 0; y < thumbH; ++y) {
+    for (int x = 0; x < thumbW; ++x) {
+      image.setPixelColor(x, y, checkerColor(x, y));
+    }
+  }
+
   if (model.paperLayer) {
-    return model.visible ? QStringLiteral("visibility") : QStringLiteral("visibility_off");
+    const QColor paper = toQColor(controller->paperColor());
+    for (int y = 0; y < thumbH; ++y) {
+      for (int x = 0; x < thumbW; ++x) {
+        image.setPixelColor(x, y, paper);
+      }
+    }
+  } else if (layerIndex < controller->document().layerCount()) {
+    const core::Layer& layer = controller->document().layerAt(layerIndex);
+    if (layer.kind() == core::LayerKind::Raster) {
+      const core::PixelBuffer& buffer = layer.buffer();
+      if (buffer.width() > 0 && buffer.height() > 0) {
+        for (int y = 0; y < thumbH; ++y) {
+          const int sy = std::clamp((y * buffer.height()) / thumbH, 0, buffer.height() - 1);
+          for (int x = 0; x < thumbW; ++x) {
+            const int sx = std::clamp((x * buffer.width()) / thumbW, 0, buffer.width() - 1);
+            const core::Color src = buffer.pixel(sx, sy);
+            image.setPixelColor(x, y, alphaBlend(image.pixelColor(x, y), src));
+          }
+        }
+      }
+    } else if (layer.kind() == core::LayerKind::Vector) {
+      QPainter painter(&image);
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      painter.setPen(QPen(QColor(208, 216, 230), 1.2));
+      painter.drawLine(QPointF(3.0, thumbH - 4.0), QPointF(thumbW - 3.0, 3.5));
+      painter.end();
+    } else if (layer.kind() == core::LayerKind::Folder) {
+      QPainter painter(&image);
+      painter.fillRect(QRect(1, 2, thumbW - 2, thumbH - 4), QColor(102, 118, 142, 80));
+      painter.end();
+    }
+  }
+
+  QPixmap pixmap = QPixmap::fromImage(image);
+  QPainter border(&pixmap);
+  border.setPen(QPen(QColor(40, 46, 56), 1.0));
+  border.setBrush(Qt::NoBrush);
+  border.drawRect(QRect(0, 0, thumbW - 1, thumbH - 1));
+  border.end();
+  return QIcon(pixmap);
+}
+
+QString layerBadge(const app::bridge::LayerViewModel& model) {
+  if (model.paperLayer) {
+    return QStringLiteral("[P]");
   }
   switch (model.kind) {
     case core::LayerKind::Raster:
-      return QStringLiteral("layer_add");
+      return QStringLiteral("[R]");
     case core::LayerKind::Vector:
-      return QStringLiteral("vector_add");
+      return QStringLiteral("[V]");
     case core::LayerKind::Folder:
-      return QStringLiteral("folder");
+      return QStringLiteral("[F]");
     default:
-      return QStringLiteral("layer_add");
+      return QStringLiteral("[?]");
   }
 }
 
@@ -85,28 +163,11 @@ QString decorateLayerName(const app::bridge::LayerViewModel& model) {
   if (model.paperLayer) {
     return QStringLiteral("用紙");
   }
-  QString suffix;
-  if (model.clippedToBelow) {
-    suffix += QStringLiteral(" C");
-  }
-  if (model.hasMask) {
-    suffix += model.maskEnabled ? QStringLiteral(" M") : QStringLiteral(" m");
-  }
-  if (model.locked) {
-    suffix += QStringLiteral(" L");
-  }
-  if (model.alphaLocked) {
-    suffix += QStringLiteral(" α");
-  }
-  if (model.positionLocked) {
-    suffix += QStringLiteral(" P");
-  }
-
   QString name = QString::fromStdString(model.name).trimmed();
   if (name.isEmpty()) {
     name = QStringLiteral("レイヤー");
   }
-  return suffix.isEmpty() ? name : QStringLiteral("%1  [%2]").arg(name, suffix.trimmed());
+  return QStringLiteral("%1 %2").arg(layerBadge(model), name);
 }
 
 QString stripLayerDecorators(const QString& text) {
@@ -127,6 +188,7 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_layerList(new QListWidget(this)),
       m_opacityLabel(new QLabel(QStringLiteral("不透明度: 100%"), this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
+      m_opacitySpin(new QSpinBox(this)),
       m_blendModeCombo(new QComboBox(this)),
       m_addRasterButton(new QPushButton(QStringLiteral("ラスタ追加"), this)),
       m_addVectorButton(new QPushButton(QStringLiteral("ベクター追加"), this)),
@@ -164,13 +226,22 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setSpacing(1);
   m_layerList->setMinimumHeight(140);
   m_layerList->setStyleSheet(
-      "QListWidget::item { min-height: 22px; padding: 3px 6px; border-bottom: 1px solid #313844; }"
+      "QListWidget::item { min-height: 20px; padding: 2px 4px; border-bottom: 1px solid #313844; }"
       "QListWidget::item:selected { background: #2e4f79; color: #ffffff; }"
-      "QListWidget::item:drop { border-top: 2px solid #7fb3ff; }");
+      "QListWidget::item:drop { border-top: 2px solid #7fb3ff; background: #243142; }"
+      "QListWidget::indicator { width: 14px; height: 14px; }"
+      "QListWidget::indicator:checked { image: url(:/icons/16/visibility.svg); }"
+      "QListWidget::indicator:unchecked { image: url(:/icons/16/visibility_off.svg); }");
 
   m_opacitySlider->setRange(0, 100);
   m_opacitySlider->setValue(100);
   m_opacitySlider->setToolTip(QStringLiteral("アクティブレイヤーの不透明度を調整"));
+  m_opacitySpin->setRange(0, 100);
+  m_opacitySpin->setValue(100);
+  m_opacitySpin->setSuffix(QStringLiteral("%"));
+  m_opacitySpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
+  m_opacitySpin->setAlignment(Qt::AlignRight);
+  m_opacitySpin->setFixedWidth(48);
 
   m_blendModeCombo->addItem(QStringLiteral("合成: 通常"), static_cast<int>(core::BlendMode::Normal));
   m_blendModeCombo->addItem(QStringLiteral("合成: 乗算"), static_cast<int>(core::BlendMode::Multiply));
@@ -230,11 +301,16 @@ LayerPanel::LayerPanel(QWidget* parent)
   auto* layout = new QVBoxLayout(this);
   layout->setContentsMargins(4, 4, 4, 4);
   layout->setSpacing(4);
+  auto* opacityRow = new QHBoxLayout();
+  opacityRow->setContentsMargins(0, 0, 0, 0);
+  opacityRow->setSpacing(4);
+  opacityRow->addWidget(m_opacitySlider, 1);
+  opacityRow->addWidget(m_opacitySpin, 0);
   layout->addWidget(m_headerLabel);
   layout->addWidget(m_filterEdit);
   layout->addWidget(m_layerList, 1);
   layout->addWidget(m_opacityLabel);
-  layout->addWidget(m_opacitySlider);
+  layout->addLayout(opacityRow);
   layout->addWidget(m_blendModeCombo);
   layout->addWidget(m_primaryGroup);
   layout->addWidget(m_stateGroup);
@@ -259,6 +335,14 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_layerList, &QListWidget::customContextMenuRequested, this, &LayerPanel::onLayerContextMenuRequested);
   connect(m_layerList->model(), &QAbstractItemModel::rowsMoved, this, &LayerPanel::onLayerRowsMoved);
   connect(m_opacitySlider, &QSlider::valueChanged, this, &LayerPanel::onOpacityChanged);
+  connect(m_opacitySpin, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+    if (m_isRefreshing) {
+      return;
+    }
+    const QSignalBlocker blocker(m_opacitySlider);
+    m_opacitySlider->setValue(value);
+    onOpacityChanged(value);
+  });
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &LayerPanel::onBlendModeChanged);
 
   applyResponsiveMode();
@@ -361,7 +445,8 @@ void LayerPanel::refreshLayers() {
 
     auto* item = new QListWidgetItem(m_layerList);
     item->setText(decorateLayerName(model));
-    item->setIcon(app::ui::icon(layerIconName(model)));
+    const std::size_t documentIndex = model.paperLayer ? 0 : (layerIndex > 0 ? layerIndex - 1 : 0);
+    item->setIcon(layerThumbnailIcon(m_controller, model, documentIndex));
 
     Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable;
     if (!model.paperLayer) {
@@ -382,11 +467,16 @@ void LayerPanel::refreshLayers() {
     item->setData(kBlendModeRole, static_cast<int>(model.blendMode));
     item->setData(kPaperRole, model.paperLayer);
 
+    const QString stateSummary = QStringLiteral("表示:%1  クリップ:%2  マスク:%3  ロック:%4")
+                                     .arg(model.visible ? QStringLiteral("ON") : QStringLiteral("OFF"))
+                                     .arg(model.clippedToBelow ? QStringLiteral("ON") : QStringLiteral("OFF"))
+                                     .arg(model.hasMask ? (model.maskEnabled ? QStringLiteral("ON") : QStringLiteral("無効")) : QStringLiteral("なし"))
+                                     .arg(model.locked ? QStringLiteral("ON") : QStringLiteral("OFF"));
     const QString tooltip = model.paperLayer
         ? QStringLiteral("用紙レイヤー: 表示/非表示のみ変更できます")
-        : QStringLiteral("%1 / 合成: %2").arg(layerKindText(model.kind), blendModeName(model.blendMode));
+        : QStringLiteral("%1 / 合成: %2\n%3").arg(layerKindText(model.kind), blendModeName(model.blendMode), stateSummary);
     item->setToolTip(tooltip);
-    item->setSizeHint(QSize(item->sizeHint().width(), 24));
+    item->setSizeHint(QSize(item->sizeHint().width(), 22));
 
     QFont font = item->font();
     font.setBold(model.active);
@@ -396,8 +486,10 @@ void LayerPanel::refreshLayers() {
     if (model.active) {
       m_layerList->setCurrentItem(item);
       const QSignalBlocker sliderBlocker(m_opacitySlider);
+      const QSignalBlocker spinBlocker(m_opacitySpin);
       const QSignalBlocker blendBlocker(m_blendModeCombo);
       m_opacitySlider->setValue(model.opacityPercent);
+      m_opacitySpin->setValue(model.opacityPercent);
       m_opacityLabel->setText(QStringLiteral("不透明度: %1%").arg(model.opacityPercent));
       const int blendIndex = m_blendModeCombo->findData(static_cast<int>(model.blendMode));
       if (blendIndex >= 0) {
@@ -614,6 +706,8 @@ void LayerPanel::onOpacityChanged(int value) {
     return;
   }
   m_opacityLabel->setText(QStringLiteral("不透明度: %1%").arg(value));
+  const QSignalBlocker spinBlocker(m_opacitySpin);
+  m_opacitySpin->setValue(value);
   m_controller->setActiveLayerOpacity(value);
 }
 
@@ -652,19 +746,21 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
   const bool canEditLayer = hasSelection && !paperSelected;
 
   QMenu menu(this);
-  QAction* renameAction = menu.addAction(QStringLiteral("名前変更"));
-  QAction* duplicateAction = menu.addAction(QStringLiteral("複製"));
-  QAction* deleteAction = menu.addAction(QStringLiteral("削除"));
+  QAction* renameAction = menu.addAction(app::ui::icon(QStringLiteral("layer")), QStringLiteral("名前変更"));
+  QAction* duplicateAction = menu.addAction(app::ui::icon(QStringLiteral("duplicate")), QStringLiteral("複製"));
+  QAction* deleteAction = menu.addAction(app::ui::icon(QStringLiteral("delete")), QStringLiteral("削除"));
   menu.addSeparator();
-  QAction* addRasterAction = menu.addAction(QStringLiteral("新規ラスターレイヤー"));
-  QAction* addVectorAction = menu.addAction(QStringLiteral("新規ベクターレイヤー"));
-  QAction* addFolderAction = menu.addAction(QStringLiteral("新規フォルダー"));
+  QAction* addRasterAction = menu.addAction(app::ui::icon(QStringLiteral("layer_add")), QStringLiteral("新規ラスターレイヤー"));
+  QAction* addVectorAction = menu.addAction(app::ui::icon(QStringLiteral("vector_add")), QStringLiteral("新規ベクターレイヤー"));
+  QAction* addFolderAction = menu.addAction(app::ui::icon(QStringLiteral("folder")), QStringLiteral("新規フォルダー"));
   menu.addSeparator();
-  QAction* moveUpAction = menu.addAction(QStringLiteral("上へ移動"));
-  QAction* moveDownAction = menu.addAction(QStringLiteral("下へ移動"));
-  QAction* toggleVisibleAction = menu.addAction(QStringLiteral("表示/非表示を切替"));
-  QAction* toggleClipAction = menu.addAction(QStringLiteral("クリッピング切替"));
-  QAction* toggleLockAction = menu.addAction(QStringLiteral("ロック切替"));
+  QAction* moveUpAction = menu.addAction(app::ui::icon(QStringLiteral("up")), QStringLiteral("上へ移動"));
+  QAction* moveDownAction = menu.addAction(app::ui::icon(QStringLiteral("down")), QStringLiteral("下へ移動"));
+  QAction* toggleVisibleAction = menu.addAction(app::ui::icon(QStringLiteral("visibility")), QStringLiteral("表示/非表示を切替"));
+  QAction* toggleClipAction = menu.addAction(app::ui::icon(QStringLiteral("clip")), QStringLiteral("クリッピング切替"));
+  QAction* toggleLockAction = menu.addAction(app::ui::icon(QStringLiteral("lock")), QStringLiteral("ロック切替"));
+  QAction* mergeDownAction = menu.addAction(QStringLiteral("下のレイヤーと結合"));
+  QAction* rasterizeAction = menu.addAction(QStringLiteral("ラスタライズ"));
 
   renameAction->setEnabled(canEditLayer);
   duplicateAction->setEnabled(canEditLayer);
@@ -674,6 +770,8 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
   toggleVisibleAction->setEnabled(hasSelection);
   toggleClipAction->setEnabled(canEditLayer && m_clipButton->isEnabled());
   toggleLockAction->setEnabled(canEditLayer && m_lockButton->isEnabled());
+  mergeDownAction->setEnabled(canEditLayer);
+  rasterizeAction->setEnabled(canEditLayer);
 
   if (paperSelected) {
     toggleVisibleAction->setText(QStringLiteral("用紙の表示/非表示を切替"));
@@ -727,6 +825,20 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
   }
   if (selected == toggleLockAction) {
     onToggleLockClicked();
+    return;
+  }
+  if (selected == mergeDownAction && m_layerList->currentItem() != nullptr) {
+    const int layerIndex = m_layerList->currentItem()->data(kLayerIndexRole).toInt();
+    if (layerIndex >= 0) {
+      m_controller->mergeLayerDown(static_cast<std::size_t>(layerIndex));
+    }
+    return;
+  }
+  if (selected == rasterizeAction && m_layerList->currentItem() != nullptr) {
+    const int layerIndex = m_layerList->currentItem()->data(kLayerIndexRole).toInt();
+    if (layerIndex >= 0) {
+      m_controller->rasterizeLayer(static_cast<std::size_t>(layerIndex));
+    }
     return;
   }
 }
@@ -809,6 +921,7 @@ void LayerPanel::refreshButtonState() {
     m_upButton->setEnabled(false);
     m_downButton->setEnabled(false);
     m_opacitySlider->setEnabled(false);
+    m_opacitySpin->setEnabled(false);
     m_blendModeCombo->setEnabled(false);
     m_clipButton->setEnabled(false);
     m_maskButton->setEnabled(false);
@@ -834,6 +947,7 @@ void LayerPanel::refreshButtonState() {
   m_upButton->setEnabled(canMoveUp && !paperSelected);
   m_downButton->setEnabled(canMoveDown && !paperSelected);
   m_opacitySlider->setEnabled(hasSelection && !paperSelected);
+  m_opacitySpin->setEnabled(hasSelection && !paperSelected);
   m_blendModeCombo->setEnabled(hasSelection && !paperSelected);
 
   if (paperSelected) {
