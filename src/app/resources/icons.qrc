@@ -1,4 +1,4 @@
-﻿<RCC>
+<RCC>
   <qresource prefix="/icons">
     <file>app_icon.ico</file>
   </qresource>
@@ -112,5 +112,17 @@
     <file>icons/24/visibility.svg</file>
     <file>icons/24/visibility_off.svg</file>
     <file>icons/24/zoom.svg</file>
-  </qresource>
+          <file>icons/16/zoom_in.svg</file>
+        <file>icons/16/zoom_out.svg</file>
+        <file>icons/16/zoom_reset.svg</file>
+        <file>icons/16/folder_add.svg</file>
+        <file>icons/20/zoom_in.svg</file>
+        <file>icons/20/zoom_out.svg</file>
+        <file>icons/20/zoom_reset.svg</file>
+        <file>icons/20/folder_add.svg</file>
+        <file>icons/24/zoom_in.svg</file>
+        <file>icons/24/zoom_out.svg</file>
+        <file>icons/24/zoom_reset.svg</file>
+        <file>icons/24/folder_add.svg</file>
+</qresource>
 </RCC>

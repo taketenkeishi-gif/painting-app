@@ -26,6 +26,7 @@
 #include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
+#include <QLayoutItem>
 #include <QKeySequenceEdit>
 #include <QLineEdit>
 #include <QListWidget>
@@ -46,6 +47,7 @@
 #include <QSet>
 #include <QTabWidget>
 #include <QToolBar>
+#include <QTimer>
 #include <QVariant>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -176,6 +178,7 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::setupShellLayout() {
   setCentralWidget(m_canvasWidget);
   setDockNestingEnabled(true);
+  setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::North);
 
   auto* colorPanel = new QWidget(this);
   m_colorPanelWidget = colorPanel;
@@ -393,15 +396,15 @@ void MainWindow::setupShellLayout() {
   auto* historyTitle = new QLabel("カラーヒストリー", colorPanel);
   historyTitle->setVisible(false);
   historyTitle->setStyleSheet("font-weight: 600; font-size: 10px;");
-  auto* historyGridWidget = new QWidget(nullptr);
-  historyGridWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  auto* historyLayout = new QGridLayout(historyGridWidget);
-  historyLayout->setContentsMargins(0, 0, 0, 0);
-  historyLayout->setSpacing(0);
-  historyLayout->setHorizontalSpacing(0);
-  historyLayout->setVerticalSpacing(0);
-  historyLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-  historyLayout->setSizeConstraint(QLayout::SetFixedSize);
+  m_colorHistoryGridWidget = new QWidget(nullptr);
+  m_colorHistoryGridWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+  m_colorHistoryLayout = new QGridLayout(m_colorHistoryGridWidget);
+  m_colorHistoryLayout->setContentsMargins(0, 0, 0, 0);
+  m_colorHistoryLayout->setSpacing(0);
+  m_colorHistoryLayout->setHorizontalSpacing(0);
+  m_colorHistoryLayout->setVerticalSpacing(0);
+  m_colorHistoryLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_colorHistoryLayout->setSizeConstraint(QLayout::SetMinAndMaxSize);
   m_colorHistoryButtons.clear();
   m_colorHistoryButtons.reserve(84);
   for (int i = 0; i < 84; ++i) {
@@ -415,18 +418,18 @@ void MainWindow::setupShellLayout() {
     chip->setStyleSheet("QPushButton { min-width: 18px; max-width: 18px; min-height: 18px; max-height: 18px; padding: 0px; margin: 0px; border: 1px solid #343d4d; border-radius: 0px; background: #202833; }");
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
-    historyLayout->addWidget(chip, i / 8, i % 8);
+    m_colorHistoryLayout->addWidget(chip, i / 12, i % 12);
     m_colorHistoryButtons.push_back(chip);
   }
   for (int col = 0; col < 8; ++col) {
-    historyLayout->setColumnMinimumWidth(col, 24);
-    historyLayout->setColumnStretch(col, 0);
+    m_colorHistoryLayout->setColumnMinimumWidth(col, 24);
+    m_colorHistoryLayout->setColumnStretch(col, 0);
   }
   for (int row = 0; row < 11; ++row) {
-    historyLayout->setRowMinimumHeight(row, 24);
-    historyLayout->setRowStretch(row, 0);
+    m_colorHistoryLayout->setRowMinimumHeight(row, 24);
+    m_colorHistoryLayout->setRowStretch(row, 0);
   }
-  historyGridWidget->setFixedSize(24 * 8, 24 * 11);
+  m_colorHistoryGridWidget->setMinimumSize(1, 1);
   auto* colorMainWidget = new QWidget(nullptr);
   auto* colorMainLayout = new QVBoxLayout(colorMainWidget);
   colorMainLayout->setContentsMargins(0, 0, 0, 0);
@@ -447,13 +450,14 @@ void MainWindow::setupShellLayout() {
   hsvLayout->addLayout(addHsvRow("A", m_alphaSlider, m_alphaSpin));
 
   auto* historyWidget = new QWidget(nullptr);
-  historyWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-  historyWidget->setMaximumHeight(280);
+  historyWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+  historyWidget->setMaximumHeight(QWIDGETSIZE_MAX);
   auto* historyWrap = new QVBoxLayout(historyWidget);
   historyWrap->setContentsMargins(0, 0, 0, 0);
   historyWrap->setSpacing(2);
   historyWrap->addWidget(historyTitle);
-  historyWrap->addWidget(historyGridWidget, 0, Qt::AlignLeft | Qt::AlignTop);
+  historyWrap->addWidget(m_colorHistoryGridWidget, 0, Qt::AlignLeft | Qt::AlignTop);
+  QTimer::singleShot(0, this, [this]() { relayoutColorHistoryGrid(); });
   m_hueSpin->setMinimumWidth(52);
   m_satSpin->setMinimumWidth(52);
   m_valSpin->setMinimumWidth(52);
@@ -625,6 +629,79 @@ void MainWindow::setupShellLayout() {
   colorHistoryDock->setMinimumWidth(188);
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
+  auto applyTabIntegratedTitleBar = [this](QDockWidget* dock) {
+    if (dock == nullptr) {
+      return;
+    }
+
+    auto* bar = new QWidget(dock);
+    bar->setObjectName(QStringLiteral("TabIntegratedDockTitleBar"));
+    bar->setFixedHeight(17);
+    bar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    bar->setStyleSheet(QStringLiteral(
+        "QWidget#TabIntegratedDockTitleBar {"
+        " background: #202833;"
+        " border-left: 1px solid #354052;"
+        " border-right: 1px solid #354052;"
+        " border-bottom: 1px solid #354052;"
+        "}"));
+
+    auto* row = new QHBoxLayout(bar);
+    row->setContentsMargins(4, 0, 3, 0);
+    row->setSpacing(3);
+
+    auto* grip = new QLabel(QStringLiteral("⋮⋮"), bar);
+    grip->setFixedWidth(16);
+    grip->setAlignment(Qt::AlignCenter);
+    grip->setStyleSheet(QStringLiteral("color: #4f5c6f; font-size: 10px;"));
+    row->addWidget(grip);
+    row->addStretch(1);
+
+    auto makeTinyDockButton = [](const QString& text, QWidget* parent) {
+      auto* button = new QPushButton(text, parent);
+      button->setFixedSize(14, 14);
+      button->setFocusPolicy(Qt::NoFocus);
+      button->setFlat(true);
+      button->setStyleSheet(QStringLiteral(
+          "QPushButton {"
+          " margin: 0px; padding: 0px;"
+          " border: 1px solid transparent;"
+          " border-radius: 2px;"
+          " color: #7e8da2;"
+          " background: transparent;"
+          " font-size: 10px;"
+          "}"
+          "QPushButton:hover {"
+          " border: 1px solid #4c5d73;"
+          " background: #263243;"
+          " color: #e4ebf6;"
+          "}"));
+      return button;
+    };
+
+    auto* floatButton = makeTinyDockButton(QStringLiteral("□"), bar);
+    floatButton->setToolTip(QStringLiteral("パネルを分離/戻す"));
+    row->addWidget(floatButton);
+
+    auto* closeButton = makeTinyDockButton(QStringLiteral("×"), bar);
+    closeButton->setToolTip(QStringLiteral("パネルを閉じる"));
+    row->addWidget(closeButton);
+
+    connect(floatButton, &QPushButton::clicked, dock, [dock]() {
+      dock->setFloating(!dock->isFloating());
+    });
+    connect(closeButton, &QPushButton::clicked, dock, [dock]() {
+      dock->hide();
+    });
+
+    dock->setTitleBarWidget(bar);
+  };
+
+  applyTabIntegratedTitleBar(m_subToolDock);
+  applyTabIntegratedTitleBar(m_toolPropertyDock);
+  applyTabIntegratedTitleBar(m_colorDock);
+  applyTabIntegratedTitleBar(colorSliderDock);
+  applyTabIntegratedTitleBar(colorHistoryDock);
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolSliderDock);
@@ -1110,15 +1187,15 @@ void MainWindow::createToolBar() {
   m_redoAction->setIcon(app::ui::icon("redo"));
   m_addRasterLayerAction->setIcon(app::ui::icon("layer_add"));
   m_addVectorLayerAction->setIcon(app::ui::icon("vector_add"));
-  m_addFolderLayerAction->setIcon(app::ui::icon("folder"));
+  m_addFolderLayerAction->setIcon(app::ui::icon("folder_add"));
   m_duplicateLayerAction->setIcon(app::ui::icon("duplicate"));
   m_deleteLayerAction->setIcon(app::ui::icon("delete"));
   m_toggleLayerVisibilityAction->setIcon(app::ui::icon("visibility"));
   m_moveLayerUpAction->setIcon(app::ui::icon("up"));
   m_moveLayerDownAction->setIcon(app::ui::icon("down"));
-  m_zoomInAction->setIcon(app::ui::icon("zoom"));
-  m_zoomOutAction->setIcon(app::ui::icon("zoom"));
-  m_resetZoomAction->setIcon(app::ui::icon("fit"));
+  m_zoomInAction->setIcon(app::ui::icon("zoom_in"));
+  m_zoomOutAction->setIcon(app::ui::icon("zoom_out"));
+  m_resetZoomAction->setIcon(app::ui::icon("zoom_reset"));
   m_fitToScreenAction->setIcon(app::ui::icon("fit"));
   m_commandPaletteAction->setIcon(app::ui::icon("command_palette"));
 
@@ -1174,6 +1251,7 @@ void MainWindow::adjustRightDockLayout() {
 void MainWindow::resizeEvent(QResizeEvent* event) {
   QMainWindow::resizeEvent(event);
   adjustRightDockLayout();
+  relayoutColorHistoryGrid();
 }
 
 void MainWindow::applyUiChrome() {
@@ -2164,7 +2242,73 @@ void MainWindow::refreshColorHistoryButtons() {
         .arg(color.b, 2, 16, QChar('0'))
         .arg(color.a));
   }
+  relayoutColorHistoryGrid();
 }
+
+void MainWindow::relayoutColorHistoryGrid() {
+  if (m_colorHistoryLayout == nullptr || m_colorHistoryGridWidget == nullptr || m_colorHistoryButtons.empty()) {
+    return;
+  }
+
+  constexpr int kChipSize = 24;
+  constexpr int kMinColumns = 1;
+  constexpr int kMaxColumns = 48;
+
+  int availableWidth = 0;
+  for (QWidget* widget = m_colorHistoryGridWidget; widget != nullptr; widget = widget->parentWidget()) {
+    auto* scrollArea = qobject_cast<QScrollArea*>(widget);
+    if (scrollArea != nullptr && scrollArea->viewport() != nullptr) {
+      availableWidth = scrollArea->viewport()->contentsRect().width();
+      break;
+    }
+  }
+
+  if (availableWidth <= 0 && m_colorHistoryGridWidget->parentWidget() != nullptr) {
+    availableWidth = m_colorHistoryGridWidget->parentWidget()->contentsRect().width();
+  }
+  if (availableWidth <= 0) {
+    availableWidth = m_colorHistoryGridWidget->width();
+  }
+
+  availableWidth = std::max(kChipSize, availableWidth - 1);
+  const int columns = std::clamp(availableWidth / kChipSize, kMinColumns, kMaxColumns);
+  const int rowCount = static_cast<int>((m_colorHistoryButtons.size() + static_cast<std::size_t>(columns) - 1) /
+                                        static_cast<std::size_t>(columns));
+
+  while (m_colorHistoryLayout->count() > 0) {
+    QLayoutItem* item = m_colorHistoryLayout->takeAt(0);
+    delete item;
+  }
+
+  for (std::size_t i = 0; i < m_colorHistoryButtons.size(); ++i) {
+    QPushButton* chip = m_colorHistoryButtons[i];
+    if (chip == nullptr) {
+      continue;
+    }
+
+    chip->setFixedSize(kChipSize, kChipSize);
+    chip->setMinimumSize(kChipSize, kChipSize);
+    chip->setMaximumSize(kChipSize, kChipSize);
+    const int row = static_cast<int>(i) / columns;
+    const int col = static_cast<int>(i) % columns;
+    m_colorHistoryLayout->addWidget(chip, row, col);
+  }
+
+  for (int col = 0; col < columns; ++col) {
+    m_colorHistoryLayout->setColumnMinimumWidth(col, kChipSize);
+    m_colorHistoryLayout->setColumnStretch(col, 0);
+  }
+  for (int row = 0; row < rowCount; ++row) {
+    m_colorHistoryLayout->setRowMinimumHeight(row, kChipSize);
+    m_colorHistoryLayout->setRowStretch(row, 0);
+  }
+
+  const int gridWidth = columns * kChipSize;
+  const int gridHeight = std::max(1, rowCount) * kChipSize;
+  m_colorHistoryGridWidget->setFixedSize(gridWidth, gridHeight);
+  m_colorHistoryColumnCount = columns;
+}
+
 
 void MainWindow::updateToolActionState() {
   const core::ToolKind current = m_controller->currentTool();
@@ -2366,4 +2510,6 @@ QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, cons
 }
 
 } // namespace app::mainwindow
+
+
 
