@@ -25,6 +25,7 @@
     <file>icons/16/redo.svg</file>
     <file>icons/16/reset_bw.svg</file>
     <file>icons/16/save.svg</file>
+    <file>icons/16/settings.svg</file>
     <file>icons/16/select.svg</file>
     <file>icons/16/swap.svg</file>
     <file>icons/16/transparent.svg</file>
@@ -61,6 +62,7 @@
     <file>icons/20/redo.svg</file>
     <file>icons/20/reset_bw.svg</file>
     <file>icons/20/save.svg</file>
+    <file>icons/20/settings.svg</file>
     <file>icons/20/select.svg</file>
     <file>icons/20/swap.svg</file>
     <file>icons/20/transparent.svg</file>
@@ -97,6 +99,7 @@
     <file>icons/24/redo.svg</file>
     <file>icons/24/reset_bw.svg</file>
     <file>icons/24/save.svg</file>
+    <file>icons/24/settings.svg</file>
     <file>icons/24/select.svg</file>
     <file>icons/24/swap.svg</file>
     <file>icons/24/transparent.svg</file>

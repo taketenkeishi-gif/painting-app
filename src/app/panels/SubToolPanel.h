@@ -5,11 +5,11 @@
 class QLabel;
 class QListWidget;
 class QLineEdit;
-class QPushButton;
 class QResizeEvent;
 class QString;
 class QToolButton;
 class QBoxLayout;
+class QMenu;
 
 namespace app::bridge {
 class AppController;
@@ -44,16 +44,13 @@ private:
   bool m_refreshing {false};
   app::bridge::AppController* m_controller {nullptr};
   QBoxLayout* m_searchRowLayout {nullptr};
-  QBoxLayout* m_manageRowLayout {nullptr};
+  QBoxLayout* m_compactActionsLayout {nullptr};
   QLabel* m_toolNameLabel {nullptr};
   QLabel* m_summaryLabel {nullptr};
   QLineEdit* m_searchEdit {nullptr};
-  QPushButton* m_createButton {nullptr};
-  QPushButton* m_duplicateButton {nullptr};
-  QPushButton* m_saveButton {nullptr};
-  QToolButton* m_renameButton {nullptr};
-  QToolButton* m_deleteButton {nullptr};
-  QToolButton* m_resetButton {nullptr};
+  QToolButton* m_createButton {nullptr};
+  QToolButton* m_settingsButton {nullptr};
+  QMenu* m_settingsMenu {nullptr};
   QListWidget* m_subToolList {nullptr};
 };
 

@@ -1,26 +1,101 @@
 ﻿#include "app/panels/SubToolPanel.h"
 
 #include <QAbstractItemView>
+#include <QAction>
 #include <QColor>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QMessageBox>
-#include <QPushButton>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QResizeEvent>
 #include <QSignalBlocker>
+#include <QSizePolicy>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include "app/bridge/AppController.h"
+#include "app/ui/IconLoader.h"
 
 namespace app::panels {
 
 namespace {
 constexpr int kSubToolIdRole = Qt::UserRole;
 constexpr int kSubToolEnabledRole = Qt::UserRole + 1;
+
+QPixmap makeStrokePreview(
+    const QString& subToolId,
+    const QColor& color,
+    const QSize& size,
+    bool enabled) {
+  QPixmap pixmap(size);
+  pixmap.fill(Qt::transparent);
+
+  QPainter painter(&pixmap);
+  painter.setRenderHint(QPainter::Antialiasing, true);
+
+  QColor penColor = color;
+  if (!enabled) {
+    penColor = QColor(120, 126, 137);
+  }
+  const QString id = subToolId.toLower();
+  qreal width = 2.6;
+  if (id.contains("hard")) {
+    width = 3.6;
+  } else if (id.contains("soft") || id.contains("airbrush")) {
+    width = 2.2;
+    penColor.setAlpha(200);
+  } else if (id.contains("vector")) {
+    width = 2.0;
+  } else if (id.contains("fill")) {
+    width = 5.2;
+  }
+
+  if (id.contains("eraser")) {
+    penColor = QColor(210, 218, 232, enabled ? 220 : 130);
+  }
+
+  QPen pen(penColor, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+  painter.setPen(pen);
+
+  const qreal w = static_cast<qreal>(size.width());
+  const qreal h = static_cast<qreal>(size.height());
+  QPainterPath path;
+  path.moveTo(2.0, h * 0.72);
+  path.cubicTo(w * 0.28, h * 0.20, w * 0.62, h * 0.88, w - 2.0, h * 0.34);
+  painter.drawPath(path);
+  return pixmap;
+}
+
+QWidget* makeSubToolRowWidget(
+    QListWidget* list,
+    const QString& subToolId,
+    const QString& localizedName,
+    bool enabled) {
+  auto* rowWidget = new QWidget(list);
+  rowWidget->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+  auto* rowLayout = new QHBoxLayout(rowWidget);
+  rowLayout->setContentsMargins(3, 1, 3, 1);
+  rowLayout->setSpacing(6);
+
+  auto* preview = new QLabel(rowWidget);
+  preview->setFixedSize(56, 16);
+  preview->setPixmap(makeStrokePreview(subToolId, QColor(233, 238, 248), preview->size(), enabled));
+  preview->setStyleSheet("background: transparent;");
+
+  auto* text = new QLabel(localizedName, rowWidget);
+  text->setStyleSheet(enabled ? "color: #dfe6f5;" : "color: #818a97;");
+  text->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+  rowLayout->addWidget(preview, 0, Qt::AlignVCenter);
+  rowLayout->addWidget(text, 1, Qt::AlignVCenter);
+  return rowWidget;
+}
 
 QString toolNameJa(core::ToolKind kind) {
   switch (kind) {
@@ -82,33 +157,38 @@ SubToolPanel::SubToolPanel(QWidget* parent)
       m_toolNameLabel(new QLabel(QString::fromUtf8(u8"ツール: -"), this)),
       m_summaryLabel(new QLabel(QString::fromUtf8(u8"サブツール: -"), this)),
       m_searchEdit(new QLineEdit(this)),
-      m_createButton(new QPushButton(QString::fromUtf8(u8"新規"), this)),
-      m_duplicateButton(new QPushButton(QString::fromUtf8(u8"複製"), this)),
-      m_saveButton(new QPushButton(QString::fromUtf8(u8"保存"), this)),
-      m_renameButton(new QToolButton(this)),
-      m_deleteButton(new QToolButton(this)),
-      m_resetButton(new QToolButton(this)),
+      m_createButton(new QToolButton(this)),
+      m_settingsButton(new QToolButton(this)),
+      m_settingsMenu(new QMenu(this)),
       m_subToolList(new QListWidget(this)) {
   setStyleSheet(
       "QLineEdit { min-height: 22px; }"
-      "QPushButton, QToolButton { min-height: 22px; padding: 2px 6px; }");
+      "QToolButton { min-height: 20px; min-width: 20px; padding: 1px; }");
   auto* layout = new QVBoxLayout(this);
   layout->setContentsMargins(4, 4, 4, 4);
-  layout->setSpacing(4);
+  layout->setSpacing(3);
 
   m_toolNameLabel->setStyleSheet("font-weight: 700;");
   m_summaryLabel->setStyleSheet("color: #9fb4cf;");
   m_summaryLabel->setWordWrap(true);
   m_searchEdit->setPlaceholderText(QString::fromUtf8(u8"サブツールを検索..."));
+  m_createButton->setAutoRaise(true);
+  m_createButton->setIcon(app::ui::icon("layer_add", 16));
+  m_createButton->setIconSize(QSize(14, 14));
   m_createButton->setToolTip(QString::fromUtf8(u8"新しいサブツールを作成"));
-  m_duplicateButton->setToolTip(QString::fromUtf8(u8"現在のサブツールを複製"));
-  m_saveButton->setToolTip(QString::fromUtf8(u8"現在のサブツール設定を保存"));
-  m_renameButton->setText(QString::fromUtf8(u8"名前変更"));
-  m_deleteButton->setText(QString::fromUtf8(u8"削除"));
-  m_resetButton->setText(QString::fromUtf8(u8"初期化"));
-  m_renameButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
-  m_deleteButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
-  m_resetButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+  m_settingsButton->setAutoRaise(true);
+  m_settingsButton->setIcon(app::ui::icon("settings", 16));
+  m_settingsButton->setIconSize(QSize(14, 14));
+  m_settingsButton->setToolTip(QString::fromUtf8(u8"サブツール設定"));
+  m_settingsButton->setPopupMode(QToolButton::InstantPopup);
+  m_settingsButton->setMenu(m_settingsMenu);
+
+  auto* duplicateAction = m_settingsMenu->addAction(app::ui::icon("duplicate", 16), QString::fromUtf8(u8"複製"));
+  auto* saveAction = m_settingsMenu->addAction(app::ui::icon("save", 16), QString::fromUtf8(u8"保存"));
+  m_settingsMenu->addSeparator();
+  auto* renameAction = m_settingsMenu->addAction(QString::fromUtf8(u8"名前変更"));
+  auto* deleteAction = m_settingsMenu->addAction(app::ui::icon("delete", 16), QString::fromUtf8(u8"削除"));
+  auto* resetAction = m_settingsMenu->addAction(QString::fromUtf8(u8"初期化"));
 
   m_subToolList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_subToolList->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -116,16 +196,17 @@ SubToolPanel::SubToolPanel(QWidget* parent)
   m_subToolList->setUniformItemSizes(true);
   m_subToolList->setSpacing(1);
   m_subToolList->setStyleSheet(
-      "QListWidget::item { padding: 4px 6px; border-bottom: 1px solid #303a46; }"
+      "QListWidget::item { padding: 1px 2px; border-bottom: 1px solid #303a46; }"
       "QListWidget::item:hover { background: #26303d; }"
       "QListWidget::item:selected { background: #345985; color: #ffffff; }");
 
   m_searchRowLayout = new QHBoxLayout();
   m_searchRowLayout->setContentsMargins(0, 0, 0, 0);
-  m_searchRowLayout->setSpacing(4);
-  m_searchRowLayout->addWidget(m_createButton);
+  m_searchRowLayout->setSpacing(3);
   m_searchRowLayout->addWidget(m_searchEdit, 1);
-  m_searchRowLayout->addWidget(m_duplicateButton);
+  auto* searchLabel = new QLabel(QString::fromUtf8(u8"一覧"), this);
+  searchLabel->setStyleSheet("font-size:10px; color:#9fb1c8;");
+  m_searchRowLayout->addWidget(searchLabel);
 
   layout->addWidget(m_toolNameLabel);
   layout->addWidget(m_summaryLabel);
@@ -135,26 +216,22 @@ SubToolPanel::SubToolPanel(QWidget* parent)
   layout->addLayout(m_searchRowLayout);
   layout->addWidget(m_subToolList);
 
-  auto* manageTitle = new QLabel(QString::fromUtf8(u8"管理"), this);
-  manageTitle->setStyleSheet("font-weight:600; color:#c9d4e4;");
-  layout->addWidget(manageTitle);
-  m_manageRowLayout = new QHBoxLayout();
-  m_manageRowLayout->setContentsMargins(0, 0, 0, 0);
-  m_manageRowLayout->setSpacing(4);
-  m_manageRowLayout->addWidget(m_saveButton);
-  m_manageRowLayout->addWidget(m_renameButton);
-  m_manageRowLayout->addWidget(m_deleteButton);
-  m_manageRowLayout->addWidget(m_resetButton);
-  layout->addLayout(m_manageRowLayout);
+  m_compactActionsLayout = new QHBoxLayout();
+  m_compactActionsLayout->setContentsMargins(0, 0, 0, 0);
+  m_compactActionsLayout->setSpacing(1);
+  m_compactActionsLayout->addStretch(1);
+  m_compactActionsLayout->addWidget(m_createButton);
+  m_compactActionsLayout->addWidget(m_settingsButton);
+  layout->addLayout(m_compactActionsLayout);
 
   connect(m_subToolList, &QListWidget::currentRowChanged, this, &SubToolPanel::onCurrentSubToolChanged);
   connect(m_searchEdit, &QLineEdit::textChanged, this, &SubToolPanel::onFilterTextChanged);
-  connect(m_createButton, &QPushButton::clicked, this, &SubToolPanel::onCreateClicked);
-  connect(m_duplicateButton, &QPushButton::clicked, this, &SubToolPanel::onDuplicateClicked);
-  connect(m_saveButton, &QPushButton::clicked, this, &SubToolPanel::onSaveClicked);
-  connect(m_renameButton, &QToolButton::clicked, this, &SubToolPanel::onRenameClicked);
-  connect(m_deleteButton, &QToolButton::clicked, this, &SubToolPanel::onDeleteClicked);
-  connect(m_resetButton, &QToolButton::clicked, this, &SubToolPanel::onResetClicked);
+  connect(m_createButton, &QToolButton::clicked, this, &SubToolPanel::onCreateClicked);
+  connect(duplicateAction, &QAction::triggered, this, &SubToolPanel::onDuplicateClicked);
+  connect(saveAction, &QAction::triggered, this, &SubToolPanel::onSaveClicked);
+  connect(renameAction, &QAction::triggered, this, &SubToolPanel::onRenameClicked);
+  connect(deleteAction, &QAction::triggered, this, &SubToolPanel::onDeleteClicked);
+  connect(resetAction, &QAction::triggered, this, &SubToolPanel::onResetClicked);
 }
 
 void SubToolPanel::setController(app::bridge::AppController* controller) {
@@ -177,12 +254,12 @@ void SubToolPanel::resizeEvent(QResizeEvent* event) {
 }
 
 void SubToolPanel::applyResponsiveLayout() {
-  if (m_searchRowLayout == nullptr || m_manageRowLayout == nullptr) {
+  if (m_searchRowLayout == nullptr || m_compactActionsLayout == nullptr) {
     return;
   }
-  const bool compact = width() < 260;
+  const bool compact = width() < 220;
   m_searchRowLayout->setDirection(compact ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
-  m_manageRowLayout->setDirection(compact ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+  m_compactActionsLayout->setDirection(QBoxLayout::LeftToRight);
 }
 
 void SubToolPanel::refreshFromController() {
@@ -212,18 +289,18 @@ void SubToolPanel::refreshFromController() {
     if (!matches) {
       continue;
     }
-    auto* row = new QListWidgetItem(
-        item.enabled ? localizedName : QString::fromUtf8(u8"%1（非対応）").arg(localizedName),
-        m_subToolList);
+    auto* row = new QListWidgetItem(m_subToolList);
+    const QString displayText =
+        item.enabled ? localizedName : QString::fromUtf8(u8"%1（非対応）").arg(localizedName);
     row->setData(kSubToolIdRole, subToolId);
     row->setData(kSubToolEnabledRole, item.enabled);
     row->setFlags(item.enabled ? (Qt::ItemIsEnabled | Qt::ItemIsSelectable) : Qt::NoItemFlags);
-    row->setForeground(item.enabled ? palette().windowText().color() : QColor(130, 136, 148));
     row->setToolTip(
         item.enabled
             ? (item.hint.empty() ? localizedName : QString::fromStdString(item.hint))
             : QString::fromUtf8(u8"現在のレイヤー種別では使用できません"));
-    row->setSizeHint(QSize(row->sizeHint().width(), 24));
+    row->setSizeHint(QSize(row->sizeHint().width(), 28));
+    m_subToolList->setItemWidget(row, makeSubToolRowWidget(m_subToolList, subToolId, displayText, item.enabled));
     hasEnabledRow = hasEnabledRow || item.enabled;
     if (item.active) {
       m_subToolList->setCurrentItem(row);
@@ -240,11 +317,7 @@ void SubToolPanel::refreshFromController() {
   }
   const bool hasRows = m_subToolList->count() > 0;
   m_createButton->setEnabled(true);
-  m_duplicateButton->setEnabled(hasRows);
-  m_saveButton->setEnabled(hasRows);
-  m_renameButton->setEnabled(hasRows && hasEnabledRow);
-  m_deleteButton->setEnabled(hasRows && hasEnabledRow);
-  m_resetButton->setEnabled(hasRows && hasEnabledRow);
+  m_settingsButton->setEnabled(hasRows && hasEnabledRow);
   if (!hasEnabledRow && hasRows) {
     m_summaryLabel->setText(QString::fromUtf8(u8"現在のレイヤー種別で有効なサブツールがありません"));
   }
