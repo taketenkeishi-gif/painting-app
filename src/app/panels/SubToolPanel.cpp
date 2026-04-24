@@ -144,6 +144,7 @@ public:
 
     
     
+    const int fixedPreviewWidth = 128;
     QRectF r(
         option.rect.left() + 8,
         option.rect.top() + 5,
@@ -498,6 +499,7 @@ void SubToolPanel::onResetClicked() {
 }
 
 } // namespace app::panels
+
 
 
 
