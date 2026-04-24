@@ -11,6 +11,8 @@ class QGridLayout;
 class QToolButton;
 class QSlider;
 class QLabel;
+class QFrame;
+class QColor;
 class QVBoxLayout;
 
 namespace app::bridge {
@@ -48,6 +50,7 @@ private slots:
 private:
   void rebuildButtons();
   void relayoutButtons();
+  void updateQuickSliderVisuals(const QColor& color);
   int columnCountForWidth(int width) const noexcept;
 
   app::bridge::AppController* m_controller {nullptr};
@@ -61,6 +64,10 @@ private:
   QSlider* m_opacitySlider {nullptr};
   QLabel* m_sizeValueLabel {nullptr};
   QLabel* m_opacityValueLabel {nullptr};
+  QLabel* m_sizeUnitLabel {nullptr};
+  QLabel* m_opacityUnitLabel {nullptr};
+  QFrame* m_sizeChip {nullptr};
+  QFrame* m_opacityChip {nullptr};
   bool m_refreshingSliders {false};
   Sections m_sections {Combined};
 };

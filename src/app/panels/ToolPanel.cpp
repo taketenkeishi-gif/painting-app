@@ -98,64 +98,108 @@ QString iconName(core::ToolKind kind) {
   }
 }
 
+QColor toQColor(const core::Color& color) {
+  return QColor(color.r, color.g, color.b, color.a);
+}
+
+QString contrastTextColor(const QColor& base) {
+  const double luminance = (0.2126 * base.redF()) + (0.7152 * base.greenF()) + (0.0722 * base.blueF());
+  return luminance > 0.45 ? QStringLiteral("#101318") : QStringLiteral("#f6f9ff");
+}
+
+QString sliderStyle(const QColor& accent, bool opacityMode) {
+  const QColor border = QColor(53, 61, 75, 220);
+  const QColor groove = QColor(20, 24, 31, 255);
+  const QColor darkAccent = accent.darker(155);
+  const QColor emptyTop = QColor(43, 50, 61, 255);
+  const QColor emptyBottom = QColor(28, 33, 41, 255);
+  QString subPage;
+  QString addPage;
+  if (opacityMode) {
+    subPage = QStringLiteral(
+                  "qlineargradient(x1:0,y1:1,x2:0,y2:0,"
+                  "stop:0 rgba(%1,%2,%3,36),"
+                  "stop:0.36 rgba(220,226,236,38),"
+                  "stop:0.7 rgba(%1,%2,%3,170),"
+                  "stop:1 rgba(%1,%2,%3,255))")
+                  .arg(accent.red())
+                  .arg(accent.green())
+                  .arg(accent.blue());
+    addPage = QStringLiteral(
+                  "qlineargradient(x1:0,y1:1,x2:0,y2:0,"
+                  "stop:0 #252c37, stop:0.25 #313949, stop:0.5 #252c37, stop:0.75 #313949, stop:1 #252c37)");
+  } else {
+    subPage = QStringLiteral("qlineargradient(x1:0,y1:1,x2:0,y2:0, stop:0 %1, stop:1 %2)")
+                  .arg(darkAccent.name(QColor::HexRgb), accent.name(QColor::HexRgb));
+    addPage = QStringLiteral("qlineargradient(x1:0,y1:1,x2:0,y2:0, stop:0 %1, stop:1 %2)")
+                  .arg(emptyBottom.name(QColor::HexRgb), emptyTop.name(QColor::HexRgb));
+  }
+
+  return QString(
+             "QSlider::groove:vertical { background: %1; border: 1px solid %2; width: 4px; border-radius: 2px; }"
+             "QSlider::sub-page:vertical { background: %3; border-radius: 2px; }"
+             "QSlider::add-page:vertical { background: %4; border-radius: 2px; }"
+             "QSlider::handle:vertical { background: #ecf1fb; height: 9px; margin: 0 -3px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.28); }")
+      .arg(groove.name(QColor::HexRgb), border.name(QColor::HexArgb), subPage, addPage);
+}
+
 QWidget* makeQuickSliderBlock(
     QWidget* parent,
-    const QString& labelText,
-    const QString& swatchStyle,
-    const QString& grooveColor,
-    const QString& fillColor,
-    const QString& emptyColor,
+    const QString& unitText,
+    bool opacityMode,
     QSlider*& sliderOut,
     QLabel*& valueLabelOut,
+    QLabel*& unitLabelOut,
+    QFrame*& chipFrameOut,
     int min,
     int max) {
   auto* block = new QWidget(parent);
   block->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+  block->setMinimumWidth(34);
   auto* blockLayout = new QVBoxLayout(block);
   blockLayout->setContentsMargins(0, 0, 0, 0);
-  blockLayout->setSpacing(2);
+  blockLayout->setSpacing(1);
 
-  auto* top = new QHBoxLayout();
-  top->setContentsMargins(0, 0, 0, 0);
-  top->setSpacing(6);
-  auto* swatch = new QFrame(block);
-  swatch->setFixedSize(14, 14);
-  swatch->setStyleSheet(swatchStyle);
-  auto* label = new QLabel(labelText, block);
-  label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-  label->setStyleSheet("font-size: 12px; font-weight: 600; color: #c7d2e3;");
+  chipFrameOut = new QFrame(block);
+  chipFrameOut->setFixedSize(30, 20);
+  chipFrameOut->setStyleSheet(
+      "QFrame { border: 1px solid #5d687a; border-radius: 4px; background: #49648b; }");
+  auto* chipLayout = new QVBoxLayout(chipFrameOut);
+  chipLayout->setContentsMargins(0, 0, 0, 0);
+  chipLayout->setSpacing(0);
   valueLabelOut = new QLabel("0", block);
-  valueLabelOut->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  valueLabelOut->setMinimumWidth(28);
-  valueLabelOut->setStyleSheet("font-size: 12px; font-weight: 600; color: #eef4ff;");
-  top->addWidget(swatch, 0, Qt::AlignVCenter);
-  top->addWidget(label);
-  top->addWidget(valueLabelOut, 1);
+  valueLabelOut->setAlignment(Qt::AlignCenter);
+  valueLabelOut->setStyleSheet("font-size: 11px; font-weight: 700; color: #f6f9ff;");
+  chipLayout->addWidget(valueLabelOut);
+
+  unitLabelOut = new QLabel(unitText, block);
+  unitLabelOut->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+  unitLabelOut->setStyleSheet("font-size: 9px; font-weight: 600; color: #97a4ba; padding-top: 0px;");
+
+  auto* header = new QVBoxLayout();
+  header->setContentsMargins(0, 0, 0, 0);
+  header->setSpacing(0);
+  header->addWidget(chipFrameOut, 0, Qt::AlignHCenter);
+  header->addWidget(unitLabelOut, 0, Qt::AlignHCenter);
 
   sliderOut = new QSlider(Qt::Vertical, block);
   sliderOut->setRange(min, max);
   sliderOut->setInvertedAppearance(true);
   sliderOut->setInvertedControls(false);
-  sliderOut->setFixedWidth(10);
+  sliderOut->setFixedWidth(8);
   sliderOut->setMinimumHeight(120);
   sliderOut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
   sliderOut->setFocusPolicy(Qt::StrongFocus);
-  sliderOut->setStyleSheet(
-      QString(
-          "QSlider::groove:vertical { background: %1; border: 1px solid #343d4d; width: 5px; border-radius: 3px; }"
-          "QSlider::sub-page:vertical { background: %2; border-radius: 2px; }"
-          "QSlider::add-page:vertical { background: %3; border-radius: 2px; }"
-          "QSlider::handle:vertical { background: #edf2fb; height: 10px; margin: 0 -4px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.25); }")
-          .arg(grooveColor, emptyColor, fillColor));
+  sliderOut->setStyleSheet(sliderStyle(QColor(120, 166, 235), opacityMode));
 
   auto* sliderHolder = new QHBoxLayout();
-  sliderHolder->setContentsMargins(0, 8, 0, 10);
+  sliderHolder->setContentsMargins(0, 5, 0, 7);
   sliderHolder->setSpacing(0);
   sliderHolder->addStretch(1);
   sliderHolder->addWidget(sliderOut);
   sliderHolder->addStretch(1);
 
-  blockLayout->addLayout(top);
+  blockLayout->addLayout(header);
   blockLayout->addLayout(sliderHolder, 1);
   return block;
 }
@@ -193,30 +237,28 @@ ToolPanel::ToolPanel(QWidget* parent)
   m_rootLayout->addWidget(m_buttonGridHost);
 
   auto* quickWrap = new QHBoxLayout(m_quickHost);
-  quickWrap->setContentsMargins(0, 2, 0, 2);
-  quickWrap->setSpacing(2);
+  quickWrap->setContentsMargins(0, 3, 0, 4);
+  quickWrap->setSpacing(1);
   quickWrap->addWidget(
       makeQuickSliderBlock(
           this,
           "px",
-          "QFrame { background: #79a8f5; border: 1px solid #9ec2ff; border-radius: 2px; }",
-          "#161b23",
-          "#5f8fda",
-          "#2e3540",
+          false,
           m_sizeSlider,
           m_sizeValueLabel,
+          m_sizeUnitLabel,
+          m_sizeChip,
           1,
           128));
   quickWrap->addWidget(
       makeQuickSliderBlock(
           this,
           "%",
-          "QFrame { background: #9098a6; border: 1px solid #b6becd; border-radius: 2px; }",
-          "#161b23",
-          "#8d96a3",
-          "#2e3540",
+          true,
           m_opacitySlider,
           m_opacityValueLabel,
+          m_opacityUnitLabel,
+          m_opacityChip,
           0,
           100));
   m_quickHost->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
@@ -302,13 +344,61 @@ void ToolPanel::refreshFromController() {
     m_opacitySlider->setValue(state.opacity);
     m_sizeValueLabel->setText(QString::number(state.size));
     m_opacityValueLabel->setText(QString::number(state.opacity));
+    updateQuickSliderVisuals(toQColor(state.color));
     const bool sizeEnabled = m_controller->currentToolSupportsSize();
     const bool opacityEnabled = m_controller->currentToolSupportsOpacity();
     m_sizeSlider->setEnabled(sizeEnabled);
     m_opacitySlider->setEnabled(opacityEnabled);
     m_sizeValueLabel->setEnabled(sizeEnabled);
     m_opacityValueLabel->setEnabled(opacityEnabled);
+    if (m_sizeChip != nullptr) {
+      m_sizeChip->setEnabled(sizeEnabled);
+    }
+    if (m_opacityChip != nullptr) {
+      m_opacityChip->setEnabled(opacityEnabled);
+    }
+    if (m_sizeUnitLabel != nullptr) {
+      m_sizeUnitLabel->setEnabled(sizeEnabled);
+    }
+    if (m_opacityUnitLabel != nullptr) {
+      m_opacityUnitLabel->setEnabled(opacityEnabled);
+    }
     m_refreshingSliders = false;
+  }
+}
+
+void ToolPanel::updateQuickSliderVisuals(const QColor& color) {
+  const QColor accent = color;
+  const QString textColor = contrastTextColor(accent);
+  const QColor sizeAccent = accent.alpha() == 0 ? QColor(104, 142, 204) : accent;
+  const QColor sizeBorder = sizeAccent.lighter(125);
+
+  if (m_sizeChip != nullptr) {
+    m_sizeChip->setStyleSheet(
+        QStringLiteral("QFrame { border: 1px solid %1; border-radius: 4px; background: %2; }")
+            .arg(sizeBorder.name(QColor::HexRgb), sizeAccent.name(QColor::HexRgb)));
+  }
+  if (m_sizeValueLabel != nullptr) {
+    m_sizeValueLabel->setStyleSheet(
+        QStringLiteral("font-size: 11px; font-weight: 700; color: %1;").arg(textColor));
+  }
+  if (m_sizeSlider != nullptr) {
+    m_sizeSlider->setStyleSheet(sliderStyle(sizeAccent, false));
+  }
+
+  if (m_opacityChip != nullptr) {
+    m_opacityChip->setStyleSheet(
+        QStringLiteral(
+            "QFrame { border: 1px solid %1; border-radius: 4px; "
+            "background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #2c3340, stop:0.5 %2, stop:1 #2c3340); }")
+            .arg(sizeBorder.name(QColor::HexRgb), sizeAccent.name(QColor::HexRgb)));
+  }
+  if (m_opacityValueLabel != nullptr) {
+    m_opacityValueLabel->setStyleSheet(
+        QStringLiteral("font-size: 11px; font-weight: 700; color: %1;").arg(textColor));
+  }
+  if (m_opacitySlider != nullptr) {
+    m_opacitySlider->setStyleSheet(sliderStyle(sizeAccent, true));
   }
 }
 
