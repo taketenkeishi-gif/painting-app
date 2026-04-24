@@ -81,13 +81,13 @@ double ColorWheelWidget::ringRadius() const {
 }
 
 double ColorWheelWidget::ringThickness() const {
-  return std::clamp(outerRadius() * 0.11, 8.0, 14.0);
+  return std::clamp(outerRadius() * 0.16, 14.0, 28.0);
 }
 
 QRectF ColorWheelWidget::squareRect() const {
   const double gapFromRing = 0.7;
   const double safeRadius = std::max(8.0, innerRadius() - gapFromRing);
-  const double size = safeRadius * std::sqrt(2.0) * 0.995;
+  const double size = safeRadius * std::sqrt(2.0) * 0.90;
   const QPointF c = centerPoint();
   return QRectF(c.x() - size / 2.0, c.y() - size / 2.0, size, size);
 }
@@ -163,14 +163,14 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
       svRect.left() + (static_cast<double>(saturation) / 255.0) * svRect.width(),
       svRect.top() + (1.0 - static_cast<double>(value) / 255.0) * svRect.height());
   painter.setPen(QPen(QColor(10, 10, 10, 220), 1.4));    painter.setBrush(Qt::NoBrush);
-  painter.drawEllipse(svHandle, 6.5, 6.5);
+  painter.drawEllipse(svHandle, 9.0, 9.0);
   painter.setPen(QPen(QColor(245, 245, 245, 230), 1.0));
-  painter.drawEllipse(svHandle, 6.5, 6.5);
+  painter.drawEllipse(svHandle, 9.0, 9.0);
 
   const QPointF hueHandle = pointFromHue(c, ringMid, hue);
   painter.setPen(QPen(QColor(10, 10, 10, 220), 1.3));
   painter.setBrush(QColor(240, 240, 240, 220));
-  painter.drawEllipse(hueHandle, 5.0, 5.0);
+  painter.drawEllipse(hueHandle, 7.5, 7.5);
 }
 
 bool ColorWheelWidget::updateHueFromPoint(const QPointF& point) {
@@ -240,6 +240,7 @@ void ColorWheelWidget::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 } // namespace app::panels
+
 
 
 
