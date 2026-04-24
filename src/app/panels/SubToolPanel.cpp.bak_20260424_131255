@@ -16,8 +16,6 @@
 #include <QResizeEvent>
 #include <QSignalBlocker>
 #include <QSizePolicy>
-#include <QStyledItemDelegate>
-#include <QStyleOptionViewItem>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -98,71 +96,6 @@ QWidget* makeSubToolRowWidget(
   rowLayout->addWidget(text, 1, Qt::AlignVCenter);
   return rowWidget;
 }
-
-class SubToolDelegate : public QStyledItemDelegate {
-public:
-  using QStyledItemDelegate::QStyledItemDelegate;
-
-  void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
-    painter->save();
-    painter->setRenderHint(QPainter::Antialiasing, true);
-
-    const bool selected = option.state & QStyle::State_Selected;
-    const bool enabled = index.data(kSubToolEnabledRole).toBool();
-    const QString id = index.data(kSubToolIdRole).toString().toLower();
-
-    QColor bg = selected ? QColor("#345985") : QColor("#1b2129");
-    if (!enabled) {
-      bg = QColor("#171b22");
-    }
-    painter->fillRect(option.rect, bg);
-
-    QColor stroke = selected ? QColor(245, 250, 255, 140) : QColor(220, 230, 245, 88);
-    qreal width = 2.4;
-    if (id.contains("hard")) {
-      width = 3.4;
-      stroke.setAlpha(selected ? 170 : 120);
-    } else if (id.contains("soft")) {
-      width = 5.0;
-      stroke.setAlpha(selected ? 90 : 55);
-    } else if (id.contains("airbrush")) {
-      width = 6.0;
-      stroke.setAlpha(selected ? 75 : 45);
-    } else if (id.contains("fill")) {
-      width = 7.0;
-      stroke.setAlpha(selected ? 95 : 60);
-    } else if (id.contains("vector")) {
-      width = 1.8;
-      stroke.setAlpha(selected ? 180 : 120);
-    } else if (id.contains("eraser")) {
-      stroke = QColor(225, 232, 245, selected ? 120 : 80);
-      width = 3.0;
-    }
-
-    QPen pen(stroke, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    painter->setPen(pen);
-
-    QRectF r = option.rect.adjusted(8, 5, -8, -5);
-    QPainterPath path;
-    path.moveTo(r.left(), r.center().y() + 3);
-    path.cubicTo(r.left() + r.width() * 0.25, r.top(),
-                 r.left() + r.width() * 0.60, r.bottom(),
-                 r.right(), r.center().y() - 2);
-    painter->drawPath(path);
-
-    const QString text = index.data(Qt::DisplayRole).toString();
-    painter->setPen(enabled ? QColor("#edf4ff") : QColor("#7f8998"));
-    painter->drawText(option.rect.adjusted(10, 0, -6, 0), Qt::AlignVCenter | Qt::AlignLeft, text);
-
-    painter->restore();
-  }
-
-  QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
-    Q_UNUSED(option);
-    Q_UNUSED(index);
-    return QSize(120, 28);
-  }
-};
 
 QString toolNameJa(core::ToolKind kind) {
   switch (kind) {
@@ -261,7 +194,6 @@ SubToolPanel::SubToolPanel(QWidget* parent)
   m_subToolList->setEditTriggers(QAbstractItemView::NoEditTriggers);
   m_subToolList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   m_subToolList->setUniformItemSizes(true);
-  m_subToolList->setItemDelegate(new SubToolDelegate(m_subToolList));
   m_subToolList->setSpacing(1);
   m_subToolList->setStyleSheet(
       "QListWidget::item { padding: 1px 2px; border-bottom: 1px solid #303a46; }"
@@ -360,7 +292,6 @@ void SubToolPanel::refreshFromController() {
     auto* row = new QListWidgetItem(m_subToolList);
     const QString displayText =
         item.enabled ? localizedName : QString::fromUtf8(u8"%1（非対応）").arg(localizedName);
-    row->setText(displayText);
     row->setData(kSubToolIdRole, subToolId);
     row->setData(kSubToolEnabledRole, item.enabled);
     row->setFlags(item.enabled ? (Qt::ItemIsEnabled | Qt::ItemIsSelectable) : Qt::NoItemFlags);
@@ -369,6 +300,7 @@ void SubToolPanel::refreshFromController() {
             ? (item.hint.empty() ? localizedName : QString::fromStdString(item.hint))
             : QString::fromUtf8(u8"現在のレイヤー種別では使用できません"));
     row->setSizeHint(QSize(row->sizeHint().width(), 28));
+    m_subToolList->setItemWidget(row, makeSubToolRowWidget(m_subToolList, subToolId, displayText, item.enabled));
     hasEnabledRow = hasEnabledRow || item.enabled;
     if (item.active) {
       m_subToolList->setCurrentItem(row);
@@ -492,4 +424,3 @@ void SubToolPanel::onResetClicked() {
 }
 
 } // namespace app::panels
-
