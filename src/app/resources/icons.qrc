@@ -1,7 +1,19 @@
 ﻿<RCC>
   <qresource prefix="/icons">
     <file>app_icon.ico</file>
-  </qresource>
+      <file>icons/16/layer_raster_add.svg</file>
+    <file>icons/16/layer_vector_add.svg</file>
+    <file>icons/16/lock_alpha.svg</file>
+    <file>icons/16/lock_position.svg</file>
+    <file>icons/20/layer_raster_add.svg</file>
+    <file>icons/20/layer_vector_add.svg</file>
+    <file>icons/20/lock_alpha.svg</file>
+    <file>icons/20/lock_position.svg</file>
+    <file>icons/24/layer_raster_add.svg</file>
+    <file>icons/24/layer_vector_add.svg</file>
+    <file>icons/24/lock_alpha.svg</file>
+    <file>icons/24/lock_position.svg</file>
+</qresource>
   <qresource prefix="/icons/16">
     <file>icons/16/brush.svg</file>
     <file>icons/16/clip.svg</file>

@@ -491,9 +491,9 @@ LayerPanel::LayerPanel(QWidget* parent)
     button->setText(fullText);
   };
 
-  initButton(m_addRasterButton, QStringLiteral("layer_add"), QStringLiteral("ラスタ追加"));
-  initButton(m_addVectorButton, QStringLiteral("vector_add"), QStringLiteral("ベクター追加"));
-  initButton(m_addFolderButton, QStringLiteral("folder"), QStringLiteral("フォルダ追加"));
+  initButton(m_addRasterButton, QStringLiteral("layer_raster_add"), QStringLiteral("ラスタ追加"));
+  initButton(m_addVectorButton, QStringLiteral("layer_vector_add"), QStringLiteral("ベクター追加"));
+  initButton(m_addFolderButton, QStringLiteral("folder_add"), QStringLiteral("フォルダ追加"));
   initButton(m_duplicateButton, QStringLiteral("duplicate"), QStringLiteral("複製"));
   initButton(m_upButton, QStringLiteral("up"), QStringLiteral("上へ"));
   initButton(m_downButton, QStringLiteral("down"), QStringLiteral("下へ"));
@@ -502,8 +502,8 @@ LayerPanel::LayerPanel(QWidget* parent)
   initButton(m_maskButton, QStringLiteral("mask"), QStringLiteral("マスク"));
   initButton(m_removeMaskButton, QStringLiteral("mask_remove"), QStringLiteral("マスク解除"));
   initButton(m_lockButton, QStringLiteral("lock"), QStringLiteral("ロック"));
-  initButton(m_lockAlphaButton, QStringLiteral("lock"), QStringLiteral("透明保護"));
-  initButton(m_lockPositionButton, QStringLiteral("move"), QStringLiteral("位置固定"));
+  initButton(m_lockAlphaButton, QStringLiteral("lock_alpha"), QStringLiteral("透明保護"));
+  initButton(m_lockPositionButton, QStringLiteral("lock_position"), QStringLiteral("位置固定"));
   m_upButton->setToolTip(QStringLiteral("選択中レイヤーを上（前面）へ移動"));
   m_downButton->setToolTip(QStringLiteral("選択中レイヤーを下（背面）へ移動"));
 
@@ -519,7 +519,7 @@ LayerPanel::LayerPanel(QWidget* parent)
     button->setToolTip(label);
     button->setText(QString());
     button->setFixedSize(28, 24);
-    button->setIconSize(QSize(16, 16));
+    button->setIconSize(QSize(17, 17));
     button->setFocusPolicy(Qt::NoFocus);
     button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     button->setStyleSheet(QStringLiteral(
@@ -554,28 +554,58 @@ LayerPanel::LayerPanel(QWidget* parent)
   }
 
 
-  m_primaryGrid->setContentsMargins(2, 2, 2, 2);
-  m_primaryGrid->setHorizontalSpacing(3);
-  m_primaryGrid->setVerticalSpacing(3);
-  m_primaryGrid->addWidget(m_addRasterButton, 0, 0);
-  m_primaryGrid->addWidget(m_addVectorButton, 0, 1);
-  m_primaryGrid->addWidget(m_addFolderButton, 0, 2);
-  m_primaryGrid->addWidget(m_duplicateButton, 0, 3);
-  m_primaryGrid->addWidget(m_upButton, 1, 0);
-  m_primaryGrid->addWidget(m_downButton, 1, 1);
-  m_primaryGrid->addWidget(m_deleteButton, 1, 2);
-  m_primaryGrid->setColumnStretch(3, 1);
+  auto tuneLayerButtonGroup = [](QGroupBox* group, QGridLayout* grid) {
+    if (group == nullptr || grid == nullptr) {
+      return;
+    }
+
+    group->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    group->setStyleSheet(QStringLiteral(
+        "QGroupBox {"
+        " margin-top: 12px;"
+        " padding: 5px 4px 4px 4px;"
+        " border: 1px solid #354052;"
+        " border-radius: 4px;"
+        " background: transparent;"
+        "}"
+        "QGroupBox::title {"
+        " subcontrol-origin: margin;"
+        " subcontrol-position: top left;"
+        " left: 6px;"
+        " padding: 0px 3px;"
+        " color: #d8e2f0;"
+        "}"));
+
+    grid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    grid->setContentsMargins(4, 3, 4, 4);
+    grid->setHorizontalSpacing(4);
+    grid->setVerticalSpacing(4);
+    for (int col = 0; col < 8; ++col) {
+      grid->setColumnStretch(col, 0);
+    }
+    for (int row = 0; row < 4; ++row) {
+      grid->setRowStretch(row, 0);
+    }
+  };
+
+  tuneLayerButtonGroup(m_primaryGroup, m_primaryGrid);
+  tuneLayerButtonGroup(m_stateGroup, m_stateGrid);
+
+  m_primaryGrid->addWidget(m_addRasterButton, 0, 0, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_addVectorButton, 0, 1, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_addFolderButton, 0, 2, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_duplicateButton, 0, 3, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_upButton, 1, 0, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_downButton, 1, 1, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_deleteButton, 1, 2, Qt::AlignLeft | Qt::AlignTop);
   m_primaryGroup->setLayout(m_primaryGrid);
 
-  m_stateGrid->setContentsMargins(2, 2, 2, 2);
-  m_stateGrid->setHorizontalSpacing(3);
-  m_stateGrid->setVerticalSpacing(3);
-  m_stateGrid->addWidget(m_clipButton, 0, 0);
-  m_stateGrid->addWidget(m_maskButton, 0, 1);
-  m_stateGrid->addWidget(m_removeMaskButton, 0, 2);
-  m_stateGrid->addWidget(m_lockButton, 1, 0);
-  m_stateGrid->addWidget(m_lockAlphaButton, 1, 1);
-  m_stateGrid->addWidget(m_lockPositionButton, 1, 2);
+  m_stateGrid->addWidget(m_clipButton, 0, 0, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_maskButton, 0, 1, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_removeMaskButton, 0, 2, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_lockButton, 1, 0, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_lockAlphaButton, 1, 1, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_lockPositionButton, 1, 2, Qt::AlignLeft | Qt::AlignTop);
   m_stateGroup->setLayout(m_stateGrid);
 
   auto* layout = new QVBoxLayout(this);
@@ -660,35 +690,45 @@ void LayerPanel::applyButtonCompactMode(bool compact) {
     button->setText(QString());
     button->setToolTip(full);
     button->setFixedSize(28, 24);
-    button->setIconSize(QSize(16, 16));
+    button->setIconSize(QSize(17, 17));
     button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   }
 
   m_compactButtons = true;
 }void LayerPanel::applyResponsiveMode() {
-  const bool compactWidth = width() < 330;
+  const bool compactWidth = width() < 420;
   const bool compactHeight = height() < 560;
 
   applyButtonCompactMode(compactWidth);
 
   if (m_stateGroup != nullptr) {
-    m_stateGroup->setVisible(!compactHeight);
+    m_stateGroup->setVisible(true);
   }
 
   if (m_primaryGrid != nullptr) {
-    const int columns = compactWidth ? 3 : 4;
-    m_primaryGrid->setColumnStretch(0, 1);
-    m_primaryGrid->setColumnStretch(1, 1);
-    m_primaryGrid->setColumnStretch(2, 1);
-    m_primaryGrid->setColumnStretch(3, columns == 4 ? 1 : 0);
+    m_primaryGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    for (int col = 0; col < 8; ++col) {
+      m_primaryGrid->setColumnStretch(col, 0);
+    }
+    for (int row = 0; row < 4; ++row) {
+      m_primaryGrid->setRowStretch(row, 0);
+    }
+  }
+
+  if (m_stateGrid != nullptr) {
+    m_stateGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    for (int col = 0; col < 8; ++col) {
+      m_stateGrid->setColumnStretch(col, 0);
+    }
+    for (int row = 0; row < 4; ++row) {
+      m_stateGrid->setRowStretch(row, 0);
+    }
   }
 
   if (m_layerList != nullptr) {
     m_layerList->setMinimumHeight(compactHeight ? 90 : 140);
   }
-}
-
-void LayerPanel::setController(app::bridge::AppController* controller) {
+}void LayerPanel::setController(app::bridge::AppController* controller) {
   if (m_controller != nullptr) {
     disconnect(m_controller, nullptr, this, nullptr);
   }
