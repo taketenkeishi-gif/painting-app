@@ -967,6 +967,7 @@ bool AppController::fillSelectionOrCanvas() {
   entry.beforeLayer = before;
   entry.afterLayer = after;
   pushHistoryEntry(std::move(entry));
+  emit foregroundColorUsed();
   rerender();
   emit documentChanged();
   return true;
@@ -2607,6 +2608,9 @@ void AppController::finishPendingStrokeHistory() {
       entry.beforeLayer = *pending.beforeLayer;
       entry.afterLayer = after;
       pushHistoryEntry(std::move(entry));
+      if (currentToolSupportsColor()) {
+        emit foregroundColorUsed();
+      }
     }
   }
 

@@ -6,6 +6,10 @@
 #include <QGridLayout>
 #include <QFrame>
 #include <QColor>
+#include <QLinearGradient>
+#include <QPainter>
+#include <QStyle>
+#include <QStyleOptionSlider>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLayoutItem>
@@ -107,51 +111,173 @@ QString contrastTextColor(const QColor& base) {
   return luminance > 0.45 ? QStringLiteral("#101318") : QStringLiteral("#f6f9ff");
 }
 
-QString sliderStyle(const QColor& accent, bool opacityMode) {
-  const QString groove = QStringLiteral("#171c24");
-  const QString border = QStringLiteral("#394252");
-  const QString upperEmptyPage = QStringLiteral("#2b333f");
 
-  QString lowerValuePage;
-  if (opacityMode) {
-    lowerValuePage =
-        QStringLiteral(
-            "qlineargradient(x1:0,y1:1,x2:0,y2:0,"
-            "stop:0 rgba(%1,%2,%3,255),"
-            "stop:0.28 rgba(%1,%2,%3,210),"
-            "stop:0.52 rgba(210,216,226,135),"
-            "stop:0.74 rgba(%1,%2,%3,120),"
-            "stop:1 rgba(160,166,176,80))")
-            .arg(accent.red())
-            .arg(accent.green())
-            .arg(accent.blue());
-  } else {
-    lowerValuePage = QStringLiteral("#8d929b");
+class NeutralValueSlider final : public QSlider {
+public:
+  explicit NeutralValueSlider(Qt::Orientation orientation, QWidget* parent = nullptr)
+      : QSlider(orientation, parent) {}
+
+protected:
+  void paintEvent(QPaintEvent*) override {
+    QStyleOptionSlider opt;
+    initStyleOption(&opt);
+
+    QRect track = rect().adjusted(width() / 2 - 4, 8, -(width() / 2 - 4), -8);
+    track.setWidth(8);
+    track.moveCenter(QPoint(width() / 2, track.center().y()));
+
+    const double range = double(maximum() - minimum());
+    const double ratio = range <= 0.0 ? 0.0 : double(value() - minimum()) / range;
+    const int handleY = track.bottom() - int(ratio * track.height());
+
+    QRect fillRect(track.left() + 1, handleY, track.width() - 2, track.bottom() - handleY);
+    fillRect = fillRect.normalized().intersected(track.adjusted(1, 1, -1, -1));
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    painter.setPen(QColor(70, 80, 96));
+    painter.setBrush(QColor(31, 37, 46));
+    painter.drawRoundedRect(track.adjusted(0, 0, -1, -1), 4, 4);
+
+    if (fillRect.isValid()) {
+      QLinearGradient gradient(fillRect.bottomLeft(), fillRect.topLeft());
+      gradient.setColorAt(0.0, QColor(92, 100, 114));
+      gradient.setColorAt(1.0, QColor(138, 148, 164));
+      painter.fillRect(fillRect, gradient);
+    }
+
+    QRect handle(0, handleY - 8, 18, 16);
+    handle.moveCenter(QPoint(width() / 2, handle.center().y()));
+
+    painter.setPen(QColor(244, 247, 252));
+    painter.setBrush(QColor(238, 243, 251));
+    painter.drawRoundedRect(handle.adjusted(1, 1, -1, -1), 5, 5);
+
+    painter.setPen(QColor(84, 96, 116));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(handle.adjusted(0, 0, -1, -1), 5, 5);
+  }
+};
+
+class AlphaPreviewSlider final : public QSlider {
+public:
+  explicit AlphaPreviewSlider(Qt::Orientation orientation, QWidget* parent = nullptr)
+      : QSlider(orientation, parent) {}
+
+  void setPreviewColor(const QColor& color) {
+    QColor next = color;
+    if (!next.isValid()) {
+      next = QColor(120, 166, 235);
+    }
+    next.setAlpha(255);
+    if (m_previewColor == next) {
+      return;
+    }
+    m_previewColor = next;
+    update();
   }
 
-  return QString(
+protected:
+  void paintEvent(QPaintEvent*) override {
+    QStyleOptionSlider opt;
+    initStyleOption(&opt);
+
+    QRect track = rect().adjusted(width() / 2 - 4, 8, -(width() / 2 - 4), -8);
+    track.setWidth(8);
+    track.moveCenter(QPoint(width() / 2, track.center().y()));
+
+    const double range = double(maximum() - minimum());
+    const double ratio = range <= 0.0 ? 0.0 : double(value() - minimum()) / range;
+    const int handleY = track.bottom() - int(ratio * track.height());
+
+    QRect fillRect(track.left() + 1, handleY, track.width() - 2, track.bottom() - handleY);
+    fillRect = fillRect.normalized().intersected(track.adjusted(1, 1, -1, -1));
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    painter.setPen(QColor(70, 80, 96));
+    painter.setBrush(QColor(31, 37, 46));
+    painter.drawRoundedRect(track.adjusted(0, 0, -1, -1), 4, 4);
+
+    if (fillRect.isValid()) {
+      painter.save();
+      painter.setClipRect(fillRect);
+
+      const int cell = 4;
+      const QColor checkA(188, 194, 204);
+      const QColor checkB(92, 100, 114);
+      for (int y = fillRect.top(); y <= fillRect.bottom(); y += cell) {
+        for (int x = fillRect.left(); x <= fillRect.right(); x += cell) {
+          const bool useA = ((x / cell) + (y / cell)) % 2 == 0;
+          painter.fillRect(QRect(x, y, cell, cell).intersected(fillRect), useA ? checkA : checkB);
+        }
+      }
+
+      QColor top = m_previewColor;
+      top.setAlpha(215);
+      QColor bottom(80, 86, 98, 225);
+      QLinearGradient gradient(fillRect.bottomLeft(), fillRect.topLeft());
+      gradient.setColorAt(0.0, bottom);
+      gradient.setColorAt(1.0, top);
+      painter.fillRect(fillRect, gradient);
+
+      painter.restore();
+    }
+
+    QRect handle(0, handleY - 8, 18, 16);
+    handle.moveCenter(QPoint(width() / 2, handle.center().y()));
+
+    painter.setPen(QColor(244, 247, 252));
+    painter.setBrush(QColor(238, 243, 251));
+    painter.drawRoundedRect(handle.adjusted(1, 1, -1, -1), 5, 5);
+
+    painter.setPen(QColor(84, 96, 116));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(handle.adjusted(0, 0, -1, -1), 5, 5);
+  }
+
+private:
+  QColor m_previewColor {120, 166, 235};
+};
+
+
+
+QString sliderStyle(const QColor& accent, bool opacityMode) {
+  QColor solid = accent.isValid() ? accent : QColor(120, 166, 235);
+  if (solid.alpha() == 0) {
+    solid = QColor(120, 166, 235);
+  }
+  solid.setAlpha(255);
+
+  const QString handleBorder = opacityMode
+      ? solid.lighter(125).name(QColor::HexRgb)
+      : QStringLiteral("#667184");
+
+  return QStringLiteral(
              "QSlider::groove:vertical {"
-             " background:%1;"
-             " border:1px solid %2;"
-             " width:5px;"
-             " border-radius:3px;"
+             "  width: 8px;"
+             "  border: 0px;"
+             "  background: transparent;"
              "}"
              "QSlider::sub-page:vertical {"
-             " background:%3;"
-             " border-radius:3px;"
+             "  background: transparent;"
+             "  border: 0px;"
              "}"
              "QSlider::add-page:vertical {"
-             " background:%4;"
-             " border-radius:3px;"
+             "  background: transparent;"
+             "  border: 0px;"
              "}"
              "QSlider::handle:vertical {"
-             " background:#eef3fb;"
-             " height:18px;"
-             " margin:0 -7px;"
-             " border-radius:9px;"
-             " border:1px solid rgba(0,0,0,0.45);"
+             "  width: 18px;"
+             "  height: 16px;"
+             "  margin: -2px -6px;"
+             "  border-radius: 5px;"
+             "  border: 1px solid %1;"
+             "  background: #eef3fb;"
              "}")
-      .arg(groove, border, upperEmptyPage, lowerValuePage);
+      .arg(handleBorder);
 }
 
 QWidget* makeQuickSliderBlock(
@@ -193,7 +319,7 @@ QWidget* makeQuickSliderBlock(
   header->addWidget(chipFrameOut, 0, Qt::AlignHCenter);
   header->addWidget(unitLabelOut, 0, Qt::AlignHCenter);
 
-  sliderOut = new QSlider(Qt::Vertical, block);
+  sliderOut = opacityMode ? static_cast<QSlider*>(new AlphaPreviewSlider(Qt::Vertical, block)) : static_cast<QSlider*>(new NeutralValueSlider(Qt::Vertical, block));
   sliderOut->setRange(min, max);
   sliderOut->setInvertedAppearance(false);
   sliderOut->setInvertedControls(false);
@@ -393,7 +519,7 @@ void ToolPanel::updateQuickSliderVisuals(const QColor& color) {
         QStringLiteral("font-size: 11px; font-weight: 700; color: #f3f6fb; padding: 1px 3px;"));
   }
   if (m_sizeSlider != nullptr) {
-    m_sizeSlider->setStyleSheet(sliderStyle(sizeAccent, false));
+    m_sizeSlider->setStyleSheet(sliderStyle(QColor(120, 126, 136), false));
   }
 
   if (m_opacityChip != nullptr) {
@@ -408,6 +534,9 @@ void ToolPanel::updateQuickSliderVisuals(const QColor& color) {
         QStringLiteral("font-size: 11px; font-weight: 700; color: %1; padding: 1px 3px;").arg(textColor));
   }
   if (m_opacitySlider != nullptr) {
+    if (auto* alphaSlider = dynamic_cast<AlphaPreviewSlider*>(m_opacitySlider)) {
+      alphaSlider->setPreviewColor(sizeAccent);
+    }
     m_opacitySlider->setStyleSheet(sliderStyle(sizeAccent, true));
   }
 }

@@ -258,6 +258,7 @@ signals:
   void documentChanged();
   void layersChanged();
   void toolStateChanged();
+  void foregroundColorUsed();
   void overlayChanged();
 
 private:

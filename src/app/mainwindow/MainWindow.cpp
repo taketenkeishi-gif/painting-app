@@ -153,6 +153,10 @@ MainWindow::MainWindow(QWidget* parent)
   applyUiChrome();
 
   connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &MainWindow::onToolStateChanged);
+  connect(m_controller, &app::bridge::AppController::foregroundColorUsed, this, [this]() {
+    pushForegroundColorHistory(m_controller->toolState().color);
+    refreshColorHistoryButtons();
+  }, Qt::QueuedConnection);
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateActiveLayerStatus);
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateActiveLayerStatus);
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateUndoRedoState);
@@ -252,26 +256,48 @@ void MainWindow::setupShellLayout() {
   historyTitle->setStyleSheet("font-weight: 600; font-size: 10px;");
   auto* historyLayout = new QGridLayout();
   historyLayout->setContentsMargins(0, 0, 0, 0);
-  historyLayout->setSpacing(2);
+  historyLayout->setSpacing(1);
   m_colorHistoryButtons.clear();
-  m_colorHistoryButtons.reserve(24);
-  for (int i = 0; i < 24; ++i) {
-    auto* chip = new QPushButton(colorPanel);
-    chip->setFixedSize(15, 15);
+  m_colorHistoryButtons.reserve(80);
+  for (int i = 0; i < 80; ++i) {
+    auto* chip = new QPushButton(nullptr);
+    chip->setFixedSize(12, 12);
+    chip->setMinimumSize(12, 12);
+    chip->setMaximumSize(12, 12);
+    chip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    chip->setProperty("colorHistoryChip", true);
+    chip->setStyleSheet("QPushButton { min-width: 12px; max-width: 12px; min-height: 12px; max-height: 12px; padding: 0px; margin: 0px; border: 1px solid #445064; border-radius: 2px; background: #202833; }");
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
-    historyLayout->addWidget(chip, i / 8, i % 8);
+    historyLayout->addWidget(chip, i / 10, i % 10);
     m_colorHistoryButtons.push_back(chip);
   }
-  colorLayout->addWidget(colorTitle);
-  colorLayout->addLayout(colorButtons);
-  colorLayout->addWidget(m_colorWheelWidget, 1);
-  colorLayout->addLayout(addHsvRow("H", m_hueSlider, m_hueSpin));
-  colorLayout->addLayout(addHsvRow("S", m_satSlider, m_satSpin));
-  colorLayout->addLayout(addHsvRow("V", m_valSlider, m_valSpin));
-  colorLayout->addLayout(addHsvRow("A", m_alphaSlider, m_alphaSpin));
-  colorLayout->addWidget(historyTitle);
-  colorLayout->addLayout(historyLayout);
+  auto* colorMainWidget = new QWidget(nullptr);
+  auto* colorMainLayout = new QVBoxLayout(colorMainWidget);
+  colorMainLayout->setContentsMargins(0, 0, 0, 0);
+  colorMainLayout->setSpacing(2);
+  colorMainLayout->addWidget(colorTitle);
+  colorMainLayout->addLayout(colorButtons);
+  colorMainLayout->addWidget(m_colorWheelWidget, 1);
+
+  auto* hsvWidget = new QWidget(nullptr);
+  hsvWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+  hsvWidget->setMinimumWidth(280);
+  auto* hsvLayout = new QVBoxLayout(hsvWidget);
+  hsvLayout->setContentsMargins(0, 0, 0, 0);
+  hsvLayout->setSpacing(2);
+  hsvLayout->addLayout(addHsvRow("H", m_hueSlider, m_hueSpin));
+  hsvLayout->addLayout(addHsvRow("S", m_satSlider, m_satSpin));
+  hsvLayout->addLayout(addHsvRow("V", m_valSlider, m_valSpin));
+  hsvLayout->addLayout(addHsvRow("A", m_alphaSlider, m_alphaSpin));
+
+  auto* historyWidget = new QWidget(nullptr);
+  historyWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+  auto* historyWrap = new QVBoxLayout(historyWidget);
+  historyWrap->setContentsMargins(0, 0, 0, 0);
+  historyWrap->setSpacing(1);
+  historyWrap->addWidget(historyTitle);
+  historyWrap->addLayout(historyLayout);
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
   connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
@@ -421,7 +447,10 @@ void MainWindow::setupShellLayout() {
   m_toolSliderDock = makeDock("ツールスライダー", makeScrollable(m_quickSliderPanel), "ToolSliderDock");
   m_subToolDock = makeDock("サブツール", makeScrollable(m_subToolPanel), "SubToolDock");
   m_toolPropertyDock = makeDock("ツールプロパティ", makeScrollable(m_toolPropertyPanel), "ToolPropertyDock");
-  m_colorDock = makeDock("カラー", makeScrollable(colorPanel), "ColorDock");
+  m_colorDock = makeDock("カラー", makeScrollable(colorMainWidget), "ColorDock");
+  auto* colorSliderDock = makeDock("カラースライダー", makeScrollable(hsvWidget), "ColorSliderDock");
+  colorSliderDock->setMinimumWidth(300);
+  auto* colorHistoryDock = makeDock("最近色", makeScrollable(historyWidget), "ColorHistoryDock");
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
 
@@ -430,10 +459,14 @@ void MainWindow::setupShellLayout() {
   addDockWidget(Qt::LeftDockWidgetArea, m_subToolDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolPropertyDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_colorDock);
+  addDockWidget(Qt::LeftDockWidgetArea, colorSliderDock);
+  addDockWidget(Qt::LeftDockWidgetArea, colorHistoryDock);
   splitDockWidget(m_toolDock, m_toolSliderDock, Qt::Horizontal);
   splitDockWidget(m_toolSliderDock, m_subToolDock, Qt::Horizontal);
   tabifyDockWidget(m_subToolDock, m_toolPropertyDock);
   tabifyDockWidget(m_subToolDock, m_colorDock);
+  tabifyDockWidget(m_subToolDock, colorSliderDock);
+  tabifyDockWidget(m_subToolDock, colorHistoryDock);
   resizeDocks({m_toolDock, m_toolSliderDock, m_subToolDock}, {88, 88, 320}, Qt::Horizontal);
   m_subToolDock->raise();
 
@@ -1117,7 +1150,6 @@ void MainWindow::onToolStateChanged() {
   if (m_lastForegroundColor.r != state.color.r || m_lastForegroundColor.g != state.color.g ||
       m_lastForegroundColor.b != state.color.b || m_lastForegroundColor.a != state.color.a) {
     m_lastForegroundColor = state.color;
-    pushForegroundColorHistory(state.color);
   }
 
   if (m_sizeStatusLabel != nullptr) {
@@ -1860,7 +1892,7 @@ void MainWindow::pushForegroundColorHistory(const core::Color& color) {
   };
   m_colorHistory.erase(std::remove_if(m_colorHistory.begin(), m_colorHistory.end(), sameColor), m_colorHistory.end());
   m_colorHistory.insert(m_colorHistory.begin(), color);
-  constexpr std::size_t kHistoryMax = 24;
+  constexpr std::size_t kHistoryMax = 80;
   if (m_colorHistory.size() > kHistoryMax) {
     m_colorHistory.resize(kHistoryMax);
   }
@@ -1936,6 +1968,17 @@ void MainWindow::refreshColorHistoryButtons() {
             .arg(color.alpha())
             .arg(textColor));
     chip->setProperty("coreColor", color);
+  }
+
+  // colorHistoryChip compact enforcement
+  for (auto* chip : m_colorHistoryButtons) {
+    if (chip == nullptr) {
+      continue;
+    }
+    chip->setFixedSize(12, 12);
+    chip->setMinimumSize(12, 12);
+    chip->setMaximumSize(12, 12);
+    chip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   }
 }
 
