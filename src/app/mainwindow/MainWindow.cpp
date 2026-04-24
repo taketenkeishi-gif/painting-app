@@ -1,4 +1,5 @@
-﻿#include "app/mainwindow/MainWindow.h"
+#include "app/mainwindow/MainWindow.h"
+#include <QPainter>
 
 #include <algorithm>
 #include <cstdint>
@@ -182,9 +183,10 @@ void MainWindow::setupShellLayout() {
   colorLayout->setContentsMargins(2, 2, 2, 2);
   colorLayout->setSpacing(1);
   auto* colorTitle = new QLabel("カラー", colorPanel);
+  colorTitle->setVisible(false);
   colorTitle->setStyleSheet("font-weight: 700; font-size: 11px;");
-  m_foregroundColorButton = new QPushButton("FG", colorPanel);
-  m_backgroundColorButton = new QPushButton("BG", colorPanel);
+  m_foregroundColorButton = new QPushButton(colorPanel);
+  m_backgroundColorButton = new QPushButton(colorPanel);
   auto* swapColorButton = new QPushButton(colorPanel);
   auto* resetColorButton = new QPushButton(colorPanel);
   auto* transparentColorButton = new QPushButton(colorPanel);
@@ -197,21 +199,29 @@ void MainWindow::setupShellLayout() {
   m_valSpin = new QSpinBox(colorPanel);
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
-  m_colorWheelWidget->setMinimumSize(170, 170);
-  m_foregroundColorButton->setFixedSize(22, 16);
-  m_backgroundColorButton->setFixedSize(22, 16);
-  swapColorButton->setFixedSize(18, 18);
-  resetColorButton->setFixedSize(18, 18);
-  transparentColorButton->setFixedSize(18, 18);
+  m_colorWheelWidget->setMinimumSize(104, 104);
+  m_foregroundColorButton->setFixedSize(22, 22);
+  m_backgroundColorButton->setFixedSize(22, 22);
+  swapColorButton->setFixedSize(20, 20);
+  resetColorButton->setFixedSize(20, 20);
+  transparentColorButton->setFixedSize(18, 10);
   swapColorButton->setIcon(app::ui::icon("swap"));
+  swapColorButton->setIconSize(QSize(12, 12));
   resetColorButton->setIcon(app::ui::icon("reset_bw"));
+  resetColorButton->setIconSize(QSize(12, 12));
   transparentColorButton->setIcon(app::ui::icon("transparent"));
-  swapColorButton->setIconSize(QSize(13, 13));
-  resetColorButton->setIconSize(QSize(13, 13));
-  transparentColorButton->setIconSize(QSize(13, 13));
+  transparentColorButton->setIconSize(QSize(10, 10));
   swapColorButton->setFlat(true);
   resetColorButton->setFlat(true);
   transparentColorButton->setFlat(true);
+  const QString colorOpButtonStyle = QStringLiteral(
+      "QPushButton { min-width: 20px; max-width: 20px; min-height: 20px; max-height: 20px; "
+      "padding: 0px; margin: 0px; border: 1px solid #4c5a70; border-radius: 2px; background: #26303c; }"
+      "QPushButton:hover { border: 1px solid #8fb5e8; background: #303b4a; }"
+      "QPushButton:pressed { border: 1px solid #b7d4ff; background: #223a56; }");
+  swapColorButton->setStyleSheet(colorOpButtonStyle);
+  resetColorButton->setStyleSheet(colorOpButtonStyle);
+
   m_hueSlider->setRange(0, 359);
   m_satSlider->setRange(0, 255);
   m_valSlider->setRange(0, 255);
@@ -225,21 +235,71 @@ void MainWindow::setupShellLayout() {
   transparentColorButton->setToolTip("前景色を透明にする");
   auto* colorButtons = new QHBoxLayout();
   colorButtons->setContentsMargins(0, 0, 0, 0);
-  colorButtons->setSpacing(2);
-  colorButtons->addWidget(m_foregroundColorButton);
-  colorButtons->addWidget(m_backgroundColorButton);
+  colorButtons->setSpacing(1);
+  auto* colorSwatchHost = new QWidget(colorPanel);
+  colorSwatchHost->setFixedSize(42, 36);
+  colorSwatchHost->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  colorSwatchHost->setStyleSheet("background: transparent;");
+
+  m_backgroundColorButton->setParent(colorSwatchHost);
+  m_backgroundColorButton->move(16, 7);
+  m_backgroundColorButton->setFixedSize(22, 22);
+
+  m_foregroundColorButton->setParent(colorSwatchHost);
+  m_foregroundColorButton->move(2, 0);
+  m_foregroundColorButton->setFixedSize(22, 22);
+
+  transparentColorButton->setParent(colorSwatchHost);
+  transparentColorButton->move(2, 24);
+  transparentColorButton->setFixedSize(18, 10);
+
+  m_backgroundColorButton->show();
+  m_foregroundColorButton->show();
+  transparentColorButton->show();
+  auto makeTransparentCheckerIcon = []() {
+    QPixmap pixmap(16, 8);
+    pixmap.fill(QColor(244, 244, 244));
+
+    QPainter checkerPainter(&pixmap);
+    const QColor light(244, 244, 244);
+    const QColor dark(142, 151, 164);
+    constexpr int cell = 2;
+    for (int y = 0; y < pixmap.height(); y += cell) {
+      for (int x = 0; x < pixmap.width(); x += cell) {
+        const bool useDark = ((x / cell) + (y / cell)) % 2 == 1;
+        checkerPainter.fillRect(QRect(x, y, cell, cell), useDark ? dark : light);
+      }
+    }
+    checkerPainter.end();
+    return QIcon(pixmap);
+  };
+
+  transparentColorButton->setIcon(makeTransparentCheckerIcon());
+  transparentColorButton->setIconSize(QSize(16, 8));
+  transparentColorButton->setText(QString());
+  transparentColorButton->setToolTip(QStringLiteral("透明色"));
+  transparentColorButton->setStyleSheet(QStringLiteral(
+      "QPushButton { min-width: 18px; max-width: 18px; min-height: 10px; max-height: 10px; "
+      "padding: 0px; margin: 0px; border: 1px solid #6a7484; border-radius: 0px; background: transparent; }"
+      "QPushButton:hover { border: 1px solid #eef3fb; }"));
+
+  m_backgroundColorButton->raise();
+  m_foregroundColorButton->raise();
+  transparentColorButton->raise();
+
+  colorButtons->addWidget(colorSwatchHost, 0, Qt::AlignLeft | Qt::AlignTop);
   auto* colorOps = new QHBoxLayout();
   colorOps->setContentsMargins(0, 0, 0, 0);
-  colorOps->setSpacing(2);
+  colorOps->setSpacing(1);
   colorOps->addStretch(1);
   colorOps->addWidget(swapColorButton);
   colorOps->addWidget(resetColorButton);
-  colorOps->addWidget(transparentColorButton);
+  // transparentColorButton is shown in colorSwatchHost.
   colorButtons->addLayout(colorOps, 1);
   auto addHsvRow = [this, colorPanel](const QString& label, QSlider* slider, QSpinBox* spin) {
     auto* row = new QHBoxLayout();
-    row->setContentsMargins(4, 1, 4, 1);
-    row->setSpacing(5);
+    row->setContentsMargins(2, 1, 2, 1);
+    row->setSpacing(4);
 
     const QString accent =
         label == QStringLiteral("H") ? QStringLiteral("#ff5a8a") :
@@ -254,7 +314,7 @@ void MainWindow::setupShellLayout() {
         QStringLiteral("#415d8c");
 
     auto* nameLabel = new QLabel(label, colorPanel);
-    nameLabel->setFixedWidth(24);
+    nameLabel->setFixedWidth(17);
     nameLabel->setMinimumHeight(18);
     nameLabel->setAlignment(Qt::AlignCenter);
     nameLabel->setStyleSheet(QStringLiteral(
@@ -267,7 +327,7 @@ void MainWindow::setupShellLayout() {
         "  padding: 0px;"
         "}").arg(accent, accentSoft));
 
-    slider->setMinimumWidth(185);
+    slider->setMinimumWidth(76);
     slider->setFixedHeight(18);
     slider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     slider->setStyleSheet(QStringLiteral(
@@ -298,21 +358,21 @@ void MainWindow::setupShellLayout() {
         "  border: 1px solid #ffffff;"
         "}").arg(accent));
 
-    spin->setMinimumWidth(62);
-    spin->setMaximumWidth(66);
-    spin->setFixedWidth(64);
+    spin->setMinimumWidth(44);
+    spin->setMaximumWidth(48);
+    spin->setFixedWidth(46);
     spin->setButtonSymbols(QAbstractSpinBox::UpDownArrows);
     spin->setStyleSheet(QStringLiteral(
         "QSpinBox {"
         "  min-height: 22px;"
         "  padding-left: 4px;"
-        "  padding-right: 17px;"
+        "  padding-right: 14px;"
         "  border: 1px solid #455166;"
         "  background: #121820;"
         "  color: #eef3fb;"
         "}"
         "QSpinBox::up-button, QSpinBox::down-button {"
-        "  width: 15px;"
+        "  width: 13px;"
         "  subcontrol-origin: border;"
         "  background: #1d2632;"
         "  border-left: 1px solid #3f4a5d;"
@@ -331,6 +391,7 @@ void MainWindow::setupShellLayout() {
     return row;
   };
   auto* historyTitle = new QLabel("カラーヒストリー", colorPanel);
+  historyTitle->setVisible(false);
   historyTitle->setStyleSheet("font-weight: 600; font-size: 10px;");
   auto* historyGridWidget = new QWidget(nullptr);
   historyGridWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -354,29 +415,29 @@ void MainWindow::setupShellLayout() {
     chip->setStyleSheet("QPushButton { min-width: 18px; max-width: 18px; min-height: 18px; max-height: 18px; padding: 0px; margin: 0px; border: 1px solid #343d4d; border-radius: 0px; background: #202833; }");
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
-    historyLayout->addWidget(chip, i / 14, i % 14);
+    historyLayout->addWidget(chip, i / 8, i % 8);
     m_colorHistoryButtons.push_back(chip);
   }
-  for (int col = 0; col < 14; ++col) {
+  for (int col = 0; col < 8; ++col) {
     historyLayout->setColumnMinimumWidth(col, 24);
     historyLayout->setColumnStretch(col, 0);
   }
-  for (int row = 0; row < 6; ++row) {
+  for (int row = 0; row < 11; ++row) {
     historyLayout->setRowMinimumHeight(row, 24);
     historyLayout->setRowStretch(row, 0);
   }
-  historyGridWidget->setFixedSize(24 * 14, 24 * 6);
+  historyGridWidget->setFixedSize(24 * 8, 24 * 11);
   auto* colorMainWidget = new QWidget(nullptr);
   auto* colorMainLayout = new QVBoxLayout(colorMainWidget);
   colorMainLayout->setContentsMargins(0, 0, 0, 0);
-  colorMainLayout->setSpacing(2);
+  colorMainLayout->setSpacing(0);
   colorMainLayout->addWidget(colorTitle);
   colorMainLayout->addLayout(colorButtons);
   colorMainLayout->addWidget(m_colorWheelWidget, 1);
 
   auto* hsvWidget = new QWidget(nullptr);
   hsvWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-  hsvWidget->setMinimumWidth(330);
+  hsvWidget->setMinimumWidth(176);
   auto* hsvLayout = new QVBoxLayout(hsvWidget);
   hsvLayout->setContentsMargins(0, 0, 0, 0);
   hsvLayout->setSpacing(2);
@@ -387,25 +448,25 @@ void MainWindow::setupShellLayout() {
 
   auto* historyWidget = new QWidget(nullptr);
   historyWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-  historyWidget->setMaximumHeight(174);
+  historyWidget->setMaximumHeight(280);
   auto* historyWrap = new QVBoxLayout(historyWidget);
   historyWrap->setContentsMargins(0, 0, 0, 0);
   historyWrap->setSpacing(2);
   historyWrap->addWidget(historyTitle);
   historyWrap->addWidget(historyGridWidget, 0, Qt::AlignLeft | Qt::AlignTop);
-  m_hueSpin->setMinimumWidth(58);
-  m_satSpin->setMinimumWidth(58);
-  m_valSpin->setMinimumWidth(58);
-  m_alphaSpin->setMinimumWidth(58);
-  m_hueSpin->setMaximumWidth(62);
-  m_satSpin->setMaximumWidth(62);
-  m_valSpin->setMaximumWidth(62);
-  m_alphaSpin->setMaximumWidth(62);
+  m_hueSpin->setMinimumWidth(52);
+  m_satSpin->setMinimumWidth(52);
+  m_valSpin->setMinimumWidth(52);
+  m_alphaSpin->setMinimumWidth(52);
+  m_hueSpin->setMaximumWidth(56);
+  m_satSpin->setMaximumWidth(56);
+  m_valSpin->setMaximumWidth(56);
+  m_alphaSpin->setMaximumWidth(56);
 
-  m_hueSpin->setStyleSheet("QSpinBox { padding-right: 14px; } QSpinBox::up-button, QSpinBox::down-button { width: 16px; }");
-  m_satSpin->setStyleSheet("QSpinBox { padding-right: 14px; } QSpinBox::up-button, QSpinBox::down-button { width: 16px; }");
-  m_valSpin->setStyleSheet("QSpinBox { padding-right: 14px; } QSpinBox::up-button, QSpinBox::down-button { width: 16px; }");
-  m_alphaSpin->setStyleSheet("QSpinBox { padding-right: 14px; } QSpinBox::up-button, QSpinBox::down-button { width: 16px; }");
+  m_hueSpin->setStyleSheet("QSpinBox { padding-right: 12px; } QSpinBox::up-button, QSpinBox::down-button { width: 13px; }");
+  m_satSpin->setStyleSheet("QSpinBox { padding-right: 12px; } QSpinBox::up-button, QSpinBox::down-button { width: 13px; }");
+  m_valSpin->setStyleSheet("QSpinBox { padding-right: 12px; } QSpinBox::up-button, QSpinBox::down-button { width: 13px; }");
+  m_alphaSpin->setStyleSheet("QSpinBox { padding-right: 12px; } QSpinBox::up-button, QSpinBox::down-button { width: 13px; }");
 
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
@@ -557,9 +618,11 @@ void MainWindow::setupShellLayout() {
   m_subToolDock = makeDock("サブツール", makeScrollable(m_subToolPanel), "SubToolDock");
   m_toolPropertyDock = makeDock("ツールプロパティ", makeScrollable(m_toolPropertyPanel), "ToolPropertyDock");
   m_colorDock = makeDock("カラー", makeScrollable(colorMainWidget), "ColorDock");
+  m_colorDock->setMinimumWidth(128);
   auto* colorSliderDock = makeDock("カラースライダー", makeScrollable(hsvWidget), "ColorSliderDock");
-  colorSliderDock->setMinimumWidth(350);
+  colorSliderDock->setMinimumWidth(188);
   auto* colorHistoryDock = makeDock("カラーヒストリー", makeScrollable(historyWidget), "ColorHistoryDock");
+  colorHistoryDock->setMinimumWidth(188);
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
 
@@ -576,7 +639,7 @@ void MainWindow::setupShellLayout() {
   tabifyDockWidget(m_subToolDock, m_colorDock);
   tabifyDockWidget(m_subToolDock, colorSliderDock);
   tabifyDockWidget(m_subToolDock, colorHistoryDock);
-  resizeDocks({m_toolDock, m_toolSliderDock, m_subToolDock}, {88, 88, 320}, Qt::Horizontal);
+  resizeDocks({m_toolDock, m_toolSliderDock, m_subToolDock}, {68, 72, 220}, Qt::Horizontal);
   m_subToolDock->raise();
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
@@ -1972,26 +2035,40 @@ void MainWindow::updateColorPanel() {
 
   const QColor fg = toQColor(m_controller->toolState().color);
   const QColor bg = toQColor(m_backgroundColor);
-  const auto makeStyle = [](const QColor& color) {
-    const int luminance = (299 * color.red() + 587 * color.green() + 114 * color.blue()) / 1000;
-    const QString textColor = luminance > 128 ? "#111111" : "#f5f5f5";
-    return QString(
-               "QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #505866; "
-               "min-height:16px; padding:0 2px; border-radius:2px; }")
+
+  const auto swatchStyle = [](const QColor& color, int size, bool primary) {
+    const QString border = primary ? QStringLiteral("#eef3fb") : QStringLiteral("#d8e0ec");
+    const QString hover = primary ? QStringLiteral("#ffffff") : QStringLiteral("#eef3fb");
+    const int displayAlpha = color.alpha() == 0 ? 255 : color.alpha();
+
+    const QString background = QStringLiteral("rgba(%1,%2,%3,%4)")
         .arg(color.red())
         .arg(color.green())
         .arg(color.blue())
-        .arg(color.alpha())
-        .arg(textColor);
+        .arg(displayAlpha);
+
+    return QStringLiteral(
+               "QPushButton { min-width: %1px; max-width: %1px; min-height: %1px; max-height: %1px; "
+               "padding: 0px; margin: 0px; border: %2px solid %3; border-radius: 2px; background: %4; }"
+               "QPushButton:hover { border-color: %5; }"
+               "QPushButton:pressed { border-color: #9fb5d6; }")
+        .arg(size)
+        .arg(primary ? 2 : 1)
+        .arg(border)
+        .arg(background)
+        .arg(hover);
   };
 
-  m_foregroundColorButton->setText("FG");
-  m_backgroundColorButton->setText("BG");
+  m_foregroundColorButton->setText(QString());
+  m_backgroundColorButton->setText(QString());
+  m_foregroundColorButton->setFixedSize(22, 22);
+  m_backgroundColorButton->setFixedSize(22, 22);
+  m_foregroundColorButton->setStyleSheet(swatchStyle(fg, 22, true));
+  m_backgroundColorButton->setStyleSheet(swatchStyle(bg, 22, false));
   m_foregroundColorButton->setToolTip(
-      fg.alpha() == 0 ? "前景色: 透明" : QString("前景色: %1").arg(fg.name(QColor::HexArgb).toUpper()));
+      fg.alpha() == 0 ? QStringLiteral("前景色: 透明") : QString("前景色: %1").arg(fg.name(QColor::HexArgb).toUpper()));
   m_backgroundColorButton->setToolTip(QString("背景色: %1").arg(bg.name(QColor::HexArgb).toUpper()));
-  m_foregroundColorButton->setStyleSheet(makeStyle(fg));
-  m_backgroundColorButton->setStyleSheet(makeStyle(bg));
+
   refreshColorHistoryButtons();
 }
 

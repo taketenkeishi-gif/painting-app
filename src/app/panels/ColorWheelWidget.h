@@ -14,6 +14,9 @@ public:
   QColor color() const noexcept { return m_color; }
   void setColor(const QColor& color);
 
+  QSize sizeHint() const override;
+  QSize minimumSizeHint() const override;
+
 signals:
   void colorChanged(const QColor& color);
 

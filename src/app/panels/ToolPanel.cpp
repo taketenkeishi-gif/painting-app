@@ -1,4 +1,4 @@
-﻿#include "app/panels/ToolPanel.h"
+#include "app/panels/ToolPanel.h"
 
 #include <algorithm>
 #include <vector>
@@ -356,22 +356,25 @@ ToolPanel::ToolPanel(QWidget* parent)
       "  color: #d8deea;"
       "  border-radius: 3px;"
       "  padding: 0;"
-      "  min-width: 30px;"
-      "  min-height: 30px;"
+      "  min-width: 28px;"
+      "  min-height: 28px;"
       "}"
       "QToolButton:hover { background: #303846; border-color: #6f8fb7; }"
       "QToolButton:checked { background: #2d4f74; border-color: #93c1f3; color: #ffffff; }"
       "QToolButton:disabled { background: #1f232b; border-color: #2d3441; color: #6d7888; }"
       "QLabel { color: #c9d2df; }");
 
-  m_rootLayout->setContentsMargins(1, 1, 1, 1);
-  m_rootLayout->setSpacing(2);
+  m_rootLayout->setContentsMargins(0, 0, 0, 0);
+  m_rootLayout->setSpacing(1);
 
   m_buttonGrid->setContentsMargins(0, 0, 0, 0);
-  m_buttonGrid->setHorizontalSpacing(1);
+  m_buttonGrid->setHorizontalSpacing(2);
   m_buttonGrid->setVerticalSpacing(1);
+  m_buttonGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_buttonGridHost->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
+  m_buttonGridHost->setStyleSheet(QStringLiteral("background: #3a4658;"));
   m_buttonGridHost->setLayout(m_buttonGrid);
-  m_rootLayout->addWidget(m_buttonGridHost);
+  m_rootLayout->addWidget(m_buttonGridHost, 0, Qt::AlignLeft | Qt::AlignTop);
 
   auto* quickWrap = new QHBoxLayout(m_quickHost);
   quickWrap->setContentsMargins(0, 3, 0, 4);
@@ -609,8 +612,8 @@ void ToolPanel::rebuildButtons() {
     button->setAutoExclusive(true);
     button->setToolButtonStyle(Qt::ToolButtonIconOnly);
     button->setIcon(app::ui::icon(iconName(kind)));
-    button->setIconSize(QSize(18, 18));
-    button->setFixedSize(32, 32);
+    button->setIconSize(QSize(16, 16));
+    button->setFixedSize(28, 28);
     button->setProperty("toolKind", static_cast<int>(kind));
     connect(button, &QToolButton::clicked, this, &ToolPanel::onToolButtonClicked);
     m_buttons[kind] = button;
@@ -624,20 +627,52 @@ void ToolPanel::relayoutButtons() {
   if (m_buttonGrid == nullptr) {
     return;
   }
+
   while (m_buttonGrid->count() > 0) {
     QLayoutItem* item = m_buttonGrid->takeAt(0);
+    if (item != nullptr && item->widget() != nullptr && item->widget()->property("toolSeparator").toBool()) {
+      item->widget()->deleteLater();
+    }
     delete item;
   }
 
-  const int columns = columnCountForWidth(m_buttonGridHost->width());
+  const int availableWidth = std::max(width(), m_buttonGridHost != nullptr ? m_buttonGridHost->width() : 0);
+  const int columns = std::max(1, columnCountForWidth(availableWidth));
+
   for (int i = 0; i < static_cast<int>(m_buttonOrder.size()); ++i) {
-    const int row = i / columns;
+    const int logicalRow = i / columns;
+    const int row = logicalRow * 2;
     const int col = i % columns;
-    m_buttonGrid->addWidget(m_buttonOrder[static_cast<std::size_t>(i)], row, col);
+    m_buttonGrid->addWidget(m_buttonOrder[static_cast<std::size_t>(i)], row, col, Qt::AlignLeft | Qt::AlignTop);
   }
+
+  const int rowCount = (static_cast<int>(m_buttonOrder.size()) + columns - 1) / columns;
+  for (int r = 0; r < rowCount - 1; ++r) {
+    auto* separator = new QFrame(m_buttonGridHost);
+    separator->setProperty("toolSeparator", true);
+    separator->setFixedHeight(1);
+    separator->setMinimumHeight(1);
+    separator->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    separator->setFrameShape(QFrame::NoFrame);
+    separator->setStyleSheet(QStringLiteral("background: #536173; border: none;"));
+    m_buttonGrid->addWidget(separator, r * 2 + 1, 0, 1, columns);
+  }
+
   for (int c = 0; c < columns; ++c) {
-    m_buttonGrid->setColumnStretch(c, 1);
+    m_buttonGrid->setColumnStretch(c, 0);
   }
+  for (int r = 0; r < rowCount; ++r) {
+    m_buttonGrid->setRowStretch(r * 2, 0);
+    if (r < rowCount - 1) {
+      m_buttonGrid->setRowStretch(r * 2 + 1, 0);
+      m_buttonGrid->setRowMinimumHeight(r * 2 + 1, 1);
+    }
+  }
+
+  const int buttonSize = m_buttonOrder.empty() ? 28 : m_buttonOrder.front()->width();
+  const int gridWidth = columns * buttonSize + std::max(0, columns - 1) * 2;
+  m_buttonGridHost->setFixedWidth(gridWidth);
+  m_buttonGridHost->adjustSize();
 }
 
 } // namespace app::panels
