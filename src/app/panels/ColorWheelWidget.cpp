@@ -165,7 +165,7 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   painter.setPen(QPen(QColor(10, 10, 10, 220), 1.4));    painter.setBrush(Qt::NoBrush);
   painter.drawEllipse(svHandle, 6.5, 6.5);
   painter.setPen(QPen(QColor(245, 245, 245, 230), 1.0));
-  painter.drawEllipse(svHandle, 4.0, 4.0);
+  painter.drawEllipse(svHandle, 6.5, 6.5);
 
   const QPointF hueHandle = pointFromHue(c, ringMid, hue);
   painter.setPen(QPen(QColor(10, 10, 10, 220), 1.3));
@@ -240,6 +240,7 @@ void ColorWheelWidget::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 } // namespace app::panels
+
 
 
 
