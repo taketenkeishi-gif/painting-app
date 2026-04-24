@@ -95,31 +95,6 @@ Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
   }
 }
 
-QString toolNameJa(core::ToolKind tool) {
-  switch (tool) {
-    case core::ToolKind::Brush:
-      return "ブラシ";
-    case core::ToolKind::Eraser:
-      return "消しゴム";
-    case core::ToolKind::Eyedropper:
-      return "スポイト";
-    case core::ToolKind::Fill:
-      return "塗りつぶし";
-    case core::ToolKind::Line:
-      return "直線";
-    case core::ToolKind::RectSelection:
-      return "選択";
-    case core::ToolKind::MoveLayer:
-      return "移動";
-    case core::ToolKind::Hand:
-      return "手のひら";
-    case core::ToolKind::Zoom:
-      return "ズーム";
-    default:
-      return "ツール";
-  }
-}
-
 } // namespace
 
 CanvasWidget::CanvasWidget(QWidget* parent)
@@ -285,13 +260,6 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.drawRect(QRectF(selectionRect.bottomRight().x() - handle / 2.0, selectionRect.bottomRight().y() - handle / 2.0, handle, handle));
     }
 
-    const QString activeToolText = toolNameJa(m_controller->currentTool());
-    const QRect badgeRect(target.x() + 10, target.y() + 10, 180, 24);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(0, 0, 0, 145));
-    painter.drawRoundedRect(badgeRect, 4.0, 4.0);
-    painter.setPen(QColor(255, 255, 255, 235));
-    painter.drawText(badgeRect.adjusted(8, 0, -6, 0), Qt::AlignVCenter | Qt::AlignLeft, activeToolText);
   }
 
   if (m_showGrid && state.zoom >= 8.0) {
