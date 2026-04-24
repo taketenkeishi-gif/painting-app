@@ -252,15 +252,15 @@ void MainWindow::setupShellLayout() {
   historyTitle->setStyleSheet("font-weight: 600; font-size: 10px;");
   auto* historyLayout = new QGridLayout();
   historyLayout->setContentsMargins(0, 0, 0, 0);
-  historyLayout->setSpacing(1);
+  historyLayout->setSpacing(2);
   m_colorHistoryButtons.clear();
-  m_colorHistoryButtons.reserve(30);
-  for (int i = 0; i < 30; ++i) {
+  m_colorHistoryButtons.reserve(24);
+  for (int i = 0; i < 24; ++i) {
     auto* chip = new QPushButton(colorPanel);
-    chip->setFixedSize(10, 10);
+    chip->setFixedSize(15, 15);
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
-    historyLayout->addWidget(chip, i / 10, i % 10);
+    historyLayout->addWidget(chip, i / 8, i % 8);
     m_colorHistoryButtons.push_back(chip);
   }
   colorLayout->addWidget(colorTitle);
@@ -1916,7 +1916,7 @@ void MainWindow::refreshColorHistoryButtons() {
     if (i >= m_colorHistory.size()) {
       chip->setEnabled(false);
       chip->setText({});
-      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; padding:0; border-radius:0px; }");
+      chip->setStyleSheet("QPushButton { border: 1px solid #3b4452; background: #262c35; padding:0; border-radius:2px; }");
       chip->setProperty("coreColor", QVariant {});
       continue;
     }
@@ -1929,7 +1929,7 @@ void MainWindow::refreshColorHistoryButtons() {
     chip->setStyleSheet(
         QString(
             "QPushButton { background-color: rgba(%1,%2,%3,%4); color:%5; border:1px solid #596476; "
-            "padding:0; border-radius:0px; }")
+            "padding:0; border-radius:2px; }")
             .arg(color.red())
             .arg(color.green())
             .arg(color.blue())

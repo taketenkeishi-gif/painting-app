@@ -142,7 +142,12 @@ public:
     QPen pen(stroke, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     painter->setPen(pen);
 
-    QRectF r = option.rect.adjusted(8, 5, -8, -5);
+    const int fixedPreviewWidth = 132;
+    QRectF r(
+        option.rect.left() + 8,
+        option.rect.top() + 5,
+        fixedPreviewWidth,
+        option.rect.height() - 10);
     QPainterPath path;
     path.moveTo(r.left(), r.center().y() + 3);
     path.cubicTo(r.left() + r.width() * 0.25, r.top(),

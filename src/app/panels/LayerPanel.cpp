@@ -91,8 +91,8 @@ QIcon layerThumbnailIcon(
     const app::bridge::AppController* controller,
     const app::bridge::LayerViewModel& model,
     std::size_t layerIndex) {
-  constexpr int thumbW = 26;
-  constexpr int thumbH = 16;
+  constexpr int thumbW = 30;
+  constexpr int thumbH = 20;
   QImage image(thumbW, thumbH, QImage::Format_ARGB32_Premultiplied);
   for (int y = 0; y < thumbH; ++y) {
     for (int x = 0; x < thumbW; ++x) {
@@ -226,7 +226,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setSpacing(1);
   m_layerList->setMinimumHeight(140);
   m_layerList->setStyleSheet(
-      "QListWidget::item { min-height: 20px; padding: 2px 4px; border-bottom: 1px solid #313844; }"
+      "QListWidget::item { min-height: 28px; padding: 3px 5px; border-bottom: 1px solid #313844; }"
       "QListWidget::item:selected { background: #2e4f79; color: #ffffff; }"
       "QListWidget::item:drop { border-top: 2px solid #7fb3ff; background: #243142; }"
       "QListWidget::indicator { width: 14px; height: 14px; }"
@@ -251,9 +251,9 @@ LayerPanel::LayerPanel(QWidget* parent)
     button->setIcon(app::ui::icon(iconName));
     button->setProperty("fullText", fullText);
     button->setProperty("shortText", QString());
-    button->setIconSize(QSize(14, 14));
+    button->setIconSize(QSize(16, 16));
     button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    button->setMinimumHeight(24);
+    button->setMinimumHeight(25);
     button->setText(fullText);
   };
 
@@ -385,7 +385,7 @@ void LayerPanel::applyButtonCompactMode(bool compact) {
 }
 
 void LayerPanel::applyResponsiveMode() {
-  const bool compactWidth = width() < 330;
+  const bool compactWidth = width() < 420;
   const bool compactHeight = height() < 560;
 
   applyButtonCompactMode(compactWidth);
@@ -476,7 +476,7 @@ void LayerPanel::refreshLayers() {
         ? QStringLiteral("用紙レイヤー: 表示/非表示のみ変更できます")
         : QStringLiteral("%1 / 合成: %2\n%3").arg(layerKindText(model.kind), blendModeName(model.blendMode), stateSummary);
     item->setToolTip(tooltip);
-    item->setSizeHint(QSize(item->sizeHint().width(), 22));
+    item->setSizeHint(QSize(item->sizeHint().width(), 30));
 
     QFont font = item->font();
     font.setBold(model.active);
