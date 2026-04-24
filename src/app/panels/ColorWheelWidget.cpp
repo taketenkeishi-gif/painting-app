@@ -128,21 +128,15 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   painter.drawImage(QPoint(0, 0), ringImage);
 
   // Clear the ring interior to avoid color bleed artifacts at the inner edge.
-  painter.save();
-  painter.setCompositionMode(QPainter::CompositionMode_Clear);
-  painter.setPen(Qt::NoPen);
+  painter.save();  painter.setPen(Qt::NoPen);
   painter.setBrush(Qt::transparent);
   painter.drawEllipse(c, inner - 0.4, inner - 0.4);
   painter.restore();
 
-  painter.setPen(QPen(QColor(14, 17, 22, 235), 1.0));
-  painter.setCompositionMode(QPainter::CompositionMode_Clear);
-    painter.setBrush(Qt::NoBrush);
+  painter.setPen(QPen(QColor(14, 17, 22, 235), 1.0));    painter.setBrush(Qt::NoBrush);
   painter.drawEllipse(c, outer + 0.5, outer + 0.5);
 
-  painter.setPen(QPen(QColor(24, 28, 34, 220), 1.0));
-  painter.setCompositionMode(QPainter::CompositionMode_Clear);
-    painter.setBrush(Qt::NoBrush);
+  painter.setPen(QPen(QColor(24, 28, 34, 220), 1.0));    painter.setBrush(Qt::NoBrush);
   painter.drawEllipse(c, inner + 0.5, inner + 0.5);
 
   const QRectF svRect = squareRect();
@@ -168,9 +162,7 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   const QPointF svHandle(
       svRect.left() + (static_cast<double>(saturation) / 255.0) * svRect.width(),
       svRect.top() + (1.0 - static_cast<double>(value) / 255.0) * svRect.height());
-  painter.setPen(QPen(QColor(10, 10, 10, 220), 1.4));
-  painter.setCompositionMode(QPainter::CompositionMode_Clear);
-    painter.setBrush(Qt::NoBrush);
+  painter.setPen(QPen(QColor(10, 10, 10, 220), 1.4));    painter.setBrush(Qt::NoBrush);
   painter.drawEllipse(svHandle, 4.0, 4.0);
   painter.setPen(QPen(QColor(245, 245, 245, 230), 1.0));
   painter.drawEllipse(svHandle, 2.8, 2.8);
@@ -248,4 +240,5 @@ void ColorWheelWidget::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 } // namespace app::panels
+
 
