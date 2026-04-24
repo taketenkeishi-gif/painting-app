@@ -129,17 +129,16 @@ QString sliderStyle(const QColor& accent, bool opacityMode) {
                   "qlineargradient(x1:0,y1:1,x2:0,y2:0,"
                   "stop:0 #252c37, stop:0.25 #313949, stop:0.5 #252c37, stop:0.75 #313949, stop:1 #252c37)");
   } else {
-    subPage = QStringLiteral("qlineargradient(x1:0,y1:1,x2:0,y2:0, stop:0 %1, stop:1 %2)")
-                  .arg(darkAccent.name(QColor::HexRgb), accent.name(QColor::HexRgb));
-    addPage = QStringLiteral("qlineargradient(x1:0,y1:1,x2:0,y2:0, stop:0 %1, stop:1 %2)")
-                  .arg(emptyBottom.name(QColor::HexRgb), emptyTop.name(QColor::HexRgb));
+    Q_UNUSED(darkAccent);
+    subPage = QStringLiteral("#8a8f98");
+    addPage = QStringLiteral("qlineargradient(x1:0,y1:1,x2:0,y2:0, stop:0 #252c36, stop:1 #2f3744)");
   }
 
   return QString(
              "QSlider::groove:vertical { background: %1; border: 1px solid %2; width: 4px; border-radius: 2px; }"
              "QSlider::sub-page:vertical { background: %3; border-radius: 2px; }"
              "QSlider::add-page:vertical { background: %4; border-radius: 2px; }"
-             "QSlider::handle:vertical { background: #ecf1fb; height: 9px; margin: 0 -3px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.28); }")
+             "QSlider::handle:vertical { background: #ecf1fb; height: 14px; margin: 0 -4px; border-radius: 7px; border: 1px solid rgba(0,0,0,0.28); }")
       .arg(groove.name(QColor::HexRgb), border.name(QColor::HexArgb), subPage, addPage);
 }
 
@@ -169,7 +168,7 @@ QWidget* makeQuickSliderBlock(
   chipLayout->setSpacing(0);
   valueLabelOut = new QLabel("0", block);
   valueLabelOut->setAlignment(Qt::AlignCenter);
-  valueLabelOut->setStyleSheet("font-size: 11px; font-weight: 700; color: #f6f9ff;");
+  valueLabelOut->setStyleSheet("font-size: 11px; font-weight: 700; color: #f6f9ff; padding: 1px 3px;");
   chipLayout->addWidget(valueLabelOut);
 
   unitLabelOut = new QLabel(unitText, block);
@@ -186,14 +185,14 @@ QWidget* makeQuickSliderBlock(
   sliderOut->setRange(min, max);
   sliderOut->setInvertedAppearance(true);
   sliderOut->setInvertedControls(false);
-  sliderOut->setFixedWidth(8);
+  sliderOut->setFixedWidth(7);
   sliderOut->setMinimumHeight(120);
   sliderOut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
   sliderOut->setFocusPolicy(Qt::StrongFocus);
   sliderOut->setStyleSheet(sliderStyle(QColor(120, 166, 235), opacityMode));
 
   auto* sliderHolder = new QHBoxLayout();
-  sliderHolder->setContentsMargins(0, 5, 0, 7);
+  sliderHolder->setContentsMargins(0, 10, 0, 12);
   sliderHolder->setSpacing(0);
   sliderHolder->addStretch(1);
   sliderHolder->addWidget(sliderOut);
@@ -375,12 +374,11 @@ void ToolPanel::updateQuickSliderVisuals(const QColor& color) {
 
   if (m_sizeChip != nullptr) {
     m_sizeChip->setStyleSheet(
-        QStringLiteral("QFrame { border: 1px solid %1; border-radius: 4px; background: %2; }")
-            .arg(sizeBorder.name(QColor::HexRgb), sizeAccent.name(QColor::HexRgb)));
+        QStringLiteral("QFrame { border: 1px solid #5f697a; border-radius: 4px; background: #47505f; }"));
   }
   if (m_sizeValueLabel != nullptr) {
     m_sizeValueLabel->setStyleSheet(
-        QStringLiteral("font-size: 11px; font-weight: 700; color: %1;").arg(textColor));
+        QStringLiteral("font-size: 11px; font-weight: 700; color: #f3f6fb; padding: 1px 3px;"));
   }
   if (m_sizeSlider != nullptr) {
     m_sizeSlider->setStyleSheet(sliderStyle(sizeAccent, false));
@@ -395,7 +393,7 @@ void ToolPanel::updateQuickSliderVisuals(const QColor& color) {
   }
   if (m_opacityValueLabel != nullptr) {
     m_opacityValueLabel->setStyleSheet(
-        QStringLiteral("font-size: 11px; font-weight: 700; color: %1;").arg(textColor));
+        QStringLiteral("font-size: 11px; font-weight: 700; color: %1; padding: 1px 3px;").arg(textColor));
   }
   if (m_opacitySlider != nullptr) {
     m_opacitySlider->setStyleSheet(sliderStyle(sizeAccent, true));
