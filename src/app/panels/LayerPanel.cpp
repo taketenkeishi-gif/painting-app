@@ -30,6 +30,7 @@
 #include <QSlider>
 #include <QSpinBox>
 #include <QStyle>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QListWidgetItem>
 
@@ -434,11 +435,13 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_lockButton(new QPushButton(QStringLiteral("ロック"), this)),
       m_lockAlphaButton(new QPushButton(QStringLiteral("透明保護"), this)),
       m_lockPositionButton(new QPushButton(QStringLiteral("位置固定"), this)),
-      m_primaryGroup(new QGroupBox(QStringLiteral("頻用操作"), this)),
-      m_stateGroup(new QGroupBox(QStringLiteral("状態操作"), this)),
+      m_primaryGroup(new QGroupBox(QString(), this)),
+      m_stateGroup(new QGroupBox(QString(), this)),
       m_primaryGrid(new QGridLayout()),
       m_stateGrid(new QGridLayout()) {
   m_headerLabel->setStyleSheet("font-weight:700;");
+  m_primaryGroup->setTitle(QString());
+  m_stateGroup->setTitle(QString());
 
   m_filterEdit->setPlaceholderText(QStringLiteral("レイヤーを検索..."));
   m_filterEdit->setClearButtonEnabled(true);
@@ -641,6 +644,12 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_lockPositionButton, &QPushButton::clicked, this, &LayerPanel::onTogglePositionLockClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
+  auto* layerThumbnailRefreshTimer = new QTimer(this);
+  layerThumbnailRefreshTimer->setObjectName(QStringLiteral("layerThumbnailRefreshTimer"));
+  layerThumbnailRefreshTimer->setSingleShot(true);
+  layerThumbnailRefreshTimer->setInterval(33);
+  connect(layerThumbnailRefreshTimer, &QTimer::timeout, this, &LayerPanel::refreshLayers);
+
   connect(m_filterEdit, &QLineEdit::textChanged, this, &LayerPanel::onFilterTextChanged);
   connect(m_layerList, &QListWidget::customContextMenuRequested, this, &LayerPanel::onLayerContextMenuRequested);
   connect(m_layerList->model(), &QAbstractItemModel::rowsMoved, this, &LayerPanel::onLayerRowsMoved);
@@ -739,6 +748,19 @@ void LayerPanel::applyButtonCompactMode(bool compact) {
   }
 
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &LayerPanel::refreshLayers);
+  connect(m_controller, &app::bridge::AppController::documentChanged, this, [this]() {
+    if (m_isRefreshing) {
+      return;
+    }
+
+    auto* timer = findChild<QTimer*>(QStringLiteral("layerThumbnailRefreshTimer"));
+    if (timer != nullptr) {
+      timer->start();
+      return;
+    }
+
+    refreshLayers();
+  });
   refreshLayers();
 }
 
