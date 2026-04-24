@@ -1,4 +1,4 @@
-#include "app/panels/ColorWheelWidget.h"
+﻿#include "app/panels/ColorWheelWidget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -136,11 +136,13 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   painter.restore();
 
   painter.setPen(QPen(QColor(14, 17, 22, 235), 1.0));
-  painter.setBrush(Qt::NoBrush);
+  painter.setCompositionMode(QPainter::CompositionMode_Clear);
+    painter.setBrush(Qt::NoBrush);
   painter.drawEllipse(c, outer + 0.5, outer + 0.5);
 
   painter.setPen(QPen(QColor(24, 28, 34, 220), 1.0));
-  painter.setBrush(Qt::NoBrush);
+  painter.setCompositionMode(QPainter::CompositionMode_Clear);
+    painter.setBrush(Qt::NoBrush);
   painter.drawEllipse(c, inner + 0.5, inner + 0.5);
 
   const QRectF svRect = squareRect();
@@ -167,7 +169,8 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
       svRect.left() + (static_cast<double>(saturation) / 255.0) * svRect.width(),
       svRect.top() + (1.0 - static_cast<double>(value) / 255.0) * svRect.height());
   painter.setPen(QPen(QColor(10, 10, 10, 220), 1.4));
-  painter.setBrush(Qt::NoBrush);
+  painter.setCompositionMode(QPainter::CompositionMode_Clear);
+    painter.setBrush(Qt::NoBrush);
   painter.drawEllipse(svHandle, 4.0, 4.0);
   painter.setPen(QPen(QColor(245, 245, 245, 230), 1.0));
   painter.drawEllipse(svHandle, 2.8, 2.8);
@@ -245,3 +248,4 @@ void ColorWheelWidget::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 } // namespace app::panels
+
