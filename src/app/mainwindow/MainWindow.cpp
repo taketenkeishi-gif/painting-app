@@ -263,9 +263,15 @@ void MainWindow::setupShellLayout() {
     historyLayout->addWidget(chip, i / 8, i % 8);
     m_colorHistoryButtons.push_back(chip);
   }
-  colorLayout->addWidget(colorTitle);
-  colorLayout->addLayout(colorButtons);
-  colorLayout->addWidget(m_colorWheelWidget, 1);
+  auto* colorMainWidget = new QWidget(colorPanel);
+  auto* colorMainLayout = new QVBoxLayout(colorMainWidget);
+  colorMainLayout->setContentsMargins(0, 0, 0, 0);
+  colorMainLayout->setSpacing(2);
+
+  colorMainLayout->addLayout(colorButtons);
+  colorMainLayout->addWidget(m_colorWheelWidget, 1);
+
+  colorLayout->addWidget(makePanelGroup("カラー", colorMainWidget, colorPanel));
   auto* hsvWidget = new QWidget(colorPanel);
   auto* hsvLayout = new QVBoxLayout(hsvWidget);
   hsvLayout->setContentsMargins(0, 0, 0, 0);
@@ -2152,4 +2158,3 @@ QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, cons
 }
 
 } // namespace app::mainwindow
-
