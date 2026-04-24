@@ -11,13 +11,22 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QImage>
+#include <QItemDelegate>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPainter>
+#include <QPaintEvent>
+#include <QPixmap>
+#include <QStyledItemDelegate>
+#include <QStyleOptionSlider>
+#include <QVariant>
 #include <QResizeEvent>
 #include <QSignalBlocker>
+#include <QSizePolicy>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStyle>
@@ -43,6 +52,13 @@ constexpr int kAlphaLockedRole = Qt::UserRole + 9;
 constexpr int kPositionLockedRole = Qt::UserRole + 10;
 constexpr int kBlendModeRole = Qt::UserRole + 11;
 constexpr int kPaperRole = Qt::UserRole + 12;
+constexpr int kActiveRole = Qt::UserRole + 13;
+
+constexpr int kLayerRowHeight = 30;
+constexpr int kLayerThumbWidth = 38;
+constexpr int kLayerThumbHeight = 24;
+constexpr int kVisibilitySlotWidth = 20;
+constexpr int kActiveSlotWidth = 16;
 
 QString layerKindText(core::LayerKind kind) {
   switch (kind) {
@@ -91,8 +107,8 @@ QIcon layerThumbnailIcon(
     const app::bridge::AppController* controller,
     const app::bridge::LayerViewModel& model,
     std::size_t layerIndex) {
-  constexpr int thumbW = 30;
-  constexpr int thumbH = 20;
+  constexpr int thumbW = kLayerThumbWidth;
+  constexpr int thumbH = kLayerThumbHeight;
   QImage image(thumbW, thumbH, QImage::Format_ARGB32_Premultiplied);
   for (int y = 0; y < thumbH; ++y) {
     for (int x = 0; x < thumbW; ++x) {
@@ -171,13 +187,228 @@ QString decorateLayerName(const app::bridge::LayerViewModel& model) {
 }
 
 QString stripLayerDecorators(const QString& text) {
-  QString next = text;
-  const int marker = next.indexOf("  [");
-  if (marker > 0) {
-    next = next.left(marker);
+  QStringList parts = text.trimmed().split(QChar(' '), Qt::SkipEmptyParts);
+
+  const QStringList prefixTokens {
+      QStringLiteral("[R]"),
+      QStringLiteral("[V]"),
+      QStringLiteral("[F]"),
+      QStringLiteral("[P]"),
+      QStringLiteral("[?]"),
+      QStringLiteral("▣"),
+      QStringLiteral("◇"),
+      QStringLiteral("▤"),
+      QStringLiteral("□")};
+
+  const QStringList stateTokens {
+      QStringLiteral("非"),
+      QStringLiteral("C"),
+      QStringLiteral("L"),
+      QStringLiteral("α"),
+      QStringLiteral("P"),
+      QStringLiteral("M"),
+      QStringLiteral("M×")};
+
+  while (!parts.isEmpty() && prefixTokens.contains(parts.front())) {
+    parts.pop_front();
   }
-  return next.trimmed();
+  while (!parts.isEmpty() && stateTokens.contains(parts.back())) {
+    parts.pop_back();
+  }
+
+  return parts.join(QChar(' ')).trimmed();
+}class AlphaSlider : public QSlider {
+ public:
+  explicit AlphaSlider(Qt::Orientation orientation, QWidget* parent = nullptr)
+      : QSlider(orientation, parent) {}
+
+ protected:
+  void paintEvent(QPaintEvent* event) override {
+    Q_UNUSED(event);
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    const int grooveHeight = 10;
+    const QRect grooveRect(6, (height() - grooveHeight) / 2, width() - 12, grooveHeight);
+    if (grooveRect.width() <= 0 || grooveRect.height() <= 0) {
+      return;
+    }
+
+    const int minValue = minimum();
+    const int maxValue = maximum();
+    const double ratio = maxValue == minValue
+                             ? 0.0
+                             : static_cast<double>(value() - minValue) /
+                                   static_cast<double>(maxValue - minValue);
+
+    const int usableWidth = grooveRect.width() - 1;
+    const int fillWidth = qBound(0, static_cast<int>(std::lround(ratio * usableWidth)), usableWidth);
+
+    const QRect fillRect(grooveRect.left(), grooveRect.top(), fillWidth, grooveRect.height());
+    const QRect remainRect(
+        grooveRect.left() + fillWidth,
+        grooveRect.top(),
+        grooveRect.width() - fillWidth,
+        grooveRect.height());
+
+    painter.setPen(Qt::NoPen);
+
+    if (remainRect.width() > 0) {
+      painter.setBrush(QColor(57, 67, 82));
+      painter.drawRoundedRect(remainRect.adjusted(0, 0, -1, -1), 3, 3);
+    }
+
+    if (fillRect.width() > 0) {
+      painter.save();
+      painter.setClipRect(fillRect);
+
+      const int cell = 4;
+      for (int y = grooveRect.top(); y < grooveRect.bottom(); y += cell) {
+        for (int x = grooveRect.left(); x < grooveRect.right(); x += cell) {
+          const bool dark =
+              (((x - grooveRect.left()) / cell) + ((y - grooveRect.top()) / cell)) % 2 == 0;
+          painter.fillRect(
+              QRect(x, y, cell, cell),
+              dark ? QColor(74, 82, 94) : QColor(122, 132, 146));
+        }
+      }
+
+      QLinearGradient gradient(fillRect.left(), 0, fillRect.right(), 0);
+      gradient.setColorAt(0.0, QColor(127, 169, 232, 35));
+      gradient.setColorAt(0.45, QColor(127, 169, 232, 125));
+      gradient.setColorAt(1.0, QColor(127, 169, 232, 235));
+      painter.fillRect(fillRect, gradient);
+
+      painter.restore();
+    }
+
+    painter.setPen(QPen(QColor(43, 53, 67), 1));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(grooveRect.adjusted(0, 0, -1, -1), 3, 3);
+
+    const int handleCenterX = grooveRect.left() + fillWidth;
+    const QRect handleRect(handleCenterX - 5, (height() - 18) / 2, 10, 18);
+
+    painter.setPen(QPen(isEnabled() ? QColor(223, 232, 246) : QColor(92, 104, 120), 1));
+    painter.setBrush(isEnabled() ? QColor(238, 243, 250) : QColor(120, 130, 145));
+    painter.drawRoundedRect(handleRect, 3, 3);
+  }};
+
+QRect layerVisibilityRect(const QRect& rect) {
+  return QRect(rect.left() + 4, rect.top() + (rect.height() - 16) / 2, 16, 16);
 }
+
+QRect layerActiveRect(const QRect& rect) {
+  return QRect(rect.left() + 4 + kVisibilitySlotWidth, rect.top() + (rect.height() - 14) / 2, 14, 14);
+}
+
+QRect layerThumbnailRect(const QRect& rect) {
+  const int left = rect.left() + 4 + kVisibilitySlotWidth + kActiveSlotWidth + 3;
+  return QRect(left, rect.top() + (rect.height() - kLayerThumbHeight) / 2, kLayerThumbWidth, kLayerThumbHeight);
+}
+
+QRect layerNameRect(const QRect& rect) {
+  const QRect thumb = layerThumbnailRect(rect);
+  return QRect(thumb.right() + 7, rect.top(), rect.right() - thumb.right() - 10, rect.height());
+}
+
+QString layerPaintName(const QModelIndex& index) {
+  if (index.data(kPaperRole).toBool()) {
+    return QStringLiteral("用紙");
+  }
+
+  QString name = index.data(kNameRole).toString();
+  if (name.trimmed().isEmpty()) {
+    name = index.data(Qt::DisplayRole).toString();
+  }
+
+  name = stripLayerDecorators(name);
+  if (name.isEmpty()) {
+    name = QStringLiteral("レイヤー");
+  }
+  return name;
+}class LayerItemDelegate : public QStyledItemDelegate {
+ public:
+  explicit LayerItemDelegate(QObject* parent = nullptr) : QStyledItemDelegate(parent) {}
+
+  QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+    Q_UNUSED(option);
+    Q_UNUSED(index);
+    return QSize(120, kLayerRowHeight);
+  }
+
+  void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+
+    const QRect rect = option.rect;
+    const bool selected = option.state.testFlag(QStyle::State_Selected);
+    const bool active = index.data(kActiveRole).toBool();
+    const bool visible = index.data(kVisibilityRole).toBool();
+
+    QColor background = QColor(Qt::transparent);
+    if (selected || active) {
+      background = QColor(38, 65, 102);
+    } else if (option.features.testFlag(QStyleOptionViewItem::Alternate)) {
+      background = QColor(22, 29, 38);
+    }
+
+    if (background.alpha() > 0) {
+      painter->fillRect(rect, background);
+    }
+
+    painter->setPen(QPen(QColor(43, 53, 67), 1));
+    painter->drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
+
+    const QRect eyeRect = layerVisibilityRect(rect);
+    const QIcon eyeIcon = visible ? app::ui::icon(QStringLiteral("visibility"))
+                                  : app::ui::icon(QStringLiteral("visibility_off"));
+    eyeIcon.paint(painter, eyeRect, Qt::AlignCenter, QIcon::Normal);
+
+    const QRect activeRect = layerActiveRect(rect);
+    if (active) {
+      app::ui::icon(QStringLiteral("pen_active")).paint(painter, activeRect, Qt::AlignCenter, QIcon::Normal);
+    }
+
+    const QRect thumbRect = layerThumbnailRect(rect);
+    const QIcon thumbnail = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
+    thumbnail.paint(painter, thumbRect, Qt::AlignCenter, QIcon::Normal);
+
+    painter->setPen(QColor(42, 48, 58));
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRect(thumbRect.adjusted(0, 0, -1, -1));
+
+    QFont nameFont = option.font;
+    nameFont.setBold(active);
+    painter->setFont(nameFont);
+    painter->setPen(visible ? QColor(242, 247, 255) : QColor(130, 142, 158));
+    painter->drawText(layerNameRect(rect), Qt::AlignVCenter | Qt::AlignLeft, layerPaintName(index));
+
+    painter->restore();
+  }
+
+  bool editorEvent(
+      QEvent* event,
+      QAbstractItemModel* model,
+      const QStyleOptionViewItem& option,
+      const QModelIndex& index) override {
+    if (event == nullptr || model == nullptr || !index.isValid()) {
+      return false;
+    }
+
+    if (event->type() == QEvent::MouseButtonRelease) {
+      auto* mouseEvent = static_cast<QMouseEvent*>(event);
+      if (mouseEvent->button() == Qt::LeftButton && layerVisibilityRect(option.rect).contains(mouseEvent->pos())) {
+        const bool visible = index.data(kVisibilityRole).toBool();
+        model->setData(index, visible ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
+        return true;
+      }
+    }
+
+    return QStyledItemDelegate::editorEvent(event, model, option, index);
+  }
+};
 
 } // namespace
 
@@ -187,7 +418,7 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_filterEdit(new QLineEdit(this)),
       m_layerList(new QListWidget(this)),
       m_opacityLabel(new QLabel(QStringLiteral("不透明度: 100%"), this)),
-      m_opacitySlider(new QSlider(Qt::Horizontal, this)),
+      m_opacitySlider(new AlphaSlider(Qt::Horizontal, this)),
       m_opacitySpin(new QSpinBox(this)),
       m_blendModeCombo(new QComboBox(this)),
       m_addRasterButton(new QPushButton(QStringLiteral("ラスタ追加"), this)),
@@ -223,7 +454,9 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
   m_layerList->setDefaultDropAction(Qt::MoveAction);
   m_layerList->setContextMenuPolicy(Qt::CustomContextMenu);
-  m_layerList->setSpacing(1);
+  m_layerList->setSpacing(0);
+  m_layerList->setUniformItemSizes(true);
+  m_layerList->setItemDelegate(new LayerItemDelegate(m_layerList));
   m_layerList->setMinimumHeight(140);
   m_layerList->setStyleSheet(
       "QListWidget::item { min-height: 28px; padding: 3px 5px; border-bottom: 1px solid #313844; }"
@@ -236,6 +469,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_opacitySlider->setRange(0, 100);
   m_opacitySlider->setValue(100);
   m_opacitySlider->setToolTip(QStringLiteral("アクティブレイヤーの不透明度を調整"));
+  m_opacitySlider->setFixedHeight(22);
   m_opacitySpin->setRange(0, 100);
   m_opacitySpin->setValue(100);
   m_opacitySpin->setSuffix(QStringLiteral("%"));
@@ -251,9 +485,9 @@ LayerPanel::LayerPanel(QWidget* parent)
     button->setIcon(app::ui::icon(iconName));
     button->setProperty("fullText", fullText);
     button->setProperty("shortText", QString());
-    button->setIconSize(QSize(16, 16));
+    button->setIconSize(QSize(14, 14));
     button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    button->setMinimumHeight(25);
+    button->setMinimumHeight(24);
     button->setText(fullText);
   };
 
@@ -270,9 +504,55 @@ LayerPanel::LayerPanel(QWidget* parent)
   initButton(m_lockButton, QStringLiteral("lock"), QStringLiteral("ロック"));
   initButton(m_lockAlphaButton, QStringLiteral("lock"), QStringLiteral("透明保護"));
   initButton(m_lockPositionButton, QStringLiteral("move"), QStringLiteral("位置固定"));
-
   m_upButton->setToolTip(QStringLiteral("選択中レイヤーを上（前面）へ移動"));
   m_downButton->setToolTip(QStringLiteral("選択中レイヤーを下（背面）へ移動"));
+
+  auto forceLayerIconButton = [](QPushButton* button) {
+    if (button == nullptr) {
+      return;
+    }
+
+    const QString label = button->property("fullText").toString().isEmpty()
+                              ? button->text()
+                              : button->property("fullText").toString();
+    button->setProperty("fullText", label);
+    button->setToolTip(label);
+    button->setText(QString());
+    button->setFixedSize(28, 24);
+    button->setIconSize(QSize(16, 16));
+    button->setFocusPolicy(Qt::NoFocus);
+    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    button->setStyleSheet(QStringLiteral(
+        "QPushButton {"
+        " margin: 0px;"
+        " padding: 0px;"
+        " border: 1px solid #3a4658;"
+        " border-radius: 3px;"
+        " background: #202a36;"
+        " color: #d8e2f0;"
+        "}"
+        "QPushButton:hover { background: #263446; border-color: #55708f; }"
+        "QPushButton:pressed { background: #2e4f79; border-color: #7fb3ff; }"
+        "QPushButton:disabled { color: #5f6b7a; border-color: #2c3542; background: #18212c; }"));
+  };
+
+  for (QPushButton* button : QList<QPushButton*> {
+           m_addRasterButton,
+           m_addVectorButton,
+           m_addFolderButton,
+           m_duplicateButton,
+           m_upButton,
+           m_downButton,
+           m_deleteButton,
+           m_clipButton,
+           m_maskButton,
+           m_removeMaskButton,
+           m_lockButton,
+           m_lockAlphaButton,
+           m_lockPositionButton}) {
+    forceLayerIconButton(button);
+  }
+
 
   m_primaryGrid->setContentsMargins(2, 2, 2, 2);
   m_primaryGrid->setHorizontalSpacing(3);
@@ -354,10 +634,7 @@ void LayerPanel::resizeEvent(QResizeEvent* event) {
 }
 
 void LayerPanel::applyButtonCompactMode(bool compact) {
-  if (m_compactButtons == compact) {
-    return;
-  }
-  m_compactButtons = compact;
+  Q_UNUSED(compact);
 
   const QList<QPushButton*> buttons {
       m_addRasterButton,
@@ -375,17 +652,21 @@ void LayerPanel::applyButtonCompactMode(bool compact) {
       m_lockPositionButton};
 
   for (QPushButton* button : buttons) {
-    const QString full = button->property("fullText").toString();
-    button->setText(compact ? QString() : full);
-    button->setToolTip(full);
-    button->setMinimumHeight(22);
-    button->setMaximumHeight(compact ? 24 : 26);
-    button->setMinimumWidth(compact ? 24 : 64);
-  }
-}
+    if (button == nullptr) {
+      continue;
+    }
 
-void LayerPanel::applyResponsiveMode() {
-  const bool compactWidth = width() < 420;
+    const QString full = button->property("fullText").toString();
+    button->setText(QString());
+    button->setToolTip(full);
+    button->setFixedSize(28, 24);
+    button->setIconSize(QSize(16, 16));
+    button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  }
+
+  m_compactButtons = true;
+}void LayerPanel::applyResponsiveMode() {
+  const bool compactWidth = width() < 330;
   const bool compactHeight = height() < 560;
 
   applyButtonCompactMode(compactWidth);
@@ -434,6 +715,20 @@ void LayerPanel::refreshLayers() {
   m_layerList->setDragDropMode(hasFilter ? QAbstractItemView::NoDragDrop : QAbstractItemView::InternalMove);
 
   const auto models = m_controller->layerViewModels();
+  for (std::size_t cleanupIndex = models.size(); cleanupIndex-- > 0;) {
+    const auto& cleanupModel = models[cleanupIndex];
+    if (cleanupModel.paperLayer || cleanupIndex == 0) {
+      continue;
+    }
+
+    const QString rawName = QString::fromStdString(cleanupModel.name).trimmed();
+    const QString cleanName = stripLayerDecorators(rawName);
+    if (!cleanName.isEmpty() && cleanName != rawName) {
+      m_isRefreshing = false;
+      m_controller->renameLayer(static_cast<std::size_t>(cleanupIndex - 1), cleanName.toStdString());
+      return;
+    }
+  }
   for (std::size_t layerIndex = models.size(); layerIndex-- > 0;) {
     const auto& model = models[layerIndex];
     if (hasFilter) {
@@ -444,7 +739,7 @@ void LayerPanel::refreshLayers() {
     }
 
     auto* item = new QListWidgetItem(m_layerList);
-    item->setText(decorateLayerName(model));
+    item->setText(stripLayerDecorators(decorateLayerName(model)));
     const std::size_t documentIndex = model.paperLayer ? 0 : (layerIndex > 0 ? layerIndex - 1 : 0);
     item->setIcon(layerThumbnailIcon(m_controller, model, documentIndex));
 
@@ -466,6 +761,7 @@ void LayerPanel::refreshLayers() {
     item->setData(kPositionLockedRole, model.positionLocked);
     item->setData(kBlendModeRole, static_cast<int>(model.blendMode));
     item->setData(kPaperRole, model.paperLayer);
+    item->setData(kActiveRole, model.active);
 
     const QString stateSummary = QStringLiteral("表示:%1  クリップ:%2  マスク:%3  ロック:%4")
                                      .arg(model.visible ? QStringLiteral("ON") : QStringLiteral("OFF"))
@@ -476,7 +772,7 @@ void LayerPanel::refreshLayers() {
         ? QStringLiteral("用紙レイヤー: 表示/非表示のみ変更できます")
         : QStringLiteral("%1 / 合成: %2\n%3").arg(layerKindText(model.kind), blendModeName(model.blendMode), stateSummary);
     item->setToolTip(tooltip);
-    item->setSizeHint(QSize(item->sizeHint().width(), 30));
+    item->setSizeHint(QSize(item->sizeHint().width(), kLayerRowHeight));
 
     QFont font = item->font();
     font.setBold(model.active);
@@ -662,21 +958,11 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
   const std::size_t layerIndex =
       layerIndexValue >= 0 ? static_cast<std::size_t>(layerIndexValue) : layerIndexFromRow(row);
 
-  const QString oldName = item->data(kNameRole).toString();
+  const QString oldName = stripLayerDecorators(item->data(kNameRole).toString());
   QString newName = stripLayerDecorators(item->text());
   if (newName.isEmpty()) {
     const QSignalBlocker signalBlocker(m_layerList);
-    const core::LayerKind kind = static_cast<core::LayerKind>(item->data(kKindRole).toInt());
-    app::bridge::LayerViewModel model;
-    model.name = oldName.toStdString();
-    model.kind = kind;
-    model.clippedToBelow = item->data(kClippedRole).toBool();
-    model.hasMask = item->data(kHasMaskRole).toBool();
-    model.maskEnabled = item->data(kMaskEnabledRole).toBool();
-    model.locked = item->data(kLockedRole).toBool();
-    model.alphaLocked = item->data(kAlphaLockedRole).toBool();
-    model.positionLocked = item->data(kPositionLockedRole).toBool();
-    item->setText(decorateLayerName(model));
+    item->setText(oldName.isEmpty() ? QStringLiteral("レイヤー") : oldName);
     return;
   }
 
@@ -695,9 +981,7 @@ void LayerPanel::onLayerItemChanged(QListWidgetItem* item) {
   if (!nameChanged && !visibilityChanged) {
     refreshButtonState();
   }
-}
-
-void LayerPanel::onOpacityChanged(int value) {
+}void LayerPanel::onOpacityChanged(int value) {
   if (m_controller == nullptr || m_isRefreshing) {
     return;
   }
@@ -993,13 +1277,6 @@ void LayerPanel::refreshButtonState() {
   m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
   m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
 
-  if (!m_compactButtons) {
-    m_clipButton->setText(clipped ? QStringLiteral("クリップON") : QStringLiteral("クリップ"));
-    m_maskButton->setText(maskEnabled ? QStringLiteral("マスクON") : QStringLiteral("マスク"));
-    m_lockButton->setText(locked ? QStringLiteral("ロックON") : QStringLiteral("ロック"));
-    m_lockAlphaButton->setText(alphaLocked ? QStringLiteral("透明保護ON") : QStringLiteral("透明保護"));
-    m_lockPositionButton->setText(positionLocked ? QStringLiteral("位置固定ON") : QStringLiteral("位置固定"));
-  }
 }
 
 } // namespace app::panels
