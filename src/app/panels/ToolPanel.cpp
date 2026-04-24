@@ -108,35 +108,50 @@ QString contrastTextColor(const QColor& base) {
 }
 
 QString sliderStyle(const QColor& accent, bool opacityMode) {
-  const QColor border = QColor(53, 61, 75, 220);
-  const QColor groove = QColor(20, 24, 31, 255);
-  const QColor emptyTop = QColor(43, 50, 61, 255);
-  QString lowerValuePage;
-  QString upperEmptyPage;
+  const QString groove = QStringLiteral("#171c24");
+  const QString border = QStringLiteral("#394252");
+  const QString upperEmptyPage = QStringLiteral("#2b333f");
 
+  QString lowerValuePage;
   if (opacityMode) {
-    lowerValuePage = QStringLiteral(
-                         "qlineargradient(x1:0,y1:1,x2:0,y2:0,"
-                         "stop:0 rgba(%1,%2,%3,70),"
-                         "stop:0.35 rgba(210,216,226,55),"
-                         "stop:0.65 rgba(%1,%2,%3,190),"
-                         "stop:1 rgba(%1,%2,%3,255))")
-                         .arg(accent.red())
-                         .arg(accent.green())
-                         .arg(accent.blue());
+    lowerValuePage =
+        QStringLiteral(
+            "qlineargradient(x1:0,y1:1,x2:0,y2:0,"
+            "stop:0 rgba(%1,%2,%3,255),"
+            "stop:0.28 rgba(%1,%2,%3,210),"
+            "stop:0.52 rgba(210,216,226,135),"
+            "stop:0.74 rgba(%1,%2,%3,120),"
+            "stop:1 rgba(160,166,176,80))")
+            .arg(accent.red())
+            .arg(accent.green())
+            .arg(accent.blue());
   } else {
-    lowerValuePage = QStringLiteral("#8a8f98");
+    lowerValuePage = QStringLiteral("#8d929b");
   }
 
-  upperEmptyPage = QStringLiteral(
-      "qlineargradient(x1:0,y1:1,x2:0,y2:0, stop:0 #252c36, stop:1 #2f3744)");
-
   return QString(
-             "QSlider::groove:vertical { background: %1; border: 1px solid %2; width: 5px; border-radius: 3px; }"
-             "QSlider::sub-page:vertical { background: %3; border-radius: 3px; }"
-             "QSlider::add-page:vertical { background: %4; border-radius: 3px; }"
-             "QSlider::handle:vertical { background: #eef3fb; height: 17px; margin: 0 -6px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.36); }")
-      .arg(groove.name(QColor::HexRgb), border.name(QColor::HexArgb), upperEmptyPage, lowerValuePage);
+             "QSlider::groove:vertical {"
+             " background:%1;"
+             " border:1px solid %2;"
+             " width:5px;"
+             " border-radius:3px;"
+             "}"
+             "QSlider::sub-page:vertical {"
+             " background:%3;"
+             " border-radius:3px;"
+             "}"
+             "QSlider::add-page:vertical {"
+             " background:%4;"
+             " border-radius:3px;"
+             "}"
+             "QSlider::handle:vertical {"
+             " background:#eef3fb;"
+             " height:18px;"
+             " margin:0 -7px;"
+             " border-radius:9px;"
+             " border:1px solid rgba(0,0,0,0.45);"
+             "}")
+      .arg(groove, border, upperEmptyPage, lowerValuePage);
 }
 
 QWidget* makeQuickSliderBlock(
@@ -180,9 +195,9 @@ QWidget* makeQuickSliderBlock(
 
   sliderOut = new QSlider(Qt::Vertical, block);
   sliderOut->setRange(min, max);
-  sliderOut->setInvertedAppearance(true);
+  sliderOut->setInvertedAppearance(false);
   sliderOut->setInvertedControls(false);
-  sliderOut->setFixedWidth(11);
+  sliderOut->setFixedWidth(12);
   sliderOut->setMinimumHeight(120);
   sliderOut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
   sliderOut->setFocusPolicy(Qt::StrongFocus);

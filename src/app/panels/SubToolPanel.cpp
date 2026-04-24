@@ -143,6 +143,7 @@ public:
     painter->setPen(pen);
 
     const int fixedPreviewWidth = 132;
+    const int fixedPreviewWidth = 128;
     QRectF r(
         option.rect.left() + 8,
         option.rect.top() + 5,
