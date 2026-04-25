@@ -1,4 +1,4 @@
-﻿#include "app/panels/ColorWheelWidget.h"
+#include "app/panels/ColorWheelWidget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -36,8 +36,16 @@ QPointF pointFromHue(const QPointF& center, double radius, int hue) {
 
 ColorWheelWidget::ColorWheelWidget(QWidget* parent)
     : QWidget(parent) {
-  setMinimumSize(160, 160);
-  setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  setMinimumSize(104, 104);
+  setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+}
+
+QSize ColorWheelWidget::sizeHint() const {
+  return QSize(210, 210);
+}
+
+QSize ColorWheelWidget::minimumSizeHint() const {
+  return QSize(104, 104);
 }
 
 QColor ColorWheelWidget::normalizedHsvColor(const QColor& color) const {
@@ -81,7 +89,7 @@ double ColorWheelWidget::ringRadius() const {
 }
 
 double ColorWheelWidget::ringThickness() const {
-  return std::clamp(outerRadius() * 0.16, 14.0, 28.0);
+  return std::clamp(outerRadius() * 0.16, 6.5, 24.0);
 }
 
 QRectF ColorWheelWidget::squareRect() const {
@@ -162,15 +170,30 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   const QPointF svHandle(
       svRect.left() + (static_cast<double>(saturation) / 255.0) * svRect.width(),
       svRect.top() + (1.0 - static_cast<double>(value) / 255.0) * svRect.height());
-  painter.setPen(QPen(QColor(10, 10, 10, 220), 1.4));    painter.setBrush(Qt::NoBrush);
-  painter.drawEllipse(svHandle, 9.0, 9.0);
-  painter.setPen(QPen(QColor(245, 245, 245, 230), 1.0));
-  painter.drawEllipse(svHandle, 9.0, 9.0);
+  painter.setPen(QPen(QColor(248, 250, 255, 240), 1.3));
+  painter.setBrush(Qt::NoBrush);
+  painter.drawEllipse(svHandle, 4.5, 4.5);
 
   const QPointF hueHandle = pointFromHue(c, ringMid, hue);
   painter.setPen(QPen(QColor(10, 10, 10, 220), 1.3));
   painter.setBrush(QColor(240, 240, 240, 220));
-  painter.drawEllipse(hueHandle, 7.5, 7.5);
+  painter.save();
+  const QPointF hueDirection = hueHandle - QPointF(width() / 2.0, height() / 2.0);
+  const double hueAngle =
+      std::atan2(hueDirection.y(), hueDirection.x()) * 180.0 / 3.14159265358979323846 + 90.0;
+  painter.translate(hueHandle);
+  painter.rotate(hueAngle);
+
+  const QRectF hueHandleRect(-3.5, -12.0, 7.0, 24.0);
+  painter.setPen(QPen(QColor(34, 40, 50), 1.2));
+  painter.setBrush(QColor(238, 243, 250));
+  painter.drawRoundedRect(hueHandleRect, 1.5, 1.5);
+
+  const QRectF hueHandleInner(-1.4, -9.0, 2.8, 18.0);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(QColor(132, 150, 172));
+  painter.drawRoundedRect(hueHandleInner, 1.0, 1.0);
+  painter.restore();
 }
 
 bool ColorWheelWidget::updateHueFromPoint(const QPointF& point) {

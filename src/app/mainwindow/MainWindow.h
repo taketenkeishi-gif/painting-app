@@ -18,6 +18,7 @@ class QMenu;
 class QKeySequence;
 class QDockWidget;
 class QPushButton;
+class QGridLayout;
 class QSpinBox;
 class QSplitter;
 class QSlider;
@@ -126,6 +127,7 @@ private:
   void applyForegroundColor(const QColor& color, bool pushHistory = true);
   void applyForegroundFromHsvControls();
   void refreshColorHistoryButtons();
+  void relayoutColorHistoryGrid();
   bool openImageFile(const QString& path);
   bool saveImageFile(const QString& path);
   void pushRecentFile(const QString& path);
@@ -185,6 +187,9 @@ private:
   QSpinBox* m_alphaSpin {nullptr};
   app::panels::ColorWheelWidget* m_colorWheelWidget {nullptr};
   std::vector<QPushButton*> m_colorHistoryButtons;
+  QWidget* m_colorHistoryGridWidget {nullptr};
+  QGridLayout* m_colorHistoryLayout {nullptr};
+  int m_colorHistoryColumnCount {0};
   std::vector<core::Color> m_colorHistory;
   core::Color m_backgroundColor {255, 255, 255, 255};
   core::Color m_lastForegroundColor {0, 0, 0, 255};
