@@ -1,6 +1,7 @@
 #include "app/panels/ToolPanel.h"
 
 #include <algorithm>
+#include <array>
 #include <vector>
 
 #include <QGridLayout>
@@ -26,6 +27,35 @@
 namespace app::panels {
 
 namespace {
+
+enum class CategoryId : int {
+  Pen = 0,
+  Pencil = 1,
+  Airbrush = 2,
+  Figure = 3,
+  Text = 4,
+  Object = 5,
+  Gradient = 6
+};
+
+struct CategorySpec {
+  CategoryId id;
+  const char* label;
+  const char* icon;
+  bool staticEnabled;
+  bool hasMappedTool;
+  core::ToolKind mappedTool;
+};
+
+constexpr std::array<CategorySpec, 7> kCategorySpecs {{
+    {CategoryId::Pen, "Pen", "brush", true, true, core::ToolKind::Brush},
+    {CategoryId::Pencil, "Pencil", "brush", true, true, core::ToolKind::Brush},
+    {CategoryId::Airbrush, "Air", "brush", true, true, core::ToolKind::Brush},
+    {CategoryId::Figure, "Figure", "line", true, true, core::ToolKind::Line},
+    {CategoryId::Text, "Text", "select", false, false, core::ToolKind::Brush},
+    {CategoryId::Object, "Object", "move", true, true, core::ToolKind::MoveLayer},
+    {CategoryId::Gradient, "Gradient", "fill", true, true, core::ToolKind::Fill},
+}};
 
 QString toolNameJa(core::ToolKind kind) {
   switch (kind) {
@@ -345,6 +375,8 @@ QWidget* makeQuickSliderBlock(
 
 ToolPanel::ToolPanel(QWidget* parent)
     : QWidget(parent),
+      m_categoryHost(new QWidget(this)),
+      m_categoryGrid(new QGridLayout()),
       m_buttonGridHost(new QWidget(this)),
       m_buttonGrid(new QGridLayout()),
       m_quickHost(new QWidget(this)),
@@ -366,6 +398,14 @@ ToolPanel::ToolPanel(QWidget* parent)
 
   m_rootLayout->setContentsMargins(0, 0, 0, 0);
   m_rootLayout->setSpacing(1);
+
+  m_categoryGrid->setContentsMargins(0, 0, 0, 0);
+  m_categoryGrid->setHorizontalSpacing(2);
+  m_categoryGrid->setVerticalSpacing(2);
+  m_categoryGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  m_categoryHost->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
+  m_categoryHost->setLayout(m_categoryGrid);
+  m_rootLayout->addWidget(m_categoryHost, 0, Qt::AlignLeft | Qt::AlignTop);
 
   m_buttonGrid->setContentsMargins(0, 0, 0, 0);
   m_buttonGrid->setHorizontalSpacing(2);
@@ -406,6 +446,8 @@ ToolPanel::ToolPanel(QWidget* parent)
 
   connect(m_sizeSlider, &QSlider::valueChanged, this, &ToolPanel::onSizeSliderChanged);
   connect(m_opacitySlider, &QSlider::valueChanged, this, &ToolPanel::onOpacitySliderChanged);
+
+  rebuildCategoryButtons();
 }
 
 void ToolPanel::setController(app::bridge::AppController* controller) {
@@ -428,6 +470,7 @@ void ToolPanel::resizeEvent(QResizeEvent* event) {
   if ((m_sections & ButtonsOnly) == 0U) {
     return;
   }
+  relayoutCategoryButtons();
   relayoutButtons();
 }
 
@@ -435,9 +478,11 @@ void ToolPanel::setSections(Sections sections) noexcept {
   m_sections = sections;
   const bool showButtons = (m_sections & ButtonsOnly) != 0U;
   const bool showQuick = (m_sections & QuickSlidersOnly) != 0U;
+  m_categoryHost->setVisible(showButtons);
   m_buttonGridHost->setVisible(showButtons);
   m_quickHost->setVisible(showQuick);
   if (showButtons) {
+    relayoutCategoryButtons();
     relayoutButtons();
   }
 }
@@ -461,6 +506,32 @@ void ToolPanel::refreshFromController() {
   }
 
   const core::ToolKind current = m_controller->currentTool();
+  const auto available = m_controller->availableTools();
+  const int defaultCategoryId = defaultCategoryIdForTool(current);
+  bool fallbackChecked = false;
+  for (auto& category : m_categoryButtons) {
+    if (category.button == nullptr) {
+      continue;
+    }
+    bool enabled = category.staticEnabled;
+    if (enabled && category.hasMappedTool) {
+      const bool listed = std::find(available.begin(), available.end(), category.mappedTool) != available.end();
+      enabled = listed && m_controller->canUseToolOnActiveLayer(category.mappedTool);
+    }
+    const QSignalBlocker blocker(category.button);
+    category.button->setEnabled(enabled);
+    bool checked = false;
+    if (enabled && category.hasMappedTool && current == category.mappedTool) {
+      if (isCategoryLastPicked(category.id, current)) {
+        checked = true;
+      } else if (!fallbackChecked && category.id == defaultCategoryId) {
+        checked = true;
+        fallbackChecked = true;
+      }
+    }
+    category.button->setChecked(checked);
+  }
+
   const QString layerKind = QString::fromStdString(m_controller->activeLayerKindDisplayName());
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
@@ -544,6 +615,25 @@ void ToolPanel::updateQuickSliderVisuals(const QColor& color) {
   }
 }
 
+void ToolPanel::onCategoryButtonClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  auto* button = qobject_cast<QToolButton*>(sender());
+  if (button == nullptr) {
+    return;
+  }
+  if (!button->property("hasMappedTool").toBool()) {
+    return;
+  }
+  const core::ToolKind mappedTool = static_cast<core::ToolKind>(button->property("mappedToolKind").toInt());
+  if (!m_controller->canUseToolOnActiveLayer(mappedTool)) {
+    return;
+  }
+  m_lastCategoryId = button->property("categoryId").toInt();
+  m_controller->setCurrentTool(mappedTool);
+}
+
 void ToolPanel::onToolButtonClicked() {
   if (m_controller == nullptr) {
     return;
@@ -568,6 +658,118 @@ void ToolPanel::onOpacitySliderChanged(int value) {
     return;
   }
   m_controller->setBrushOpacity(value);
+}
+
+void ToolPanel::rebuildCategoryButtons() {
+  if (m_categoryGrid == nullptr) {
+    return;
+  }
+
+  while (m_categoryGrid->count() > 0) {
+    QLayoutItem* item = m_categoryGrid->takeAt(0);
+    if (item != nullptr && item->widget() != nullptr) {
+      item->widget()->deleteLater();
+    }
+    delete item;
+  }
+  m_categoryButtons.clear();
+
+  for (const CategorySpec& spec : kCategorySpecs) {
+    auto* button = new QToolButton(this);
+    button->setCheckable(true);
+    button->setAutoExclusive(true);
+    button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    button->setIcon(app::ui::icon(QString::fromUtf8(spec.icon)));
+    button->setIconSize(QSize(14, 14));
+    button->setText(QString::fromUtf8(spec.label));
+    button->setAccessibleName(QString::fromUtf8(spec.label));
+    button->setObjectName(QStringLiteral("category_%1").arg(QString::fromUtf8(spec.label).toLower()));
+    button->setFixedSize(52, 40);
+    button->setProperty("categoryId", static_cast<int>(spec.id));
+    button->setProperty("hasMappedTool", spec.hasMappedTool);
+    button->setProperty("mappedToolKind", static_cast<int>(spec.mappedTool));
+    button->setEnabled(spec.staticEnabled);
+    button->setToolTip(QString::fromUtf8(spec.label));
+
+    connect(button, &QToolButton::clicked, this, &ToolPanel::onCategoryButtonClicked);
+
+    m_categoryButtons.push_back(CategoryButtonState {
+        static_cast<int>(spec.id),
+        spec.staticEnabled,
+        spec.hasMappedTool,
+        spec.mappedTool,
+        button});
+  }
+
+  relayoutCategoryButtons();
+}
+
+void ToolPanel::relayoutCategoryButtons() {
+  if (m_categoryGrid == nullptr) {
+    return;
+  }
+
+  while (m_categoryGrid->count() > 0) {
+    QLayoutItem* item = m_categoryGrid->takeAt(0);
+    delete item;
+  }
+
+  const int availableWidth = std::max(width(), m_categoryHost != nullptr ? m_categoryHost->width() : 0);
+  const int columns = std::max(1, categoryColumnCountForWidth(availableWidth));
+  for (int i = 0; i < static_cast<int>(m_categoryButtons.size()); ++i) {
+    auto* button = m_categoryButtons[static_cast<std::size_t>(i)].button;
+    if (button == nullptr) {
+      continue;
+    }
+    const int row = i / columns;
+    const int col = i % columns;
+    m_categoryGrid->addWidget(button, row, col, Qt::AlignLeft | Qt::AlignTop);
+  }
+  for (int c = 0; c < columns; ++c) {
+    m_categoryGrid->setColumnStretch(c, 0);
+  }
+  const int buttonWidth = m_categoryButtons.empty() || m_categoryButtons.front().button == nullptr
+      ? 52
+      : m_categoryButtons.front().button->width();
+  const int gridWidth = columns * buttonWidth + std::max(0, columns - 1) * m_categoryGrid->horizontalSpacing();
+  m_categoryHost->setFixedWidth(gridWidth);
+}
+
+int ToolPanel::categoryColumnCountForWidth(int width) const noexcept {
+  if (width < 110) {
+    return 1;
+  }
+  if (width < 170) {
+    return 2;
+  }
+  return 3;
+}
+
+int ToolPanel::defaultCategoryIdForTool(core::ToolKind tool) const noexcept {
+  switch (tool) {
+    case core::ToolKind::Brush:
+      return static_cast<int>(CategoryId::Pen);
+    case core::ToolKind::Line:
+      return static_cast<int>(CategoryId::Figure);
+    case core::ToolKind::MoveLayer:
+      return static_cast<int>(CategoryId::Object);
+    case core::ToolKind::Fill:
+      return static_cast<int>(CategoryId::Gradient);
+    default:
+      return -1;
+  }
+}
+
+bool ToolPanel::isCategoryLastPicked(int categoryId, core::ToolKind currentTool) const noexcept {
+  if (m_lastCategoryId < 0 || m_lastCategoryId != categoryId) {
+    return false;
+  }
+  for (const auto& category : m_categoryButtons) {
+    if (category.id == m_lastCategoryId) {
+      return category.hasMappedTool && category.mappedTool == currentTool;
+    }
+  }
+  return false;
 }
 
 void ToolPanel::rebuildButtons() {
