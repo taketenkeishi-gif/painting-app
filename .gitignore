@@ -8,3 +8,13 @@ build-tests/
 *.VC.db
 *.VC.opendb
 CMakeUserPresets.json
+
+# Local helper/backup artifacts
+*.lnk
+*.bak_*
+_backup*/
+_fix*/
+_rollback*/
+作業ログ.txt
+実装方針.txt
+起動_Release.ps1
