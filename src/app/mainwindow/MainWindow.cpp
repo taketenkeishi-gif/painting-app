@@ -22,6 +22,7 @@
 #include <QGuiApplication>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QImage>
 #include <QInputDialog>
 #include <QKeySequence>
@@ -32,6 +33,7 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMouseEvent>
 #include <QMessageBox>
 #include <QMap>
 #include <QPixmap>
@@ -47,11 +49,13 @@
 #include <QSet>
 #include <QTabWidget>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTimer>
 #include <QVariant>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QUrl>
+#include <QSizePolicy>
 
 #include "app/bridge/AppController.h"
 #include "app/canvasview/CanvasWidget.h"
@@ -125,6 +129,83 @@ QString layerKindJa(core::LayerKind kind) {
   }
 }
 
+class DockTabTitleBar final : public QWidget {
+public:
+  DockTabTitleBar(QDockWidget* dock, const QIcon& icon)
+      : QWidget(dock), m_dock(dock) {
+    setObjectName(QStringLiteral("DockTabTitleBar"));
+    setFixedHeight(24);
+    setMinimumHeight(24);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+    auto* layout = new QHBoxLayout(this);
+    layout->setContentsMargins(6, 1, 3, 1);
+    layout->setSpacing(4);
+
+    auto* iconLabel = new QLabel(this);
+    iconLabel->setObjectName(QStringLiteral("DockTabIcon"));
+    iconLabel->setFixedSize(14, 14);
+    iconLabel->setAlignment(Qt::AlignCenter);
+    iconLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    if (!icon.isNull()) {
+      iconLabel->setPixmap(icon.pixmap(14, 14));
+    }
+
+    auto* titleLabel = new QLabel(dock != nullptr ? dock->windowTitle() : QString(), this);
+    titleLabel->setObjectName(QStringLiteral("DockTabLabel"));
+    titleLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    titleLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    titleLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+    auto* floatButton = new QToolButton(this);
+    floatButton->setObjectName(QStringLiteral("DockTitleButton"));
+    floatButton->setText(QStringLiteral("□"));
+    floatButton->setToolTip(QStringLiteral("分離 / ドッキング"));
+    floatButton->setAutoRaise(true);
+    floatButton->setFocusPolicy(Qt::NoFocus);
+    floatButton->setFixedSize(20, 20);
+
+    auto* closeButton = new QToolButton(this);
+    closeButton->setObjectName(QStringLiteral("DockTitleButton"));
+    closeButton->setText(QStringLiteral("×"));
+    closeButton->setToolTip(QStringLiteral("閉じる"));
+    closeButton->setAutoRaise(true);
+    closeButton->setFocusPolicy(Qt::NoFocus);
+    closeButton->setFixedSize(20, 20);
+
+    layout->addWidget(iconLabel);
+    layout->addWidget(titleLabel, 1);
+    layout->addWidget(floatButton);
+    layout->addWidget(closeButton);
+
+    if (dock != nullptr) {
+      QObject::connect(floatButton, &QToolButton::clicked, dock, [dock]() {
+        dock->setFloating(!dock->isFloating());
+        dock->raise();
+      });
+      QObject::connect(closeButton, &QToolButton::clicked, dock, [dock]() {
+        dock->close();
+      });
+    }
+  }
+
+protected:
+  void mousePressEvent(QMouseEvent* event) override {
+    event->ignore();
+  }
+
+  void mouseMoveEvent(QMouseEvent* event) override {
+    event->ignore();
+  }
+
+  void mouseDoubleClickEvent(QMouseEvent* event) override {
+    event->ignore();
+  }
+
+private:
+  QDockWidget* m_dock {nullptr};
+};
+
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
@@ -176,9 +257,18 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::setupShellLayout() {
-  setCentralWidget(m_canvasWidget);
+
+  // Dock behavior: all dock panels use the same tabbed draggable model.
   setDockNestingEnabled(true);
+  setDockOptions(QMainWindow::AnimatedDocks | QMainWindow::AllowNestedDocks |
+                 QMainWindow::AllowTabbedDocks | QMainWindow::GroupedDragging);
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::North);
+  setTabPosition(Qt::RightDockWidgetArea, QTabWidget::North);
+
+
+
+  setCentralWidget(m_canvasWidget);
+
 
   auto* colorPanel = new QWidget(this);
   m_colorPanelWidget = colorPanel;
@@ -629,80 +719,40 @@ void MainWindow::setupShellLayout() {
   colorHistoryDock->setMinimumWidth(188);
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
-  auto applyTabIntegratedTitleBar = [this](QDockWidget* dock) {
+
+
+  auto applyDockSingleTabTitleBar = [this](QDockWidget* dock, QStyle::StandardPixmap iconType) {
     if (dock == nullptr) {
       return;
     }
-
-    auto* bar = new QWidget(dock);
-    bar->setObjectName(QStringLiteral("TabIntegratedDockTitleBar"));
-    bar->setFixedHeight(17);
-    bar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    bar->setStyleSheet(QStringLiteral(
-        "QWidget#TabIntegratedDockTitleBar {"
-        " background: #202833;"
-        " border-left: 1px solid #354052;"
-        " border-right: 1px solid #354052;"
-        " border-bottom: 1px solid #354052;"
-        "}"));
-
-    auto* row = new QHBoxLayout(bar);
-    row->setContentsMargins(4, 0, 3, 0);
-    row->setSpacing(3);
-
-    auto* grip = new QLabel(QStringLiteral("⋮⋮"), bar);
-    grip->setFixedWidth(16);
-    grip->setAlignment(Qt::AlignCenter);
-    grip->setStyleSheet(QStringLiteral("color: #4f5c6f; font-size: 10px;"));
-    row->addWidget(grip);
-    row->addStretch(1);
-
-    auto makeTinyDockButton = [](const QString& text, QWidget* parent) {
-      auto* button = new QPushButton(text, parent);
-      button->setFixedSize(14, 14);
-      button->setFocusPolicy(Qt::NoFocus);
-      button->setFlat(true);
-      button->setStyleSheet(QStringLiteral(
-          "QPushButton {"
-          " margin: 0px; padding: 0px;"
-          " border: 1px solid transparent;"
-          " border-radius: 2px;"
-          " color: #7e8da2;"
-          " background: transparent;"
-          " font-size: 10px;"
-          "}"
-          "QPushButton:hover {"
-          " border: 1px solid #4c5d73;"
-          " background: #263243;"
-          " color: #e4ebf6;"
-          "}"));
-      return button;
-    };
-
-    auto* floatButton = makeTinyDockButton(QStringLiteral("□"), bar);
-    floatButton->setToolTip(QStringLiteral("パネルを分離/戻す"));
-    row->addWidget(floatButton);
-
-    auto* closeButton = makeTinyDockButton(QStringLiteral("×"), bar);
-    closeButton->setToolTip(QStringLiteral("パネルを閉じる"));
-    row->addWidget(closeButton);
-
-    connect(floatButton, &QPushButton::clicked, dock, [dock]() {
-      dock->setFloating(!dock->isFloating());
-    });
-    connect(closeButton, &QPushButton::clicked, dock, [dock]() {
-      dock->hide();
-    });
-
-    dock->setTitleBarWidget(bar);
+    const QIcon icon = style()->standardIcon(iconType);
+    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+    dock->setWindowIcon(icon);
+    dock->setTitleBarWidget(new DockTabTitleBar(dock, icon));
   };
 
-  applyTabIntegratedTitleBar(m_subToolDock);
-  applyTabIntegratedTitleBar(m_toolPropertyDock);
-  applyTabIntegratedTitleBar(m_colorDock);
-  applyTabIntegratedTitleBar(colorSliderDock);
-  applyTabIntegratedTitleBar(colorHistoryDock);
+  auto applyDockNativeTabChrome = [this](QDockWidget* dock, QStyle::StandardPixmap iconType) {
+    if (dock == nullptr) {
+      return;
+    }
+    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+    dock->setWindowIcon(style()->standardIcon(iconType));
+    dock->setTitleBarWidget(nullptr);
+  };
 
+  // Split/standalone docks get a compact one-tab-like drag handle.
+  applyDockSingleTabTitleBar(m_toolDock, QStyle::SP_FileDialogListView);
+  applyDockSingleTabTitleBar(m_toolSliderDock, QStyle::SP_ArrowUp);
+  applyDockSingleTabTitleBar(m_layerDock, QStyle::SP_DirIcon);
+  applyDockSingleTabTitleBar(m_infoDock, QStyle::SP_MessageBoxInformation);
+
+  // Real tab groups must keep Qt's native QTabBar.  Do not install a custom
+  // titleBarWidget here; doing so creates the duplicated titlebar + tabbar UI.
+  applyDockNativeTabChrome(m_subToolDock, QStyle::SP_FileDialogContentsView);
+  applyDockNativeTabChrome(m_toolPropertyDock, QStyle::SP_FileDialogDetailedView);
+  applyDockNativeTabChrome(m_colorDock, QStyle::SP_DialogYesButton);
+  applyDockNativeTabChrome(colorSliderDock, QStyle::SP_ArrowRight);
+  applyDockNativeTabChrome(colorHistoryDock, QStyle::SP_BrowserReload);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolSliderDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_subToolDock);
@@ -710,15 +760,18 @@ void MainWindow::setupShellLayout() {
   addDockWidget(Qt::LeftDockWidgetArea, m_colorDock);
   addDockWidget(Qt::LeftDockWidgetArea, colorSliderDock);
   addDockWidget(Qt::LeftDockWidgetArea, colorHistoryDock);
+
+  // Dock layout: tool panels remain independent, while color panels share their own tab bar.
   splitDockWidget(m_toolDock, m_toolSliderDock, Qt::Horizontal);
   splitDockWidget(m_toolSliderDock, m_subToolDock, Qt::Horizontal);
   tabifyDockWidget(m_subToolDock, m_toolPropertyDock);
-  tabifyDockWidget(m_subToolDock, m_colorDock);
-  tabifyDockWidget(m_subToolDock, colorSliderDock);
-  tabifyDockWidget(m_subToolDock, colorHistoryDock);
-  resizeDocks({m_toolDock, m_toolSliderDock, m_subToolDock}, {68, 72, 220}, Qt::Horizontal);
   m_subToolDock->raise();
 
+  // Dock layout: color / color slider / color history are one independent tab group.
+  splitDockWidget(m_subToolDock, m_colorDock, Qt::Vertical);
+  tabifyDockWidget(m_colorDock, colorSliderDock);
+  tabifyDockWidget(m_colorDock, colorHistoryDock);
+  m_colorDock->raise();
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
   resizeDocks({m_layerDock, m_infoDock}, {620, 210}, Qt::Vertical);
@@ -1258,7 +1311,18 @@ void MainWindow::applyUiChrome() {
   setStyleSheet(
       "QMainWindow { background: #1a1d22; color: #dfe4ee; }"
       "QDockWidget { color: #d5dbe7; font-size: 12px; }"
-      "QDockWidget::title { background: #242a33; border: 1px solid #394352; padding: 4px 8px; font-weight: 700; }"
+      "QDockWidget::title { background: transparent; color: transparent; border: 0px; padding: 0px 4px; margin: 0px; }"
+      "QDockWidget::close-button, QDockWidget::float-button { background: transparent; border: 0px; padding: 0px; margin: 0px; width: 18px; height: 18px; }"
+      "QWidget#DockTabTitleBar { background: #202833; color: #c8d0dc; border: 1px solid #344052; border-bottom: 0px; }"
+      "QWidget#DockTabTitleBar:hover { background: #263140; color: #e2e8f2; }"
+      "QLabel#DockTabLabel { color: #c8d0dc; font-size: 11px; font-weight: 600; }"
+      "QLabel#DockTabIcon { background: transparent; border: 0px; }"
+      "QToolButton#DockTitleButton { background: transparent; border: 0px; color: #c8d0dc; padding: 0px; min-width: 20px; max-width: 20px; min-height: 20px; max-height: 20px; font-size: 11px; }"
+      "QToolButton#DockTitleButton:hover { background: #3a4656; color: #ffffff; border: 1px solid #54657a; }"
+      "QTabBar { qproperty-iconSize: 13px 13px; }"
+      "QTabBar::tab { background: #202833; color: #c8d0dc; border: 1px solid #344052; border-bottom: 0px; min-height: 20px; max-height: 20px; padding: 2px 8px 2px 6px; margin-right: -1px; }"
+      "QTabBar::tab:selected { background: #2d3541; color: #eef3fb; border-color: #4a5b70; }"
+      "QTabBar::tab:hover:!selected { background: #263140; color: #e2e8f2; }"
       "QDockWidget > QWidget { background: #20252d; }"
       "QGroupBox { border: 1px solid #394352; border-radius: 4px; margin-top: 10px; padding-top: 8px; }"
       "QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #cfd7e4; font-weight: 700; }"
@@ -2419,6 +2483,13 @@ void MainWindow::rebuildWorkspaceLayoutsMenu() {
 void MainWindow::loadWorkspaceLayoutState() {
   QSettings settings("taketenkeishi", "LayeredPaintApp");
   settings.beginGroup("workspaces");
+  const QString dockLayoutSchema = settings.value("dockLayoutSchema", QString()).toString();
+  if (dockLayoutSchema != QStringLiteral("dock-tabs-v7-tabbar-title-text-hidden")) {
+    settings.setValue("last", "__default__");
+    settings.setValue("dockLayoutSchema", "dock-tabs-v7-tabbar-title-text-hidden");
+    settings.endGroup();
+    return;
+  }
   const QString last = settings.value("last", "__default__").toString();
   settings.endGroup();
   if (last.isEmpty() || last == "__default__") {
@@ -2431,6 +2502,7 @@ void MainWindow::loadWorkspaceLayoutState() {
   }
 }
 
+
 void MainWindow::saveWorkspaceLayout(const QString& name) {
   if (name.isEmpty()) {
     return;
@@ -2441,6 +2513,7 @@ void MainWindow::saveWorkspaceLayout(const QString& name) {
   settings.endGroup();
   settings.beginGroup("workspaces");
   settings.setValue("last", name);
+  settings.setValue("dockLayoutSchema", "dock-tabs-v7-tabbar-title-text-hidden");
   settings.endGroup();
 }
 
