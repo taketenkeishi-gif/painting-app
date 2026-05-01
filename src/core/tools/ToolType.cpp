@@ -1,4 +1,4 @@
-#include "core/tools/ToolType.h"
+﻿#include "core/tools/ToolType.h"
 
 namespace core {
 
@@ -6,6 +6,8 @@ const char* toolKindDisplayName(ToolKind kind) noexcept {
   switch (kind) {
     case ToolKind::Brush:
       return "Brush";
+    case ToolKind::Pen:
+      return "Pen";
     case ToolKind::Eraser:
       return "Eraser";
     case ToolKind::Eyedropper:

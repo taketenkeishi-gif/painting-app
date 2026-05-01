@@ -590,17 +590,18 @@ void ToolPanel::rebuildButtons() {
     }
     delete item;
   }
-
   const std::vector<core::ToolKind> ordered {
-      core::ToolKind::Brush,
-      core::ToolKind::Eraser,
-      core::ToolKind::Eyedropper,
-      core::ToolKind::Fill,
-      core::ToolKind::Line,
-      core::ToolKind::RectSelection,
-      core::ToolKind::MoveLayer,
-      core::ToolKind::Hand,
-      core::ToolKind::Zoom};
+    core::ToolKind::Brush,
+    core::ToolKind::Eraser,
+    core::ToolKind::Eyedropper,
+    core::ToolKind::Fill,
+    core::ToolKind::Line,
+    core::ToolKind::RectSelection,
+    core::ToolKind::MoveLayer,
+    core::ToolKind::Hand,
+    core::ToolKind::Zoom,
+    core::ToolKind::Pen
+};
   const auto available = m_controller->availableTools();
 
   for (core::ToolKind kind : ordered) {

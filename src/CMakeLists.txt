@@ -1,4 +1,4 @@
-set(CORE_SOURCES
+﻿set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/buffer/PixelBuffer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/document/Document.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/layer/Layer.cpp
@@ -7,6 +7,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolType.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/BrushTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/PenTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/EraserTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/EyedropperTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/HandTool.cpp

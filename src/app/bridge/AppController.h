@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -17,6 +17,7 @@
 #include "core/document/Document.h"
 #include "core/render/Renderer.h"
 #include "core/tools/BrushTool.h"
+#include "core/tools/PenTool.h"
 #include "core/tools/EraserTool.h"
 #include "core/tools/EyedropperTool.h"
 #include "core/tools/FillTool.h"
@@ -324,6 +325,7 @@ private:
 
   core::ToolManager m_toolManager;
   core::BrushTool* m_brushTool {nullptr};
+  core::PenTool* m_penTool {nullptr};
   core::EraserTool* m_eraserTool {nullptr};
   core::LineTool* m_lineTool {nullptr};
   core::RectSelectionTool* m_rectSelectionTool {nullptr};

@@ -92,7 +92,13 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   "Airbrush",
                   BrushPreset {24, 28, 10, 35, 12, true, 60, true, true, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Brush},
                   {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
-                  "Low-flow brush for gradual buildup.")},
+                  "Low-flow brush for gradual buildup."),
+              makeSubTool(
+                  "brush_marker",
+                  "Marker",
+                  BrushPreset {14, 92, 82, 65, 20, true, 28, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 8, 12, TargetLayerKind::Raster, CursorStyle::Brush},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
+                  "Opaque marker-style brush with mild pressure response.")},
           {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
           "Draw on active layer."},
       ToolDescriptor {
@@ -198,6 +204,20 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   "Fill with simple gap-close and all-layer reference.")},
           {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose},
           "Fill connected pixels."},
+            ToolDescriptor {
+          core::ToolKind::Pen,
+          "pen",
+          "Pen",
+          {
+              makeSubTool(
+                  "pen_default",
+                  "Pen",
+                  BrushPreset {8, 100, 100, 100, 10, true, 50, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Brush},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size},
+                  "Basic pen tool.")
+          },
+          {ToolPropertyKey::Color, ToolPropertyKey::Size},
+          "Pen tool."},
       ToolDescriptor {
           core::ToolKind::Line,
           "line",

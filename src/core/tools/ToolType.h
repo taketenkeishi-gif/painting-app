@@ -11,7 +11,8 @@ enum class ToolKind {
   Line,
   RectSelection,
   MoveLayer,
-  Fill
+  Fill,
+  Pen
 };
 
 const char* toolKindDisplayName(ToolKind kind) noexcept;

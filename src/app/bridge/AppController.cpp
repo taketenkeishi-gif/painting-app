@@ -1,4 +1,4 @@
-#include "app/bridge/AppController.h"
+﻿#include "app/bridge/AppController.h"
 
 #include <algorithm>
 #include <cmath>
@@ -212,6 +212,9 @@ AppController::AppController(QObject* parent)
   auto brush = std::make_unique<core::BrushTool>();
   m_brushTool = brush.get();
   m_toolManager.registerTool(std::move(brush));
+  auto pen = std::make_unique<core::PenTool>();
+  m_penTool = pen.get();
+  m_toolManager.registerTool(std::move(pen));
 
   auto eraser = std::make_unique<core::EraserTool>();
   m_eraserTool = eraser.get();
@@ -2080,6 +2083,7 @@ void AppController::setAutoSelectReferAllLayers(bool enabled) {
 bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
   switch (kind) {
     case core::ToolKind::Brush:
+    case core::ToolKind::Pen:
     case core::ToolKind::Eraser:
     case core::ToolKind::Line:
     case core::ToolKind::Fill:
@@ -2221,6 +2225,23 @@ void AppController::applyUiStateToTools() {
     m_brushTool->setEraseMode(m_uiState.eraseMode);
     m_brushTool->setLockAlphaRespect(m_uiState.lockAlphaRespect);
     m_brushTool->setColor(m_currentColor);
+  }
+
+  if (m_penTool != nullptr) {
+    m_penTool->setSize(m_uiState.size);
+    m_penTool->setOpacity(opacity);
+    m_penTool->setHardness(hardness);
+    m_penTool->setFlow(flow);
+    m_penTool->setSpacing(spacing);
+    m_penTool->setAntiAlias(m_uiState.antiAlias);
+    m_penTool->setStabilization(stabilization);
+    m_penTool->setPostCorrection(m_uiState.postCorrection);
+    m_penTool->setVelocityBasedCorrection(m_uiState.velocityBasedCorrection);
+    m_penTool->setShapeType(m_uiState.shapeType);
+    m_penTool->setBlendMode(m_uiState.blendMode);
+    m_penTool->setEraseMode(m_uiState.eraseMode);
+    m_penTool->setLockAlphaRespect(m_uiState.lockAlphaRespect);
+    m_penTool->setColor(m_currentColor);
   }
 
   if (m_eraserTool != nullptr) {
