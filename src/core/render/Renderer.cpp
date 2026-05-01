@@ -161,7 +161,7 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
   vectorRasters.resize(document.layerCount());
   for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
     const Layer& layer = document.layerAt(layerIndex);
-    if (layer.kind() != LayerKind::Vector || !layer.visible() || layer.opacity() <= 0.0F) {
+    if (!layer.usesVectorPathsForRendering() || !layer.visible() || layer.opacity() <= 0.0F) {
       continue;
     }
     vectorRasters[layerIndex].resize(size.width, size.height, Color::Transparent());
@@ -175,12 +175,12 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
 
       for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
         const Layer& layer = document.layerAt(layerIndex);
-        if (!layer.visible() || layer.opacity() <= 0.0F || layer.kind() == LayerKind::Folder || layer.isPaperLayer()) {
+        if (!layer.visible() || layer.opacity() <= 0.0F || !layer.isRenderableContentLayer() || layer.isPaperLayer()) {
           continue;
         }
 
         const PixelBuffer* sourceBuffer = &layer.buffer();
-        if (layer.kind() == LayerKind::Vector) {
+        if (layer.usesVectorPathsForRendering()) {
           sourceBuffer = &vectorRasters[layerIndex];
         }
 

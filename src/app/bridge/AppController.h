@@ -44,6 +44,10 @@ struct LayerViewModel {
   bool locked {false};
   bool alphaLocked {false};
   bool positionLocked {false};
+  bool supportsLayerClipping {false};
+  bool supportsMask {false};
+  bool supportsAlphaLock {false};
+  bool supportsPositionLock {false};
 };
 
 struct SubToolViewModel {

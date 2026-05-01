@@ -34,6 +34,13 @@ public:
   bool isRaster() const noexcept { return m_kind == LayerKind::Raster; }
   bool isVector() const noexcept { return m_kind == LayerKind::Vector; }
   bool isFolder() const noexcept { return m_kind == LayerKind::Folder; }
+  bool isRenderableContentLayer() const noexcept { return !isFolder(); }
+  bool usesRasterBufferForRendering() const noexcept { return isRaster(); }
+  bool usesVectorPathsForRendering() const noexcept { return isVector(); }
+  bool supportsLayerClipping() const noexcept { return !isFolder(); }
+  bool supportsMask() const noexcept { return !isFolder(); }
+  bool supportsAlphaLock() const noexcept { return isRaster(); }
+  bool supportsPositionLock() const noexcept { return !isFolder(); }
   void setKind(LayerKind kind) noexcept { m_kind = kind; }
 
   bool visible() const noexcept { return m_visible; }

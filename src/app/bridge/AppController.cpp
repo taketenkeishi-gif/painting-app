@@ -290,7 +290,11 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
       false,
       true,
       false,
-      true});
+      true,
+      false,
+      false,
+      false,
+      false});
   for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
     const core::Layer& layer = m_document.layerAt(i);
     models.push_back(LayerViewModel {
@@ -306,7 +310,11 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
         layer.maskEnabled(),
         layer.locked(),
         layer.alphaLocked(),
-        layer.positionLocked()});
+        layer.positionLocked(),
+        layer.supportsLayerClipping(),
+        layer.supportsMask(),
+        layer.supportsAlphaLock(),
+        layer.supportsPositionLock()});
   }
   return models;
 }
@@ -738,7 +746,7 @@ bool AppController::toggleActiveLayerClipToBelow() {
   }
   const std::size_t activeIndex = m_document.activeLayerIndex();
   core::Layer& active = m_document.layerAt(activeIndex);
-  if (active.kind() == core::LayerKind::Folder) {
+  if (!active.supportsLayerClipping()) {
     return false;
   }
   const core::Layer before = active;
@@ -766,7 +774,7 @@ bool AppController::toggleActiveLayerMask() {
   }
   const std::size_t activeIndex = m_document.activeLayerIndex();
   core::Layer& active = m_document.layerAt(activeIndex);
-  if (active.kind() == core::LayerKind::Folder) {
+  if (!active.supportsMask()) {
     return false;
   }
   const core::Layer before = active;
@@ -851,7 +859,7 @@ bool AppController::toggleActiveLayerAlphaLock() {
   }
   const std::size_t activeIndex = m_document.activeLayerIndex();
   core::Layer& active = m_document.layerAt(activeIndex);
-  if (active.kind() != core::LayerKind::Raster) {
+  if (!active.supportsAlphaLock()) {
     return false;
   }
   const core::Layer before = active;
@@ -879,7 +887,7 @@ bool AppController::toggleActiveLayerPositionLock() {
   }
   const std::size_t activeIndex = m_document.activeLayerIndex();
   core::Layer& active = m_document.layerAt(activeIndex);
-  if (active.kind() == core::LayerKind::Folder) {
+  if (!active.supportsPositionLock()) {
     return false;
   }
   const core::Layer before = active;
@@ -940,7 +948,7 @@ bool AppController::invertSelection() {
 
 bool AppController::fillSelectionOrCanvas() {
   core::Layer* active = m_document.activeLayer();
-  if (active == nullptr || active->kind() != core::LayerKind::Raster) {
+  if (active == nullptr || !active->usesRasterBufferForRendering()) {
     return false;
   }
 
@@ -978,7 +986,7 @@ bool AppController::fillSelectionOrCanvas() {
 
 bool AppController::deleteSelectionPixels() {
   core::Layer* active = m_document.activeLayer();
-  if (active == nullptr || active->kind() != core::LayerKind::Raster) {
+  if (active == nullptr || !active->usesRasterBufferForRendering()) {
     return false;
   }
 
@@ -1111,7 +1119,7 @@ bool AppController::canUseToolOnActiveLayer(core::ToolKind kind) const {
   if (active == nullptr) {
     return true;
   }
-  if (active->kind() == core::LayerKind::Folder) {
+  if (!active->isRenderableContentLayer()) {
     return kind == core::ToolKind::Hand || kind == core::ToolKind::Zoom;
   }
   return firstCompatibleSubTool(kind, active->kind()) != nullptr;

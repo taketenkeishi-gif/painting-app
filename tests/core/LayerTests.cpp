@@ -7,6 +7,13 @@ void runLayerTests() {
   core::Layer layer("Layer Test", 8, 8);
   expectTrue(layer.visible(), "Layer should be visible by default.");
   expectNear(static_cast<int>(layer.opacity() * 100.0F), 100, 0, "Layer opacity should default to 1.0.");
+  expectTrue(layer.isRenderableContentLayer(), "Raster layer should be renderable.");
+  expectTrue(layer.usesRasterBufferForRendering(), "Raster layer should render from raster buffer.");
+  expectTrue(!layer.usesVectorPathsForRendering(), "Raster layer should not render from vector paths.");
+  expectTrue(layer.supportsLayerClipping(), "Raster layer should support clipping.");
+  expectTrue(layer.supportsMask(), "Raster layer should support masks.");
+  expectTrue(layer.supportsAlphaLock(), "Raster layer should support alpha lock.");
+  expectTrue(layer.supportsPositionLock(), "Raster layer should support position lock.");
 
   layer.setVisible(false);
   expectTrue(!layer.visible(), "Layer visibility flag should update.");
@@ -26,6 +33,18 @@ void runLayerTests() {
   expectNear(layer.maskBuffer().pixel(0, 0).a, 0, 0, "Mask pixel should be writable.");
   layer.removeMask();
   expectTrue(!layer.hasMask(), "removeMask should clear mask state.");
+
+  core::Layer vectorLayer("Vector", 8, 8, core::LayerKind::Vector);
+  expectTrue(vectorLayer.isRenderableContentLayer(), "Vector layer should be renderable.");
+  expectTrue(!vectorLayer.usesRasterBufferForRendering(), "Vector layer should not render from raster buffer.");
+  expectTrue(vectorLayer.usesVectorPathsForRendering(), "Vector layer should render from vector paths.");
+  expectTrue(!vectorLayer.supportsAlphaLock(), "Vector layer should not support alpha lock.");
+
+  core::Layer folderLayer("Folder", 8, 8, core::LayerKind::Folder);
+  expectTrue(!folderLayer.isRenderableContentLayer(), "Folder layer should be non-renderable.");
+  expectTrue(!folderLayer.supportsLayerClipping(), "Folder layer should not support clipping.");
+  expectTrue(!folderLayer.supportsMask(), "Folder layer should not support masks.");
+  expectTrue(!folderLayer.supportsPositionLock(), "Folder layer should not support position lock.");
 
   core::PixelBuffer buffer(4, 4, core::Color::Transparent());
   expectTrue(buffer.setPixel(1, 1, core::Color {10, 20, 30, 255}), "setPixel should succeed in bounds.");

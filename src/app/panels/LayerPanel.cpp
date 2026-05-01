@@ -54,6 +54,10 @@ constexpr int kPositionLockedRole = Qt::UserRole + 10;
 constexpr int kBlendModeRole = Qt::UserRole + 11;
 constexpr int kPaperRole = Qt::UserRole + 12;
 constexpr int kActiveRole = Qt::UserRole + 13;
+constexpr int kSupportsLayerClippingRole = Qt::UserRole + 14;
+constexpr int kSupportsMaskRole = Qt::UserRole + 15;
+constexpr int kSupportsAlphaLockRole = Qt::UserRole + 16;
+constexpr int kSupportsPositionLockRole = Qt::UserRole + 17;
 
 constexpr int kLayerRowHeight = 30;
 constexpr int kLayerThumbWidth = 38;
@@ -821,6 +825,10 @@ void LayerPanel::refreshLayers() {
     item->setData(kLockedRole, model.locked);
     item->setData(kAlphaLockedRole, model.alphaLocked);
     item->setData(kPositionLockedRole, model.positionLocked);
+    item->setData(kSupportsLayerClippingRole, model.supportsLayerClipping);
+    item->setData(kSupportsMaskRole, model.supportsMask);
+    item->setData(kSupportsAlphaLockRole, model.supportsAlphaLock);
+    item->setData(kSupportsPositionLockRole, model.supportsPositionLock);
     item->setData(kBlendModeRole, static_cast<int>(model.blendMode));
     item->setData(kPaperRole, model.paperLayer);
     item->setData(kActiveRole, model.active);
@@ -1300,44 +1308,37 @@ void LayerPanel::refreshButtonState() {
     m_opacityLabel->setText(QStringLiteral("用紙レイヤー（背景色）"));
   }
 
-  bool canClipOrMask = false;
+  bool canClip = false;
+  bool canMask = false;
   bool hasMask = false;
-  bool maskEnabled = false;
-  bool clipped = false;
-  bool locked = false;
-  bool alphaLocked = false;
-  bool positionLocked = false;
-  core::LayerKind kind = core::LayerKind::Raster;
+  bool canLayerLock = false;
+  bool canAlphaLock = false;
+  bool canPositionLock = false;
 
   if (hasSelection && !paperSelected) {
     QListWidgetItem* activeItem = m_layerList->item(current);
     if (activeItem != nullptr) {
-      const int layerIndex = activeItem->data(kLayerIndexRole).toInt();
-      if (layerIndex >= 0) {
-        const core::Layer& layer = m_controller->document().layerAt(static_cast<std::size_t>(layerIndex));
-        kind = layer.kind();
-        canClipOrMask = layer.kind() != core::LayerKind::Folder;
-        hasMask = layer.hasMask();
-        maskEnabled = layer.maskEnabled();
-        clipped = layer.clippedToBelow();
-        locked = layer.locked();
-        alphaLocked = layer.alphaLocked();
-        positionLocked = layer.positionLocked();
-        const QSignalBlocker blendBlocker(m_blendModeCombo);
-        const int blendIndex = m_blendModeCombo->findData(static_cast<int>(layer.blendMode()));
-        if (blendIndex >= 0) {
-          m_blendModeCombo->setCurrentIndex(blendIndex);
-        }
+      canClip = activeItem->data(kSupportsLayerClippingRole).toBool();
+      canMask = activeItem->data(kSupportsMaskRole).toBool();
+      hasMask = activeItem->data(kHasMaskRole).toBool();
+      canAlphaLock = activeItem->data(kSupportsAlphaLockRole).toBool();
+      canPositionLock = activeItem->data(kSupportsPositionLockRole).toBool();
+      canLayerLock = canPositionLock;
+
+      const QSignalBlocker blendBlocker(m_blendModeCombo);
+      const int blendIndex = m_blendModeCombo->findData(activeItem->data(kBlendModeRole).toInt());
+      if (blendIndex >= 0) {
+        m_blendModeCombo->setCurrentIndex(blendIndex);
       }
     }
   }
 
-  m_clipButton->setEnabled(canClipOrMask);
-  m_maskButton->setEnabled(canClipOrMask);
-  m_removeMaskButton->setEnabled(canClipOrMask && hasMask);
-  m_lockButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
-  m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
-  m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
+  m_clipButton->setEnabled(canClip);
+  m_maskButton->setEnabled(canMask);
+  m_removeMaskButton->setEnabled(canMask && hasMask);
+  m_lockButton->setEnabled(hasSelection && canLayerLock);
+  m_lockAlphaButton->setEnabled(hasSelection && canAlphaLock);
+  m_lockPositionButton->setEnabled(hasSelection && canPositionLock);
 
 }
 
