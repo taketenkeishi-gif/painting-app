@@ -15,6 +15,9 @@
 #include "core/common/Point.h"
 #include "core/common/Rect.h"
 #include "core/document/Document.h"
+#include "core/registry/FeatureRegistry.h"
+#include "core/registry/RendererRegistry.h"
+#include "core/registry/ToolRegistry.h"
 #include "core/render/Renderer.h"
 #include "core/tools/BrushTool.h"
 #include "core/tools/PenTool.h"
@@ -325,6 +328,9 @@ private:
 
   core::Document m_document;
   core::Renderer m_renderer;
+  core::registry::ToolRegistry m_toolRegistry;
+  core::registry::RendererRegistry m_rendererRegistry;
+  core::registry::FeatureRegistry m_featureRegistry;
   core::PixelBuffer m_composited;
 
   core::ToolManager m_toolManager;

@@ -161,7 +161,8 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
   vectorRasters.resize(document.layerCount());
   for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
     const Layer& layer = document.layerAt(layerIndex);
-    if (!layer.usesVectorPathsForRendering() || !layer.visible() || layer.opacity() <= 0.0F) {
+    const registry::LayerRenderRoute route = m_registry.routeFor(layer);
+    if (route != registry::LayerRenderRoute::VectorPaths || !layer.visible() || layer.opacity() <= 0.0F) {
       continue;
     }
     vectorRasters[layerIndex].resize(size.width, size.height, Color::Transparent());
@@ -175,12 +176,13 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
 
       for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
         const Layer& layer = document.layerAt(layerIndex);
-        if (!layer.visible() || layer.opacity() <= 0.0F || !layer.isRenderableContentLayer() || layer.isPaperLayer()) {
+        const registry::LayerRenderRoute route = m_registry.routeFor(layer);
+        if (!layer.visible() || layer.opacity() <= 0.0F || route == registry::LayerRenderRoute::None || layer.isPaperLayer()) {
           continue;
         }
 
         const PixelBuffer* sourceBuffer = &layer.buffer();
-        if (layer.usesVectorPathsForRendering()) {
+        if (route == registry::LayerRenderRoute::VectorPaths) {
           sourceBuffer = &vectorRasters[layerIndex];
         }
 

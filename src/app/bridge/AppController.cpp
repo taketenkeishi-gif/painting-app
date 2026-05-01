@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <utility>
 
@@ -209,30 +210,49 @@ app::ui::BrushPreset presetFromJson(const QJsonObject& json, const app::ui::Brus
 AppController::AppController(QObject* parent)
     : QObject(parent),
       m_document(800, 600) {
-  auto brush = std::make_unique<core::BrushTool>();
-  m_brushTool = brush.get();
-  m_toolManager.registerTool(std::move(brush));
-  auto pen = std::make_unique<core::PenTool>();
-  m_penTool = pen.get();
-  m_toolManager.registerTool(std::move(pen));
+  m_featureRegistry.activateEnabledFeatures(m_toolRegistry, m_rendererRegistry);
+  m_renderer.registry() = m_rendererRegistry;
 
-  auto eraser = std::make_unique<core::EraserTool>();
-  m_eraserTool = eraser.get();
-  m_toolManager.registerTool(std::move(eraser));
+  auto registerTool = [&](core::ToolKind kind, std::function<std::unique_ptr<core::ITool>()> fallbackFactory) {
+    std::unique_ptr<core::ITool> tool = m_toolRegistry.createByKind(kind);
+    if (!tool) {
+      tool = fallbackFactory();
+    }
+    core::ITool* raw = tool.get();
+    m_toolManager.registerTool(std::move(tool));
+    return raw;
+  };
 
-  m_toolManager.registerTool(std::make_unique<core::EyedropperTool>());
-  m_toolManager.registerTool(std::make_unique<core::HandTool>());
-  m_toolManager.registerTool(std::make_unique<core::ZoomTool>());
-  auto line = std::make_unique<core::LineTool>();
-  m_lineTool = line.get();
-  m_toolManager.registerTool(std::move(line));
-  auto rectSelection = std::make_unique<core::RectSelectionTool>();
-  m_rectSelectionTool = rectSelection.get();
-  m_toolManager.registerTool(std::move(rectSelection));
-  auto fill = std::make_unique<core::FillTool>();
-  m_fillTool = fill.get();
-  m_toolManager.registerTool(std::move(fill));
-  m_toolManager.registerTool(std::make_unique<core::MoveLayerTool>());
+  m_brushTool = dynamic_cast<core::BrushTool*>(registerTool(core::ToolKind::Brush, []() {
+    return std::make_unique<core::BrushTool>();
+  }));
+  m_penTool = dynamic_cast<core::PenTool*>(registerTool(core::ToolKind::Pen, []() {
+    return std::make_unique<core::PenTool>();
+  }));
+  m_eraserTool = dynamic_cast<core::EraserTool*>(registerTool(core::ToolKind::Eraser, []() {
+    return std::make_unique<core::EraserTool>();
+  }));
+  registerTool(core::ToolKind::Eyedropper, []() {
+    return std::make_unique<core::EyedropperTool>();
+  });
+  registerTool(core::ToolKind::Hand, []() {
+    return std::make_unique<core::HandTool>();
+  });
+  registerTool(core::ToolKind::Zoom, []() {
+    return std::make_unique<core::ZoomTool>();
+  });
+  m_lineTool = dynamic_cast<core::LineTool*>(registerTool(core::ToolKind::Line, []() {
+    return std::make_unique<core::LineTool>();
+  }));
+  m_rectSelectionTool = dynamic_cast<core::RectSelectionTool*>(registerTool(core::ToolKind::RectSelection, []() {
+    return std::make_unique<core::RectSelectionTool>();
+  }));
+  m_fillTool = dynamic_cast<core::FillTool*>(registerTool(core::ToolKind::Fill, []() {
+    return std::make_unique<core::FillTool>();
+  }));
+  registerTool(core::ToolKind::MoveLayer, []() {
+    return std::make_unique<core::MoveLayerTool>();
+  });
 
   for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
     if (!tool.subTools.empty()) {
@@ -1110,6 +1130,10 @@ std::string AppController::toolDisplayName(core::ToolKind kind) const {
   const app::ui::ToolDescriptor* descriptor = m_toolCatalog.findTool(kind);
   if (descriptor != nullptr && !descriptor->displayName.empty()) {
     return descriptor->displayName;
+  }
+  const core::registry::ToolEntry* registryEntry = m_toolRegistry.findByKind(kind);
+  if (registryEntry != nullptr && !registryEntry->displayName.empty()) {
+    return registryEntry->displayName;
   }
   return std::string {core::toolKindDisplayName(kind)};
 }

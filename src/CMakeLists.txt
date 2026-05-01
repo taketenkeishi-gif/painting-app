@@ -3,6 +3,9 @@
   ${CMAKE_CURRENT_SOURCE_DIR}/core/document/Document.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/layer/Layer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/render/Renderer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/registry/FeatureRegistry.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/registry/RendererRegistry.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/registry/ToolRegistry.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/selection/SelectionMask.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolType.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolManager.cpp
@@ -16,6 +19,28 @@
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/RectSelectionTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FillTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/MoveLayerTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/FeatureManifest.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/common/DescriptorUtils.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/brush/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/brush/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/eraser/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/eraser/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/eyedropper/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/eyedropper/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/fill/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/fill/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/hand/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/hand/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/line/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/line/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/move_layer/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/move_layer/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/pen/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/pen/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/rect_selection/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/rect_selection/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/zoom/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/zoom/Descriptor.cpp
 )
 
 add_library(paint_core STATIC ${CORE_SOURCES})
