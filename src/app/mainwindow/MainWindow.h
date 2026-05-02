@@ -1,9 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <map>
 #include <vector>
 
 #include <QMainWindow>
+
+#include "app/commands/CommandRegistry.h"
 #include <QColor>
 #include <QByteArray>
 #include <QString>
@@ -110,6 +112,7 @@ private slots:
   void onUseTransparentColor();
 
 private:
+  app::commands::CommandRegistry m_commandRegistry;
   void setupShellLayout();
   void createMenus();
   void createToolBar();

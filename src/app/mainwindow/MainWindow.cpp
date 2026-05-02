@@ -1,4 +1,8 @@
-#include "app/mainwindow/MainWindow.h"
+﻿#include "app/mainwindow/MainWindow.h"
+
+#include <QAction>
+#include <QMenuBar>
+#include <QMessageBox>
 #include <QPainter>
 
 #include <algorithm>
@@ -136,6 +140,26 @@ MainWindow::MainWindow(QWidget* parent)
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
       m_subToolPanel(new app::panels::SubToolPanel(this)),
       m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
+  // CommandRegistry smoke: first visible backend connection.
+  m_commandRegistry.registerCommand(
+      app::commands::CommandDescriptor {
+          "app.commandRegistrySmoke",
+          "Command Registry Smoke",
+          "Developer",
+          "",
+          "Verifies that CommandRegistry is wired into MainWindow.",
+          true
+      },
+      [this]() {
+        QMessageBox::information(this, QStringLiteral("CommandRegistry"), QStringLiteral("CommandRegistry is connected."));
+        return true;
+      });
+
+  QAction* commandRegistrySmokeAction = menuBar()->addAction(QStringLiteral("CommandRegistry Smoke"));
+  QObject::connect(commandRegistrySmokeAction, &QAction::triggered, this, [this]() {
+    m_commandRegistry.execute("app.commandRegistrySmoke");
+  });
+
   setWindowTitle("自作イラストアプリ");
   resize(1400, 860);
 
