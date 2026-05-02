@@ -101,6 +101,11 @@ int clampPercent(int value) {
   return std::clamp(value, 0, 100);
 }
 
+std::string toUtf8StdString(const QString& value) {
+  const QByteArray utf8 = value.toUtf8();
+  return std::string(utf8.constData(), static_cast<std::size_t>(utf8.size()));
+}
+
 QString toolKindSettingsKey(core::ToolKind kind) {
   switch (kind) {
     case core::ToolKind::Brush:
@@ -2472,9 +2477,11 @@ void AppController::loadSubToolCatalogFromSettings() {
           if (id.isEmpty() || name.isEmpty()) {
             continue;
           }
+          const std::string idString = toUtf8StdString(id);
+          const std::string nameString = toUtf8StdString(name);
           const app::ui::SubToolDescriptor* fallback = nullptr;
           for (const auto& candidate : defaultTool->subTools) {
-            if (candidate.id == id.toStdString()) {
+            if (candidate.id == idString) {
               fallback = &candidate;
               break;
             }
@@ -2486,8 +2493,8 @@ void AppController::loadSubToolCatalogFromSettings() {
             continue;
           }
           app::ui::SubToolDescriptor loadedSub = *fallback;
-          loadedSub.id = id.toStdString();
-          loadedSub.displayName = name.toStdString();
+          loadedSub.id = idString;
+          loadedSub.displayName = nameString;
           loadedSub.preset = presetFromJson(subObj.value(QStringLiteral("preset")).toObject(), fallback->preset);
           loadedSub.profile.stroke.size = loadedSub.preset.size;
           loadedSub.profile.stroke.opacity = loadedSub.preset.opacity;
@@ -2523,7 +2530,7 @@ void AppController::loadSubToolCatalogFromSettings() {
           loadedSub.profile.cursorStyle = loadedSub.preset.cursorStyle;
           const QString guideValue = subObj.value(QStringLiteral("guide")).toString();
           if (!guideValue.isEmpty()) {
-            loadedSub.guide = guideValue.toStdString();
+            loadedSub.guide = toUtf8StdString(guideValue);
           }
 
           QJsonArray editable = subObj.value(QStringLiteral("editableProperties")).toArray();
@@ -2552,7 +2559,7 @@ void AppController::loadSubToolCatalogFromSettings() {
         const QString toolKey = toolKindSettingsKey(tool.kind);
         const QString selectedId = selectedObj.value(toolKey).toString();
         if (!selectedId.isEmpty()) {
-          m_selectedSubToolByTool[tool.kind] = selectedId.toStdString();
+          m_selectedSubToolByTool[tool.kind] = toUtf8StdString(selectedId);
         }
       }
     }
