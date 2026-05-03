@@ -25,6 +25,7 @@ class ToolPropertyPanel : public QWidget {
 public:
   explicit ToolPropertyPanel(QWidget* parent = nullptr);
   void setController(app::bridge::AppController* controller);
+  void setDetailMode(bool enabled);
 
 protected:
   void resizeEvent(QResizeEvent* event) override;

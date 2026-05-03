@@ -30,6 +30,7 @@
 #include "core/tools/RectSelectionTool.h"
 #include "core/tools/ToolManager.h"
 #include "core/tools/ZoomTool.h"
+#include "features/requested_tools/RequestedToolsRuntime.h"
 
 namespace app::bridge {
 
@@ -98,6 +99,7 @@ struct ToolStateViewModel {
 struct CanvasOverlayViewModel {
   core::ToolOverlayState toolOverlay;
   std::optional<core::Rect> selectionRect;
+  std::vector<core::VectorPath> guides;
 };
 
 class AppController : public QObject {
@@ -176,6 +178,7 @@ public:
   bool renameCurrentSubTool(const std::string& displayName);
   bool deleteCurrentSubTool();
   bool resetCurrentSubTool();
+  bool moveCurrentSubTool(std::size_t fromIndex, std::size_t toIndex);
   bool saveSubToolSettings();
 
   std::string currentToolDisplayName() const;
@@ -219,6 +222,9 @@ public:
   void beginStroke(int x, int y);
   void continueStroke(int x, int y);
   void endStroke();
+  bool placeTextAt(int x, int y, const std::string& text);
+  std::optional<std::string> textAt(int x, int y) const;
+  bool editTextAt(int x, int y, const std::string& text);
   bool pickColorAt(int x, int y);
   void setInputModifiers(bool shift, bool ctrl, bool alt);
 
@@ -300,6 +306,13 @@ private:
     core::SelectionMask beforeSelection;
   };
 
+  struct TextEntry {
+    core::Point point {0, 0};
+    std::string text;
+    core::Color color {0, 0, 0, 255};
+    int size {8};
+  };
+
   static bool toolWritesPixels(core::ToolKind kind) noexcept;
   static bool toolWritesSelection(core::ToolKind kind) noexcept;
   static std::string actionNameForTool(core::ToolKind kind);
@@ -323,8 +336,12 @@ private:
   void pushHistoryEntry(StrokeHistoryEntry entry);
   void pushSelectionHistoryIfChanged(const core::SelectionMask& before, const std::string& actionName);
   void clearStrokeHistory() noexcept;
+  std::optional<std::size_t> findTextEntryAt(std::size_t layerIndex, int x, int y) const;
+  bool rebuildTextLayer(std::size_t layerIndex);
+  void clearTextCacheForLayer(std::size_t layerIndex);
   void rerender();
   void rerenderDirty(const core::Rect& dirtyRect);
+  core::Point snapPointToRulerGuides(core::Point point) const;
 
   core::Document m_document;
   core::Renderer m_renderer;
@@ -342,6 +359,7 @@ private:
   core::FillTool* m_fillTool {nullptr};
 
   app::ui::ToolCatalog m_toolCatalog;
+  features::requested_tools::RequestedToolsRuntime m_requestedToolsRuntime;
   app::ui::UiState m_uiState;
   std::unordered_map<core::ToolKind, std::string> m_selectedSubToolByTool;
 
@@ -357,6 +375,8 @@ private:
   std::vector<StrokeHistoryEntry> m_undoHistory;
   std::vector<StrokeHistoryEntry> m_redoHistory;
   std::size_t m_maxStrokeHistory {20};
+  std::unordered_map<std::size_t, std::vector<TextEntry>> m_textEntriesByLayer;
+  std::unordered_map<std::size_t, core::PixelBuffer> m_textBaseByLayer;
   std::optional<core::Rect> m_lastCompositeDirtyRect;
   std::uint64_t m_compositeRevision {0};
 };

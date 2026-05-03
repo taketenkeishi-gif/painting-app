@@ -197,6 +197,7 @@ public:
   bool renameSubTool(core::ToolKind kind, std::string_view subToolId, const std::string& newDisplayName);
   bool removeSubTool(core::ToolKind kind, std::string_view subToolId);
   bool resetSubTool(core::ToolKind kind, std::string_view subToolId);
+  bool moveSubTool(core::ToolKind kind, std::size_t fromIndex, std::size_t toIndex);
 
 private:
   static std::string makeSubToolId(std::string_view baseId, const std::vector<SubToolDescriptor>& existing);

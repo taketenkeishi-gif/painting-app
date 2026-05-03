@@ -23,6 +23,7 @@
 #include <QSpinBox>
 #include <QVariant>
 #include <QVBoxLayout>
+#include <QListWidget>
 
 #include "app/bridge/AppController.h"
 
@@ -480,6 +481,12 @@ void ToolPropertyPanel::setController(app::bridge::AppController* controller) {
   refreshFromController();
 }
 
+void ToolPropertyPanel::setDetailMode(bool enabled) {
+  m_showDetails = enabled;
+  refreshDetailToggleText();
+  refreshFromController();
+}
+
 void ToolPropertyPanel::resizeEvent(QResizeEvent* event) {
   QWidget::resizeEvent(event);
   applyResponsiveLayout();
@@ -593,9 +600,50 @@ void ToolPropertyPanel::refreshDetailToggleText() {
 }
 
 void ToolPropertyPanel::onToggleDetailRequested() {
-  m_showDetails = !m_showDetails;
-  refreshDetailToggleText();
-  refreshFromController();
+  if (m_controller == nullptr) {
+    return;
+  }
+  QDialog dialog(this);
+  dialog.setWindowTitle(QStringLiteral("サブツール詳細"));
+  dialog.resize(980, 680);
+  auto* layout = new QHBoxLayout(&dialog);
+  layout->setContentsMargins(8, 8, 8, 8);
+  layout->setSpacing(8);
+
+  auto* categoryList = new QListWidget(&dialog);
+  categoryList->addItems({
+      QStringLiteral("基本"),
+      QStringLiteral("ブラシ特性"),
+      QStringLiteral("補正"),
+      QStringLiteral("形状"),
+      QStringLiteral("描画制御"),
+      QStringLiteral("ベクター"),
+      QStringLiteral("塗りつぶし"),
+      QStringLiteral("選択")});
+  categoryList->setFixedWidth(170);
+  categoryList->setCurrentRow(0);
+
+  auto* detailPanel = new ToolPropertyPanel(&dialog);
+  detailPanel->setController(m_controller);
+  detailPanel->setDetailMode(true);
+
+  layout->addWidget(categoryList);
+  layout->addWidget(detailPanel, 1);
+
+  QObject::connect(categoryList, &QListWidget::currentTextChanged, &dialog, [detailPanel](const QString& name) {
+    const auto boxes = detailPanel->findChildren<QGroupBox*>();
+    for (QGroupBox* box : boxes) {
+      if (box == nullptr || box->title() != name) {
+        continue;
+      }
+      if (auto* scroll = detailPanel->findChild<QScrollArea*>()) {
+        scroll->ensureWidgetVisible(box, 0, 8);
+      }
+      break;
+    }
+  });
+
+  dialog.exec();
 }
 
 void ToolPropertyPanel::onConfigurePinnedRequested() {
@@ -663,7 +711,9 @@ void ToolPropertyPanel::refreshFromController() {
   }
   refreshDetailToggleText();
 
-  m_toolNameLabel->setText(QString("ツール: %1").arg(toolNameJa(m_controller->currentTool())));
+  const QString effectiveToolName = QString::fromStdString(m_controller->currentToolDisplayName());
+  m_toolNameLabel->setText(QString("ツール: %1").arg(
+      effectiveToolName.isEmpty() ? toolNameJa(m_controller->currentTool()) : effectiveToolName));
   const QString compatibilityHint = QString::fromStdString(m_controller->currentLayerCompatibilityHint());
   m_compatibilityLabel->setVisible(!compatibilityHint.isEmpty());
   m_compatibilityLabel->setText(compatibilityHint);

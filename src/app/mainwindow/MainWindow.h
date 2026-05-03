@@ -98,6 +98,9 @@ private slots:
   void onZoomOutTriggered();
   void onResetZoomTriggered();
   void onFitToScreenTriggered();
+  void onRotateViewLeftTriggered();
+  void onRotateViewRightTriggered();
+  void onResetViewRotationTriggered();
   void onResetWorkspaceTriggered();
   void onSaveWorkspaceTriggered();
   void onDeleteWorkspaceTriggered();
@@ -233,6 +236,9 @@ private:
   QAction* m_zoomOutAction {nullptr};
   QAction* m_resetZoomAction {nullptr};
   QAction* m_fitToScreenAction {nullptr};
+  QAction* m_rotateViewLeftAction {nullptr};
+  QAction* m_rotateViewRightAction {nullptr};
+  QAction* m_resetViewRotationAction {nullptr};
   QAction* m_toggleGridAction {nullptr};
   QAction* m_toggleOverlayAction {nullptr};
   QAction* m_resetWorkspaceAction {nullptr};

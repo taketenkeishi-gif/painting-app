@@ -6,8 +6,11 @@
 #include <QGridLayout>
 #include <QFrame>
 #include <QColor>
+#include <QEvent>
 #include <QLinearGradient>
+#include <QMouseEvent>
 #include <QPainter>
+#include <QSettings>
 #include <QStyle>
 #include <QStyleOptionSlider>
 #include <QHBoxLayout>
@@ -22,6 +25,7 @@
 
 #include "app/bridge/AppController.h"
 #include "app/ui/IconLoader.h"
+#include "features/requested_tools/RequestedToolsPanel.h"
 
 namespace app::panels {
 
@@ -72,6 +76,8 @@ QString toolShortcut(core::ToolKind kind) {
       return "H";
     case core::ToolKind::Zoom:
       return "Z";
+    case core::ToolKind::Pen:
+      return "P";
     default:
       return {};
   }
@@ -97,8 +103,37 @@ QString iconName(core::ToolKind kind) {
       return "hand";
     case core::ToolKind::Zoom:
       return "zoom";
+    case core::ToolKind::Pen:
+      return "pen_active";
     default:
       return "brush";
+  }
+}
+
+QString defaultCoreSubToolId(core::ToolKind kind) {
+  switch (kind) {
+    case core::ToolKind::Brush:
+      return QStringLiteral("brush_normal");
+    case core::ToolKind::Eraser:
+      return QStringLiteral("eraser_normal");
+    case core::ToolKind::Eyedropper:
+      return QStringLiteral("eyedropper_default");
+    case core::ToolKind::Fill:
+      return QStringLiteral("fill_contiguous");
+    case core::ToolKind::Line:
+      return QStringLiteral("line_raster");
+    case core::ToolKind::RectSelection:
+      return QStringLiteral("rect_default");
+    case core::ToolKind::MoveLayer:
+      return QStringLiteral("move_layer_default");
+    case core::ToolKind::Hand:
+      return QStringLiteral("hand_default");
+    case core::ToolKind::Zoom:
+      return QStringLiteral("zoom_default");
+    case core::ToolKind::Pen:
+      return QStringLiteral("pen_default");
+    default:
+      return {};
   }
 }
 
@@ -461,6 +496,7 @@ void ToolPanel::refreshFromController() {
   }
 
   const core::ToolKind current = m_controller->currentTool();
+  const QString currentSubToolId = QString::fromStdString(m_controller->currentSubToolId());
   const QString layerKind = QString::fromStdString(m_controller->activeLayerKindDisplayName());
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
@@ -472,6 +508,20 @@ void ToolPanel::refreshFromController() {
     button->setChecked(kind == current);
     button->setEnabled(enabled);
     button->setToolTip(tip);
+  }
+
+  for (QToolButton* button : m_buttonOrder) {
+    if (button == nullptr || !button->property("requestedToolPlaceholder").toBool()) {
+      continue;
+    }
+
+    const QSignalBlocker blocker(button);
+    const core::ToolKind kind = static_cast<core::ToolKind>(button->property("toolKind").toInt());
+    const QString subToolId = button->property("subToolId").toString();
+    const bool enabled = m_controller->canUseToolOnActiveLayer(kind);
+    const bool active = (kind == current) && !subToolId.isEmpty() && (subToolId == currentSubToolId);
+    button->setEnabled(enabled);
+    button->setChecked(active);
   }
 
   if (m_sizeSlider != nullptr && m_opacitySlider != nullptr &&
@@ -553,7 +603,20 @@ void ToolPanel::onToolButtonClicked() {
     return;
   }
   const core::ToolKind kind = static_cast<core::ToolKind>(button->property("toolKind").toInt());
-  m_controller->setCurrentTool(kind);
+  if (!m_controller->setCurrentTool(kind)) {
+    return;
+  }
+
+  const QString subToolId = button->property("subToolId").toString();
+  if (!subToolId.isEmpty()) {
+    m_controller->setCurrentSubTool(subToolId.toStdString());
+    return;
+  }
+
+  const QString coreSubToolId = defaultCoreSubToolId(kind);
+  if (!coreSubToolId.isEmpty()) {
+    m_controller->setCurrentSubTool(coreSubToolId.toStdString());
+  }
 }
 
 void ToolPanel::onSizeSliderChanged(int value) {
@@ -613,14 +676,37 @@ void ToolPanel::rebuildButtons() {
     button->setAutoExclusive(true);
     button->setToolButtonStyle(Qt::ToolButtonIconOnly);
     button->setIcon(app::ui::icon(iconName(kind)));
-    button->setIconSize(QSize(16, 16));
+    button->setIconSize(QSize(20, 20));
     button->setFixedSize(28, 28);
     button->setProperty("toolKind", static_cast<int>(kind));
     connect(button, &QToolButton::clicked, this, &ToolPanel::onToolButtonClicked);
+    button->installEventFilter(this);
     m_buttons[kind] = button;
     m_buttonOrder.push_back(button);
   }
 
+  for (const auto& requestedSpec : ::features::requested_tools::detail::requestedToolSpecs()) {
+    auto* requestedButton = new QToolButton(this);
+    requestedButton->setObjectName(QString::fromLatin1(requestedSpec.objectName));
+    requestedButton->setProperty("requestedToolPlaceholder", true);
+    requestedButton->setProperty("toolKind", static_cast<int>(requestedSpec.kind));
+    requestedButton->setProperty("subToolId", QString::fromLatin1(requestedSpec.subToolId));
+    requestedButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    requestedButton->setIcon(::features::requested_tools::detail::makeRequestedToolIcon(requestedSpec.subToolId));
+    requestedButton->setIconSize(QSize(20, 20));
+    requestedButton->setFixedSize(28, 28);
+    requestedButton->setCheckable(true);
+    requestedButton->setAutoExclusive(true);
+    const QString requestedLabelJa = ::features::requested_tools::detail::requestedToolJaLabel(requestedSpec.subToolId);
+    const QString label = requestedLabelJa.isEmpty() ? QString::fromLatin1(requestedSpec.label) : requestedLabelJa;
+    requestedButton->setToolTip(label);
+    requestedButton->setStatusTip(label);
+    connect(requestedButton, &QToolButton::clicked, this, &ToolPanel::onToolButtonClicked);
+    requestedButton->installEventFilter(this);
+    m_buttonOrder.push_back(requestedButton);
+  }
+
+  loadButtonOrder();
   relayoutButtons();
 }
 
@@ -674,6 +760,109 @@ void ToolPanel::relayoutButtons() {
   const int gridWidth = columns * buttonSize + std::max(0, columns - 1) * 2;
   m_buttonGridHost->setFixedWidth(gridWidth);
   m_buttonGridHost->adjustSize();
+}
+
+bool ToolPanel::eventFilter(QObject* watched, QEvent* event) {
+  auto* button = qobject_cast<QToolButton*>(watched);
+  if (button == nullptr) {
+    return QWidget::eventFilter(watched, event);
+  }
+  if (event->type() == QEvent::MouseButtonPress) {
+    auto* mouse = static_cast<QMouseEvent*>(event);
+    if (mouse->button() == Qt::LeftButton) {
+      m_dragButton = button;
+      m_dragStartPos = mouse->pos();
+    }
+  } else if (event->type() == QEvent::MouseMove) {
+    if (m_dragButton == button) {
+      auto* mouse = static_cast<QMouseEvent*>(event);
+      if ((mouse->pos() - m_dragStartPos).manhattanLength() >= 8) {
+        QWidget* targetWidget = childAt(button->mapTo(this, mouse->pos()));
+        auto* target = qobject_cast<QToolButton*>(targetWidget);
+        if (target != nullptr && target != button) {
+          const int from = buttonIndex(button);
+          const int to = buttonIndex(target);
+          if (from >= 0 && to >= 0 && from != to) {
+            moveButton(from, to);
+            saveButtonOrder();
+            relayoutButtons();
+          }
+        }
+      }
+    }
+  } else if (event->type() == QEvent::MouseButtonRelease) {
+    auto* mouse = static_cast<QMouseEvent*>(event);
+    if (mouse->button() == Qt::LeftButton && m_dragButton == button) {
+      m_dragButton = nullptr;
+    }
+  }
+  return QWidget::eventFilter(watched, event);
+}
+
+int ToolPanel::buttonIndex(QToolButton* button) const {
+  for (int i = 0; i < static_cast<int>(m_buttonOrder.size()); ++i) {
+    if (m_buttonOrder[static_cast<std::size_t>(i)] == button) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void ToolPanel::moveButton(int from, int to) {
+  if (from < 0 || to < 0 || from >= static_cast<int>(m_buttonOrder.size()) || to >= static_cast<int>(m_buttonOrder.size())) {
+    return;
+  }
+  QToolButton* moved = m_buttonOrder[static_cast<std::size_t>(from)];
+  m_buttonOrder.erase(m_buttonOrder.begin() + from);
+  m_buttonOrder.insert(m_buttonOrder.begin() + to, moved);
+}
+
+void ToolPanel::saveButtonOrder() const {
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  QStringList ids;
+  for (QToolButton* button : m_buttonOrder) {
+    if (button == nullptr) {
+      continue;
+    }
+    const QString subToolId = button->property("subToolId").toString();
+    if (!subToolId.isEmpty()) {
+      ids.push_back(QStringLiteral("sub:") + subToolId);
+    } else {
+      ids.push_back(QStringLiteral("kind:") + QString::number(button->property("toolKind").toInt()));
+    }
+  }
+  settings.setValue(QStringLiteral("toolPanel/buttonOrder"), ids);
+}
+
+void ToolPanel::loadButtonOrder() {
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  const QStringList ids = settings.value(QStringLiteral("toolPanel/buttonOrder")).toStringList();
+  if (ids.isEmpty()) {
+    return;
+  }
+  std::vector<QToolButton*> reordered;
+  reordered.reserve(m_buttonOrder.size());
+  for (const QString& id : ids) {
+    for (QToolButton* button : m_buttonOrder) {
+      if (button == nullptr) {
+        continue;
+      }
+      const QString subToolId = button->property("subToolId").toString();
+      const QString token = !subToolId.isEmpty()
+          ? (QStringLiteral("sub:") + subToolId)
+          : (QStringLiteral("kind:") + QString::number(button->property("toolKind").toInt()));
+      if (token == id && std::find(reordered.begin(), reordered.end(), button) == reordered.end()) {
+        reordered.push_back(button);
+        break;
+      }
+    }
+  }
+  for (QToolButton* button : m_buttonOrder) {
+    if (std::find(reordered.begin(), reordered.end(), button) == reordered.end()) {
+      reordered.push_back(button);
+    }
+  }
+  m_buttonOrder = std::move(reordered);
 }
 
 } // namespace app::panels

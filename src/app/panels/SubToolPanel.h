@@ -10,6 +10,7 @@ class QString;
 class QToolButton;
 class QBoxLayout;
 class QMenu;
+class QModelIndex;
 
 namespace app::bridge {
 class AppController;
@@ -30,6 +31,7 @@ protected:
 private slots:
   void refreshFromController();
   void onCurrentSubToolChanged(int row);
+  void onRowsMoved(const QModelIndex& parent, int start, int end, const QModelIndex& destination, int row);
   void onFilterTextChanged(const QString& text);
   void onCreateClicked();
   void onDuplicateClicked();
@@ -52,6 +54,7 @@ private:
   QToolButton* m_settingsButton {nullptr};
   QMenu* m_settingsMenu {nullptr};
   QListWidget* m_subToolList {nullptr};
+  bool m_internalReorder {false};
 };
 
 } // namespace app::panels

@@ -202,7 +202,13 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::setupShellLayout() {
   setCentralWidget(m_canvasWidget);
   setDockNestingEnabled(true);
+  setDockOptions(
+      QMainWindow::AnimatedDocks |
+      QMainWindow::AllowNestedDocks |
+      QMainWindow::AllowTabbedDocks |
+      QMainWindow::GroupedDragging);
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::North);
+  setTabPosition(Qt::RightDockWidgetArea, QTabWidget::North);
 
   auto* colorPanel = new QWidget(this);
   m_colorPanelWidget = colorPanel;
@@ -653,17 +659,17 @@ void MainWindow::setupShellLayout() {
   colorHistoryDock->setMinimumWidth(188);
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
-  auto applyTabIntegratedTitleBar = [this](QDockWidget* dock) {
+  auto applyThinDockTitleBar = [](QDockWidget* dock) {
     if (dock == nullptr) {
       return;
     }
 
     auto* bar = new QWidget(dock);
-    bar->setObjectName(QStringLiteral("TabIntegratedDockTitleBar"));
-    bar->setFixedHeight(17);
+    bar->setObjectName(QStringLiteral("ThinDockTitleBar"));
+    bar->setFixedHeight(18);
     bar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     bar->setStyleSheet(QStringLiteral(
-        "QWidget#TabIntegratedDockTitleBar {"
+        "QWidget#ThinDockTitleBar {"
         " background: #202833;"
         " border-left: 1px solid #354052;"
         " border-right: 1px solid #354052;"
@@ -671,21 +677,20 @@ void MainWindow::setupShellLayout() {
         "}"));
 
     auto* row = new QHBoxLayout(bar);
-    row->setContentsMargins(4, 0, 3, 0);
+    row->setContentsMargins(6, 0, 4, 0);
     row->setSpacing(3);
 
-    auto* grip = new QLabel(QStringLiteral("⋮⋮"), bar);
-    grip->setFixedWidth(16);
-    grip->setAlignment(Qt::AlignCenter);
-    grip->setStyleSheet(QStringLiteral("color: #4f5c6f; font-size: 10px;"));
-    row->addWidget(grip);
-    row->addStretch(1);
+    auto* title = new QLabel(dock->windowTitle(), bar);
+    title->setStyleSheet(QStringLiteral("color:#d8e1ef; font-size:10px; font-weight:600;"));
+    title->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    row->addWidget(title);
 
-    auto makeTinyDockButton = [](const QString& text, QWidget* parent) {
+    auto makeTinyDockButton = [](const QString& text, const QString& tip, QWidget* parent) {
       auto* button = new QPushButton(text, parent);
       button->setFixedSize(14, 14);
       button->setFocusPolicy(Qt::NoFocus);
       button->setFlat(true);
+      button->setToolTip(tip);
       button->setStyleSheet(QStringLiteral(
           "QPushButton {"
           " margin: 0px; padding: 0px;"
@@ -703,29 +708,20 @@ void MainWindow::setupShellLayout() {
       return button;
     };
 
-    auto* floatButton = makeTinyDockButton(QStringLiteral("□"), bar);
-    floatButton->setToolTip(QStringLiteral("パネルを分離/戻す"));
+    auto* floatButton = makeTinyDockButton(QStringLiteral("□"), QStringLiteral("パネルを分離/戻す"), bar);
+    auto* closeButton = makeTinyDockButton(QStringLiteral("×"), QStringLiteral("パネルを閉じる"), bar);
     row->addWidget(floatButton);
-
-    auto* closeButton = makeTinyDockButton(QStringLiteral("×"), bar);
-    closeButton->setToolTip(QStringLiteral("パネルを閉じる"));
     row->addWidget(closeButton);
 
-    connect(floatButton, &QPushButton::clicked, dock, [dock]() {
+    QObject::connect(floatButton, &QPushButton::clicked, dock, [dock]() {
       dock->setFloating(!dock->isFloating());
     });
-    connect(closeButton, &QPushButton::clicked, dock, [dock]() {
+    QObject::connect(closeButton, &QPushButton::clicked, dock, [dock]() {
       dock->hide();
     });
 
     dock->setTitleBarWidget(bar);
   };
-
-  applyTabIntegratedTitleBar(m_subToolDock);
-  applyTabIntegratedTitleBar(m_toolPropertyDock);
-  applyTabIntegratedTitleBar(m_colorDock);
-  applyTabIntegratedTitleBar(colorSliderDock);
-  applyTabIntegratedTitleBar(colorHistoryDock);
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolSliderDock);
@@ -742,9 +738,18 @@ void MainWindow::setupShellLayout() {
   tabifyDockWidget(m_subToolDock, colorHistoryDock);
   resizeDocks({m_toolDock, m_toolSliderDock, m_subToolDock}, {68, 72, 220}, Qt::Horizontal);
   m_subToolDock->raise();
+  applyThinDockTitleBar(m_toolDock);
+  applyThinDockTitleBar(m_toolSliderDock);
+  applyThinDockTitleBar(m_subToolDock);
+  applyThinDockTitleBar(m_toolPropertyDock);
+  applyThinDockTitleBar(m_colorDock);
+  applyThinDockTitleBar(colorSliderDock);
+  applyThinDockTitleBar(colorHistoryDock);
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
+  applyThinDockTitleBar(m_layerDock);
+  applyThinDockTitleBar(m_infoDock);
   resizeDocks({m_layerDock, m_infoDock}, {620, 210}, Qt::Vertical);
 
   m_toolDock->raise();
@@ -809,6 +814,9 @@ void MainWindow::createMenus() {
   m_zoomOutAction = new QAction("ズームアウト(&O)", this);
   m_resetZoomAction = new QAction("ズームをリセット(&Z)", this);
   m_fitToScreenAction = new QAction("画面に合わせる(&F)", this);
+  m_rotateViewLeftAction = new QAction("ビューを左回転", this);
+  m_rotateViewRightAction = new QAction("ビューを右回転", this);
+  m_resetViewRotationAction = new QAction("ビュー回転をリセット", this);
   m_toggleGridAction = new QAction("グリッド表示を切替(&G)", this);
   m_toggleOverlayAction = new QAction("オーバーレイ表示を切替(&O)", this);
   m_resetWorkspaceAction = new QAction("ワークスペースを初期化(&R)", this);
@@ -871,6 +879,9 @@ void MainWindow::createMenus() {
   m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
   m_resetZoomAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
   m_fitToScreenAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_9));
+  m_rotateViewLeftAction->setShortcut(QKeySequence(Qt::Key_Comma));
+  m_rotateViewRightAction->setShortcut(QKeySequence(Qt::Key_Period));
+  m_resetViewRotationAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_0));
   m_toggleGridAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft));
   m_toggleOverlayAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_8));
   m_resetWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
@@ -964,6 +975,10 @@ void MainWindow::createMenus() {
   viewMenu->addAction(m_zoomOutAction);
   viewMenu->addAction(m_resetZoomAction);
   viewMenu->addAction(m_fitToScreenAction);
+  viewMenu->addSeparator();
+  viewMenu->addAction(m_rotateViewLeftAction);
+  viewMenu->addAction(m_rotateViewRightAction);
+  viewMenu->addAction(m_resetViewRotationAction);
   viewMenu->addSeparator();
   viewMenu->addAction(m_toggleGridAction);
   viewMenu->addAction(m_toggleOverlayAction);
@@ -1067,6 +1082,9 @@ void MainWindow::createMenus() {
   connect(m_zoomOutAction, &QAction::triggered, this, &MainWindow::onZoomOutTriggered);
   connect(m_resetZoomAction, &QAction::triggered, this, &MainWindow::onResetZoomTriggered);
   connect(m_fitToScreenAction, &QAction::triggered, this, &MainWindow::onFitToScreenTriggered);
+  connect(m_rotateViewLeftAction, &QAction::triggered, this, &MainWindow::onRotateViewLeftTriggered);
+  connect(m_rotateViewRightAction, &QAction::triggered, this, &MainWindow::onRotateViewRightTriggered);
+  connect(m_resetViewRotationAction, &QAction::triggered, this, &MainWindow::onResetViewRotationTriggered);
   connect(m_toggleGridAction, &QAction::toggled, m_canvasWidget, &app::canvasview::CanvasWidget::setGridVisible);
   connect(m_toggleOverlayAction, &QAction::toggled, m_canvasWidget, &app::canvasview::CanvasWidget::setOverlayVisible);
   connect(m_resetWorkspaceAction, &QAction::triggered, this, &MainWindow::onResetWorkspaceTriggered);
@@ -1172,6 +1190,9 @@ void MainWindow::createMenus() {
   markCommand(m_zoomOutAction, "view.zoom_out");
   markCommand(m_resetZoomAction, "view.zoom_reset");
   markCommand(m_fitToScreenAction, "view.fit_screen");
+  markCommand(m_rotateViewLeftAction, "view.rotate_left");
+  markCommand(m_rotateViewRightAction, "view.rotate_right");
+  markCommand(m_resetViewRotationAction, "view.rotate_reset");
   markCommand(m_toggleGridAction, "view.toggle_grid");
   markCommand(m_toggleOverlayAction, "view.toggle_overlay");
   markCommand(m_resetWorkspaceAction, "window.reset_workspace");
@@ -1221,6 +1242,9 @@ void MainWindow::createToolBar() {
   m_zoomOutAction->setIcon(app::ui::icon("zoom_out"));
   m_resetZoomAction->setIcon(app::ui::icon("zoom_reset"));
   m_fitToScreenAction->setIcon(app::ui::icon("fit"));
+  m_rotateViewLeftAction->setIcon(app::ui::icon("undo"));
+  m_rotateViewRightAction->setIcon(app::ui::icon("redo"));
+  m_resetViewRotationAction->setIcon(app::ui::icon("zoom_reset"));
   m_commandPaletteAction->setIcon(app::ui::icon("command_palette"));
 
   m_newCanvasAction->setToolTip("新規キャンバス");
@@ -1236,6 +1260,9 @@ void MainWindow::createToolBar() {
   m_zoomOutAction->setToolTip("ズームアウト");
   m_resetZoomAction->setToolTip("ズームを100%に戻す");
   m_fitToScreenAction->setToolTip("画面に合わせる");
+  m_rotateViewLeftAction->setToolTip("表示ビューを左に15度回転");
+  m_rotateViewRightAction->setToolTip("表示ビューを右に15度回転");
+  m_resetViewRotationAction->setToolTip("表示ビューの回転を戻す");
 
   m_quickToolBar->addAction(m_newCanvasAction);
   m_quickToolBar->addAction(m_openAction);
@@ -1255,6 +1282,8 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addAction(m_zoomOutAction);
   m_quickToolBar->addAction(m_resetZoomAction);
   m_quickToolBar->addAction(m_fitToScreenAction);
+  m_quickToolBar->addAction(m_rotateViewLeftAction);
+  m_quickToolBar->addAction(m_rotateViewRightAction);
 }
 
 void MainWindow::adjustRightDockLayout() {
@@ -1739,6 +1768,18 @@ void MainWindow::onResetZoomTriggered() {
 
 void MainWindow::onFitToScreenTriggered() {
   m_canvasWidget->fitToScreen();
+}
+
+void MainWindow::onRotateViewLeftTriggered() {
+  m_canvasWidget->rotateViewLeft();
+}
+
+void MainWindow::onRotateViewRightTriggered() {
+  m_canvasWidget->rotateViewRight();
+}
+
+void MainWindow::onResetViewRotationTriggered() {
+  m_canvasWidget->resetViewRotation();
 }
 
 void MainWindow::onResetWorkspaceTriggered() {

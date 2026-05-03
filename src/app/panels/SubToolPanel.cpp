@@ -10,6 +10,7 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
+#include <QAbstractItemModel>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
@@ -23,6 +24,7 @@
 
 #include "app/bridge/AppController.h"
 #include "app/ui/IconLoader.h"
+#include "features/requested_tools/RequestedToolsPanel.h"
 
 namespace app::panels {
 
@@ -74,6 +76,120 @@ QPixmap makeStrokePreview(
   return pixmap;
 }
 
+void drawSubToolPreviewStroke(
+    QPainter* painter,
+    const QRectF& r,
+    const QString& id,
+    bool selected,
+    bool enabled) {
+  QColor stroke = selected ? QColor(245, 250, 255, 150) : QColor(220, 230, 245, 100);
+  if (!enabled) {
+    stroke = QColor(130, 138, 150, 90);
+  }
+
+  if (id == "gradient_linear") {
+    QLinearGradient g(r.left(), r.center().y(), r.right(), r.center().y());
+    g.setColorAt(0.0, QColor(240, 242, 250, enabled ? 210 : 120));
+    g.setColorAt(1.0, QColor(90, 132, 210, enabled ? 210 : 120));
+    painter->fillRect(r.adjusted(0, 2, 0, -2), g);
+    return;
+  }
+  if (id == "text_basic") {
+    painter->setPen(QPen(stroke, 1.1));
+    QFont font = painter->font();
+    font.setBold(true);
+    font.setPixelSize(10);
+    painter->setFont(font);
+    painter->drawText(r.toRect(), Qt::AlignVCenter | Qt::AlignLeft, "T");
+    return;
+  }
+  if (id == "comic_panel") {
+    painter->setPen(QPen(stroke, 1.3));
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRect(r.adjusted(2, 2, -2, -2));
+    return;
+  }
+  if (id == "clone_stamp_basic") {
+    painter->setPen(QPen(stroke, 1.2));
+    painter->setBrush(QColor(118, 148, 196, enabled ? 170 : 100));
+    painter->drawEllipse(QPointF(r.left() + 10, r.center().y()), 2.8, 2.8);
+    painter->drawRect(r.right() - 10, r.center().y() - 3, 6, 6);
+    painter->drawLine(QPointF(r.left() + 14, r.center().y()), QPointF(r.right() - 11, r.center().y()));
+    return;
+  }
+  if (id == "color_mix_blend") {
+    QLinearGradient g(r.left(), r.center().y(), r.right(), r.center().y());
+    g.setColorAt(0.0, QColor(232, 96, 96, enabled ? 200 : 120));
+    g.setColorAt(0.5, QColor(190, 154, 180, enabled ? 200 : 120));
+    g.setColorAt(1.0, QColor(98, 138, 228, enabled ? 200 : 120));
+    painter->fillRect(r.adjusted(0, 3, 0, -3), g);
+    return;
+  }
+  if (id == "liquify_push") {
+    QPainterPath wave;
+    wave.moveTo(r.left(), r.center().y() + 3);
+    wave.cubicTo(r.left() + r.width() * 0.25, r.top() + 1, r.left() + r.width() * 0.6, r.bottom() - 1, r.right(), r.center().y() - 2);
+    painter->setPen(QPen(stroke, 1.5));
+    painter->drawPath(wave);
+    return;
+  }
+  if (id == "airbrush_soft") {
+    painter->setPen(Qt::NoPen);
+    for (int i = 0; i < 22; ++i) {
+      painter->setBrush(QColor(225, 236, 252, (enabled ? 24 : 14) + (i % 5) * 12));
+      const qreal x = r.left() + (i * 7) % static_cast<int>(r.width());
+      const qreal y = r.top() + 2 + (i * 5) % static_cast<int>(std::max(4.0, r.height() - 4));
+      painter->drawEllipse(QPointF(x, y), 1.2 + (i % 2), 1.2 + (i % 2));
+    }
+    return;
+  }
+  if (id == "sketch_pencil") {
+    painter->setPen(QPen(QColor(stroke.red(), stroke.green(), stroke.blue(), enabled ? 190 : 110), 1.1));
+    painter->drawLine(QPointF(r.left(), r.bottom() - 2), QPointF(r.right(), r.top() + 2));
+    painter->setPen(QPen(QColor(stroke.red(), stroke.green(), stroke.blue(), enabled ? 120 : 70), 0.9));
+    painter->drawLine(QPointF(r.left() + 2, r.bottom() - 1), QPointF(r.right() - 1, r.top() + 4));
+    return;
+  }
+  if (id == "ruler_straight") {
+    painter->setPen(QPen(stroke, 1.3));
+    painter->drawLine(QPointF(r.left(), r.bottom() - 1), QPointF(r.right(), r.top() + 1));
+    return;
+  }
+  if (id == "line_correction_smooth") {
+    QPainterPath p;
+    p.moveTo(r.left(), r.center().y() + 2);
+    p.cubicTo(r.left() + r.width() * 0.25, r.top() + 2, r.left() + r.width() * 0.6, r.bottom() - 2, r.right(), r.center().y() - 1);
+    painter->setPen(QPen(stroke, 1.4));
+    painter->drawPath(p);
+    return;
+  }
+  if (id == "operation_object") {
+    painter->setPen(QPen(stroke, 1.2));
+    painter->setBrush(QColor(102, 136, 192, enabled ? 170 : 100));
+    painter->drawEllipse(QPointF(r.left() + 9, r.center().y()), 2.6, 2.6);
+    painter->drawLine(QPointF(r.left() + 13, r.center().y()), QPointF(r.right() - 1, r.center().y()));
+    return;
+  }
+
+  qreal width = 2.4;
+  if (id.contains("hard")) {
+    width = 3.4;
+  } else if (id.contains("soft")) {
+    width = 5.0;
+  } else if (id.contains("fill")) {
+    width = 7.0;
+  } else if (id.contains("vector")) {
+    width = 1.8;
+  } else if (id.contains("eraser")) {
+    width = 3.0;
+  }
+  painter->setPen(QPen(stroke, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+  QPainterPath path;
+  path.moveTo(r.left(), r.center().y() + 3);
+  path.cubicTo(r.left() + r.width() * 0.25, r.top(), r.left() + r.width() * 0.60, r.bottom(), r.right(), r.center().y() - 2);
+  painter->drawPath(path);
+}
+
 QWidget* makeSubToolRowWidget(
     QListWidget* list,
     const QString& subToolId,
@@ -117,45 +233,13 @@ public:
     }
     painter->fillRect(option.rect, bg);
 
-    QColor stroke = selected ? QColor(245, 250, 255, 140) : QColor(220, 230, 245, 88);
-    qreal width = 2.4;
-    if (id.contains("hard")) {
-      width = 3.4;
-      stroke.setAlpha(selected ? 170 : 120);
-    } else if (id.contains("soft")) {
-      width = 5.0;
-      stroke.setAlpha(selected ? 90 : 55);
-    } else if (id.contains("airbrush")) {
-      width = 6.0;
-      stroke.setAlpha(selected ? 75 : 45);
-    } else if (id.contains("fill")) {
-      width = 7.0;
-      stroke.setAlpha(selected ? 95 : 60);
-    } else if (id.contains("vector")) {
-      width = 1.8;
-      stroke.setAlpha(selected ? 180 : 120);
-    } else if (id.contains("eraser")) {
-      stroke = QColor(225, 232, 245, selected ? 120 : 80);
-      width = 3.0;
-    }
-
-    QPen pen(stroke, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    painter->setPen(pen);
-
-    
-    
     const int fixedPreviewWidth = 128;
     QRectF r(
         option.rect.left() + 8,
         option.rect.top() + 5,
         fixedPreviewWidth,
         option.rect.height() - 10);
-    QPainterPath path;
-    path.moveTo(r.left(), r.center().y() + 3);
-    path.cubicTo(r.left() + r.width() * 0.25, r.top(),
-                 r.left() + r.width() * 0.60, r.bottom(),
-                 r.right(), r.center().y() - 2);
-    painter->drawPath(path);
+    drawSubToolPreviewStroke(painter, r, id, selected, enabled);
 
     const QString text = index.data(Qt::DisplayRole).toString();
     painter->setPen(enabled ? QColor("#edf4ff") : QColor("#7f8998"));
@@ -221,6 +305,8 @@ QString subToolNameJa(QString id, const QString& displayName) {
   if (id == "hand_default") return QString::fromUtf8(u8"手のひら移動");
   if (id == "zoom_default") return QString::fromUtf8(u8"ズーム");
   if (id == "eyedropper_default") return QString::fromUtf8(u8"色取得");
+  const QString requested = ::features::requested_tools::detail::requestedToolJaLabel(id.toStdString());
+  if (!requested.isEmpty()) return requested;
   return displayName;
 }
 
@@ -268,6 +354,11 @@ SubToolPanel::SubToolPanel(QWidget* parent)
   m_subToolList->setEditTriggers(QAbstractItemView::NoEditTriggers);
   m_subToolList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   m_subToolList->setUniformItemSizes(true);
+  m_subToolList->setDragDropMode(QAbstractItemView::InternalMove);
+  m_subToolList->setDefaultDropAction(Qt::MoveAction);
+  m_subToolList->setDragEnabled(true);
+  m_subToolList->setAcceptDrops(true);
+  m_subToolList->setDropIndicatorShown(true);
   m_subToolList->setItemDelegate(new SubToolDelegate(m_subToolList));
   m_subToolList->setSpacing(1);
   m_subToolList->setStyleSheet(
@@ -300,6 +391,11 @@ SubToolPanel::SubToolPanel(QWidget* parent)
   layout->addLayout(m_compactActionsLayout);
 
   connect(m_subToolList, &QListWidget::currentRowChanged, this, &SubToolPanel::onCurrentSubToolChanged);
+  connect(
+      m_subToolList->model(),
+      &QAbstractItemModel::rowsMoved,
+      this,
+      &SubToolPanel::onRowsMoved);
   connect(m_searchEdit, &QLineEdit::textChanged, this, &SubToolPanel::onFilterTextChanged);
   connect(m_createButton, &QToolButton::clicked, this, &SubToolPanel::onCreateClicked);
   connect(duplicateAction, &QAction::triggered, this, &SubToolPanel::onDuplicateClicked);
@@ -344,11 +440,17 @@ void SubToolPanel::refreshFromController() {
 
   const QSignalBlocker blocker(m_subToolList);
   m_refreshing = true;
-  m_toolNameLabel->setText(QString::fromUtf8(u8"ツール: %1").arg(toolNameJa(m_controller->currentTool())));
+  const QString effectiveToolName = QString::fromStdString(m_controller->currentToolDisplayName());
+  m_toolNameLabel->setText(QString::fromUtf8(u8"ツール: %1").arg(
+      effectiveToolName.isEmpty() ? toolNameJa(m_controller->currentTool()) : effectiveToolName));
   const QString currentSubToolName = subToolNameJa(
       QString::fromStdString(m_controller->currentSubToolId()),
       QString::fromStdString(m_controller->currentSubToolDisplayName()));
-  m_summaryLabel->setText(QString::fromUtf8(u8"現在: %1").arg(currentSubToolName));
+  if (effectiveToolName == currentSubToolName) {
+    m_summaryLabel->setText(QString());
+  } else {
+    m_summaryLabel->setText(QString::fromUtf8(u8"現在: %1").arg(currentSubToolName));
+  }
   m_subToolList->clear();
   const auto items = m_controller->subToolViewModels();
   const QString query = m_searchEdit->text().trimmed();
@@ -397,6 +499,29 @@ void SubToolPanel::refreshFromController() {
     m_summaryLabel->setText(QString::fromUtf8(u8"現在のレイヤー種別で有効なサブツールがありません"));
   }
   m_refreshing = false;
+}
+
+void SubToolPanel::onRowsMoved(
+    const QModelIndex& parent,
+    int start,
+    int end,
+    const QModelIndex& destination,
+    int row) {
+  Q_UNUSED(parent);
+  Q_UNUSED(end);
+  Q_UNUSED(destination);
+  if (m_controller == nullptr || m_refreshing || m_internalReorder) {
+    return;
+  }
+  if (start < 0 || row < 0 || start == row || start + 1 == row) {
+    return;
+  }
+  const int to = (row > start) ? row - 1 : row;
+  m_internalReorder = true;
+  const bool moved = m_controller->moveCurrentSubTool(static_cast<std::size_t>(start), static_cast<std::size_t>(to));
+  m_internalReorder = false;
+  refreshFromController();
+  Q_UNUSED(moved);
 }
 
 void SubToolPanel::onCurrentSubToolChanged(int row) {

@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 
+#include <QPoint>
 #include <QWidget>
 
 #include "core/tools/ToolType.h"
@@ -14,6 +15,9 @@ class QLabel;
 class QFrame;
 class QColor;
 class QVBoxLayout;
+class QMouseEvent;
+class QEvent;
+class QPoint;
 
 namespace app::bridge {
 class AppController;
@@ -40,6 +44,7 @@ public:
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
+  bool eventFilter(QObject* watched, QEvent* event) override;
 
 private slots:
   void refreshFromController();
@@ -52,6 +57,10 @@ private:
   void relayoutButtons();
   void updateQuickSliderVisuals(const QColor& color);
   int columnCountForWidth(int width) const noexcept;
+  void saveButtonOrder() const;
+  void loadButtonOrder();
+  int buttonIndex(QToolButton* button) const;
+  void moveButton(int from, int to);
 
   app::bridge::AppController* m_controller {nullptr};
   std::map<core::ToolKind, QToolButton*> m_buttons;
@@ -70,6 +79,8 @@ private:
   QFrame* m_opacityChip {nullptr};
   bool m_refreshingSliders {false};
   Sections m_sections {Combined};
+  QToolButton* m_dragButton {nullptr};
+  QPoint m_dragStartPos;
 };
 
 } // namespace app::panels

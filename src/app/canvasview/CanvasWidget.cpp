@@ -8,8 +8,10 @@
 #include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QInputDialog>
 #include <QWheelEvent>
 
 #include "app/bridge/AppController.h"
@@ -22,6 +24,7 @@ namespace {
 
 struct CanvasInteractionState {
   double zoom {1.0};
+  double rotationDegrees {0.0};
   QPointF panOffset {0.0, 0.0};
   bool panning {false};
   bool panDragging {false};
@@ -80,7 +83,7 @@ Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
     case core::ToolKind::Eyedropper:
       return Qt::CrossCursor;
     case core::ToolKind::Fill:
-      return Qt::PointingHandCursor;
+      return Qt::CrossCursor;
     case core::ToolKind::Line:
     case core::ToolKind::RectSelection:
       return Qt::CrossCursor;
@@ -159,6 +162,27 @@ void CanvasWidget::resetZoom() {
   update();
 }
 
+void CanvasWidget::rotateViewLeft() {
+  auto& state = stateFor(this);
+  state.rotationDegrees = std::fmod(state.rotationDegrees - 15.0 + 360.0, 360.0);
+  updateCursorForState(state.hasMousePos ? mapToCanvas(state.lastMousePos) : std::optional<core::Point> {});
+  update();
+}
+
+void CanvasWidget::rotateViewRight() {
+  auto& state = stateFor(this);
+  state.rotationDegrees = std::fmod(state.rotationDegrees + 15.0, 360.0);
+  updateCursorForState(state.hasMousePos ? mapToCanvas(state.lastMousePos) : std::optional<core::Point> {});
+  update();
+}
+
+void CanvasWidget::resetViewRotation() {
+  auto& state = stateFor(this);
+  state.rotationDegrees = 0.0;
+  updateCursorForState(state.hasMousePos ? mapToCanvas(state.lastMousePos) : std::optional<core::Point> {});
+  update();
+}
+
 void CanvasWidget::fitToScreen() {
   if (m_image.isNull()) {
     return;
@@ -203,6 +227,10 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   }
 
   const QRect target = canvasRect();
+  painter.save();
+  painter.translate(target.center());
+  painter.rotate(state.rotationDegrees);
+  painter.translate(-target.center());
   drawCheckerboard(painter, target, static_cast<int>(std::lround(std::clamp(state.zoom * 10.0, 8.0, 24.0))));
   painter.drawImage(target, m_image);
   painter.setPen(QPen(QColor(88, 96, 108), 1.0));
@@ -212,6 +240,22 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
     const core::ToolKind activeTool = m_controller->currentTool();
     painter.setRenderHint(QPainter::Antialiasing, true);
+
+    for (const core::VectorPath& guide : overlay.guides) {
+      if (guide.points.size() < 2) {
+        continue;
+      }
+      const QPointF p1(
+          target.x() + (static_cast<double>(guide.points[0].x) + 0.5) * state.zoom,
+          target.y() + (static_cast<double>(guide.points[0].y) + 0.5) * state.zoom);
+      const QPointF p2(
+          target.x() + (static_cast<double>(guide.points[1].x) + 0.5) * state.zoom,
+          target.y() + (static_cast<double>(guide.points[1].y) + 0.5) * state.zoom);
+      painter.setPen(QPen(QColor(45, 130, 255, 190), 4.0, Qt::SolidLine, Qt::RoundCap));
+      painter.drawLine(p1, p2);
+      painter.setPen(QPen(QColor(245, 250, 255, 235), 1.2, Qt::DashLine, Qt::RoundCap));
+      painter.drawLine(p1, p2);
+    }
 
     if (overlay.toolOverlay.hasLine) {
       const QPointF p1(
@@ -292,6 +336,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.drawEllipse(center, radiusPx, radiusPx);
     }
   }
+  painter.restore();
 }
 
 void CanvasWidget::mousePressEvent(QMouseEvent* event) {
@@ -348,6 +393,34 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
 
   const auto point = mapToCanvas(event->position().toPoint());
   if (!point.has_value()) {
+    return;
+  }
+
+  if (m_controller->currentSubToolId() == "text_basic") {
+    bool ok = false;
+    static QString s_lastText = QStringLiteral("Text");
+    QString initial = s_lastText;
+    const auto existing = m_controller->textAt(point->x, point->y);
+    const bool hasExisting = existing.has_value();
+    if (hasExisting) {
+      initial = QString::fromUtf8(existing->c_str());
+    }
+    const QString text = QInputDialog::getText(
+        this,
+        QStringLiteral("テキスト入力"),
+        QStringLiteral("文字列"),
+        QLineEdit::Normal,
+        initial,
+        &ok);
+    if (ok && !text.isEmpty()) {
+      s_lastText = text;
+      if (hasExisting) {
+        m_controller->editTextAt(point->x, point->y, text.toUtf8().toStdString());
+      } else {
+        m_controller->placeTextAt(point->x, point->y, text.toUtf8().toStdString());
+      }
+      update();
+    }
     return;
   }
 
@@ -649,17 +722,27 @@ std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) co
     return std::nullopt;
   }
   const QRect targetRect = canvasRect();
-  if (!targetRect.contains(widgetPos)) {
+  const auto& state = stateFor(this);
+  QPointF localPos = widgetPos;
+  if (std::abs(state.rotationDegrees) > 0.0001) {
+    const QPointF center = targetRect.center();
+    const double radians = -state.rotationDegrees * 3.14159265358979323846 / 180.0;
+    const double dx = static_cast<double>(widgetPos.x()) - center.x();
+    const double dy = static_cast<double>(widgetPos.y()) - center.y();
+    localPos = QPointF(
+        center.x() + dx * std::cos(radians) - dy * std::sin(radians),
+        center.y() + dx * std::sin(radians) + dy * std::cos(radians));
+  }
+  if (!targetRect.contains(localPos.toPoint())) {
     return std::nullopt;
   }
 
-  const auto& state = stateFor(this);
   if (state.zoom <= 0.0) {
     return std::nullopt;
   }
 
-  const int cx = static_cast<int>(std::floor((widgetPos.x() - targetRect.x()) / state.zoom));
-  const int cy = static_cast<int>(std::floor((widgetPos.y() - targetRect.y()) / state.zoom));
+  const int cx = static_cast<int>(std::floor((localPos.x() - targetRect.x()) / state.zoom));
+  const int cy = static_cast<int>(std::floor((localPos.y() - targetRect.y()) / state.zoom));
   const int clampedX = std::clamp(cx, 0, m_image.width() - 1);
   const int clampedY = std::clamp(cy, 0, m_image.height() - 1);
   return core::Point {clampedX, clampedY};

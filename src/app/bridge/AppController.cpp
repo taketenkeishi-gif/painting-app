@@ -97,6 +97,57 @@ bool containsProperty(
   return containsProperty(descriptor->availableProperties, key);
 }
 
+bool requestedSubToolWritesPixels(std::string_view subToolId) {
+  return subToolId == "gradient_linear" || subToolId == "comic_panel" ||
+      subToolId == "line_correction_smooth" || subToolId == "clone_stamp_basic" ||
+      subToolId == "color_mix_blend" || subToolId == "liquify_push" || subToolId == "operation_object";
+}
+
+bool requestedSubToolWritesSelection(std::string_view subToolId) {
+  return subToolId == "comic_panel";
+}
+
+std::string_view subToolUiGroup(std::string_view subToolId) {
+  if (subToolId == "gradient_linear") return "requested.gradient";
+  if (subToolId == "comic_panel") return "requested.comic";
+  if (subToolId == "text_basic") return "requested.text";
+  if (subToolId == "ruler_straight") return "requested.ruler";
+  if (subToolId == "line_correction_smooth") return "requested.line_correction";
+  if (subToolId == "operation_object") return "requested.operation";
+  if (subToolId == "airbrush_soft") return "requested.airbrush";
+  if (subToolId == "color_mix_blend") return "requested.color_mix";
+  if (subToolId == "liquify_push") return "requested.liquify";
+  if (subToolId == "clone_stamp_basic") return "requested.clone_stamp";
+  if (subToolId == "sketch_pencil") return "requested.sketch";
+
+  if (subToolId.rfind("brush_", 0) == 0) return "core.brush";
+  if (subToolId.rfind("eraser_", 0) == 0) return "core.eraser";
+  if (subToolId.rfind("line_", 0) == 0) return "core.line";
+  if (subToolId.rfind("fill_", 0) == 0) return "core.fill";
+  if (subToolId == "rect_default" || subToolId == "lasso_default" || subToolId == "auto_select") return "core.selection";
+  if (subToolId == "move_layer_default") return "core.move_layer";
+  if (subToolId == "hand_default") return "core.hand";
+  if (subToolId == "zoom_default") return "core.zoom";
+  if (subToolId == "eyedropper_default") return "core.eyedropper";
+  if (subToolId.rfind("pen_", 0) == 0) return "core.pen";
+  return {};
+}
+
+std::string requestedToolDisplayName(std::string_view subToolId) {
+  if (subToolId == "gradient_linear") return u8"グラデーション";
+  if (subToolId == "comic_panel") return u8"コミック";
+  if (subToolId == "text_basic") return u8"テキスト";
+  if (subToolId == "ruler_straight") return u8"定規";
+  if (subToolId == "line_correction_smooth") return u8"線修正";
+  if (subToolId == "operation_object") return u8"操作";
+  if (subToolId == "airbrush_soft") return u8"エアブラシ";
+  if (subToolId == "color_mix_blend") return u8"色混ぜ";
+  if (subToolId == "liquify_push") return u8"ゆがみ";
+  if (subToolId == "clone_stamp_basic") return u8"コピースタンプ";
+  if (subToolId == "sketch_pencil") return u8"スケッチ";
+  return {};
+}
+
 int clampPercent(int value) {
   return std::clamp(value, 0, 100);
 }
@@ -296,6 +347,17 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
   CanvasOverlayViewModel view;
   view.toolOverlay = m_toolManager.overlay();
   view.selectionRect = m_document.selection().boundingRect();
+  for (std::size_t layerIndex = 0; layerIndex < m_document.layerCount(); ++layerIndex) {
+    const core::Layer& layer = m_document.layerAt(layerIndex);
+    if (!layer.visible()) {
+      continue;
+    }
+    for (const core::VectorPath& path : layer.vectorPaths()) {
+      if (path.kind == core::VectorPath::Kind::Ruler && path.guideVisible) {
+        view.guides.push_back(path);
+      }
+    }
+  }
   return view;
 }
 
@@ -352,10 +414,17 @@ std::vector<SubToolViewModel> AppController::subToolViewModels() const {
   }
 
   const std::string selectedId = currentSubToolId();
+  const std::string_view selectedGroup = subToolUiGroup(selectedId);
   const core::Layer* active = m_document.activeLayer();
   const core::LayerKind activeKind = active == nullptr ? core::LayerKind::Raster : active->kind();
   models.reserve(descriptor->subTools.size());
   for (const app::ui::SubToolDescriptor& sub : descriptor->subTools) {
+    if (!selectedGroup.empty()) {
+      const std::string_view candidateGroup = subToolUiGroup(sub.id);
+      if (candidateGroup.empty() || candidateGroup != selectedGroup) {
+        continue;
+      }
+    }
     const bool enabled = isSubToolCompatibleWithLayerKind(sub, activeKind);
     models.push_back(SubToolViewModel {
         sub.id,
@@ -1269,12 +1338,26 @@ bool AppController::resetCurrentSubTool() {
   return true;
 }
 
+bool AppController::moveCurrentSubTool(std::size_t fromIndex, std::size_t toIndex) {
+  if (!m_toolCatalog.moveSubTool(currentTool(), fromIndex, toIndex)) {
+    return false;
+  }
+  saveSubToolCatalogToSettings();
+  emit toolStateChanged();
+  emit documentChanged();
+  return true;
+}
+
 bool AppController::saveSubToolSettings() {
   saveSubToolCatalogToSettings();
   return true;
 }
 
 std::string AppController::currentToolDisplayName() const {
+  const std::string requestedName = requestedToolDisplayName(currentSubToolId());
+  if (!requestedName.empty()) {
+    return requestedName;
+  }
   const app::ui::ToolDescriptor* descriptor = currentToolDescriptor();
   if (descriptor != nullptr) {
     return descriptor->displayName;
@@ -1585,9 +1668,13 @@ void AppController::beginStroke(int x, int y) {
   }
 
   const core::ToolKind activeKind = m_toolManager.activeToolKind();
+  const std::string activeSubToolId = currentSubToolId();
+  const bool handledByRequested = m_requestedToolsRuntime.handles(activeSubToolId);
   PendingStrokeState pending;
-  pending.actionName = actionNameForTool(activeKind);
-  if (toolWritesPixels(activeKind)) {
+  pending.actionName = handledByRequested ? requestedToolDisplayName(activeSubToolId) : actionNameForTool(activeKind);
+  const bool trackPixels = requestedSubToolWritesPixels(activeSubToolId) || (!handledByRequested && toolWritesPixels(activeKind));
+  const bool trackSelection = requestedSubToolWritesSelection(activeSubToolId) || toolWritesSelection(activeKind);
+  if (trackPixels) {
     core::Layer* activeLayer = m_document.activeLayer();
     if (activeLayer == nullptr) {
       return;
@@ -1596,7 +1683,7 @@ void AppController::beginStroke(int x, int y) {
     pending.layerIndex = m_document.activeLayerIndex();
     pending.beforeLayer = *activeLayer;
   }
-  if (toolWritesSelection(activeKind)) {
+  if (trackSelection) {
     pending.trackSelection = true;
     pending.beforeSelection = m_document.selection();
   }
@@ -1607,14 +1694,17 @@ void AppController::beginStroke(int x, int y) {
   }
 
   m_stroking = true;
-  m_lastPointer = core::Point {x, y};
+  m_lastPointer = snapPointToRulerGuides(core::Point {x, y});
   core::ToolPointerEvent pressEvent;
   pressEvent.point = m_lastPointer;
   pressEvent.shift = m_shiftModifier;
   pressEvent.ctrl = m_ctrlModifier;
   pressEvent.alt = m_altModifier;
   core::ToolContext context = makeToolContext();
-  const core::ToolResult result = m_toolManager.pointerPress(context, pressEvent);
+  const core::ToolResult result = handledByRequested
+      ? m_requestedToolsRuntime.onPointerPress(
+            activeSubToolId, context, pressEvent, m_currentColor, m_uiState.size, m_uiState.opacity)
+      : m_toolManager.pointerPress(context, pressEvent);
   applyToolResult(result);
 }
 
@@ -1622,18 +1712,23 @@ void AppController::continueStroke(int x, int y) {
   if (!m_stroking) {
     return;
   }
-  if (m_lastPointer.x == x && m_lastPointer.y == y) {
+  const core::Point snapped = snapPointToRulerGuides(core::Point {x, y});
+  if (m_lastPointer.x == snapped.x && m_lastPointer.y == snapped.y) {
     return;
   }
 
-  m_lastPointer = core::Point {x, y};
+  m_lastPointer = snapped;
+  const std::string activeSubToolId = currentSubToolId();
   core::ToolPointerEvent moveEvent;
   moveEvent.point = m_lastPointer;
   moveEvent.shift = m_shiftModifier;
   moveEvent.ctrl = m_ctrlModifier;
   moveEvent.alt = m_altModifier;
   core::ToolContext context = makeToolContext();
-  const core::ToolResult result = m_toolManager.pointerMove(context, moveEvent);
+  const core::ToolResult result = m_requestedToolsRuntime.handles(activeSubToolId)
+      ? m_requestedToolsRuntime.onPointerMove(
+            activeSubToolId, context, moveEvent, m_currentColor, m_uiState.size, m_uiState.opacity)
+      : m_toolManager.pointerMove(context, moveEvent);
   applyToolResult(result);
 }
 
@@ -1643,15 +1738,180 @@ void AppController::endStroke() {
   }
 
   m_stroking = false;
+  const std::string activeSubToolId = currentSubToolId();
   core::ToolPointerEvent releaseEvent;
   releaseEvent.point = m_lastPointer;
   releaseEvent.shift = m_shiftModifier;
   releaseEvent.ctrl = m_ctrlModifier;
   releaseEvent.alt = m_altModifier;
   core::ToolContext context = makeToolContext();
-  const core::ToolResult result = m_toolManager.pointerRelease(context, releaseEvent);
+  const core::ToolResult result = m_requestedToolsRuntime.handles(activeSubToolId)
+      ? m_requestedToolsRuntime.onPointerRelease(
+            activeSubToolId, context, releaseEvent, m_currentColor, m_uiState.size, m_uiState.opacity)
+      : m_toolManager.pointerRelease(context, releaseEvent);
   applyToolResult(result);
   finishPendingStrokeHistory();
+}
+
+bool AppController::placeTextAt(int x, int y, const std::string& text) {
+  if (text.empty()) {
+    return false;
+  }
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || active->locked()) {
+    return false;
+  }
+  if (active->kind() != core::LayerKind::Vector) {
+    const std::size_t createdIndex = m_document.addVectorLayer("Text Objects");
+    active = &m_document.layerAt(createdIndex);
+    emit layersChanged();
+  }
+  const std::size_t layerIndex = m_document.activeLayerIndex();
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Text Object";
+  entry.layerIndex = layerIndex;
+  entry.beforeLayer = *active;
+
+  core::VectorPath path;
+  path.kind = core::VectorPath::Kind::Text;
+  path.points = {core::Point {x, y}};
+  path.color = m_currentColor;
+  path.width = std::max(4, m_uiState.size);
+  path.opacity = std::clamp(static_cast<float>(m_uiState.opacity) / 100.0F, 0.0F, 1.0F);
+  path.text = text;
+  active->addVectorPath(std::move(path));
+
+  entry.afterLayer = *active;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit documentChanged();
+  return true;
+#if 0
+  if (m_textBaseByLayer.find(layerIndex) == m_textBaseByLayer.end()) {
+    m_textBaseByLayer[layerIndex] = active->buffer();
+  }
+  TextEntry newEntry;
+  newEntry.point = core::Point {x, y};
+  newEntry.text = text;
+  newEntry.color = m_currentColor;
+  newEntry.size = m_uiState.size;
+  m_textEntriesByLayer[layerIndex].push_back(std::move(newEntry));
+
+  PendingStrokeState pending;
+  pending.actionName = "Text";
+  pending.trackPixels = true;
+  pending.layerIndex = layerIndex;
+  pending.beforeLayer = *active;
+  m_pendingStroke = std::move(pending);
+
+  if (!rebuildTextLayer(layerIndex)) {
+    return false;
+  }
+  core::ToolResult result;
+  result.pixelsChanged = true;
+  result.dirtyRect = core::Rect {0, 0, active->buffer().width(), active->buffer().height()};
+  applyToolResult(result);
+  finishPendingStrokeHistory();
+  return true;
+#endif
+}
+
+std::optional<std::string> AppController::textAt(int x, int y) const {
+  if (m_document.layerCount() == 0) {
+    return std::nullopt;
+  }
+  const std::size_t layerIndex = m_document.activeLayerIndex();
+  const core::Layer& layer = m_document.layerAt(layerIndex);
+  if (layer.kind() == core::LayerKind::Vector) {
+    const auto& paths = layer.vectorPaths();
+    for (std::size_t i = paths.size(); i > 0; --i) {
+      const core::VectorPath& path = paths[i - 1];
+      if (path.kind != core::VectorPath::Kind::Text || path.points.empty()) {
+        continue;
+      }
+      const int charW = std::max(4, path.width);
+      const int w = std::max(12, static_cast<int>(path.text.size()) * (charW + 2));
+      const int h = std::max(8, path.width * 2);
+      const core::Point p = path.points.front();
+      if (x >= p.x && y >= p.y && x <= p.x + w && y <= p.y + h) {
+        return path.text;
+      }
+    }
+  }
+  const auto hit = findTextEntryAt(layerIndex, x, y);
+  if (!hit.has_value()) {
+    return std::nullopt;
+  }
+  const auto listIt = m_textEntriesByLayer.find(layerIndex);
+  if (listIt == m_textEntriesByLayer.end() || *hit >= listIt->second.size()) {
+    return std::nullopt;
+  }
+  return listIt->second[*hit].text;
+}
+
+bool AppController::editTextAt(int x, int y, const std::string& text) {
+  if (text.empty() || m_document.layerCount() == 0) {
+    return false;
+  }
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || active->locked()) {
+    return false;
+  }
+  const std::size_t layerIndex = m_document.activeLayerIndex();
+  if (active->kind() == core::LayerKind::Vector) {
+    auto& paths = active->vectorPaths();
+    for (std::size_t i = paths.size(); i > 0; --i) {
+      core::VectorPath& path = paths[i - 1];
+      if (path.kind != core::VectorPath::Kind::Text || path.points.empty()) {
+        continue;
+      }
+      const int charW = std::max(4, path.width);
+      const int w = std::max(12, static_cast<int>(path.text.size()) * (charW + 2));
+      const int h = std::max(8, path.width * 2);
+      const core::Point p = path.points.front();
+      if (x < p.x || y < p.y || x > p.x + w || y > p.y + h) {
+        continue;
+      }
+      StrokeHistoryEntry entry;
+      entry.kind = HistoryKind::Stroke;
+      entry.actionName = "Text Edit";
+      entry.layerIndex = layerIndex;
+      entry.beforeLayer = *active;
+      path.text = text;
+      entry.afterLayer = *active;
+      pushHistoryEntry(std::move(entry));
+      rerender();
+      emit documentChanged();
+      return true;
+    }
+  }
+  const auto hit = findTextEntryAt(layerIndex, x, y);
+  if (!hit.has_value()) {
+    return false;
+  }
+  auto listIt = m_textEntriesByLayer.find(layerIndex);
+  if (listIt == m_textEntriesByLayer.end() || *hit >= listIt->second.size()) {
+    return false;
+  }
+
+  PendingStrokeState pending;
+  pending.actionName = "Text Edit";
+  pending.trackPixels = true;
+  pending.layerIndex = layerIndex;
+  pending.beforeLayer = *active;
+  m_pendingStroke = std::move(pending);
+
+  listIt->second[*hit].text = text;
+  if (!rebuildTextLayer(layerIndex)) {
+    return false;
+  }
+  core::ToolResult result;
+  result.pixelsChanged = true;
+  result.dirtyRect = core::Rect {0, 0, active->buffer().width(), active->buffer().height()};
+  applyToolResult(result);
+  finishPendingStrokeHistory();
+  return true;
 }
 
 bool AppController::pickColorAt(int x, int y) {
@@ -2609,6 +2869,52 @@ core::ToolContext AppController::makeToolContext() {
       m_uiState.size};
 }
 
+core::Point AppController::snapPointToRulerGuides(core::Point point) const {
+  const core::ToolKind tool = currentTool();
+  if (tool != core::ToolKind::Brush && tool != core::ToolKind::Pen && tool != core::ToolKind::Line) {
+    return point;
+  }
+  const std::string subToolId = currentSubToolId();
+  if (subToolId == "ruler_straight" || subToolId == "operation_object") {
+    return point;
+  }
+
+  double bestDistance2 = 24.0 * 24.0;
+  std::optional<core::Point> bestPoint;
+  for (std::size_t layerIndex = 0; layerIndex < m_document.layerCount(); ++layerIndex) {
+    const core::Layer& layer = m_document.layerAt(layerIndex);
+    if (!layer.visible()) {
+      continue;
+    }
+    for (const core::VectorPath& path : layer.vectorPaths()) {
+      if (path.kind != core::VectorPath::Kind::Ruler || !path.guideVisible || path.points.size() < 2) {
+        continue;
+      }
+      const core::Point a = path.points[0];
+      const core::Point b = path.points[1];
+      const double vx = static_cast<double>(b.x - a.x);
+      const double vy = static_cast<double>(b.y - a.y);
+      const double len2 = vx * vx + vy * vy;
+      if (len2 <= 0.0001) {
+        continue;
+      }
+      const double t = std::clamp(((point.x - a.x) * vx + (point.y - a.y) * vy) / len2, 0.0, 1.0);
+      const double px = static_cast<double>(a.x) + vx * t;
+      const double py = static_cast<double>(a.y) + vy * t;
+      const double dx = static_cast<double>(point.x) - px;
+      const double dy = static_cast<double>(point.y) - py;
+      const double d2 = dx * dx + dy * dy;
+      if (d2 < bestDistance2) {
+        bestDistance2 = d2;
+        bestPoint = core::Point {
+            static_cast<int>(std::lround(px)),
+            static_cast<int>(std::lround(py))};
+      }
+    }
+  }
+  return bestPoint.value_or(point);
+}
+
 void AppController::applyToolResult(const core::ToolResult& result) {
   bool changed = false;
   bool pixelsChanged = false;
@@ -2672,6 +2978,9 @@ void AppController::finishPendingStrokeHistory() {
         emit foregroundColorUsed();
       }
     }
+    if (pending.actionName != "Text" && pending.actionName != "Text Edit") {
+      clearTextCacheForLayer(layerIndex);
+    }
   }
 
   if (pending.trackSelection) {
@@ -2725,6 +3034,45 @@ void AppController::pushSelectionHistoryIfChanged(const core::SelectionMask& bef
 void AppController::clearStrokeHistory() noexcept {
   m_undoHistory.clear();
   m_redoHistory.clear();
+}
+
+std::optional<std::size_t> AppController::findTextEntryAt(std::size_t layerIndex, int x, int y) const {
+  const auto it = m_textEntriesByLayer.find(layerIndex);
+  if (it == m_textEntriesByLayer.end()) {
+    return std::nullopt;
+  }
+  for (std::size_t i = it->second.size(); i > 0; --i) {
+    const TextEntry& entry = it->second[i - 1];
+    const int charW = std::max(4, entry.size);
+    const int w = std::max(12, static_cast<int>(entry.text.size()) * (charW + 2));
+    const int h = std::max(8, entry.size * 2);
+    if (x >= entry.point.x - 6 && y >= entry.point.y - 6 &&
+        x <= entry.point.x + w + 6 && y <= entry.point.y + h + 6) {
+      return i - 1;
+    }
+  }
+  return std::nullopt;
+}
+
+bool AppController::rebuildTextLayer(std::size_t layerIndex) {
+  if (layerIndex >= m_document.layerCount()) {
+    return false;
+  }
+  core::Layer& layer = m_document.layerAt(layerIndex);
+  if (layer.kind() != core::LayerKind::Raster) {
+    return false;
+  }
+  const auto baseIt = m_textBaseByLayer.find(layerIndex);
+  if (baseIt == m_textBaseByLayer.end()) {
+    return false;
+  }
+  layer.buffer() = baseIt->second;
+  return true;
+}
+
+void AppController::clearTextCacheForLayer(std::size_t layerIndex) {
+  m_textEntriesByLayer.erase(layerIndex);
+  m_textBaseByLayer.erase(layerIndex);
 }
 
 void AppController::rerender() {

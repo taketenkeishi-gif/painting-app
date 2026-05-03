@@ -26,6 +26,9 @@ public:
   void zoomOut();
   void resetZoom();
   void fitToScreen();
+  void rotateViewLeft();
+  void rotateViewRight();
+  void resetViewRotation();
   int zoomPercent() const;
   void setGridVisible(bool visible);
   void setOverlayVisible(bool visible);

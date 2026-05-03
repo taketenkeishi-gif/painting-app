@@ -17,10 +17,19 @@ enum class LayerKind {
 };
 
 struct VectorPath {
+  enum class Kind {
+    Stroke,
+    Text,
+    Ruler
+  };
+
   std::vector<Point> points;
   Color color {0, 0, 0, 255};
   int width {1};
   float opacity {1.0F};
+  Kind kind {Kind::Stroke};
+  std::string text;
+  bool guideVisible {true};
 };
 
 class Layer {

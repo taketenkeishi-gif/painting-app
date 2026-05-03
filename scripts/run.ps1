@@ -1,7 +1,7 @@
 param(
   [string]$CMakePath = "C:/temp/cmake_versions/cmake-4.3.1/bin/cmake.exe",
   [string]$QtPrefix = "C:/CraftRoot_KF6",
-  [string]$BuildDir = "build",
+  [string]$BuildDir = "build_release_run",
   [string]$Config = "Release",
   [string]$WinDeployQtPath = "C:/CraftRoot_KF6/bin/windeployqt.exe"
 )

@@ -1,4 +1,4 @@
-﻿set(CORE_SOURCES
+set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/buffer/PixelBuffer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/document/Document.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/layer/Layer.cpp
@@ -41,6 +41,29 @@
   ${CMAKE_CURRENT_SOURCE_DIR}/features/rect_selection/Descriptor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/features/zoom/Feature.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/features/zoom/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/gradient/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/gradient/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/comic/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/comic/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/text/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/text/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/ruler/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/ruler/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/line_correction/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/line_correction/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/operation/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/operation/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/airbrush/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/airbrush/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/color_mix/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/color_mix/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/liquify/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/liquify/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/clone_stamp/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/clone_stamp/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/sketch/Feature.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/sketch/Descriptor.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/requested_tools/RequestedToolsRuntime.cpp
 )
 
 add_library(paint_core STATIC ${CORE_SOURCES})

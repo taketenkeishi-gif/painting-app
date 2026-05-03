@@ -15,12 +15,23 @@
 #include "features/pen/Descriptor.h"
 #include "features/rect_selection/Descriptor.h"
 #include "features/zoom/Descriptor.h"
+#include "features/gradient/Descriptor.h"
+#include "features/comic/Descriptor.h"
+#include "features/text/Descriptor.h"
+#include "features/ruler/Descriptor.h"
+#include "features/line_correction/Descriptor.h"
+#include "features/operation/Descriptor.h"
+#include "features/airbrush/Descriptor.h"
+#include "features/color_mix/Descriptor.h"
+#include "features/liquify/Descriptor.h"
+#include "features/clone_stamp/Descriptor.h"
+#include "features/sketch/Descriptor.h"
 
 namespace app::ui {
 
 namespace {
 
-std::vector<ToolDescriptor> buildDefaultToolCatalog() {
+std::vector<ToolDescriptor> buildRawToolCatalog() {
   return {
       ::features::brush::makeBrushToolDescriptor(),
       ::features::eraser::makeEraserToolDescriptor(),
@@ -31,7 +42,51 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
       ::features::rect_selection::makeRectSelectionToolDescriptor(),
       ::features::move_layer::makeMoveLayerToolDescriptor(),
       ::features::hand::makeHandToolDescriptor(),
-      ::features::zoom::makeZoomToolDescriptor()};
+      ::features::zoom::makeZoomToolDescriptor(),
+      ::features::gradient::makeGradientToolDescriptor(),
+      ::features::comic::makeComicToolDescriptor(),
+      ::features::text::makeTextToolDescriptor(),
+      ::features::ruler::makeRulerToolDescriptor(),
+      ::features::line_correction::makeLineCorrectionToolDescriptor(),
+      ::features::operation::makeOperationToolDescriptor(),
+      ::features::airbrush::makeAirbrushToolDescriptor(),
+      ::features::color_mix::makeColorMixToolDescriptor(),
+      ::features::liquify::makeLiquifyToolDescriptor(),
+      ::features::clone_stamp::makeCloneStampToolDescriptor(),
+      ::features::sketch::makeSketchToolDescriptor()};
+}
+
+void appendUniqueSubTools(ToolDescriptor& target, const ToolDescriptor& source) {
+  for (const SubToolDescriptor& sub : source.subTools) {
+    const auto existing = std::find_if(target.subTools.begin(), target.subTools.end(), [&](const SubToolDescriptor& entry) {
+      return entry.id == sub.id;
+    });
+    if (existing == target.subTools.end()) {
+      target.subTools.push_back(sub);
+    }
+  }
+
+  for (ToolPropertyKey key : source.availableProperties) {
+    if (std::find(target.availableProperties.begin(), target.availableProperties.end(), key) ==
+        target.availableProperties.end()) {
+      target.availableProperties.push_back(key);
+    }
+  }
+}
+
+std::vector<ToolDescriptor> buildDefaultToolCatalog() {
+  std::vector<ToolDescriptor> merged;
+  for (const ToolDescriptor& descriptor : buildRawToolCatalog()) {
+    auto existing = std::find_if(merged.begin(), merged.end(), [&](const ToolDescriptor& entry) {
+      return entry.kind == descriptor.kind;
+    });
+    if (existing == merged.end()) {
+      merged.push_back(descriptor);
+      continue;
+    }
+    appendUniqueSubTools(*existing, descriptor);
+  }
+  return merged;
 }
 
 std::string normalizeName(std::string name) {
@@ -190,6 +245,20 @@ bool ToolCatalog::resetSubTool(core::ToolKind kind, std::string_view subToolId) 
     return false;
   }
   *current = *defaultSubIt;
+  return true;
+}
+
+bool ToolCatalog::moveSubTool(core::ToolKind kind, std::size_t fromIndex, std::size_t toIndex) {
+  ToolDescriptor* tool = findToolMutable(kind);
+  if (tool == nullptr) {
+    return false;
+  }
+  if (fromIndex >= tool->subTools.size() || toIndex >= tool->subTools.size() || fromIndex == toIndex) {
+    return false;
+  }
+  SubToolDescriptor moved = std::move(tool->subTools[fromIndex]);
+  tool->subTools.erase(tool->subTools.begin() + static_cast<std::ptrdiff_t>(fromIndex));
+  tool->subTools.insert(tool->subTools.begin() + static_cast<std::ptrdiff_t>(toIndex), std::move(moved));
   return true;
 }
 

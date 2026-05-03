@@ -26,7 +26,7 @@ app::ui::SubToolDescriptor makePenSubTool() {
       100,
       0,
       0,
-      app::ui::TargetLayerKind::Raster,
+      app::ui::TargetLayerKind::Both,
       app::ui::CursorStyle::Brush};
 
   app::ui::SubToolDescriptor subTool;
@@ -34,8 +34,19 @@ app::ui::SubToolDescriptor makePenSubTool() {
   subTool.displayName = "Pen";
   subTool.preset = preset;
   subTool.profile = features::common::makeProfile(preset);
-  subTool.editableProperties = {app::ui::ToolPropertyKey::Color, app::ui::ToolPropertyKey::Size};
-  subTool.guide = "Basic pen tool.";
+  subTool.profile.shape.hardness = 100;
+  subTool.profile.stroke.flow = 100;
+  subTool.profile.stroke.spacing = 8;
+  subTool.profile.stabilizer.stabilization = 45;
+  subTool.profile.stabilizer.postCorrection = true;
+  subTool.profile.vector.simplifyLevel = 25;
+  subTool.editableProperties = {
+      app::ui::ToolPropertyKey::Color,
+      app::ui::ToolPropertyKey::Size,
+      app::ui::ToolPropertyKey::Stabilization,
+      app::ui::ToolPropertyKey::PostCorrection,
+      app::ui::ToolPropertyKey::SimplifyLevel};
+  subTool.guide = "Hard line-art pen. Uses vector paths on vector layers.";
   return subTool;
 }
 
@@ -58,8 +69,13 @@ app::ui::ToolDescriptor makePenToolDescriptor() {
   descriptor.id = "pen";
   descriptor.displayName = "Pen";
   descriptor.subTools = {makePenSubTool()};
-  descriptor.availableProperties = {app::ui::ToolPropertyKey::Color, app::ui::ToolPropertyKey::Size};
-  descriptor.guide = "Pen tool.";
+  descriptor.availableProperties = {
+      app::ui::ToolPropertyKey::Color,
+      app::ui::ToolPropertyKey::Size,
+      app::ui::ToolPropertyKey::Stabilization,
+      app::ui::ToolPropertyKey::PostCorrection,
+      app::ui::ToolPropertyKey::SimplifyLevel};
+  descriptor.guide = "Line-art pen with hard strokes and vector-layer support.";
   return descriptor;
 }
 
