@@ -275,7 +275,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
           target.y() + (static_cast<double>(textObj.point.y) + 0.5) * state.zoom);
       QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
       font.setFamilies(QStringList {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo"), QStringLiteral("Noto Sans CJK JP"), font.family()});
-      font.setPointSize(std::max(8, static_cast<int>(std::lround(static_cast<double>(textObj.size) * 1.5))));
+      font.setPointSize(std::max(8, textObj.size));
       painter.save();
       painter.translate(p);
       painter.rotate(textObj.rotationDeg);
@@ -284,34 +284,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.drawText(QPointF(0.0, 0.0), QString::fromUtf8(textObj.text.c_str()));
       painter.restore();
     }
-    if (m_textEditActive && !m_textEditObjectId.empty()) {
-      const auto boundsOpt = m_controller->textBoundsForObjectId(m_textEditObjectId);
-      if (boundsOpt.has_value()) {
-      const core::Rect b = *boundsOpt;
-      const core::Point p {b.x, b.y + b.height};
-      const QPointF anchor(
-          target.x() + (static_cast<double>(p.x) + 0.5) * state.zoom,
-          target.y() + (static_cast<double>(p.y) + 0.5) * state.zoom);
-      QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
-      font.setFamilies(QStringList {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo"), QStringLiteral("Noto Sans CJK JP"), font.family()});
-      font.setPointSize(std::max(8, static_cast<int>(std::lround(static_cast<double>(m_controller->toolState().size) * 1.5))));
-      painter.setFont(font);
-      QFontMetricsF metrics(font);
-      const auto live = m_controller->textForObjectId(m_textEditObjectId).value_or(std::string {});
-      const QString display = QString::fromUtf8(live.c_str());
-      const qreal textW = std::max<qreal>(12.0, static_cast<qreal>(b.width));
-      const qreal textH = std::max<qreal>(12.0, static_cast<qreal>(b.height));
-      QRectF box(anchor.x() - 2.0, anchor.y() - textH, textW + 6.0, textH + 6.0);
-      painter.setBrush(Qt::NoBrush);
-      painter.setPen(QPen(QColor(255, 90, 90, 235), 1.2, Qt::DashLine));
-      painter.drawRect(box);
-      painter.setPen(QPen(QColor(255, 255, 255, 240), 1.0));
-      painter.drawText(anchor, display);
-      const qreal caretX = anchor.x() + metrics.horizontalAdvance(display);
-      painter.setPen(QPen(QColor(255, 90, 90, 245), 1.2));
-      painter.drawLine(QPointF(caretX, anchor.y() - textH + 2.0), QPointF(caretX, anchor.y() + 2.0));
-      }
-    }
+    // Text edit session is rendered by the same TextObject overlay. No duplicate editor overlay here.
 
     if (overlay.toolOverlay.hasLine) {
       const QPointF p1(

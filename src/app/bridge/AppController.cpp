@@ -3070,54 +3070,85 @@ void AppController::clearStrokeHistory() noexcept {
 }
 
 bool AppController::beginObjectOperation(core::Point point) {
-  m_objectSelection = m_objectSelectionService.hitTest(m_objectLayers, point);
+  if (m_textEditor.beginOperation(point)) {
+    m_objectOpBeforeLayers = m_objectLayers;
+    m_objectOpChanged = false;
+    emit overlayChanged();
+    return true;
+  }
+
   m_lastPointer = point;
+  m_objectOpBeforeLayers = m_objectLayers;
   m_objectOpChanged = false;
-  m_objectOpBeforeLayers.reset();
+  m_objectSelection = m_objectSelectionService.hitTest(m_objectLayers, point);
   if (!m_objectSelection.hasSelection) {
+    emit overlayChanged();
     return false;
   }
-  m_objectOpBeforeLayers = m_objectLayers;
+
+  emit overlayChanged();
   return true;
 }
 
 bool AppController::continueObjectOperation(core::Point point) {
+  if (m_textEditor.hasActiveOperation()) {
+    const bool changed = m_textEditor.updateOperation(point);
+    if (changed) {
+      m_objectOpChanged = true;
+      emit overlayChanged();
+      emit canvasChanged();
+    }
+    return changed;
+  }
+
   if (!m_objectSelection.hasSelection) {
     return false;
   }
+
   features::object_editing::ObjectModel* object = findObjectById(m_objectSelection.selectedObjectId);
   if (object == nullptr) {
     return false;
   }
+
   const int dx = point.x - m_lastPointer.x;
   const int dy = point.y - m_lastPointer.y;
   m_lastPointer = point;
-  if (!m_objectTransformController.applyDrag(*object, m_objectSelection.handleHit, dx, dy)) {
-    return false;
+
+  const bool changed = m_objectTransformController.applyDrag(*object, m_objectSelection.handleHit, dx, dy);
+  if (changed) {
+    m_objectSelection.bounds = object->bounds;
+    m_objectOpChanged = true;
+    emit overlayChanged();
+    emit canvasChanged();
   }
-  if (object->kind == features::object_editing::ObjectKind::Text) {
-    recomputeTextObjectBounds(*object);
-  }
-  m_objectSelection.bounds = object->bounds;
-  m_objectOpChanged = true;
-  return true;
+
+  return changed;
 }
 
 void AppController::endObjectOperation() {
-  if (!m_objectOpChanged || !m_objectOpBeforeLayers.has_value()) {
-    emit overlayChanged();
+  if (m_textEditor.hasActiveOperation()) {
+    const bool changed = m_textEditor.endOperation();
+    if (changed) {
+      emit overlayChanged();
+      emit canvasChanged();
+    }
     return;
   }
-  StrokeHistoryEntry entry;
-  entry.kind = HistoryKind::Stroke;
-  entry.actionName = "Object Transform";
-  entry.layerIndex = m_document.activeLayerIndex();
-  entry.beforeObjectLayers = *m_objectOpBeforeLayers;
-  entry.afterObjectLayers = m_objectLayers;
-  pushHistoryEntry(std::move(entry));
+  if (!m_objectSelection.hasSelection) {
+    return;
+  }
+  if (m_objectOpChanged && m_objectOpBeforeLayers.has_value()) {
+    StrokeHistoryEntry entry;
+    entry.kind = HistoryKind::Stroke;
+    entry.actionName = "Object Transform";
+    entry.beforeObjectLayers = *m_objectOpBeforeLayers;
+    entry.afterObjectLayers = m_objectLayers;
+    pushHistoryEntry(std::move(entry));
+  }
   m_objectOpBeforeLayers.reset();
-  rerender();
-  emit documentChanged();
+  m_objectOpChanged = false;
+  emit overlayChanged();
+  emit canvasChanged();
 }
 
 features::object_editing::ObjectModel* AppController::findObjectById(const std::string& id) {
@@ -3301,3 +3332,5 @@ void AppController::rerenderDirty(const core::Rect& dirtyRect) {
 }
 
 } // namespace app::bridge
+
+
