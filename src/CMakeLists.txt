@@ -64,6 +64,10 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/features/sketch/Feature.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/features/sketch/Descriptor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/features/requested_tools/RequestedToolsRuntime.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/object_editing/ObjectModel.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/object_editing/ObjectSelectionService.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/object_editing/ObjectTransformController.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/object_editing/ObjectOverlayRenderer.cpp
 )
 
 add_library(paint_core STATIC ${CORE_SOURCES})
@@ -96,6 +100,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/SubToolPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPropertyPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ColorWheelWidget.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/features/object_editing/text_editor/TextEditorFeature.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
 )
 

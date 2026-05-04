@@ -110,17 +110,7 @@ void rasterizeVectorLayer(const Layer& layer, PixelBuffer& out) {
     Color color = path.color;
     color.a = static_cast<std::uint8_t>(std::lround(std::clamp(path.opacity, 0.0F, 1.0F) * static_cast<float>(color.a)));
     if (path.kind == VectorPath::Kind::Text) {
-      const Point origin = path.points.front();
-      const int charW = std::max(4, path.width);
-      const int charH = std::max(8, path.width * 2);
-      for (std::size_t i = 0; i < path.text.size(); ++i) {
-        const int x = origin.x + static_cast<int>(i) * (charW + 2);
-        const int y = origin.y;
-        drawSegment(out, {x, y}, {x + charW, y}, color, std::max(1, path.width / 4));
-        drawSegment(out, {x, y + charH}, {x + charW, y + charH}, color, std::max(1, path.width / 4));
-        drawSegment(out, {x, y}, {x, y + charH}, color, std::max(1, path.width / 4));
-        drawSegment(out, {x + charW, y}, {x + charW, y + charH}, color, std::max(1, path.width / 4));
-      }
+      // Text vector objects are rendered in CanvasWidget with platform font APIs.
       continue;
     }
     if (path.points.size() == 1) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <string>
 
 #include <QImage>
 #include <QWidget>
@@ -51,6 +52,9 @@ private:
   QRect canvasRect() const;
   std::optional<core::Point> mapToCanvas(const QPoint& widgetPos) const;
   void updateCursorForState(const std::optional<core::Point>& canvasPoint);
+  void beginTextEditSession(const core::Point& canvasPoint);
+  void commitTextEditSession();
+  void cancelTextEditSession();
 
   app::bridge::AppController* m_controller {nullptr};
   QImage m_image;
@@ -58,6 +62,8 @@ private:
   bool m_showGrid {false};
   bool m_showOverlay {true};
   bool m_spacePressed {false};
+  bool m_textEditActive {false};
+  std::string m_textEditObjectId;
 };
 
 } // namespace app::canvasview

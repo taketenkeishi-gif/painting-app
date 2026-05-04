@@ -155,10 +155,7 @@ MainWindow::MainWindow(QWidget* parent)
         return true;
       });
 
-  QAction* commandRegistrySmokeAction = menuBar()->addAction(QStringLiteral("CommandRegistry Smoke"));
-  QObject::connect(commandRegistrySmokeAction, &QAction::triggered, this, [this]() {
-    m_commandRegistry.execute("app.commandRegistrySmoke");
-  });
+  // Keep the smoke command internal; do not expose it in user-facing UI.
 
   setWindowTitle("自作イラストアプリ");
   resize(1400, 860);
@@ -190,6 +187,8 @@ MainWindow::MainWindow(QWidget* parent)
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateUndoRedoState);
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateNavigatorPreview);
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateNavigatorPreview);
+  connect(m_controller, &app::bridge::AppController::overlayChanged, this, &MainWindow::updateObjectSelectionStatus);
+  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateObjectSelectionStatus);
 
   onToolStateChanged();
   updateUndoRedoState();
@@ -197,6 +196,7 @@ MainWindow::MainWindow(QWidget* parent)
   updateTopToolInfo();
   updateColorPanel();
   updateNavigatorPreview();
+  updateObjectSelectionStatus();
 }
 
 void MainWindow::setupShellLayout() {
@@ -1129,6 +1129,8 @@ void MainWindow::createMenus() {
   m_zoomStatusLabel->setObjectName("ZoomStatusLabel");
   m_selectionStatusLabel = new QLabel("選択: OFF", this);
   m_selectionStatusLabel->setObjectName("SelectionStatusLabel");
+  m_objectSelectionStatusLabel = new QLabel("selected object: (none)", this);
+  m_objectSelectionStatusLabel->setObjectName("ObjectSelectionStatusLabel");
 
   statusBar()->addWidget(m_toolStatusLabel);
   statusBar()->addWidget(m_subToolStatusLabel);
@@ -1137,6 +1139,7 @@ void MainWindow::createMenus() {
   statusBar()->addPermanentWidget(m_sizeStatusLabel);
   statusBar()->addPermanentWidget(m_zoomStatusLabel);
   statusBar()->addPermanentWidget(m_selectionStatusLabel);
+  statusBar()->addPermanentWidget(m_objectSelectionStatusLabel, 1);
   statusBar()->addPermanentWidget(m_activeLayerStatusLabel);
 
   const auto markCommand = [](QAction* action, const QString& id) {
@@ -1768,6 +1771,27 @@ void MainWindow::onResetZoomTriggered() {
 
 void MainWindow::onFitToScreenTriggered() {
   m_canvasWidget->fitToScreen();
+}
+
+void MainWindow::updateObjectSelectionStatus() {
+  if (m_objectSelectionStatusLabel == nullptr || m_controller == nullptr) {
+    return;
+  }
+  const auto overlay = m_controller->canvasOverlay();
+  if (!overlay.objectSelectionRect.has_value() || !overlay.objectSelectionId.has_value()) {
+    m_objectSelectionStatusLabel->setText(
+        QString("selected object: (none) textObjects=%1").arg(static_cast<int>(overlay.textObjects.size())));
+    return;
+  }
+  const core::Rect bounds = *overlay.objectSelectionRect;
+  m_objectSelectionStatusLabel->setText(
+      QString("selected object: layer/path=%1 bounds=%2,%3,%4,%5 textObjects=%6")
+          .arg(QString::fromStdString(*overlay.objectSelectionId))
+          .arg(bounds.x)
+          .arg(bounds.y)
+          .arg(bounds.width)
+          .arg(bounds.height)
+          .arg(static_cast<int>(overlay.textObjects.size())));
 }
 
 void MainWindow::onRotateViewLeftTriggered() {

@@ -4,12 +4,15 @@
 #include <cmath>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QCoreApplication>
+#include <QFont>
+#include <QFontMetricsF>
 #include <QSettings>
 #include <QString>
 
@@ -347,6 +350,22 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
   CanvasOverlayViewModel view;
   view.toolOverlay = m_toolManager.overlay();
   view.selectionRect = m_document.selection().boundingRect();
+  const auto requestedSelection = m_requestedToolsRuntime.selectionState();
+  if (requestedSelection.valid) {
+    view.objectSelectionRect = requestedSelection.bounds;
+    view.objectSelectionId = std::to_string(requestedSelection.layerIndex) + ":" + std::to_string(requestedSelection.pathIndex);
+  }
+  if (m_objectSelection.hasSelection) {
+    view.objectSelectionRect = m_objectSelection.bounds;
+    view.objectSelectionId = m_objectSelection.selectedObjectId;
+    view.objectOverlay = m_objectOverlayRenderer.buildSelectionOverlay(m_objectSelection);
+  }
+  if (m_textEditor.selectedBounds().has_value()) {
+    view.objectSelectionRect = *m_textEditor.selectedBounds();
+    view.objectSelectionId = m_textEditor.selectedId().value_or(std::string {});
+    view.objectOverlay = m_textEditor.selectionOverlay();
+  }
+  view.cloneSamplePoint = m_requestedToolsRuntime.cloneSamplePoint();
   for (std::size_t layerIndex = 0; layerIndex < m_document.layerCount(); ++layerIndex) {
     const core::Layer& layer = m_document.layerAt(layerIndex);
     if (!layer.visible()) {
@@ -357,6 +376,15 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
         view.guides.push_back(path);
       }
     }
+  }
+  for (const auto& textObject : m_textEditor.objects()) {
+    CanvasOverlayViewModel::TextObjectViewModel textView;
+    textView.point = textObject.position;
+    textView.text = textObject.text;
+    textView.color = textObject.color;
+    textView.size = std::max(6, textObject.fontSize);
+    textView.rotationDeg = textObject.rotationDeg;
+    view.textObjects.push_back(std::move(textView));
   }
   return view;
 }
@@ -1669,6 +1697,13 @@ void AppController::beginStroke(int x, int y) {
 
   const core::ToolKind activeKind = m_toolManager.activeToolKind();
   const std::string activeSubToolId = currentSubToolId();
+  if (activeSubToolId == "operation_object") {
+    m_stroking = true;
+    if (m_textEditor.beginOperation(core::Point {x, y}) || beginObjectOperation(core::Point {x, y})) {
+      emit overlayChanged();
+    }
+    return;
+  }
   const bool handledByRequested = m_requestedToolsRuntime.handles(activeSubToolId);
   PendingStrokeState pending;
   pending.actionName = handledByRequested ? requestedToolDisplayName(activeSubToolId) : actionNameForTool(activeKind);
@@ -1719,6 +1754,15 @@ void AppController::continueStroke(int x, int y) {
 
   m_lastPointer = snapped;
   const std::string activeSubToolId = currentSubToolId();
+  if (activeSubToolId == "operation_object") {
+    if (m_textEditor.updateOperation(m_lastPointer) || continueObjectOperation(m_lastPointer)) {
+      rerender();
+      emit documentChanged();
+    } else {
+      emit overlayChanged();
+    }
+    return;
+  }
   core::ToolPointerEvent moveEvent;
   moveEvent.point = m_lastPointer;
   moveEvent.shift = m_shiftModifier;
@@ -1739,6 +1783,11 @@ void AppController::endStroke() {
 
   m_stroking = false;
   const std::string activeSubToolId = currentSubToolId();
+  if (activeSubToolId == "operation_object") {
+    m_textEditor.endOperation();
+    endObjectOperation();
+    return;
+  }
   core::ToolPointerEvent releaseEvent;
   releaseEvent.point = m_lastPointer;
   releaseEvent.shift = m_shiftModifier;
@@ -1754,39 +1803,7 @@ void AppController::endStroke() {
 }
 
 bool AppController::placeTextAt(int x, int y, const std::string& text) {
-  if (text.empty()) {
-    return false;
-  }
-  core::Layer* active = m_document.activeLayer();
-  if (active == nullptr || active->locked()) {
-    return false;
-  }
-  if (active->kind() != core::LayerKind::Vector) {
-    const std::size_t createdIndex = m_document.addVectorLayer("Text Objects");
-    active = &m_document.layerAt(createdIndex);
-    emit layersChanged();
-  }
-  const std::size_t layerIndex = m_document.activeLayerIndex();
-  StrokeHistoryEntry entry;
-  entry.kind = HistoryKind::Stroke;
-  entry.actionName = "Text Object";
-  entry.layerIndex = layerIndex;
-  entry.beforeLayer = *active;
-
-  core::VectorPath path;
-  path.kind = core::VectorPath::Kind::Text;
-  path.points = {core::Point {x, y}};
-  path.color = m_currentColor;
-  path.width = std::max(4, m_uiState.size);
-  path.opacity = std::clamp(static_cast<float>(m_uiState.opacity) / 100.0F, 0.0F, 1.0F);
-  path.text = text;
-  active->addVectorPath(std::move(path));
-
-  entry.afterLayer = *active;
-  pushHistoryEntry(std::move(entry));
-  rerender();
-  emit documentChanged();
-  return true;
+  return !createTextObjectAt(x, y, text).empty();
 #if 0
   if (m_textBaseByLayer.find(layerIndex) == m_textBaseByLayer.end()) {
     m_textBaseByLayer[layerIndex] = active->buffer();
@@ -1821,6 +1838,9 @@ std::optional<std::string> AppController::textAt(int x, int y) const {
   if (m_document.layerCount() == 0) {
     return std::nullopt;
   }
+  if (const auto id = textObjectIdAt(x, y); id.has_value()) {
+    return textForObjectId(*id);
+  }
   const std::size_t layerIndex = m_document.activeLayerIndex();
   const core::Layer& layer = m_document.layerAt(layerIndex);
   if (layer.kind() == core::LayerKind::Vector) {
@@ -1831,7 +1851,8 @@ std::optional<std::string> AppController::textAt(int x, int y) const {
         continue;
       }
       const int charW = std::max(4, path.width);
-      const int w = std::max(12, static_cast<int>(path.text.size()) * (charW + 2));
+      const int glyphCount = QString::fromUtf8(path.text.c_str()).size();
+      const int w = std::max(12, glyphCount * (charW + 2));
       const int h = std::max(8, path.width * 2);
       const core::Point p = path.points.front();
       if (x >= p.x && y >= p.y && x <= p.x + w && y <= p.y + h) {
@@ -1851,8 +1872,11 @@ std::optional<std::string> AppController::textAt(int x, int y) const {
 }
 
 bool AppController::editTextAt(int x, int y, const std::string& text) {
-  if (text.empty() || m_document.layerCount() == 0) {
+  if (m_document.layerCount() == 0) {
     return false;
+  }
+  if (const auto id = textObjectIdAt(x, y); id.has_value()) {
+    return setTextForObjectId(*id, text);
   }
   core::Layer* active = m_document.activeLayer();
   if (active == nullptr || active->locked()) {
@@ -1867,7 +1891,8 @@ bool AppController::editTextAt(int x, int y, const std::string& text) {
         continue;
       }
       const int charW = std::max(4, path.width);
-      const int w = std::max(12, static_cast<int>(path.text.size()) * (charW + 2));
+      const int glyphCount = QString::fromUtf8(path.text.c_str()).size();
+      const int w = std::max(12, glyphCount * (charW + 2));
       const int h = std::max(8, path.width * 2);
       const core::Point p = path.points.front();
       if (x < p.x || y < p.y || x > p.x + w || y > p.y + h) {
@@ -1972,6 +1997,10 @@ bool AppController::undo() {
 
   switch (entry.kind) {
     case HistoryKind::Stroke:
+      if (entry.beforeObjectLayers.has_value()) {
+        m_objectLayers = *entry.beforeObjectLayers;
+        break;
+      }
       if (!entry.beforeLayer.has_value()) {
         clearStrokeHistory();
         return false;
@@ -2023,6 +2052,10 @@ bool AppController::redo() {
 
   switch (entry.kind) {
     case HistoryKind::Stroke:
+      if (entry.afterObjectLayers.has_value()) {
+        m_objectLayers = *entry.afterObjectLayers;
+        break;
+      }
       if (!entry.afterLayer.has_value()) {
         clearStrokeHistory();
         return false;
@@ -3034,6 +3067,183 @@ void AppController::pushSelectionHistoryIfChanged(const core::SelectionMask& bef
 void AppController::clearStrokeHistory() noexcept {
   m_undoHistory.clear();
   m_redoHistory.clear();
+}
+
+bool AppController::beginObjectOperation(core::Point point) {
+  m_objectSelection = m_objectSelectionService.hitTest(m_objectLayers, point);
+  m_lastPointer = point;
+  m_objectOpChanged = false;
+  m_objectOpBeforeLayers.reset();
+  if (!m_objectSelection.hasSelection) {
+    return false;
+  }
+  m_objectOpBeforeLayers = m_objectLayers;
+  return true;
+}
+
+bool AppController::continueObjectOperation(core::Point point) {
+  if (!m_objectSelection.hasSelection) {
+    return false;
+  }
+  features::object_editing::ObjectModel* object = findObjectById(m_objectSelection.selectedObjectId);
+  if (object == nullptr) {
+    return false;
+  }
+  const int dx = point.x - m_lastPointer.x;
+  const int dy = point.y - m_lastPointer.y;
+  m_lastPointer = point;
+  if (!m_objectTransformController.applyDrag(*object, m_objectSelection.handleHit, dx, dy)) {
+    return false;
+  }
+  if (object->kind == features::object_editing::ObjectKind::Text) {
+    recomputeTextObjectBounds(*object);
+  }
+  m_objectSelection.bounds = object->bounds;
+  m_objectOpChanged = true;
+  return true;
+}
+
+void AppController::endObjectOperation() {
+  if (!m_objectOpChanged || !m_objectOpBeforeLayers.has_value()) {
+    emit overlayChanged();
+    return;
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Object Transform";
+  entry.layerIndex = m_document.activeLayerIndex();
+  entry.beforeObjectLayers = *m_objectOpBeforeLayers;
+  entry.afterObjectLayers = m_objectLayers;
+  pushHistoryEntry(std::move(entry));
+  m_objectOpBeforeLayers.reset();
+  rerender();
+  emit documentChanged();
+}
+
+features::object_editing::ObjectModel* AppController::findObjectById(const std::string& id) {
+  for (auto& layer : m_objectLayers) {
+    for (auto& object : layer.objects) {
+      if (object.id == id) {
+        return &object;
+      }
+    }
+  }
+  return nullptr;
+}
+
+const features::object_editing::ObjectModel* AppController::findObjectById(const std::string& id) const {
+  for (const auto& layer : m_objectLayers) {
+    for (const auto& object : layer.objects) {
+      if (object.id == id) {
+        return &object;
+      }
+    }
+  }
+  return nullptr;
+}
+
+void AppController::recomputeTextObjectBounds(features::object_editing::ObjectModel& object) {
+  auto* payload = std::get_if<features::object_editing::TextPayload>(&object.payload);
+  if (payload == nullptr) {
+    return;
+  }
+  QFont font(QString::fromUtf8(payload->fontFamily.c_str()));
+  font.setPointSize(std::max(8, payload->fontSize));
+  QFontMetricsF metrics(font);
+  const QString text = QString::fromUtf8(payload->text.c_str());
+  const qreal w = std::max<qreal>(12.0, metrics.horizontalAdvance(text.isEmpty() ? QStringLiteral(" ") : text));
+  const qreal h = std::max<qreal>(12.0, metrics.height());
+  object.bounds.width = std::max(1, static_cast<int>(std::ceil(w)));
+  object.bounds.height = std::max(1, static_cast<int>(std::ceil(h)));
+}
+
+std::string AppController::createTextObjectAt(int x, int y, const std::string& text) {
+  const bool ok = m_textEditor.beginTextInput(core::Point {x, y}, m_currentColor, std::max(8, m_uiState.size));
+  if (!ok || !m_textEditor.selectedId().has_value()) {
+    return {};
+  }
+  const std::string id = *m_textEditor.selectedId();
+  m_textEditor.setTextForId(id, text);
+  rerender();
+  emit documentChanged();
+  return id;
+}
+
+std::optional<std::string> AppController::textObjectIdAt(int x, int y) const {
+  return m_textEditor.hitTextIdAt(core::Point {x, y});
+}
+
+std::optional<std::string> AppController::textForObjectId(const std::string& objectId) const {
+  return m_textEditor.textForId(objectId);
+}
+
+std::optional<core::Rect> AppController::textBoundsForObjectId(const std::string& objectId) const {
+  return m_textEditor.boundsForId(objectId);
+}
+
+bool AppController::setTextForObjectId(const std::string& objectId, const std::string& text) {
+  if (!m_textEditor.setTextForId(objectId, text)) {
+    return false;
+  }
+  rerender();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::removeObjectById(const std::string& objectId) {
+  if (!m_textEditor.removeById(objectId)) return false;
+  rerender();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::beginTextSessionAt(int x, int y) {
+  const bool ok = m_textEditor.beginTextInput(core::Point {x, y}, m_currentColor, std::max(8, m_uiState.size));
+  if (ok) emit overlayChanged();
+  return ok;
+}
+
+bool AppController::handleTextSessionKey(int key, const std::string& textUtf8) {
+  const bool changed = m_textEditor.handleKeyPress(key, textUtf8);
+  if (changed) {
+    rerender();
+    emit documentChanged();
+  }
+  return changed;
+}
+
+bool AppController::hasActiveTextSession() const noexcept {
+  return m_textEditor.hasActiveTextSession();
+}
+
+features::object_editing::ObjectLayerModel* AppController::ensureObjectLayerForActiveLayer() {
+  if (m_document.layerCount() == 0) {
+    return nullptr;
+  }
+  const std::string id = "layer_" + std::to_string(m_document.activeLayerIndex());
+  for (auto& layer : m_objectLayers) {
+    if (layer.id == id) {
+      return &layer;
+    }
+  }
+  features::object_editing::ObjectLayerModel layer;
+  layer.id = id;
+  layer.name = "Objects " + std::to_string(m_document.activeLayerIndex());
+  m_objectLayers.push_back(std::move(layer));
+  return &m_objectLayers.back();
+}
+
+const features::object_editing::ObjectLayerModel* AppController::objectLayerForActiveLayer() const {
+  if (m_document.layerCount() == 0) {
+    return nullptr;
+  }
+  const std::string id = "layer_" + std::to_string(m_document.activeLayerIndex());
+  for (const auto& layer : m_objectLayers) {
+    if (layer.id == id) {
+      return &layer;
+    }
+  }
+  return nullptr;
 }
 
 std::optional<std::size_t> AppController::findTextEntryAt(std::size_t layerIndex, int x, int y) const {

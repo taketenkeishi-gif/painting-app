@@ -69,6 +69,49 @@ void drawLine(core::PixelBuffer& buffer, core::Point from, core::Point to, int r
   }
 }
 
+core::Rect pointsBounds(const std::vector<core::Point>& points) {
+  if (points.empty()) {
+    return core::Rect {0, 0, 0, 0};
+  }
+  int minX = points.front().x;
+  int minY = points.front().y;
+  int maxX = points.front().x;
+  int maxY = points.front().y;
+  for (const core::Point& p : points) {
+    minX = std::min(minX, p.x);
+    minY = std::min(minY, p.y);
+    maxX = std::max(maxX, p.x);
+    maxY = std::max(maxY, p.y);
+  }
+  return core::Rect {minX, minY, std::max(1, maxX - minX + 1), std::max(1, maxY - minY + 1)};
+}
+
+core::Rect textBounds(const core::VectorPath& path) {
+  if (path.points.empty()) {
+    return core::Rect {0, 0, 0, 0};
+  }
+  const core::Point p = path.points.front();
+  const int charW = std::max(4, path.width);
+  auto utf8GlyphCount = [](std::string_view s) {
+    int count = 0;
+    for (unsigned char c : s) {
+      if ((c & 0xC0) != 0x80) {
+        ++count;
+      }
+    }
+    return std::max(1, count);
+  };
+  const int glyphCount = utf8GlyphCount(path.text);
+  const int w = std::max(12, glyphCount * (charW + 2));
+  const int h = std::max(8, path.width * 2);
+  return core::Rect {p.x, p.y, w, h};
+}
+
+bool inRect(const core::Rect& rect, core::Point p, int padding = 0) {
+  return p.x >= rect.x - padding && p.y >= rect.y - padding &&
+      p.x <= rect.x + rect.width + padding && p.y <= rect.y + rect.height + padding;
+}
+
 } // namespace
 
 bool RequestedToolsRuntime::handles(std::string_view subToolId) const noexcept {
@@ -173,7 +216,8 @@ void RequestedToolsRuntime::cancel() noexcept {
   m_cloneWorkingSnapshot.reset();
   m_blendSnapshot.reset();
   m_liquifySnapshot.reset();
-  m_operationSelectedPathIndex.reset();
+  m_selectionState = SelectionState {};
+  m_operationHandle = OperationHandle::None;
 }
 
 core::ToolResult RequestedToolsRuntime::pressGradient(core::ToolContext& context, const core::ToolPointerEvent& event) {
@@ -246,6 +290,10 @@ core::ToolResult RequestedToolsRuntime::releaseComic(
   const int maxX = std::max(m_dragStart.x, end.x);
   const int maxY = std::max(m_dragStart.y, end.y);
   const core::Color c = withOpacity(color, opacityPercent);
+  if (active->kind() == core::LayerKind::Raster) {
+    const std::size_t guideLayer = context.document.addVectorLayer("Comic Objects");
+    active = &context.document.layerAt(guideLayer);
+  }
   if (active->kind() == core::LayerKind::Vector) {
     core::VectorPath path;
     path.color = c;
@@ -257,18 +305,7 @@ core::ToolResult RequestedToolsRuntime::releaseComic(
     result.dirtyRect = core::Rect {0, 0, active->buffer().width(), active->buffer().height()};
     return result;
   }
-  if (!isRasterLayer(active)) {
-    return {};
-  }
-  core::PixelBuffer& buffer = active->buffer();
-  drawLine(buffer, {minX, minY}, {maxX, minY}, std::max(1, size / 2), c, 1.0F);
-  drawLine(buffer, {maxX, minY}, {maxX, maxY}, std::max(1, size / 2), c, 1.0F);
-  drawLine(buffer, {maxX, maxY}, {minX, maxY}, std::max(1, size / 2), c, 1.0F);
-  drawLine(buffer, {minX, maxY}, {minX, minY}, std::max(1, size / 2), c, 1.0F);
-  core::ToolResult result;
-  result.pixelsChanged = true;
-  result.dirtyRect = core::Rect {minX, minY, maxX - minX + 1, maxY - minY + 1};
-  return result;
+  return {};
 }
 
 core::ToolResult RequestedToolsRuntime::pressText(
@@ -281,45 +318,12 @@ core::ToolResult RequestedToolsRuntime::pressText(
   if (active == nullptr || active->locked()) {
     return {};
   }
-  const int w = std::max(20, size * 5);
-  const int h = std::max(12, size * 2);
-  const core::Color c = withOpacity(color, opacityPercent);
-  if (active->kind() == core::LayerKind::Vector) {
-    core::VectorPath path;
-    path.color = c;
-    path.width = std::max(1, size / 3);
-    path.points = {
-        {event.point.x, event.point.y},
-        {event.point.x + w, event.point.y},
-        {event.point.x + w, event.point.y + h},
-        {event.point.x, event.point.y + h},
-        {event.point.x, event.point.y}};
-    active->addVectorPath(std::move(path));
-    core::ToolResult result;
-    result.pixelsChanged = true;
-    result.dirtyRect = core::Rect {0, 0, active->buffer().width(), active->buffer().height()};
-    return result;
-  }
-  if (!isRasterLayer(active)) {
-    return {};
-  }
-  core::PixelBuffer& buffer = active->buffer();
-  for (int y = event.point.y; y < event.point.y + h; ++y) {
-    for (int x = event.point.x; x < event.point.x + w; ++x) {
-      if (!buffer.inBounds(x, y)) {
-        continue;
-      }
-      const bool border = (x == event.point.x) || (x == event.point.x + w - 1) || (y == event.point.y) ||
-          (y == event.point.y + h - 1);
-      if (border || ((x - event.point.x) % std::max(2, size) == 0)) {
-        blendPixel(buffer, x, y, c, border ? 1.0F : 0.35F);
-      }
-    }
-  }
-  core::ToolResult result;
-  result.pixelsChanged = true;
-  result.dirtyRect = core::Rect {event.point.x, event.point.y, w, h};
-  return result;
+  static_cast<void>(context);
+  static_cast<void>(event);
+  static_cast<void>(color);
+  static_cast<void>(size);
+  static_cast<void>(opacityPercent);
+  return {};
 }
 
 core::ToolResult RequestedToolsRuntime::releaseRuler(
@@ -588,32 +592,63 @@ core::ToolResult RequestedToolsRuntime::moveLiquify(core::ToolContext& context, 
 }
 
 core::ToolResult RequestedToolsRuntime::pressOperation(core::ToolContext& context, const core::ToolPointerEvent& event) {
-  core::Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->locked()) {
-    return {};
-  }
+  m_selectionState = SelectionState {};
   m_dragging = true;
   m_lastPoint = event.point;
-  m_operationSelectedPathIndex.reset();
-  if (active->kind() != core::LayerKind::Vector) {
-    return {};
-  }
-  auto& paths = active->vectorPaths();
-  float bestDist2 = 1.0e12F;
-  for (std::size_t i = 0; i < paths.size(); ++i) {
-    for (const core::Point& p : paths[i].points) {
-      const float dx = static_cast<float>(p.x - event.point.x);
-      const float dy = static_cast<float>(p.y - event.point.y);
-      const float d2 = dx * dx + dy * dy;
-      if (d2 < bestDist2) {
-        bestDist2 = d2;
-        m_operationSelectedPathIndex = i;
+  m_operationHandle = OperationHandle::None;
+
+  for (std::size_t layerRev = context.document.layerCount(); layerRev > 0; --layerRev) {
+    const std::size_t layerIndex = layerRev - 1;
+    core::Layer& layer = context.document.layerAt(layerIndex);
+    if (!layer.visible() || layer.locked() || layer.kind() != core::LayerKind::Vector) {
+      continue;
+    }
+    auto& paths = layer.vectorPaths();
+    for (std::size_t pathRev = paths.size(); pathRev > 0; --pathRev) {
+      const std::size_t i = pathRev - 1;
+      const core::VectorPath& path = paths[i];
+      core::Rect bounds = path.kind == core::VectorPath::Kind::Text ? textBounds(path) : pointsBounds(path.points);
+      if (bounds.width <= 0 || bounds.height <= 0 || !inRect(bounds, event.point, 8)) {
+        continue;
       }
+      m_selectionState.layerIndex = layerIndex;
+      m_selectionState.pathIndex = i;
+      m_selectionState.pathKind = path.kind;
+      m_selectionState.bounds = bounds;
+      m_selectionState.valid = true;
+
+      if (path.kind == core::VectorPath::Kind::Ruler && path.points.size() >= 2) {
+        const core::Point p0 = path.points[0];
+        const core::Point p1 = path.points[1];
+        const float d0 = static_cast<float>((p0.x - event.point.x) * (p0.x - event.point.x) + (p0.y - event.point.y) * (p0.y - event.point.y));
+        const float d1 = static_cast<float>((p1.x - event.point.x) * (p1.x - event.point.x) + (p1.y - event.point.y) * (p1.y - event.point.y));
+        if (d0 <= 100.0F) {
+          m_operationHandle = OperationHandle::RulerStart;
+        } else if (d1 <= 100.0F) {
+          m_operationHandle = OperationHandle::RulerEnd;
+        } else {
+          m_operationHandle = OperationHandle::Move;
+        }
+      } else {
+        const core::Point tl {bounds.x, bounds.y};
+        const core::Point tr {bounds.x + bounds.width, bounds.y};
+        const core::Point bl {bounds.x, bounds.y + bounds.height};
+        const core::Point br {bounds.x + bounds.width, bounds.y + bounds.height};
+        auto nearHandle = [&](core::Point hp) {
+          const int hx = hp.x - event.point.x;
+          const int hy = hp.y - event.point.y;
+          return hx * hx + hy * hy <= 144;
+        };
+        if (nearHandle(tl)) m_operationHandle = OperationHandle::RectTopLeft;
+        else if (nearHandle(tr)) m_operationHandle = OperationHandle::RectTopRight;
+        else if (nearHandle(bl)) m_operationHandle = OperationHandle::RectBottomLeft;
+        else if (nearHandle(br)) m_operationHandle = OperationHandle::RectBottomRight;
+        else m_operationHandle = OperationHandle::Move;
+      }
+      goto selected_done;
     }
   }
-  if (bestDist2 > 400.0F) {
-    m_operationSelectedPathIndex.reset();
-  }
+selected_done:
   core::ToolResult result;
   result.viewportChanged = true;
   return result;
@@ -624,7 +659,11 @@ core::ToolResult RequestedToolsRuntime::moveOperation(core::ToolContext& context
     return {};
   }
   core::Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->locked()) {
+  if (!m_selectionState.valid || m_selectionState.layerIndex >= context.document.layerCount()) {
+    return {};
+  }
+  core::Layer& layer = context.document.layerAt(m_selectionState.layerIndex);
+  if (layer.locked() || layer.kind() != core::LayerKind::Vector || m_selectionState.pathIndex >= layer.vectorPaths().size()) {
     return {};
   }
   const int dx = event.point.x - m_lastPoint.x;
@@ -633,20 +672,57 @@ core::ToolResult RequestedToolsRuntime::moveOperation(core::ToolContext& context
   if (dx == 0 && dy == 0) {
     return {};
   }
-  if (active->kind() == core::LayerKind::Vector && m_operationSelectedPathIndex.has_value() &&
-      *m_operationSelectedPathIndex < active->vectorPaths().size()) {
-    auto& points = active->vectorPaths()[*m_operationSelectedPathIndex].points;
-    for (core::Point& p : points) {
+  core::VectorPath& path = layer.vectorPaths()[m_selectionState.pathIndex];
+  if (m_operationHandle == OperationHandle::Move) {
+    for (core::Point& p : path.points) {
       p.x += dx;
       p.y += dy;
     }
-    core::ToolResult result;
-    result.pixelsChanged = true;
-    result.viewportChanged = true;
-    result.dirtyRect = core::Rect {0, 0, active->buffer().width(), active->buffer().height()};
-    return result;
+  } else if (path.kind == core::VectorPath::Kind::Ruler && path.points.size() >= 2) {
+    if (m_operationHandle == OperationHandle::RulerStart) {
+      path.points[0].x += dx;
+      path.points[0].y += dy;
+    } else if (m_operationHandle == OperationHandle::RulerEnd) {
+      path.points[1].x += dx;
+      path.points[1].y += dy;
+    }
+  } else {
+    core::Rect b = path.kind == core::VectorPath::Kind::Text ? textBounds(path) : pointsBounds(path.points);
+    int left = b.x;
+    int top = b.y;
+    int right = b.x + b.width;
+    int bottom = b.y + b.height;
+    if (m_operationHandle == OperationHandle::RectTopLeft) {
+      left += dx;
+      top += dy;
+    } else if (m_operationHandle == OperationHandle::RectTopRight) {
+      right += dx;
+      top += dy;
+    } else if (m_operationHandle == OperationHandle::RectBottomLeft) {
+      left += dx;
+      bottom += dy;
+    } else if (m_operationHandle == OperationHandle::RectBottomRight) {
+      right += dx;
+      bottom += dy;
+    }
+    if (right - left < 4 || bottom - top < 4) {
+      return {};
+    }
+    if (path.kind == core::VectorPath::Kind::Text) {
+      if (!path.points.empty()) {
+        path.points[0] = core::Point {left, top};
+      }
+      path.width = std::max(4, (bottom - top) / 2);
+    } else if (path.points.size() >= 4) {
+      path.points = {{left, top}, {right, top}, {right, bottom}, {left, bottom}, {left, top}};
+    }
   }
-  return {};
+  m_selectionState.bounds = path.kind == core::VectorPath::Kind::Text ? textBounds(path) : pointsBounds(path.points);
+  core::ToolResult result;
+  result.pixelsChanged = true;
+  result.viewportChanged = true;
+  result.dirtyRect = core::Rect {0, 0, layer.buffer().width(), layer.buffer().height()};
+  return result;
 }
 
 core::ToolResult RequestedToolsRuntime::releaseOperation(core::ToolContext& context) {

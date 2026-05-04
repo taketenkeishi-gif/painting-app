@@ -8,10 +8,9 @@
 #include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QLabel>
-#include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QInputDialog>
+#include <QFontDatabase>
 #include <QWheelEvent>
 
 #include "app/bridge/AppController.h"
@@ -73,6 +72,19 @@ void drawCheckerboard(QPainter& painter, const QRect& rect, int cellSize) {
       painter.fillRect(tile, useA ? a : b);
     }
   }
+}
+
+void drawSelectionHandles(QPainter& painter, const QRectF& selectionRect, const QColor& color, double handleSize) {
+  painter.setBrush(Qt::NoBrush);
+  painter.setPen(QPen(color, 1.4, Qt::DashLine));
+  painter.drawRect(selectionRect);
+  painter.setBrush(color);
+  painter.setPen(Qt::NoPen);
+  const double h = handleSize;
+  painter.drawRect(QRectF(selectionRect.topLeft().x() - h / 2.0, selectionRect.topLeft().y() - h / 2.0, h, h));
+  painter.drawRect(QRectF(selectionRect.topRight().x() - h / 2.0, selectionRect.topRight().y() - h / 2.0, h, h));
+  painter.drawRect(QRectF(selectionRect.bottomLeft().x() - h / 2.0, selectionRect.bottomLeft().y() - h / 2.0, h, h));
+  painter.drawRect(QRectF(selectionRect.bottomRight().x() - h / 2.0, selectionRect.bottomRight().y() - h / 2.0, h, h));
 }
 
 Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
@@ -257,6 +269,50 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.drawLine(p1, p2);
     }
 
+    for (const auto& textObj : overlay.textObjects) {
+      const QPointF p(
+          target.x() + (static_cast<double>(textObj.point.x) + 0.5) * state.zoom,
+          target.y() + (static_cast<double>(textObj.point.y) + 0.5) * state.zoom);
+      QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
+      font.setFamilies(QStringList {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo"), QStringLiteral("Noto Sans CJK JP"), font.family()});
+      font.setPointSize(std::max(8, static_cast<int>(std::lround(static_cast<double>(textObj.size) * 1.5))));
+      painter.save();
+      painter.translate(p);
+      painter.rotate(textObj.rotationDeg);
+      painter.setFont(font);
+      painter.setPen(QColor(textObj.color.r, textObj.color.g, textObj.color.b, textObj.color.a));
+      painter.drawText(QPointF(0.0, 0.0), QString::fromUtf8(textObj.text.c_str()));
+      painter.restore();
+    }
+    if (m_textEditActive && !m_textEditObjectId.empty()) {
+      const auto boundsOpt = m_controller->textBoundsForObjectId(m_textEditObjectId);
+      if (boundsOpt.has_value()) {
+      const core::Rect b = *boundsOpt;
+      const core::Point p {b.x, b.y + b.height};
+      const QPointF anchor(
+          target.x() + (static_cast<double>(p.x) + 0.5) * state.zoom,
+          target.y() + (static_cast<double>(p.y) + 0.5) * state.zoom);
+      QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
+      font.setFamilies(QStringList {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo"), QStringLiteral("Noto Sans CJK JP"), font.family()});
+      font.setPointSize(std::max(8, static_cast<int>(std::lround(static_cast<double>(m_controller->toolState().size) * 1.5))));
+      painter.setFont(font);
+      QFontMetricsF metrics(font);
+      const auto live = m_controller->textForObjectId(m_textEditObjectId).value_or(std::string {});
+      const QString display = QString::fromUtf8(live.c_str());
+      const qreal textW = std::max<qreal>(12.0, static_cast<qreal>(b.width));
+      const qreal textH = std::max<qreal>(12.0, static_cast<qreal>(b.height));
+      QRectF box(anchor.x() - 2.0, anchor.y() - textH, textW + 6.0, textH + 6.0);
+      painter.setBrush(Qt::NoBrush);
+      painter.setPen(QPen(QColor(255, 90, 90, 235), 1.2, Qt::DashLine));
+      painter.drawRect(box);
+      painter.setPen(QPen(QColor(255, 255, 255, 240), 1.0));
+      painter.drawText(anchor, display);
+      const qreal caretX = anchor.x() + metrics.horizontalAdvance(display);
+      painter.setPen(QPen(QColor(255, 90, 90, 245), 1.2));
+      painter.drawLine(QPointF(caretX, anchor.y() - textH + 2.0), QPointF(caretX, anchor.y() + 2.0));
+      }
+    }
+
     if (overlay.toolOverlay.hasLine) {
       const QPointF p1(
           target.x() + (static_cast<double>(overlay.toolOverlay.lineStart.x) + 0.5) * state.zoom,
@@ -292,16 +348,48 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
           target.y() + static_cast<double>(rect.y) * state.zoom,
           std::max(1.0, static_cast<double>(rect.width) * state.zoom),
           std::max(1.0, static_cast<double>(rect.height) * state.zoom));
-      painter.setBrush(Qt::NoBrush);
-      painter.setPen(QPen(QColor(255, 210, 80, 230), 1.4, Qt::SolidLine));
-      painter.drawRect(selectionRect);
-      painter.setBrush(QColor(255, 210, 80, 210));
-      painter.setPen(Qt::NoPen);
-      constexpr double handle = 4.0;
-      painter.drawRect(QRectF(selectionRect.topLeft().x() - handle / 2.0, selectionRect.topLeft().y() - handle / 2.0, handle, handle));
-      painter.drawRect(QRectF(selectionRect.topRight().x() - handle / 2.0, selectionRect.topRight().y() - handle / 2.0, handle, handle));
-      painter.drawRect(QRectF(selectionRect.bottomLeft().x() - handle / 2.0, selectionRect.bottomLeft().y() - handle / 2.0, handle, handle));
-      painter.drawRect(QRectF(selectionRect.bottomRight().x() - handle / 2.0, selectionRect.bottomRight().y() - handle / 2.0, handle, handle));
+      drawSelectionHandles(painter, selectionRect, QColor(255, 210, 80, 210), 4.0);
+    }
+
+    if (overlay.objectSelectionRect.has_value()) {
+      const core::Rect rect = *overlay.objectSelectionRect;
+      const QRectF selectionRect(
+          target.x() + static_cast<double>(rect.x) * state.zoom,
+          target.y() + static_cast<double>(rect.y) * state.zoom,
+          std::max(1.0, static_cast<double>(rect.width) * state.zoom),
+          std::max(1.0, static_cast<double>(rect.height) * state.zoom));
+      drawSelectionHandles(painter, selectionRect, QColor(255, 64, 64, 235), 7.0);
+    }
+    for (const auto& primitive : overlay.objectOverlay.primitives) {
+      if (primitive.kind == features::object_editing::OverlayPrimitive::Kind::Line) {
+        const QPointF p1(
+            target.x() + (static_cast<double>(primitive.p1.x) + 0.5) * state.zoom,
+            target.y() + (static_cast<double>(primitive.p1.y) + 0.5) * state.zoom);
+        const QPointF p2(
+            target.x() + (static_cast<double>(primitive.p2.x) + 0.5) * state.zoom,
+            target.y() + (static_cast<double>(primitive.p2.y) + 0.5) * state.zoom);
+        painter.setPen(QPen(QColor(255, 64, 64, 235), 1.3));
+        painter.drawLine(p1, p2);
+      } else if (primitive.kind == features::object_editing::OverlayPrimitive::Kind::HandlePoint) {
+        const QPointF p(
+            target.x() + (static_cast<double>(primitive.p1.x) + 0.5) * state.zoom,
+            target.y() + (static_cast<double>(primitive.p1.y) + 0.5) * state.zoom);
+        painter.setBrush(QColor(255, 64, 64, 235));
+        painter.setPen(QPen(QColor(20, 20, 20, 220), 1.0));
+        painter.drawEllipse(p, 4.0, 4.0);
+      }
+    }
+
+    if (overlay.cloneSamplePoint.has_value()) {
+      const core::Point p = *overlay.cloneSamplePoint;
+      const QPointF center(
+          target.x() + (static_cast<double>(p.x) + 0.5) * state.zoom,
+          target.y() + (static_cast<double>(p.y) + 0.5) * state.zoom);
+      painter.setBrush(QBrush(QColor(90, 200, 255, 220)));
+      painter.setPen(QPen(QColor(0, 0, 0, 220), 1.0));
+      painter.drawEllipse(center, 4.0, 4.0);
+      painter.drawLine(QPointF(center.x() - 8.0, center.y()), QPointF(center.x() + 8.0, center.y()));
+      painter.drawLine(QPointF(center.x(), center.y() - 8.0), QPointF(center.x(), center.y() + 8.0));
     }
 
   }
@@ -322,8 +410,11 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   if (m_showOverlay && !state.panning && !m_spacePressed && state.hasMousePos && m_controller != nullptr) {
     const auto point = mapToCanvas(state.lastMousePos);
     const core::ToolKind activeTool = m_controller->currentTool();
-    if (point.has_value() &&
-        (activeTool == core::ToolKind::Brush || activeTool == core::ToolKind::Eraser)) {
+    const std::string subToolId = m_controller->currentSubToolId();
+    const bool showSizeCursor = (activeTool == core::ToolKind::Brush || activeTool == core::ToolKind::Eraser ||
+        subToolId == "clone_stamp_basic" || subToolId == "color_mix_blend" || subToolId == "liquify_push" ||
+        subToolId == "sketch_pencil");
+    if (point.has_value() && showSizeCursor) {
       const double radiusPx = std::max(1.0, (m_controller->toolState().size * state.zoom) / 2.0);
       const QPointF center(
           target.x() + (static_cast<double>(point->x) + 0.5) * state.zoom,
@@ -397,30 +488,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   }
 
   if (m_controller->currentSubToolId() == "text_basic") {
-    bool ok = false;
-    static QString s_lastText = QStringLiteral("Text");
-    QString initial = s_lastText;
-    const auto existing = m_controller->textAt(point->x, point->y);
-    const bool hasExisting = existing.has_value();
-    if (hasExisting) {
-      initial = QString::fromUtf8(existing->c_str());
-    }
-    const QString text = QInputDialog::getText(
-        this,
-        QStringLiteral("テキスト入力"),
-        QStringLiteral("文字列"),
-        QLineEdit::Normal,
-        initial,
-        &ok);
-    if (ok && !text.isEmpty()) {
-      s_lastText = text;
-      if (hasExisting) {
-        m_controller->editTextAt(point->x, point->y, text.toUtf8().toStdString());
-      } else {
-        m_controller->placeTextAt(point->x, point->y, text.toUtf8().toStdString());
-      }
-      update();
-    }
+    beginTextEditSession(*point);
     return;
   }
 
@@ -496,6 +564,9 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   const QPoint nowPos = event->position().toPoint();
   const qint64 nowNs = g_eventTimer.nsecsElapsed();
   bool shouldDispatch = true;
+  if (m_controller->currentSubToolId() == "operation_object") {
+    shouldDispatch = true;
+  } else
   if (state.hasLastStrokeDispatchPos) {
     const QPoint delta = nowPos - state.lastStrokeDispatchWidgetPos;
     const bool movedEnough = delta.manhattanLength() >= 2;
@@ -553,6 +624,43 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
   m_mouseDrawing = false;
   state.hasLastStrokeDispatchPos = false;
   updateCursorForState(mapToCanvas(state.lastMousePos));
+  update();
+}
+
+void CanvasWidget::beginTextEditSession(const core::Point& canvasPoint) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  if (m_textEditActive) {
+    commitTextEditSession();
+  }
+  if (!m_controller->beginTextSessionAt(canvasPoint.x, canvasPoint.y)) {
+    return;
+  }
+  const auto existingId = m_controller->textObjectIdAt(canvasPoint.x, canvasPoint.y);
+  m_textEditObjectId = existingId.value_or(std::string {});
+  m_textEditActive = !m_textEditObjectId.empty();
+  setFocus(Qt::MouseFocusReason);
+  update();
+}
+
+void CanvasWidget::commitTextEditSession() {
+  if (!m_textEditActive) {
+    return;
+  }
+  m_controller->handleTextSessionKey(Qt::Key_Return, "");
+  m_textEditActive = false;
+  m_textEditObjectId.clear();
+  update();
+}
+
+void CanvasWidget::cancelTextEditSession() {
+  if (!m_textEditActive) {
+    return;
+  }
+  m_controller->handleTextSessionKey(Qt::Key_Escape, "");
+  m_textEditActive = false;
+  m_textEditObjectId.clear();
   update();
 }
 
@@ -624,6 +732,31 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
   if (event->isAutoRepeat()) {
     QWidget::keyPressEvent(event);
     return;
+  }
+  if (m_textEditActive) {
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+      commitTextEditSession();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Escape) {
+      cancelTextEditSession();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Backspace) {
+      m_controller->handleTextSessionKey(Qt::Key_Backspace, "");
+      update();
+      event->accept();
+      return;
+    }
+    const QString t = event->text();
+    if (!t.isEmpty() && t.at(0).isPrint()) {
+      m_controller->handleTextSessionKey(event->key(), t.toUtf8().toStdString());
+      update();
+      event->accept();
+      return;
+    }
   }
   if (event->key() == Qt::Key_Space) {
     m_spacePressed = true;

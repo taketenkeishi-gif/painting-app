@@ -31,6 +31,11 @@
 #include "core/tools/ToolManager.h"
 #include "core/tools/ZoomTool.h"
 #include "features/requested_tools/RequestedToolsRuntime.h"
+#include "features/object_editing/ObjectLayerModel.h"
+#include "features/object_editing/ObjectSelectionService.h"
+#include "features/object_editing/ObjectTransformController.h"
+#include "features/object_editing/ObjectOverlayRenderer.h"
+#include "features/object_editing/text_editor/TextEditorFeature.h"
 
 namespace app::bridge {
 
@@ -97,9 +102,22 @@ struct ToolStateViewModel {
 };
 
 struct CanvasOverlayViewModel {
+  struct TextObjectViewModel {
+    core::Point point {0, 0};
+    std::string text;
+    core::Color color {0, 0, 0, 255};
+    int size {8};
+    float rotationDeg {0.0F};
+  };
+
   core::ToolOverlayState toolOverlay;
   std::optional<core::Rect> selectionRect;
+  std::optional<core::Rect> objectSelectionRect;
+  std::optional<std::string> objectSelectionId;
+  features::object_editing::ObjectOverlayModel objectOverlay;
   std::vector<core::VectorPath> guides;
+  std::vector<TextObjectViewModel> textObjects;
+  std::optional<core::Point> cloneSamplePoint;
 };
 
 class AppController : public QObject {
@@ -225,6 +243,15 @@ public:
   bool placeTextAt(int x, int y, const std::string& text);
   std::optional<std::string> textAt(int x, int y) const;
   bool editTextAt(int x, int y, const std::string& text);
+  std::string createTextObjectAt(int x, int y, const std::string& text);
+  std::optional<std::string> textObjectIdAt(int x, int y) const;
+  std::optional<std::string> textForObjectId(const std::string& objectId) const;
+  std::optional<core::Rect> textBoundsForObjectId(const std::string& objectId) const;
+  bool setTextForObjectId(const std::string& objectId, const std::string& text);
+  bool removeObjectById(const std::string& objectId);
+  bool beginTextSessionAt(int x, int y);
+  bool handleTextSessionKey(int key, const std::string& textUtf8);
+  bool hasActiveTextSession() const noexcept;
   bool pickColorAt(int x, int y);
   void setInputModifiers(bool shift, bool ctrl, bool alt);
 
@@ -295,6 +322,8 @@ private:
     std::size_t afterIndex {0};
     core::SelectionMask beforeSelection;
     core::SelectionMask afterSelection;
+    std::optional<std::vector<features::object_editing::ObjectLayerModel>> beforeObjectLayers;
+    std::optional<std::vector<features::object_editing::ObjectLayerModel>> afterObjectLayers;
   };
 
   struct PendingStrokeState {
@@ -337,11 +366,19 @@ private:
   void pushSelectionHistoryIfChanged(const core::SelectionMask& before, const std::string& actionName);
   void clearStrokeHistory() noexcept;
   std::optional<std::size_t> findTextEntryAt(std::size_t layerIndex, int x, int y) const;
+  features::object_editing::ObjectLayerModel* ensureObjectLayerForActiveLayer();
+  const features::object_editing::ObjectLayerModel* objectLayerForActiveLayer() const;
   bool rebuildTextLayer(std::size_t layerIndex);
   void clearTextCacheForLayer(std::size_t layerIndex);
   void rerender();
   void rerenderDirty(const core::Rect& dirtyRect);
   core::Point snapPointToRulerGuides(core::Point point) const;
+  bool beginObjectOperation(core::Point point);
+  bool continueObjectOperation(core::Point point);
+  void endObjectOperation();
+  features::object_editing::ObjectModel* findObjectById(const std::string& id);
+  const features::object_editing::ObjectModel* findObjectById(const std::string& id) const;
+  void recomputeTextObjectBounds(features::object_editing::ObjectModel& object);
 
   core::Document m_document;
   core::Renderer m_renderer;
@@ -377,6 +414,14 @@ private:
   std::size_t m_maxStrokeHistory {20};
   std::unordered_map<std::size_t, std::vector<TextEntry>> m_textEntriesByLayer;
   std::unordered_map<std::size_t, core::PixelBuffer> m_textBaseByLayer;
+  std::vector<features::object_editing::ObjectLayerModel> m_objectLayers;
+  features::object_editing::ObjectSelectionService m_objectSelectionService;
+  features::object_editing::ObjectTransformController m_objectTransformController;
+  features::object_editing::ObjectOverlayRenderer m_objectOverlayRenderer;
+  features::object_editing::SelectionResult m_objectSelection;
+  std::optional<std::vector<features::object_editing::ObjectLayerModel>> m_objectOpBeforeLayers;
+  bool m_objectOpChanged {false};
+  features::object_editing::text_editor::TextEditorFeature m_textEditor;
   std::optional<core::Rect> m_lastCompositeDirtyRect;
   std::uint64_t m_compositeRevision {0};
 };

@@ -5,7 +5,6 @@
 
 #include <QGridLayout>
 #include <QIcon>
-#include <QLinearGradient>
 #include <QMainWindow>
 #include <QPainter>
 #include <QPainterPath>
@@ -70,79 +69,66 @@ inline QIcon makeRequestedToolIcon(std::string_view subToolId, int size = 24)
 
   QPainter painter(&pixmap);
   painter.setRenderHint(QPainter::Antialiasing, true);
-  const QRectF frame(2.0, 2.0, static_cast<qreal>(size - 4), static_cast<qreal>(size - 4));
+  const QRectF frame(3.0, 3.0, static_cast<qreal>(size - 6), static_cast<qreal>(size - 6));
+  painter.setPen(QPen(QColor(242, 246, 252), 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+  painter.setBrush(Qt::NoBrush);
 
-  auto drawLine = [&](const QColor& c, qreal w, const QPointF& a, const QPointF& b) {
-    painter.setPen(QPen(c, w, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter.drawLine(a, b);
-  };
-  auto drawText = [&](const QString& t) {
-    painter.setPen(QColor(230, 238, 252));
+  auto drawTextGlyph = [&](const QString& t) {
     QFont font = painter.font();
-    font.setPixelSize(16);
+    font.setPixelSize(std::max(12, size - 8));
     font.setBold(true);
     painter.setFont(font);
     painter.drawText(frame.toRect(), Qt::AlignCenter, t);
   };
 
   if (subToolId == "gradient_linear") {
-    QLinearGradient g(frame.topLeft(), frame.topRight());
-    g.setColorAt(0.0, QColor(240, 242, 250));
-    g.setColorAt(1.0, QColor(90, 132, 210));
-    painter.fillRect(frame.adjusted(4, 7, -4, -7), g);
+    painter.drawLine(QPointF(frame.left() + 1, frame.bottom() - 1), QPointF(frame.right() - 1, frame.top() + 1));
+    painter.drawLine(QPointF(frame.left() + 1, frame.bottom() - 6), QPointF(frame.right() - 6, frame.top() + 1));
   } else if (subToolId == "comic_panel") {
-    painter.setPen(QPen(QColor(232, 240, 252), 1.4));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawRect(frame.adjusted(5, 5, -5, -5));
-    painter.drawLine(QPointF(frame.left() + 7, frame.bottom() - 7), QPointF(frame.left() + 13, frame.bottom() - 7));
+    painter.drawRect(frame.adjusted(1, 1, -1, -1));
+    painter.drawLine(QPointF(frame.left() + 6, frame.center().y()), QPointF(frame.right() - 6, frame.center().y()));
   } else if (subToolId == "text_basic") {
-    drawText("T");
+    drawTextGlyph("T");
   } else if (subToolId == "ruler_straight") {
-    drawLine(QColor(228, 236, 250), 1.5, QPointF(frame.left() + 5, frame.bottom() - 6), QPointF(frame.right() - 5, frame.top() + 6));
+    painter.drawRect(frame.adjusted(2, 8, -2, -8));
+    for (int i = 0; i < 4; ++i) {
+      const qreal x = frame.left() + 5 + i * 4;
+      painter.drawLine(QPointF(x, frame.center().y() - 4), QPointF(x, frame.center().y() + 4));
+    }
   } else if (subToolId == "line_correction_smooth") {
     QPainterPath smooth;
-    smooth.moveTo(frame.left() + 4, frame.center().y() + 1);
-    smooth.cubicTo(frame.left() + 8, frame.top() + 8, frame.left() + 13, frame.bottom() - 7, frame.right() - 4, frame.center().y() - 1);
-    painter.setPen(QPen(QColor(232, 240, 252), 1.5));
+    smooth.moveTo(frame.left(), frame.center().y() + 1);
+    smooth.cubicTo(frame.left() + 5, frame.top() + 2, frame.right() - 5, frame.bottom() - 2, frame.right(), frame.center().y() - 1);
     painter.drawPath(smooth);
   } else if (subToolId == "operation_object") {
-    painter.setPen(QPen(QColor(230, 238, 252), 1.2));
-    painter.setBrush(QColor(84, 118, 170));
-    painter.drawEllipse(QPointF(frame.center().x(), frame.center().y()), 4.0, 4.0);
-    drawLine(QColor(230, 238, 252), 1.2, QPointF(frame.center().x() + 5, frame.center().y()), QPointF(frame.right() - 4, frame.center().y()));
+    painter.drawRect(frame.adjusted(4, 4, -4, -4));
+    painter.drawLine(QPointF(frame.center().x(), frame.top()), QPointF(frame.center().x(), frame.bottom()));
+    painter.drawLine(QPointF(frame.left(), frame.center().y()), QPointF(frame.right(), frame.center().y()));
   } else if (subToolId == "airbrush_soft") {
-    painter.setPen(Qt::NoPen);
-    for (int i = 0; i < 18; ++i) {
-      painter.setBrush(QColor(220, 232, 252, 25 + (i % 6) * 18));
-      const qreal x = frame.left() + 5 + (i * 3) % 12;
-      const qreal y = frame.top() + 6 + (i * 5) % 10;
-      painter.drawEllipse(QPointF(x, y), 1.2 + (i % 3), 1.2 + (i % 3));
+    for (int i = 0; i < 5; ++i) {
+      const qreal x = frame.left() + 2 + i * 3;
+      const qreal y = frame.bottom() - 2 - i * 2;
+      painter.drawPoint(QPointF(x, y));
     }
   } else if (subToolId == "color_mix_blend") {
-    QLinearGradient g(frame.left() + 4, frame.center().y(), frame.right() - 4, frame.center().y());
-    g.setColorAt(0.0, QColor(232, 96, 96));
-    g.setColorAt(0.5, QColor(190, 154, 180));
-    g.setColorAt(1.0, QColor(98, 138, 228));
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(g);
-    painter.drawRoundedRect(frame.adjusted(4, 8, -4, -8), 3.0, 3.0);
+    painter.drawEllipse(QPointF(frame.left() + 8, frame.center().y()), 4.5, 4.5);
+    painter.drawEllipse(QPointF(frame.right() - 8, frame.center().y()), 4.5, 4.5);
+    painter.drawLine(QPointF(frame.left() + 10, frame.center().y()), QPointF(frame.right() - 10, frame.center().y()));
   } else if (subToolId == "liquify_push") {
     QPainterPath wave;
-    wave.moveTo(frame.left() + 4, frame.center().y() + 4);
-    wave.cubicTo(frame.left() + 8, frame.top() + 3, frame.left() + 14, frame.bottom() - 3, frame.right() - 6, frame.center().y() - 3);
-    painter.setPen(QPen(QColor(220, 232, 252), 1.5));
+    wave.moveTo(frame.left(), frame.center().y());
+    wave.cubicTo(frame.left() + 4, frame.top() + 2, frame.right() - 6, frame.bottom() - 2, frame.right(), frame.center().y());
     painter.drawPath(wave);
   } else if (subToolId == "clone_stamp_basic") {
-    painter.setPen(QPen(QColor(230, 238, 252), 1.2));
-    painter.setBrush(QColor(70, 96, 140));
-    painter.drawEllipse(QPointF(frame.left() + 8, frame.center().y()), 3.2, 3.2);
-    painter.setBrush(QColor(95, 124, 176));
-    painter.drawRect(frame.right() - 10, frame.center().y() - 3, 6, 6);
+    painter.drawEllipse(QPointF(frame.left() + 7, frame.center().y()), 3.2, 3.2);
+    painter.drawRect(frame.right() - 10, frame.center().y() - 4, 8, 8);
+    painter.drawLine(QPointF(frame.left() + 10, frame.center().y()), QPointF(frame.right() - 10, frame.center().y()));
   } else if (subToolId == "sketch_pencil") {
-    drawLine(QColor(210, 220, 238), 1.1, QPointF(frame.left() + 5, frame.bottom() - 6), QPointF(frame.right() - 5, frame.top() + 7));
-    drawLine(QColor(146, 162, 188), 0.9, QPointF(frame.left() + 6, frame.bottom() - 4), QPointF(frame.right() - 4, frame.top() + 9));
+    painter.drawLine(QPointF(frame.left() + 3, frame.bottom() - 2), QPointF(frame.right() - 5, frame.top() + 4));
+    painter.drawLine(QPointF(frame.right() - 5, frame.top() + 4), QPointF(frame.right() - 1, frame.top() + 8));
+    painter.drawLine(QPointF(frame.left() + 5, frame.bottom() - 2), QPointF(frame.right() - 3, frame.top() + 6));
   } else {
-    drawText("?");
+    drawTextGlyph("?");
   }
 
   return QIcon(pixmap);

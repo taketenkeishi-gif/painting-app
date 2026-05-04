@@ -5,12 +5,21 @@
 
 #include "core/buffer/PixelBuffer.h"
 #include "core/common/Point.h"
+#include "core/layer/Layer.h"
 #include "core/tools/ToolContext.h"
 
 namespace features::requested_tools {
 
 class RequestedToolsRuntime {
 public:
+  struct SelectionState {
+    std::size_t layerIndex {0};
+    std::size_t pathIndex {0};
+    core::VectorPath::Kind pathKind {core::VectorPath::Kind::Stroke};
+    core::Rect bounds {0, 0, 0, 0};
+    bool valid {false};
+  };
+
   bool handles(std::string_view subToolId) const noexcept;
   core::ToolResult onPointerPress(
       std::string_view subToolId,
@@ -34,8 +43,26 @@ public:
       int size,
       int opacityPercent);
   void cancel() noexcept;
+  SelectionState selectionState() const noexcept { return m_selectionState; }
+  std::optional<core::Point> cloneSamplePoint() const noexcept {
+    if (!m_cloneHasSample) {
+      return std::nullopt;
+    }
+    return m_cloneSamplePoint;
+  }
 
 private:
+  enum class OperationHandle {
+    None,
+    Move,
+    RulerStart,
+    RulerEnd,
+    RectTopLeft,
+    RectTopRight,
+    RectBottomLeft,
+    RectBottomRight
+  };
+
   core::ToolResult pressGradient(core::ToolContext& context, const core::ToolPointerEvent& event);
   core::ToolResult moveGradient(core::ToolContext& context, const core::ToolPointerEvent& event);
   core::ToolResult releaseGradient(core::ToolContext& context, const core::ToolPointerEvent& event, const core::Color& color, int opacityPercent);
@@ -67,7 +94,8 @@ private:
   std::optional<core::PixelBuffer> m_blendSnapshot;
   std::optional<core::PixelBuffer> m_liquifySnapshot;
 
-  std::optional<std::size_t> m_operationSelectedPathIndex;
+  SelectionState m_selectionState;
+  OperationHandle m_operationHandle {OperationHandle::None};
 };
 
 } // namespace features::requested_tools

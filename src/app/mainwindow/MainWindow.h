@@ -123,6 +123,7 @@ private:
   void adjustRightDockLayout();
   void updateUndoRedoState();
   void updateActiveLayerStatus();
+  void updateObjectSelectionStatus();
   void updateTopToolInfo();
   void updateColorPanel();
   void updateToolActionState();
@@ -179,6 +180,7 @@ private:
   QLabel* m_zoomStatusLabel {nullptr};
   QLabel* m_activeLayerStatusLabel {nullptr};
   QLabel* m_selectionStatusLabel {nullptr};
+  QLabel* m_objectSelectionStatusLabel {nullptr};
   QLabel* m_navigatorImageLabel {nullptr};
   QPushButton* m_foregroundColorButton {nullptr};
   QPushButton* m_backgroundColorButton {nullptr};
