@@ -13,6 +13,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QTimerEvent>
 #include <QFontDatabase>
 #include <QWheelEvent>
 
@@ -141,6 +142,17 @@ bool canvasCursorInRect(const core::Rect& r, core::Point p, int pad = 6) {
   return p.x >= r.x - pad && p.y >= r.y - pad && p.x <= r.x + r.width + pad && p.y <= r.y + r.height + pad;
 }
 
+bool canvasCursorOnRectFrame(const core::Rect& r, core::Point p, int pad = 6) {
+  if (!canvasCursorInRect(r, p, pad)) {
+    return false;
+  }
+  const bool nearLeft = std::abs(p.x - r.x) <= pad;
+  const bool nearRight = std::abs(p.x - (r.x + r.width)) <= pad;
+  const bool nearTop = std::abs(p.y - r.y) <= pad;
+  const bool nearBottom = std::abs(p.y - (r.y + r.height)) <= pad;
+  return nearLeft || nearRight || nearTop || nearBottom;
+}
+
 int operationCursorModeForObjectOverlay(const app::bridge::CanvasOverlayViewModel& overlay, core::Point point) {
   if (!overlay.objectSelectionRect.has_value()) {
     return 0;
@@ -154,7 +166,7 @@ int operationCursorModeForObjectOverlay(const app::bridge::CanvasOverlayViewMode
   if (canvasCursorNearPoint(point, rot, 14)) return 4;
   if (canvasCursorNearPoint(point, tl, 12) || canvasCursorNearPoint(point, br, 12)) return 2;
   if (canvasCursorNearPoint(point, tr, 12) || canvasCursorNearPoint(point, bl, 12)) return 3;
-  if (canvasCursorInRect(b, point, 6)) return 1;
+  if (canvasCursorOnRectFrame(b, point, 6)) return 1;
   return 0;
 }
 
@@ -373,17 +385,6 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     // Text edit session is rendered by the same TextObject overlay. No duplicate editor overlay here.
 
     
-    // text-editor-visible-caret
-    if (m_textEditActive && overlay.objectSelectionRect.has_value()) {
-      const core::Rect rect = *overlay.objectSelectionRect;
-      const double caretX = target.x() + static_cast<double>(rect.x + rect.width + 2) * state.zoom;
-      const double topY = target.y() + static_cast<double>(rect.y) * state.zoom;
-      const double bottomY = target.y() + static_cast<double>(rect.y + rect.height) * state.zoom;
-      painter.setPen(QPen(QColor(0, 0, 0, 245), 1.6));
-      painter.drawLine(QPointF(caretX, topY), QPointF(caretX, bottomY));
-      painter.setPen(QPen(QColor(255, 255, 255, 210), 0.8));
-      painter.drawLine(QPointF(caretX + 1.0, topY), QPointF(caretX + 1.0, bottomY));
-    }
 if (overlay.toolOverlay.hasLine) {
       const QPointF p1(
           target.x() + (static_cast<double>(overlay.toolOverlay.lineStart.x) + 0.5) * state.zoom,
@@ -501,6 +502,42 @@ if (overlay.toolOverlay.hasLine) {
   painter.restore();
 }
 
+void CanvasWidget::mouseDoubleClickEvent(QMouseEvent* event) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->setInputModifiers(
+      event->modifiers().testFlag(Qt::ShiftModifier),
+      event->modifiers().testFlag(Qt::ControlModifier),
+      event->modifiers().testFlag(Qt::AltModifier));
+
+  auto& state = stateFor(this);
+  state.lastMousePos = event->position().toPoint();
+  state.hasMousePos = true;
+
+  if (event->button() != Qt::LeftButton) {
+    QWidget::mouseDoubleClickEvent(event);
+    return;
+  }
+
+  const auto point = mapToCanvas(event->position().toPoint());
+  if (!point.has_value()) {
+    QWidget::mouseDoubleClickEvent(event);
+    return;
+  }
+
+  if (!m_controller->textObjectIdAt(point->x, point->y).has_value()) {
+    QWidget::mouseDoubleClickEvent(event);
+    return;
+  }
+
+  switchToTextTool();
+  beginTextEditSession(*point);
+  updateCursorForState(point);
+  update();
+  event->accept();
+}
+
 void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   if (m_controller == nullptr) {
     return;
@@ -558,8 +595,29 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     return;
   }
 
+  {
+    const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
+    const int directOperationMode = operationCursorModeForObjectOverlay(overlay, *point);
+    if (directOperationMode != 0) {
+      if (m_textEditActive) {
+        commitTextEditSession();
+      }
+      switchToOperationObjectTool();
+      m_mouseDrawing = true;
+      m_operationCursorLockMode = directOperationMode;
+      state.lastStrokeDispatchWidgetPos = event->position().toPoint();
+      state.hasLastStrokeDispatchPos = true;
+      state.lastStrokeDispatchNs = g_eventTimer.nsecsElapsed();
+      m_controller->beginStroke(point->x, point->y);
+      updateCursorForState(point);
+      event->accept();
+      return;
+    }
+  }
+
   if (m_controller->currentSubToolId() == "text_basic") {
     beginTextEditSession(*point);
+    event->accept();
     return;
   }
 
@@ -717,6 +775,10 @@ void CanvasWidget::beginTextEditSession(const core::Point& canvasPoint) {
   const auto existingId = m_controller->textObjectIdAt(canvasPoint.x, canvasPoint.y);
   m_textEditObjectId = existingId.value_or(std::string {});
   m_textEditActive = !m_textEditObjectId.empty();
+  m_textCaretVisible = true;
+  if (m_textEditActive && !m_textCaretTimer.isActive()) {
+    m_textCaretTimer.start(530, this);
+  }
   setFocus(Qt::MouseFocusReason);
   update();
 }
@@ -728,6 +790,10 @@ void CanvasWidget::commitTextEditSession() {
   m_controller->handleTextSessionKey(Qt::Key_Return, "");
   m_textEditActive = false;
   m_textEditObjectId.clear();
+  m_textCaretVisible = true;
+  if (m_textCaretTimer.isActive()) {
+    m_textCaretTimer.stop();
+  }
   update();
 }
 
@@ -738,7 +804,29 @@ void CanvasWidget::cancelTextEditSession() {
   m_controller->handleTextSessionKey(Qt::Key_Escape, "");
   m_textEditActive = false;
   m_textEditObjectId.clear();
+  m_textCaretVisible = true;
+  if (m_textCaretTimer.isActive()) {
+    m_textCaretTimer.stop();
+  }
   update();
+}
+
+bool CanvasWidget::switchToOperationObjectTool() {
+  if (m_controller == nullptr) {
+    return false;
+  }
+  const bool toolOk = m_controller->setCurrentTool(core::ToolKind::MoveLayer);
+  const bool subToolOk = m_controller->setCurrentSubTool("operation_object");
+  return toolOk && subToolOk;
+}
+
+bool CanvasWidget::switchToTextTool() {
+  if (m_controller == nullptr) {
+    return false;
+  }
+  const bool toolOk = m_controller->setCurrentTool(core::ToolKind::MoveLayer);
+  const bool subToolOk = m_controller->setCurrentSubTool("text_basic");
+  return toolOk && subToolOk;
 }
 
 void CanvasWidget::wheelEvent(QWheelEvent* event) {
@@ -869,6 +957,22 @@ void CanvasWidget::keyReleaseEvent(QKeyEvent* event) {
   QWidget::keyReleaseEvent(event);
 }
 
+void CanvasWidget::timerEvent(QTimerEvent* event) {
+  if (event != nullptr && event->timerId() == m_textCaretTimer.timerId()) {
+    if (!m_textEditActive) {
+      m_textCaretTimer.stop();
+      m_textCaretVisible = true;
+      event->accept();
+      return;
+    }
+    m_textCaretVisible = !m_textCaretVisible;
+    update();
+    event->accept();
+    return;
+  }
+  QWidget::timerEvent(event);
+}
+
 void CanvasWidget::refreshFromController() {
   if (m_controller == nullptr) {
     return;
@@ -980,7 +1084,7 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
     return;
   }
 
-  if (m_controller->currentTool() == core::ToolKind::Brush && m_controller->currentSubToolId() == "operation_object") {
+  {
     const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
     const int mode = operationCursorModeForObjectOverlay(overlay, *canvasPoint);
     if (mode != 0) {

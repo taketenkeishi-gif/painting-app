@@ -51,6 +51,8 @@ private:
   TextObject* findById(const std::string& id);
   const TextObject* findById(const std::string& id) const;
   core::Rect measureBounds(const TextObject& object) const;
+  int caretIndexAtPoint(const TextObject& object, core::Point point) const;
+  core::Point boundsAnchorPoint(const core::Rect& bounds, Handle handle) const;
   Handle hitHandle(const TextObject& object, core::Point point) const;
 
   std::vector<TextObject> m_objects;
@@ -61,11 +63,17 @@ private:
   bool m_editCreatedNow {false};
   std::string m_editId;
   std::string m_editOriginalText;
+  int m_editCaretIndex {0};
 
   bool m_operationActive {false};
   Handle m_activeHandle {Handle::None};
   core::Point m_lastPoint {0, 0};
   core::Point m_operationCenter {0, 0};
+  core::Point m_operationStartPoint {0, 0};
+  core::Point m_operationFixedAnchor {0, 0};
+  int m_operationStartFontSize {16};
+  float m_operationStartRotationDeg {0.0F};
+  double m_operationStartPointerAngleDeg {0.0};
 };
 
 } // namespace features::object_editing::text_editor

@@ -44,6 +44,21 @@ std::string toUtf8String(const QString& value) {
   return std::string(utf8.constData(), static_cast<std::size_t>(utf8.size()));
 }
 
+int clampedCaretIndex(int index, const QString& text) {
+  const int size = static_cast<int>(text.size());
+  if (index < 0) {
+    return 0;
+  }
+  if (index > size) {
+    return size;
+  }
+  return index;
+}
+
+double angleDegFromCenter(core::Point center, core::Point point) {
+  return std::atan2(static_cast<double>(point.y - center.y), static_cast<double>(point.x - center.x)) * 180.0 / 3.14159265358979323846;
+}
+
 } // namespace
 
 TextEditorFeature::TextObject* TextEditorFeature::findById(const std::string& id) {
@@ -84,12 +99,54 @@ core::Rect TextEditorFeature::measureBounds(const TextObject& object) const {
       std::max(1, static_cast<int>(std::ceil(mapped.height())))};
 }
 
+int TextEditorFeature::caretIndexAtPoint(const TextObject& object, core::Point point) const {
+  const QString text = toQString(object.text);
+  if (text.isEmpty()) {
+    return 0;
+  }
+
+  const double radians = static_cast<double>(object.rotationDeg) * 3.14159265358979323846 / 180.0;
+  const double c = std::cos(radians);
+  const double s = std::sin(radians);
+  const double dx = static_cast<double>(point.x - object.position.x);
+  const double dy = static_cast<double>(point.y - object.position.y);
+  const double localX = dx * c + dy * s;
+
+  const QFont font = textFont(object.fontSize);
+  QFontMetricsF metrics(font);
+  int bestIndex = 0;
+  double bestDistance = std::abs(localX);
+  for (int i = 1; i <= text.size(); ++i) {
+    const double x = metrics.horizontalAdvance(text.left(i));
+    const double distance = std::abs(localX - x);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+}
+
+core::Point TextEditorFeature::boundsAnchorPoint(const core::Rect& bounds, Handle handle) const {
+  if (handle == Handle::TL) {
+    return core::Point {bounds.x + bounds.width, bounds.y + bounds.height};
+  }
+  if (handle == Handle::TR) {
+    return core::Point {bounds.x, bounds.y + bounds.height};
+  }
+  if (handle == Handle::BL) {
+    return core::Point {bounds.x + bounds.width, bounds.y};
+  }
+  return core::Point {bounds.x, bounds.y};
+}
+
 bool TextEditorFeature::beginTextInput(core::Point point, const core::Color& color, int fontSize) {
   const auto existing = hitTextIdAt(point);
   if (existing.has_value()) {
     m_editId = *existing;
     const auto* object = findById(m_editId);
     m_editOriginalText = object == nullptr ? std::string {} : object->text;
+    m_editCaretIndex = object == nullptr ? 0 : caretIndexAtPoint(*object, point);
     m_editCreatedNow = false;
   } else {
     TextObject object;
@@ -102,6 +159,7 @@ bool TextEditorFeature::beginTextInput(core::Point point, const core::Color& col
     m_objects.push_back(object);
     m_editId = object.id;
     m_editOriginalText.clear();
+    m_editCaretIndex = 0;
     m_editCreatedNow = true;
   }
   m_selectedId = m_editId;
@@ -122,6 +180,10 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
   if (object == nullptr) {
     return false;
   }
+
+  QString current = toQString(object->text);
+  m_editCaretIndex = clampedCaretIndex(m_editCaretIndex, current);
+
   if (key == Qt::Key_Return || key == Qt::Key_Enter) {
     if (m_editCreatedNow && object->text.empty()) {
       removeById(m_editId);
@@ -136,20 +198,47 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
       object->text = m_editOriginalText;
       object->bounds = measureBounds(*object);
       m_selectedBounds = object->bounds;
+      m_editCaretIndex = clampedCaretIndex(m_editCaretIndex, toQString(object->text));
     }
     m_editSessionActive = false;
     return true;
   }
+  if (key == Qt::Key_Left) {
+    m_editCaretIndex = std::max(0, m_editCaretIndex - 1);
+    return true;
+  }
+  if (key == Qt::Key_Right) {
+    const int size = static_cast<int>(current.size());
+    if (m_editCaretIndex < size) {
+      m_editCaretIndex += 1;
+    }
+    return true;
+  }
+  if (key == Qt::Key_Home) {
+    m_editCaretIndex = 0;
+    return true;
+  }
+  if (key == Qt::Key_End) {
+    m_editCaretIndex = current.size();
+    return true;
+  }
   if (key == Qt::Key_Backspace) {
-    const QString current = toQString(object->text);
-    if (!current.isEmpty()) {
-      object->text = toUtf8String(current.left(current.size() - 1));
+    if (!current.isEmpty() && m_editCaretIndex > 0) {
+      current.remove(m_editCaretIndex - 1, 1);
+      m_editCaretIndex -= 1;
+      object->text = toUtf8String(current);
+    } else {
+      return true;
     }
   } else if (!textUtf8.empty()) {
-    object->text += textUtf8;
+    const QString insertText = toQString(textUtf8);
+    current.insert(m_editCaretIndex, insertText);
+    m_editCaretIndex += insertText.size();
+    object->text = toUtf8String(current);
   } else {
     return false;
   }
+
   object->bounds = measureBounds(*object);
   m_selectedBounds = object->bounds;
   return true;
@@ -248,7 +337,12 @@ bool TextEditorFeature::beginOperation(core::Point point) {
     m_selectedBounds = object.bounds;
     m_activeHandle = handle;
     m_lastPoint = point;
+    m_operationStartPoint = point;
+    m_operationStartFontSize = object.fontSize;
+    m_operationStartRotationDeg = object.rotationDeg;
     m_operationCenter = core::Point {object.bounds.x + object.bounds.width / 2, object.bounds.y + object.bounds.height / 2};
+    m_operationStartPointerAngleDeg = angleDegFromCenter(m_operationCenter, point);
+    m_operationFixedAnchor = boundsAnchorPoint(object.bounds, handle);
     m_operationActive = true;
     return true;
   }
@@ -276,23 +370,26 @@ bool TextEditorFeature::updateOperation(core::Point point) {
     object->position.x += dx;
     object->position.y += dy;
   } else if (m_activeHandle == Handle::Rotate) {
-    // text-editor-stable-rotate-center
-    const double cx = static_cast<double>(m_operationCenter.x);
-    const double cy = static_cast<double>(m_operationCenter.y);
-    const double angle = std::atan2(static_cast<double>(point.y) - cy, static_cast<double>(point.x) - cx) * 180.0 / 3.14159265358979323846;
-    object->rotationDeg = static_cast<float>(angle);
+    const double currentAngle = angleDegFromCenter(m_operationCenter, point);
+    object->rotationDeg = static_cast<float>(m_operationStartRotationDeg + currentAngle - m_operationStartPointerAngleDeg);
   } else {
+    const int totalDx = point.x - m_operationStartPoint.x;
+    const int totalDy = point.y - m_operationStartPoint.y;
     int delta = 0;
     if (m_activeHandle == Handle::TL) {
-      delta = -dx - dy;
+      delta = -totalDx - totalDy;
     } else if (m_activeHandle == Handle::TR) {
-      delta = dx - dy;
+      delta = totalDx - totalDy;
     } else if (m_activeHandle == Handle::BL) {
-      delta = -dx + dy;
+      delta = -totalDx + totalDy;
     } else {
-      delta = dx + dy;
+      delta = totalDx + totalDy;
     }
-    object->fontSize = std::max(8, object->fontSize + delta / 4);
+    object->fontSize = std::max(8, m_operationStartFontSize + delta / 4);
+    object->bounds = measureBounds(*object);
+    const core::Point currentAnchor = boundsAnchorPoint(object->bounds, m_activeHandle);
+    object->position.x += m_operationFixedAnchor.x - currentAnchor.x;
+    object->position.y += m_operationFixedAnchor.y - currentAnchor.y;
   }
   object->bounds = measureBounds(*object);
   m_selectedBounds = object->bounds;
@@ -340,7 +437,8 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
       const QFont font = textFont(object->fontSize);
       const QFontMetricsF metrics(font);
       const QString text = toQString(object->text);
-      const qreal advance = std::max<qreal>(0.0, metrics.horizontalAdvance(text));
+      const int caretIndex = clampedCaretIndex(m_editCaretIndex, text);
+      const qreal advance = std::max<qreal>(0.0, metrics.horizontalAdvance(text.left(caretIndex)));
       const qreal ascent = std::max<qreal>(1.0, metrics.ascent());
       const qreal descent = std::max<qreal>(1.0, metrics.descent());
       const double radians = static_cast<double>(object->rotationDeg) * 3.14159265358979323846 / 180.0;

@@ -5,12 +5,14 @@
 
 #include <QImage>
 #include <QWidget>
+#include <QBasicTimer>
 
 #include "core/common/Point.h"
 
 class QWheelEvent;
 class QKeyEvent;
 class QEvent;
+class QTimerEvent;
 
 namespace app::bridge {
 class AppController;
@@ -41,11 +43,13 @@ protected:
   bool event(QEvent* event) override;
   void paintEvent(QPaintEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
+  void mouseDoubleClickEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
   void keyPressEvent(QKeyEvent* event) override;
   void keyReleaseEvent(QKeyEvent* event) override;
+  void timerEvent(QTimerEvent* event) override;
 
 private slots:
   void refreshFromController();
@@ -57,6 +61,8 @@ private:
   void beginTextEditSession(const core::Point& canvasPoint);
   void commitTextEditSession();
   void cancelTextEditSession();
+  bool switchToOperationObjectTool();
+  bool switchToTextTool();
 
   app::bridge::AppController* m_controller {nullptr};
   QImage m_image;
@@ -67,6 +73,8 @@ private:
   bool m_textEditActive {false};
   std::string m_textEditObjectId;
   int m_operationCursorLockMode {0};
+  bool m_textCaretVisible {true};
+  QBasicTimer m_textCaretTimer;
 };
 
 } // namespace app::canvasview
