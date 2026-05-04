@@ -1688,6 +1688,11 @@ bool AppController::currentToolSupportsAutoSelectReferAllLayers() const noexcept
 }
 
 void AppController::beginStroke(int x, int y) {
+  // operation-stroke-entry-route
+  if (currentSubToolId() == "operation_object") {
+    m_stroking = beginObjectOperation(core::Point {x, y});
+    return;
+  }
   if (m_stroking) {
     return;
   }
@@ -1744,6 +1749,16 @@ void AppController::beginStroke(int x, int y) {
 }
 
 void AppController::continueStroke(int x, int y) {
+  // operation-stroke-continue-route
+  if (currentSubToolId() == "operation_object") {
+    if (m_stroking) {
+      if (continueObjectOperation(core::Point {x, y})) {
+        emit overlayChanged();
+        emit canvasChanged();
+      }
+    }
+    return;
+  }
   if (!m_stroking) {
     return;
   }
@@ -1777,6 +1792,14 @@ void AppController::continueStroke(int x, int y) {
 }
 
 void AppController::endStroke() {
+  // operation-stroke-end-route
+  if (currentSubToolId() == "operation_object") {
+    if (m_stroking) {
+      endObjectOperation();
+    }
+    m_stroking = false;
+    return;
+  }
   if (!m_stroking) {
     return;
   }
