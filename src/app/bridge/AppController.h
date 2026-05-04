@@ -253,6 +253,7 @@ public:
   bool removeObjectById(const std::string& objectId);
   bool beginTextSessionAt(int x, int y);
   bool handleTextSessionKey(int key, const std::string& textUtf8);
+  bool handleTextSessionPreedit(const std::string& textUtf8);
   bool hasActiveTextSession() const noexcept;
   bool pickColorAt(int x, int y);
   void setInputModifiers(bool shift, bool ctrl, bool alt);

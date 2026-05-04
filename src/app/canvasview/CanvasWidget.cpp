@@ -923,9 +923,19 @@ void CanvasWidget::inputMethodEvent(QInputMethodEvent* event) {
     }
   }
 
-  if (!event->preeditString().isEmpty()) {
-    event->accept();
+  const QString preeditText = event->preeditString();
+  const QByteArray preeditUtf8 = preeditText.toUtf8();
+  const std::string preeditString(preeditUtf8.constData(), static_cast<std::string::size_type>(preeditUtf8.size()));
+  if (m_controller->handleTextSessionPreedit(preeditString)) {
+    m_textCaretVisible = true;
+    const auto& state = stateFor(this);
+    if (state.hasMousePos) {
+      updateCursorForState(mapToCanvas(state.lastMousePos));
+    } else {
+      updateCursorForState(std::nullopt);
+    }
     update();
+    event->accept();
     return;
   }
 
@@ -939,10 +949,6 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
         modifiers.testFlag(Qt::ControlModifier),
         modifiers.testFlag(Qt::AltModifier));
   }
-  if (event->isAutoRepeat()) {
-    QWidget::keyPressEvent(event);
-    return;
-  }
   if (m_textEditActive) {
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
       commitTextEditSession();
@@ -954,7 +960,14 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
       event->accept();
       return;
     }
-    if (event->key() == Qt::Key_Backspace) {
+    if (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right ||
+        event->key() == Qt::Key_Delete || event->key() == Qt::Key_Home ||
+        event->key() == Qt::Key_End) {
+      m_controller->handleTextSessionKey(event->key(), "");
+      update();
+      event->accept();
+      return;
+    }    if (event->key() == Qt::Key_Backspace) {
       m_controller->handleTextSessionKey(Qt::Key_Backspace, "");
       update();
       event->accept();

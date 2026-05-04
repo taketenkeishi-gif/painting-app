@@ -3291,6 +3291,14 @@ bool AppController::handleTextSessionKey(int key, const std::string& textUtf8) {
   return changed;
 }
 
+bool AppController::handleTextSessionPreedit(const std::string& textUtf8) {
+  const bool changed = m_textEditor.handlePreeditText(textUtf8);
+  if (changed) {
+    rerender();
+    emit documentChanged();
+  }
+  return changed;
+}
 bool AppController::hasActiveTextSession() const noexcept {
   return m_textEditor.hasActiveTextSession();
 }

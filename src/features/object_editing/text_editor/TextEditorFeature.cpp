@@ -109,7 +109,7 @@ int TextEditorFeature::caretIndexAtPoint(const TextObject& object, core::Point p
   const double s = std::sin(radians);
   const double dx = static_cast<double>(point.x - object.position.x);
   const double dy = static_cast<double>(point.y - object.position.y);
-  const double localX = dx * c + dy * s;
+  const double localX = (dx * c + dy * s) / std::max(0.1F, object.scaleX);
 
   const QFont font = textFont(object.fontSize);
   QFontMetricsF metrics(font);
@@ -186,6 +186,8 @@ bool TextEditorFeature::beginTextInput(core::Point point, const core::Color& col
   }
   m_operationActive = false;
   m_activeHandle = Handle::None;
+  m_editPreeditText.clear();
+  m_editPreeditStartIndex = m_editCaretIndex;
   m_editSessionActive = true;
   return true;
 }
@@ -202,10 +204,24 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
   QString current = toQString(object->text);
   m_editCaretIndex = clampedCaretIndex(m_editCaretIndex, current);
 
-  if (key == Qt::Key_Return || key == Qt::Key_Enter) {
-    if (m_editCreatedNow && object->text.empty()) {
-      removeById(m_editId);
+  if (!m_editPreeditText.empty()) {
+    const QString preedit = toQString(m_editPreeditText);
+    const int preeditStart = clampedCaretIndex(m_editPreeditStartIndex, current);
+    if (!preedit.isEmpty() && preeditStart + preedit.size() <= current.size() &&
+        current.mid(preeditStart, preedit.size()) == preedit) {
+      current.remove(preeditStart, preedit.size());
+      object->text = toUtf8String(current);
+      object->bounds = measureBounds(*object);
+      m_selectedBounds = object->bounds;
     }
+    m_editCaretIndex = clampedCaretIndex(preeditStart, current);
+    m_editPreeditText.clear();
+    m_editPreeditStartIndex = m_editCaretIndex;
+  }
+
+  if (key == Qt::Key_Return || key == Qt::Key_Enter) {
+    object->bounds = measureBounds(*object);
+    m_selectedBounds = object->bounds;
     m_editSessionActive = false;
     return true;
   }
@@ -219,6 +235,8 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
       m_editCaretIndex = clampedCaretIndex(m_editCaretIndex, toQString(object->text));
     }
     m_editSessionActive = false;
+    m_editPreeditText.clear();
+    m_editPreeditStartIndex = 0;
     return true;
   }
   if (key == Qt::Key_Left) {
@@ -237,26 +255,73 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
     return true;
   }
   if (key == Qt::Key_End) {
-    m_editCaretIndex = current.size();
+    m_editCaretIndex = static_cast<int>(current.size());
     return true;
   }
   if (key == Qt::Key_Backspace) {
-    if (!current.isEmpty() && m_editCaretIndex > 0) {
+    if (m_editCaretIndex > 0) {
       current.remove(m_editCaretIndex - 1, 1);
       m_editCaretIndex -= 1;
       object->text = toUtf8String(current);
-    } else {
-      return true;
+      object->bounds = measureBounds(*object);
+      m_selectedBounds = object->bounds;
     }
-  } else if (!textUtf8.empty()) {
-    const QString insertText = toQString(textUtf8);
-    current.insert(m_editCaretIndex, insertText);
-    m_editCaretIndex += insertText.size();
+    return true;
+  }
+  if (key == Qt::Key_Delete) {
+    if (m_editCaretIndex < current.size()) {
+      current.remove(m_editCaretIndex, 1);
+      object->text = toUtf8String(current);
+      object->bounds = measureBounds(*object);
+      m_selectedBounds = object->bounds;
+    }
+    return true;
+  }
+
+  if (!textUtf8.empty()) {
+    const QString insertion = toQString(textUtf8);
+    current.insert(m_editCaretIndex, insertion);
+    m_editCaretIndex += insertion.size();
     object->text = toUtf8String(current);
-  } else {
+    object->bounds = measureBounds(*object);
+    m_selectedBounds = object->bounds;
+    return true;
+  }
+
+  return false;
+}
+
+bool TextEditorFeature::handlePreeditText(const std::string& textUtf8) {
+  if (!m_editSessionActive) {
+    return false;
+  }
+  TextObject* object = findById(m_editId);
+  if (object == nullptr) {
     return false;
   }
 
+  QString current = toQString(object->text);
+  const QString previousPreedit = toQString(m_editPreeditText);
+  int preeditStart = clampedCaretIndex(m_editPreeditStartIndex, current);
+
+  if (!previousPreedit.isEmpty() && preeditStart + previousPreedit.size() <= current.size() &&
+      current.mid(preeditStart, previousPreedit.size()) == previousPreedit) {
+    current.remove(preeditStart, previousPreedit.size());
+  } else {
+    preeditStart = clampedCaretIndex(m_editCaretIndex, current);
+  }
+
+  const QString nextPreedit = toQString(textUtf8);
+  if (!nextPreedit.isEmpty()) {
+    current.insert(preeditStart, nextPreedit);
+    m_editCaretIndex = preeditStart + nextPreedit.size();
+  } else {
+    m_editCaretIndex = preeditStart;
+  }
+
+  m_editPreeditText = textUtf8;
+  m_editPreeditStartIndex = preeditStart;
+  object->text = toUtf8String(current);
   object->bounds = measureBounds(*object);
   m_selectedBounds = object->bounds;
   return true;
@@ -499,6 +564,8 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
       const qreal advance = std::max<qreal>(0.0, metrics.horizontalAdvance(text.left(caretIndex)));
       const qreal ascent = std::max<qreal>(1.0, metrics.ascent());
       const qreal descent = std::max<qreal>(1.0, metrics.descent());
+      const double scaleX = std::max(0.1F, object->scaleX);
+      const double scaleY = std::max(0.1F, object->scaleY);
       const double radians = static_cast<double>(object->rotationDeg) * 3.14159265358979323846 / 180.0;
       const double c = std::cos(radians);
       const double s = std::sin(radians);
@@ -509,8 +576,9 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
       };
       OverlayPrimitive caret;
       caret.kind = OverlayPrimitive::Kind::Line;
-      caret.p1 = mapLocal(advance + 2.0, -ascent);
-      caret.p2 = mapLocal(advance + 2.0, descent);
+      const double caretX = static_cast<double>(advance) * scaleX;
+      caret.p1 = mapLocal(caretX, -static_cast<double>(ascent) * scaleY);
+      caret.p2 = mapLocal(caretX, static_cast<double>(descent) * scaleY);
       out.primitives.push_back(caret);
     }
   }

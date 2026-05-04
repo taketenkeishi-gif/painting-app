@@ -29,6 +29,7 @@ public:
 
   bool beginTextInput(core::Point point, const core::Color& color, int fontSize);
   bool handleKeyPress(int key, const std::string& textUtf8);
+  bool handlePreeditText(const std::string& textUtf8);
   bool hasActiveTextSession() const noexcept { return m_editSessionActive; }
 
   std::optional<std::string> hitTextIdAt(core::Point point) const;
@@ -66,6 +67,8 @@ private:
   std::string m_editId;
   std::string m_editOriginalText;
   int m_editCaretIndex {0};
+  std::string m_editPreeditText;
+  int m_editPreeditStartIndex {0};
 
   bool m_operationActive {false};
   Handle m_activeHandle {Handle::None};
