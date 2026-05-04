@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <string>
@@ -10,6 +10,7 @@
 
 class QWheelEvent;
 class QKeyEvent;
+class QEvent;
 
 namespace app::bridge {
 class AppController;
@@ -37,6 +38,7 @@ public:
   bool isOverlayVisible() const noexcept { return m_showOverlay; }
 
 protected:
+  bool event(QEvent* event) override;
   void paintEvent(QPaintEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
@@ -67,3 +69,5 @@ private:
 };
 
 } // namespace app::canvasview
+
+

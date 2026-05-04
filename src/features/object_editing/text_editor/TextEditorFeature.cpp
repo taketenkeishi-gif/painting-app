@@ -229,24 +229,32 @@ bool TextEditorFeature::beginOperation(core::Point point) {
   if (m_editSessionActive) {
     return false;
   }
+
   m_operationActive = false;
-  const auto hit = hitTextIdAt(point);
-  if (!hit.has_value()) {
-    return false;
+  m_activeHandle = Handle::None;
+
+  for (std::size_t i = m_objects.size(); i > 0; --i) {
+    TextObject& object = m_objects[i - 1];
+    if (!object.visible || object.locked) {
+      continue;
+    }
+
+    const Handle handle = hitHandle(object, point);
+    if (handle == Handle::None) {
+      continue;
+    }
+
+    m_selectedId = object.id;
+    m_selectedBounds = object.bounds;
+    m_activeHandle = handle;
+    m_lastPoint = point;
+    m_operationActive = true;
+    return true;
   }
-  TextObject* object = findById(*hit);
-  if (object == nullptr) {
-    return false;
-  }
-  m_selectedId = *hit;
-  m_selectedBounds = object->bounds;
-  m_activeHandle = hitHandle(*object, point);
-  if (m_activeHandle == Handle::None) {
-    m_activeHandle = Handle::Move;
-  }
-  m_lastPoint = point;
-  m_operationActive = true;
-  return true;
+
+  m_selectedId.reset();
+  m_selectedBounds.reset();
+  return false;
 }
 
 bool TextEditorFeature::updateOperation(core::Point point) {
@@ -273,8 +281,17 @@ bool TextEditorFeature::updateOperation(core::Point point) {
     const double angle = std::atan2(static_cast<double>(point.y) - cy, static_cast<double>(point.x) - cx) * 180.0 / 3.14159265358979323846;
     object->rotationDeg = static_cast<float>(angle);
   } else {
-    const int delta = std::abs(dx) >= std::abs(dy) ? dx : dy;
-    object->fontSize = std::max(8, object->fontSize + delta / 2);
+    int delta = 0;
+    if (m_activeHandle == Handle::TL) {
+      delta = -dx - dy;
+    } else if (m_activeHandle == Handle::TR) {
+      delta = dx - dy;
+    } else if (m_activeHandle == Handle::BL) {
+      delta = -dx + dy;
+    } else {
+      delta = dx + dy;
+    }
+    object->fontSize = std::max(8, object->fontSize + delta / 4);
   }
   object->bounds = measureBounds(*object);
   m_selectedBounds = object->bounds;
@@ -318,3 +335,4 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
 }
 
 } // namespace features::object_editing::text_editor
+

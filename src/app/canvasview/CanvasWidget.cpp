@@ -6,6 +6,7 @@
 
 #include <QApplication>
 #include <QElapsedTimer>
+#include <QEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
@@ -226,6 +227,14 @@ void CanvasWidget::setOverlayVisible(bool visible) {
   }
   m_showOverlay = visible;
   update();
+}
+
+bool CanvasWidget::event(QEvent* event) {
+  if (m_textEditActive && event != nullptr && event->type() == QEvent::ShortcutOverride) {
+    event->accept();
+    return true;
+  }
+  return QWidget::event(event);
 }
 
 void CanvasWidget::paintEvent(QPaintEvent* event) {
@@ -730,6 +739,8 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
       event->accept();
       return;
     }
+    event->accept();
+    return;
   }
   if (event->key() == Qt::Key_Space) {
     m_spacePressed = true;
@@ -874,4 +885,7 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
 }
 
 } // namespace app::canvasview
+
+
+
 
