@@ -384,6 +384,8 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
     textView.color = textObject.color;
     textView.size = std::max(6, textObject.fontSize);
     textView.rotationDeg = textObject.rotationDeg;
+    textView.scaleX = textObject.scaleX;
+    textView.scaleY = textObject.scaleY;
     view.textObjects.push_back(std::move(textView));
   }
   return view;

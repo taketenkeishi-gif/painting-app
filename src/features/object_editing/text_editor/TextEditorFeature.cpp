@@ -84,9 +84,9 @@ core::Rect TextEditorFeature::measureBounds(const TextObject& object) const {
   QFontMetricsF metrics(font);
   const QString text = toQString(object.text);
   const QString measured = text.isEmpty() ? QStringLiteral(" ") : text;
-  const qreal w = std::max<qreal>(16.0, metrics.horizontalAdvance(measured));
-  const qreal ascent = std::max<qreal>(1.0, metrics.ascent());
-  const qreal descent = std::max<qreal>(1.0, metrics.descent());
+  const qreal w = std::max<qreal>(16.0, metrics.horizontalAdvance(measured)) * std::max<qreal>(0.1, object.scaleX);
+  const qreal ascent = std::max<qreal>(1.0, metrics.ascent()) * std::max<qreal>(0.1, object.scaleY);
+  const qreal descent = std::max<qreal>(1.0, metrics.descent()) * std::max<qreal>(0.1, object.scaleY);
   const QRectF localRect(0.0, -ascent, w, ascent + descent);
   QTransform transform;
   transform.translate(object.position.x, object.position.y);
@@ -98,7 +98,6 @@ core::Rect TextEditorFeature::measureBounds(const TextObject& object) const {
       std::max(1, static_cast<int>(std::ceil(mapped.width()))),
       std::max(1, static_cast<int>(std::ceil(mapped.height())))};
 }
-
 int TextEditorFeature::caretIndexAtPoint(const TextObject& object, core::Point point) const {
   const QString text = toQString(object.text);
   if (text.isEmpty()) {
@@ -128,16 +127,35 @@ int TextEditorFeature::caretIndexAtPoint(const TextObject& object, core::Point p
 }
 
 core::Point TextEditorFeature::boundsAnchorPoint(const core::Rect& bounds, Handle handle) const {
+  const int left = bounds.x;
+  const int top = bounds.y;
+  const int right = bounds.x + bounds.width;
+  const int bottom = bounds.y + bounds.height;
+  const int centerX = bounds.x + bounds.width / 2;
+  const int centerY = bounds.y + bounds.height / 2;
+
   if (handle == Handle::TL) {
-    return core::Point {bounds.x + bounds.width, bounds.y + bounds.height};
+    return core::Point {right, bottom};
+  }
+  if (handle == Handle::T) {
+    return core::Point {centerX, bottom};
   }
   if (handle == Handle::TR) {
-    return core::Point {bounds.x, bounds.y + bounds.height};
+    return core::Point {left, bottom};
+  }
+  if (handle == Handle::L) {
+    return core::Point {right, centerY};
+  }
+  if (handle == Handle::R) {
+    return core::Point {left, centerY};
   }
   if (handle == Handle::BL) {
-    return core::Point {bounds.x + bounds.width, bounds.y};
+    return core::Point {right, top};
   }
-  return core::Point {bounds.x, bounds.y};
+  if (handle == Handle::B) {
+    return core::Point {centerX, top};
+  }
+  return core::Point {left, top};
 }
 
 bool TextEditorFeature::beginTextInput(core::Point point, const core::Color& color, int fontSize) {
@@ -301,14 +319,22 @@ bool TextEditorFeature::removeById(const std::string& id) {
 TextEditorFeature::Handle TextEditorFeature::hitHandle(const TextObject& object, core::Point point) const {
   const core::Rect b = object.bounds;
   const core::Point tl {b.x, b.y};
+  const core::Point t {b.x + b.width / 2, b.y};
   const core::Point tr {b.x + b.width, b.y};
+  const core::Point l {b.x, b.y + b.height / 2};
+  const core::Point r {b.x + b.width, b.y + b.height / 2};
   const core::Point bl {b.x, b.y + b.height};
+  const core::Point btm {b.x + b.width / 2, b.y + b.height};
   const core::Point br {b.x + b.width, b.y + b.height};
   const core::Point rot {b.x + b.width / 2, b.y - 22};
   if (nearPoint(point, rot, 12)) return Handle::Rotate;
   if (nearPoint(point, tl)) return Handle::TL;
+  if (nearPoint(point, t)) return Handle::T;
   if (nearPoint(point, tr)) return Handle::TR;
+  if (nearPoint(point, l)) return Handle::L;
+  if (nearPoint(point, r)) return Handle::R;
   if (nearPoint(point, bl)) return Handle::BL;
+  if (nearPoint(point, btm)) return Handle::B;
   if (nearPoint(point, br)) return Handle::BR;
   if (inRect(b, point, 6)) return Handle::Move;
   return Handle::None;
@@ -339,6 +365,9 @@ bool TextEditorFeature::beginOperation(core::Point point) {
     m_lastPoint = point;
     m_operationStartPoint = point;
     m_operationStartFontSize = object.fontSize;
+    m_operationStartScaleX = object.scaleX;
+    m_operationStartScaleY = object.scaleY;
+    m_operationStartBounds = object.bounds;
     m_operationStartRotationDeg = object.rotationDeg;
     m_operationCenter = core::Point {object.bounds.x + object.bounds.width / 2, object.bounds.y + object.bounds.height / 2};
     m_operationStartPointerAngleDeg = angleDegFromCenter(m_operationCenter, point);
@@ -372,6 +401,32 @@ bool TextEditorFeature::updateOperation(core::Point point) {
   } else if (m_activeHandle == Handle::Rotate) {
     const double currentAngle = angleDegFromCenter(m_operationCenter, point);
     object->rotationDeg = static_cast<float>(m_operationStartRotationDeg + currentAngle - m_operationStartPointerAngleDeg);
+  } else if (m_activeHandle == Handle::T || m_activeHandle == Handle::B || m_activeHandle == Handle::L || m_activeHandle == Handle::R) {
+    const int totalDx = point.x - m_operationStartPoint.x;
+    const int totalDy = point.y - m_operationStartPoint.y;
+    const int startWidth = std::max(1, m_operationStartBounds.width);
+    const int startHeight = std::max(1, m_operationStartBounds.height);
+    if (m_activeHandle == Handle::L) {
+      const double targetWidth = std::max(8.0, static_cast<double>(startWidth - totalDx));
+      object->scaleX = std::max(0.1F, static_cast<float>(m_operationStartScaleX * targetWidth / static_cast<double>(startWidth)));
+      object->scaleY = m_operationStartScaleY;
+    } else if (m_activeHandle == Handle::R) {
+      const double targetWidth = std::max(8.0, static_cast<double>(startWidth + totalDx));
+      object->scaleX = std::max(0.1F, static_cast<float>(m_operationStartScaleX * targetWidth / static_cast<double>(startWidth)));
+      object->scaleY = m_operationStartScaleY;
+    } else if (m_activeHandle == Handle::T) {
+      const double targetHeight = std::max(8.0, static_cast<double>(startHeight - totalDy));
+      object->scaleX = m_operationStartScaleX;
+      object->scaleY = std::max(0.1F, static_cast<float>(m_operationStartScaleY * targetHeight / static_cast<double>(startHeight)));
+    } else {
+      const double targetHeight = std::max(8.0, static_cast<double>(startHeight + totalDy));
+      object->scaleX = m_operationStartScaleX;
+      object->scaleY = std::max(0.1F, static_cast<float>(m_operationStartScaleY * targetHeight / static_cast<double>(startHeight)));
+    }
+    object->bounds = measureBounds(*object);
+    const core::Point currentAnchor = boundsAnchorPoint(object->bounds, m_activeHandle);
+    object->position.x += m_operationFixedAnchor.x - currentAnchor.x;
+    object->position.y += m_operationFixedAnchor.y - currentAnchor.y;
   } else {
     const int totalDx = point.x - m_operationStartPoint.x;
     const int totalDy = point.y - m_operationStartPoint.y;
@@ -385,7 +440,9 @@ bool TextEditorFeature::updateOperation(core::Point point) {
     } else {
       delta = totalDx + totalDy;
     }
-    object->fontSize = std::max(8, m_operationStartFontSize + delta / 4);
+    const float uniform = std::max(0.1F, static_cast<float>(1.0 + static_cast<double>(delta) / 120.0));
+    object->scaleX = std::max(0.1F, m_operationStartScaleX * uniform);
+    object->scaleY = std::max(0.1F, m_operationStartScaleY * uniform);
     object->bounds = measureBounds(*object);
     const core::Point currentAnchor = boundsAnchorPoint(object->bounds, m_activeHandle);
     object->position.x += m_operationFixedAnchor.x - currentAnchor.x;
@@ -395,7 +452,6 @@ bool TextEditorFeature::updateOperation(core::Point point) {
   m_selectedBounds = object->bounds;
   return true;
 }
-
 bool TextEditorFeature::endOperation() {
   const bool wasActive = m_operationActive;
   m_operationActive = false;
@@ -413,8 +469,10 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
   box.rect = *m_selectedBounds;
   out.primitives.push_back(box);
   const core::Rect b = *m_selectedBounds;
-  for (const core::Point& point : {core::Point {b.x, b.y}, core::Point {b.x + b.width, b.y},
-                                   core::Point {b.x, b.y + b.height}, core::Point {b.x + b.width, b.y + b.height}}) {
+  for (const core::Point& point : {core::Point {b.x, b.y}, core::Point {b.x + b.width / 2, b.y},
+                                   core::Point {b.x + b.width, b.y}, core::Point {b.x, b.y + b.height / 2},
+                                   core::Point {b.x + b.width, b.y + b.height / 2}, core::Point {b.x, b.y + b.height},
+                                   core::Point {b.x + b.width / 2, b.y + b.height}, core::Point {b.x + b.width, b.y + b.height}}) {
     OverlayPrimitive handle;
     handle.kind = OverlayPrimitive::Kind::HandlePoint;
     handle.p1 = point;

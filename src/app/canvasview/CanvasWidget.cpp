@@ -159,13 +159,19 @@ int operationCursorModeForObjectOverlay(const app::bridge::CanvasOverlayViewMode
   }
   const core::Rect b = *overlay.objectSelectionRect;
   const core::Point tl {b.x, b.y};
+  const core::Point t {b.x + b.width / 2, b.y};
   const core::Point tr {b.x + b.width, b.y};
+  const core::Point l {b.x, b.y + b.height / 2};
+  const core::Point r {b.x + b.width, b.y + b.height / 2};
   const core::Point bl {b.x, b.y + b.height};
+  const core::Point btm {b.x + b.width / 2, b.y + b.height};
   const core::Point br {b.x + b.width, b.y + b.height};
   const core::Point rot {b.x + b.width / 2, b.y - 22};
   if (canvasCursorNearPoint(point, rot, 14)) return 4;
   if (canvasCursorNearPoint(point, tl, 12) || canvasCursorNearPoint(point, br, 12)) return 2;
   if (canvasCursorNearPoint(point, tr, 12) || canvasCursorNearPoint(point, bl, 12)) return 3;
+  if (canvasCursorNearPoint(point, l, 12) || canvasCursorNearPoint(point, r, 12)) return 5;
+  if (canvasCursorNearPoint(point, t, 12) || canvasCursorNearPoint(point, btm, 12)) return 6;
   if (canvasCursorOnRectFrame(b, point, 6)) return 1;
   return 0;
 }
@@ -196,6 +202,10 @@ void applyOperationCursorMode(QWidget* widget, int mode) {
     widget->setCursor(Qt::SizeBDiagCursor);
   } else if (mode == 2) {
     widget->setCursor(Qt::SizeFDiagCursor);
+  } else if (mode == 5) {
+    widget->setCursor(Qt::SizeHorCursor);
+  } else if (mode == 6) {
+    widget->setCursor(Qt::SizeVerCursor);
   } else if (mode == 1) {
     widget->setCursor(Qt::SizeAllCursor);
   }
@@ -377,6 +387,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.save();
       painter.translate(p);
       painter.rotate(textObj.rotationDeg);
+      painter.scale(std::max(0.1F, textObj.scaleX), std::max(0.1F, textObj.scaleY));
       painter.setFont(font);
       painter.setPen(QColor(textObj.color.r, textObj.color.g, textObj.color.b, textObj.color.a));
       painter.drawText(QPointF(0.0, 0.0), QString::fromUtf8(textObj.text.c_str()));

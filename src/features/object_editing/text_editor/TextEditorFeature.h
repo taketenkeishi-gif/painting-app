@@ -20,6 +20,8 @@ public:
     int fontSize {16};
     core::Color color {0, 0, 0, 255};
     float rotationDeg {0.0F};
+    float scaleX {1.0F};
+    float scaleY {1.0F};
     core::Rect bounds {0, 0, 1, 1};
     bool visible {true};
     bool locked {false};
@@ -46,7 +48,7 @@ public:
   ObjectOverlayModel selectionOverlay() const;
 
 private:
-  enum class Handle { None, Move, TL, TR, BL, BR, Rotate };
+  enum class Handle { None, Move, TL, T, TR, L, R, BL, B, BR, Rotate };
 
   TextObject* findById(const std::string& id);
   const TextObject* findById(const std::string& id) const;
@@ -72,6 +74,9 @@ private:
   core::Point m_operationStartPoint {0, 0};
   core::Point m_operationFixedAnchor {0, 0};
   int m_operationStartFontSize {16};
+  float m_operationStartScaleX {1.0F};
+  float m_operationStartScaleY {1.0F};
+  core::Rect m_operationStartBounds {0, 0, 1, 1};
   float m_operationStartRotationDeg {0.0F};
   double m_operationStartPointerAngleDeg {0.0};
 };
