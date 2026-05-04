@@ -248,6 +248,7 @@ bool TextEditorFeature::beginOperation(core::Point point) {
     m_selectedBounds = object.bounds;
     m_activeHandle = handle;
     m_lastPoint = point;
+    m_operationCenter = core::Point {object.bounds.x + object.bounds.width / 2, object.bounds.y + object.bounds.height / 2};
     m_operationActive = true;
     return true;
   }
@@ -275,9 +276,9 @@ bool TextEditorFeature::updateOperation(core::Point point) {
     object->position.x += dx;
     object->position.y += dy;
   } else if (m_activeHandle == Handle::Rotate) {
-    const core::Rect b = object->bounds;
-    const double cx = static_cast<double>(b.x) + static_cast<double>(b.width) / 2.0;
-    const double cy = static_cast<double>(b.y) + static_cast<double>(b.height) / 2.0;
+    // text-editor-stable-rotate-center
+    const double cx = static_cast<double>(m_operationCenter.x);
+    const double cy = static_cast<double>(m_operationCenter.y);
     const double angle = std::atan2(static_cast<double>(point.y) - cy, static_cast<double>(point.x) - cx) * 180.0 / 3.14159265358979323846;
     object->rotationDeg = static_cast<float>(angle);
   } else {

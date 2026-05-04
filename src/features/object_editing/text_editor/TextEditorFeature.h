@@ -65,6 +65,7 @@ private:
   bool m_operationActive {false};
   Handle m_activeHandle {Handle::None};
   core::Point m_lastPoint {0, 0};
+  core::Point m_operationCenter {0, 0};
 };
 
 } // namespace features::object_editing::text_editor

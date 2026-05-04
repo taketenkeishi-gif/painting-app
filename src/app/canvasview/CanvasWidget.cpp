@@ -1,4 +1,4 @@
-﻿#include "app/canvasview/CanvasWidget.h"
+#include "app/canvasview/CanvasWidget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -109,6 +109,20 @@ Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
     default:
       return Qt::ArrowCursor;
   }
+}
+
+// text-editor-cursor-hit-helpers
+int distanceSquared(const core::Point& a, const core::Point& b) {
+  const int dx = a.x - b.x;
+  const int dy = a.y - b.y;
+  return dx * dx + dy * dy;
+}
+
+bool inRect(const core::Rect& rect, const core::Point& point, int inflate) {
+  return point.x >= rect.x - inflate &&
+         point.y >= rect.y - inflate &&
+         point.x <= rect.x + rect.width + inflate &&
+         point.y <= rect.y + rect.height + inflate;
 }
 
 } // namespace
@@ -295,7 +309,19 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     }
     // Text edit session is rendered by the same TextObject overlay. No duplicate editor overlay here.
 
-    if (overlay.toolOverlay.hasLine) {
+    
+    // text-editor-visible-caret
+    if (m_textEditActive && overlay.objectSelectionRect.has_value()) {
+      const core::Rect rect = *overlay.objectSelectionRect;
+      const double caretX = target.x() + static_cast<double>(rect.x + rect.width + 2) * state.zoom;
+      const double topY = target.y() + static_cast<double>(rect.y) * state.zoom;
+      const double bottomY = target.y() + static_cast<double>(rect.y + rect.height) * state.zoom;
+      painter.setPen(QPen(QColor(0, 0, 0, 245), 1.6));
+      painter.drawLine(QPointF(caretX, topY), QPointF(caretX, bottomY));
+      painter.setPen(QPen(QColor(255, 255, 255, 210), 0.8));
+      painter.drawLine(QPointF(caretX + 1.0, topY), QPointF(caretX + 1.0, bottomY));
+    }
+if (overlay.toolOverlay.hasLine) {
       const QPointF p1(
           target.x() + (static_cast<double>(overlay.toolOverlay.lineStart.x) + 0.5) * state.zoom,
           target.y() + (static_cast<double>(overlay.toolOverlay.lineStart.y) + 0.5) * state.zoom);
@@ -866,6 +892,40 @@ std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) co
 }
 
 void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvasPoint) {
+  // text-editor-hover-cursor-feedback
+  if (m_controller != nullptr && m_controller->currentSubToolId() == "operation_object" && canvasPoint.has_value()) {
+    const auto overlay = m_controller->canvasOverlay();
+    const core::Point point = *canvasPoint;
+    for (const auto& primitive : overlay.objectOverlay.primitives) {
+      if (primitive.kind != features::object_editing::OverlayPrimitive::Kind::HandlePoint) {
+        continue;
+      }
+      if (distanceSquared(point, primitive.p1) > 12 * 12) {
+        continue;
+      }
+      if (overlay.objectSelectionRect.has_value()) {
+        const core::Rect b = *overlay.objectSelectionRect;
+        const core::Point tl {b.x, b.y};
+        const core::Point tr {b.x + b.width, b.y};
+        const core::Point bl {b.x, b.y + b.height};
+        const core::Point br {b.x + b.width, b.y + b.height};
+        if (distanceSquared(primitive.p1, tl) <= 4 || distanceSquared(primitive.p1, br) <= 4) {
+          setCursor(Qt::SizeFDiagCursor);
+          return;
+        }
+        if (distanceSquared(primitive.p1, tr) <= 4 || distanceSquared(primitive.p1, bl) <= 4) {
+          setCursor(Qt::SizeBDiagCursor);
+          return;
+        }
+      }
+      setCursor(Qt::CrossCursor);
+      return;
+    }
+    if (overlay.objectSelectionRect.has_value() && inRect(*overlay.objectSelectionRect, point, 4)) {
+      setCursor(Qt::SizeAllCursor);
+      return;
+    }
+  }
   const auto& state = stateFor(this);
   if (state.panning) {
     setCursor(state.panDragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
