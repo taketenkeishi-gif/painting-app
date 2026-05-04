@@ -337,11 +337,24 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
   if (m_editSessionActive && m_selectedId.has_value()) {
     const auto* object = findById(*m_selectedId);
     if (object != nullptr) {
-      const core::Rect caretBounds = object->bounds;
+      const QFont font = textFont(object->fontSize);
+      const QFontMetricsF metrics(font);
+      const QString text = toQString(object->text);
+      const qreal advance = std::max<qreal>(0.0, metrics.horizontalAdvance(text));
+      const qreal ascent = std::max<qreal>(1.0, metrics.ascent());
+      const qreal descent = std::max<qreal>(1.0, metrics.descent());
+      const double radians = static_cast<double>(object->rotationDeg) * 3.14159265358979323846 / 180.0;
+      const double c = std::cos(radians);
+      const double s = std::sin(radians);
+      auto mapLocal = [&](double x, double y) -> core::Point {
+        return core::Point {
+            static_cast<int>(std::lround(static_cast<double>(object->position.x) + x * c - y * s)),
+            static_cast<int>(std::lround(static_cast<double>(object->position.y) + x * s + y * c))};
+      };
       OverlayPrimitive caret;
       caret.kind = OverlayPrimitive::Kind::Line;
-      caret.p1 = core::Point {caretBounds.x + caretBounds.width + 2, caretBounds.y};
-      caret.p2 = core::Point {caretBounds.x + caretBounds.width + 2, caretBounds.y + caretBounds.height};
+      caret.p1 = mapLocal(advance + 2.0, -ascent);
+      caret.p2 = mapLocal(advance + 2.0, descent);
       out.primitives.push_back(caret);
     }
   }

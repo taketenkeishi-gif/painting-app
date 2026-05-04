@@ -5,6 +5,8 @@
 #include <unordered_map>
 
 #include <QApplication>
+#include <QCursor>
+#include <QPixmap>
 #include <QElapsedTimer>
 #include <QEvent>
 #include <QKeyEvent>
@@ -125,6 +127,67 @@ bool inRect(const core::Rect& rect, const core::Point& point, int inflate) {
          point.y <= rect.y + rect.height + inflate;
 }
 
+int canvasCursorDistanceSquared(core::Point a, core::Point b) {
+  const int dx = a.x - b.x;
+  const int dy = a.y - b.y;
+  return dx * dx + dy * dy;
+}
+
+bool canvasCursorNearPoint(core::Point a, core::Point b, int radius = 12) {
+  return canvasCursorDistanceSquared(a, b) <= radius * radius;
+}
+
+bool canvasCursorInRect(const core::Rect& r, core::Point p, int pad = 6) {
+  return p.x >= r.x - pad && p.y >= r.y - pad && p.x <= r.x + r.width + pad && p.y <= r.y + r.height + pad;
+}
+
+int operationCursorModeForObjectOverlay(const app::bridge::CanvasOverlayViewModel& overlay, core::Point point) {
+  if (!overlay.objectSelectionRect.has_value()) {
+    return 0;
+  }
+  const core::Rect b = *overlay.objectSelectionRect;
+  const core::Point tl {b.x, b.y};
+  const core::Point tr {b.x + b.width, b.y};
+  const core::Point bl {b.x, b.y + b.height};
+  const core::Point br {b.x + b.width, b.y + b.height};
+  const core::Point rot {b.x + b.width / 2, b.y - 22};
+  if (canvasCursorNearPoint(point, rot, 14)) return 4;
+  if (canvasCursorNearPoint(point, tl, 12) || canvasCursorNearPoint(point, br, 12)) return 2;
+  if (canvasCursorNearPoint(point, tr, 12) || canvasCursorNearPoint(point, bl, 12)) return 3;
+  if (canvasCursorInRect(b, point, 6)) return 1;
+  return 0;
+}
+
+QCursor textRotateCursor() {
+  QPixmap pixmap(24, 24);
+  pixmap.fill(Qt::transparent);
+  QPainter painter(&pixmap);
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  QPen pen(Qt::black, 2.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+  painter.setPen(pen);
+  painter.drawArc(QRectF(4.0, 4.0, 16.0, 16.0), 25 * 16, 280 * 16);
+  painter.drawLine(QPointF(17.5, 5.0), QPointF(20.0, 9.0));
+  painter.drawLine(QPointF(17.5, 5.0), QPointF(13.5, 5.2));
+  painter.setPen(QPen(Qt::white, 0.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+  painter.drawArc(QRectF(4.0, 4.0, 16.0, 16.0), 25 * 16, 280 * 16);
+  painter.end();
+  return QCursor(pixmap, 12, 12);
+}
+
+void applyOperationCursorMode(QWidget* widget, int mode) {
+  if (widget == nullptr) {
+    return;
+  }
+  if (mode == 4) {
+    widget->setCursor(textRotateCursor());
+  } else if (mode == 3) {
+    widget->setCursor(Qt::SizeBDiagCursor);
+  } else if (mode == 2) {
+    widget->setCursor(Qt::SizeFDiagCursor);
+  } else if (mode == 1) {
+    widget->setCursor(Qt::SizeAllCursor);
+  }
+}
 } // namespace
 
 CanvasWidget::CanvasWidget(QWidget* parent)
@@ -501,6 +564,11 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   }
 
   m_mouseDrawing = true;
+  m_operationCursorLockMode = 0;
+  if (m_controller->currentTool() == core::ToolKind::Brush && m_controller->currentSubToolId() == "operation_object") {
+    const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
+    m_operationCursorLockMode = operationCursorModeForObjectOverlay(overlay, *point);
+  }
   state.lastStrokeDispatchWidgetPos = event->position().toPoint();
   state.hasLastStrokeDispatchPos = true;
   state.lastStrokeDispatchNs = g_eventTimer.nsecsElapsed();
@@ -630,6 +698,7 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
     m_controller->endStroke();
   }
   m_mouseDrawing = false;
+  m_operationCursorLockMode = 0;
   state.hasLastStrokeDispatchPos = false;
   updateCursorForState(mapToCanvas(state.lastMousePos));
   update();
@@ -892,40 +961,6 @@ std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) co
 }
 
 void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvasPoint) {
-  // text-editor-hover-cursor-feedback
-  if (m_controller != nullptr && m_controller->currentSubToolId() == "operation_object" && canvasPoint.has_value()) {
-    const auto overlay = m_controller->canvasOverlay();
-    const core::Point point = *canvasPoint;
-    for (const auto& primitive : overlay.objectOverlay.primitives) {
-      if (primitive.kind != features::object_editing::OverlayPrimitive::Kind::HandlePoint) {
-        continue;
-      }
-      if (distanceSquared(point, primitive.p1) > 12 * 12) {
-        continue;
-      }
-      if (overlay.objectSelectionRect.has_value()) {
-        const core::Rect b = *overlay.objectSelectionRect;
-        const core::Point tl {b.x, b.y};
-        const core::Point tr {b.x + b.width, b.y};
-        const core::Point bl {b.x, b.y + b.height};
-        const core::Point br {b.x + b.width, b.y + b.height};
-        if (distanceSquared(primitive.p1, tl) <= 4 || distanceSquared(primitive.p1, br) <= 4) {
-          setCursor(Qt::SizeFDiagCursor);
-          return;
-        }
-        if (distanceSquared(primitive.p1, tr) <= 4 || distanceSquared(primitive.p1, bl) <= 4) {
-          setCursor(Qt::SizeBDiagCursor);
-          return;
-        }
-      }
-      setCursor(Qt::CrossCursor);
-      return;
-    }
-    if (overlay.objectSelectionRect.has_value() && inRect(*overlay.objectSelectionRect, point, 4)) {
-      setCursor(Qt::SizeAllCursor);
-      return;
-    }
-  }
   const auto& state = stateFor(this);
   if (state.panning) {
     setCursor(state.panDragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
@@ -940,10 +975,23 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
     return;
   }
 
+  if (m_operationCursorLockMode != 0) {
+    applyOperationCursorMode(this, m_operationCursorLockMode);
+    return;
+  }
+
+  if (m_controller->currentTool() == core::ToolKind::Brush && m_controller->currentSubToolId() == "operation_object") {
+    const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
+    const int mode = operationCursorModeForObjectOverlay(overlay, *canvasPoint);
+    if (mode != 0) {
+      applyOperationCursorMode(this, mode);
+      return;
+    }
+  }
+
   const bool dragging = m_mouseDrawing || (state.panning && (QApplication::mouseButtons() & Qt::LeftButton));
   setCursor(cursorForTool(m_controller->currentTool(), dragging));
 }
-
 } // namespace app::canvasview
 
 

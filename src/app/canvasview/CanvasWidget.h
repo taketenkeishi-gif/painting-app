@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <optional>
 #include <string>
@@ -66,6 +66,7 @@ private:
   bool m_spacePressed {false};
   bool m_textEditActive {false};
   std::string m_textEditObjectId;
+  int m_operationCursorLockMode {0};
 };
 
 } // namespace app::canvasview
