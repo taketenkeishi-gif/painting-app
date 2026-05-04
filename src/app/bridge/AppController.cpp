@@ -1469,6 +1469,9 @@ bool AppController::currentToolSupportsColor() const noexcept {
   if (!isCurrentSubToolCompatibleWithActiveLayer()) {
     return false;
   }
+  if (currentSubToolId() == "text_basic") {
+    return true;
+  }
   return !m_uiState.eraseMode &&
          containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::Color);
 }

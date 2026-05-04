@@ -8,17 +8,18 @@ app::ui::ToolDescriptor makeTextToolDescriptor() {
   descriptor.id = "text";
   descriptor.displayName = "Text";
   descriptor.guide = "Place a simple editable text marker object.";
-  descriptor.availableProperties = {app::ui::ToolPropertyKey::Size, app::ui::ToolPropertyKey::Opacity};
+  descriptor.availableProperties = {app::ui::ToolPropertyKey::Color, app::ui::ToolPropertyKey::Size, app::ui::ToolPropertyKey::Opacity};
 
   app::ui::SubToolDescriptor subTool;
   subTool.id = "text_basic";
   subTool.displayName = "Text";
   subTool.guide = "Click to place text marker.";
   subTool.profile.targetLayerKind = app::ui::TargetLayerKind::Both;
-  subTool.editableProperties = {app::ui::ToolPropertyKey::Size, app::ui::ToolPropertyKey::Opacity};
+  subTool.editableProperties = {app::ui::ToolPropertyKey::Color, app::ui::ToolPropertyKey::Size, app::ui::ToolPropertyKey::Opacity};
 
   descriptor.subTools = {subTool};
   return descriptor;
 }
 
 } // namespace features::text
+
