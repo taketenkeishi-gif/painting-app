@@ -1,4 +1,4 @@
-﻿#include "features/object_editing/text_editor/TextEditorFeature.h"
+#include "features/object_editing/text_editor/TextEditorFeature.h"
 
 #include <algorithm>
 #include <cmath>
@@ -227,7 +227,7 @@ TextEditorFeature::Handle TextEditorFeature::hitHandle(const TextObject& object,
 
 bool TextEditorFeature::beginOperation(core::Point point) {
   if (m_editSessionActive) {
-    return false;
+    m_editSessionActive = false;
   }
 
   m_operationActive = false;
@@ -331,6 +331,19 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
   rotate.kind = OverlayPrimitive::Kind::HandlePoint;
   rotate.p1 = stem.p2;
   out.primitives.push_back(rotate);
+
+  /* text-editor-live-caret-overlay */
+  if (m_editSessionActive && m_selectedId.has_value()) {
+    const auto* object = findById(*m_selectedId);
+    if (object != nullptr) {
+      const core::Rect caretBounds = object->bounds;
+      OverlayPrimitive caret;
+      caret.kind = OverlayPrimitive::Kind::Line;
+      caret.p1 = core::Point {caretBounds.x + caretBounds.width + 2, caretBounds.y};
+      caret.p2 = core::Point {caretBounds.x + caretBounds.width + 2, caretBounds.y + caretBounds.height};
+      out.primitives.push_back(caret);
+    }
+  }
   return out;
 }
 

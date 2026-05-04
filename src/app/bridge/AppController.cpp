@@ -1,4 +1,4 @@
-﻿#include "app/bridge/AppController.h"
+#include "app/bridge/AppController.h"
 
 #include <algorithm>
 #include <cmath>
@@ -3070,6 +3070,13 @@ void AppController::clearStrokeHistory() noexcept {
 }
 
 bool AppController::beginObjectOperation(core::Point point) {
+  // text-editor-operation-priority
+  if (m_textEditor.beginOperation(point)) {
+    m_objectOpBeforeLayers = m_objectLayers;
+    m_objectOpChanged = false;
+    emit overlayChanged();
+    return true;
+  }
   if (m_textEditor.beginOperation(point)) {
     m_objectOpBeforeLayers = m_objectLayers;
     m_objectOpChanged = false;
@@ -3091,6 +3098,13 @@ bool AppController::beginObjectOperation(core::Point point) {
 }
 
 bool AppController::continueObjectOperation(core::Point point) {
+  // text-editor-operation-live-update
+  if (m_textEditor.updateOperation(point)) {
+    m_objectOpChanged = true;
+    emit overlayChanged();
+    emit canvasChanged();
+    return true;
+  }
   if (m_textEditor.hasActiveOperation()) {
     const bool changed = m_textEditor.updateOperation(point);
     if (changed) {
@@ -3126,6 +3140,15 @@ bool AppController::continueObjectOperation(core::Point point) {
 }
 
 void AppController::endObjectOperation() {
+  // text-editor-operation-end
+  if (m_textEditor.endOperation()) {
+    if (m_objectOpChanged) {
+      emit overlayChanged();
+      emit canvasChanged();
+    }
+    m_objectOpChanged = false;
+    return;
+  }
   if (m_textEditor.hasActiveOperation()) {
     const bool changed = m_textEditor.endOperation();
     if (changed) {
