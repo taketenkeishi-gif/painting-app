@@ -9,6 +9,7 @@
 #include <QPixmap>
 #include <QElapsedTimer>
 #include <QEvent>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
@@ -220,6 +221,7 @@ CanvasWidget::CanvasWidget(QWidget* parent)
   });
 
   setFocusPolicy(Qt::StrongFocus);
+  setAttribute(Qt::WA_InputMethodEnabled, true);
   setMouseTracking(true);
   setMinimumSize(400, 300);
   updateZoomStatusLabel(this);
@@ -897,6 +899,38 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
   event->accept();
 }
 
+void CanvasWidget::inputMethodEvent(QInputMethodEvent* event) {
+  if (m_controller == nullptr || event == nullptr || !m_textEditActive) {
+    QWidget::inputMethodEvent(event);
+    return;
+  }
+
+  const QString commitText = event->commitString();
+  if (!commitText.isEmpty()) {
+    const QByteArray utf8 = commitText.toUtf8();
+    const std::string textUtf8(utf8.constData(), static_cast<std::string::size_type>(utf8.size()));
+    if (m_controller->handleTextSessionKey(0, textUtf8)) {
+      m_textCaretVisible = true;
+      const auto& state = stateFor(this);
+      if (state.hasMousePos) {
+        updateCursorForState(mapToCanvas(state.lastMousePos));
+      } else {
+        updateCursorForState(std::nullopt);
+      }
+      update();
+      event->accept();
+      return;
+    }
+  }
+
+  if (!event->preeditString().isEmpty()) {
+    event->accept();
+    update();
+    return;
+  }
+
+  QWidget::inputMethodEvent(event);
+}
 void CanvasWidget::keyPressEvent(QKeyEvent* event) {
   if (m_controller != nullptr) {
     const Qt::KeyboardModifiers modifiers = QApplication::keyboardModifiers();
@@ -1076,38 +1110,45 @@ std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) co
 }
 
 void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvasPoint) {
-  const auto& state = stateFor(this);
-  if (state.panning) {
-    setCursor(state.panDragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
-    return;
-  }
-  if (m_spacePressed) {
-    setCursor(Qt::OpenHandCursor);
-    return;
-  }
-  if (!canvasPoint.has_value() || m_controller == nullptr) {
-    unsetCursor();
-    return;
-  }
-
   if (m_operationCursorLockMode != 0) {
     applyOperationCursorMode(this, m_operationCursorLockMode);
     return;
   }
 
-  {
+  const auto& state = stateFor(this);
+  if (state.panning || m_spacePressed) {
+    setCursor(state.panDragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
+    return;
+  }
+
+  if (m_controller == nullptr) {
+    setCursor(Qt::ArrowCursor);
+    return;
+  }
+
+  if (canvasPoint.has_value()) {
     const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
-    const int mode = operationCursorModeForObjectOverlay(overlay, *canvasPoint);
-    if (mode != 0) {
-      applyOperationCursorMode(this, mode);
+    const int operationMode = operationCursorModeForObjectOverlay(overlay, *canvasPoint);
+    if (operationMode != 0) {
+      applyOperationCursorMode(this, operationMode);
       return;
     }
   }
 
-  const bool dragging = m_mouseDrawing || (state.panning && (QApplication::mouseButtons() & Qt::LeftButton));
-  setCursor(cursorForTool(m_controller->currentTool(), dragging));
+  const std::string subToolId = m_controller->currentSubToolId();
+  if (subToolId == "text_basic") {
+    setCursor(Qt::IBeamCursor);
+    return;
+  }
+  if (subToolId == "operation_object") {
+    setCursor(Qt::ArrowCursor);
+    return;
+  }
+
+  setCursor(cursorForTool(m_controller->currentTool(), m_mouseDrawing));
 }
 } // namespace app::canvasview
+
 
 
 

@@ -13,6 +13,7 @@ class QWheelEvent;
 class QKeyEvent;
 class QEvent;
 class QTimerEvent;
+class QInputMethodEvent;
 
 namespace app::bridge {
 class AppController;
@@ -49,6 +50,7 @@ protected:
   void wheelEvent(QWheelEvent* event) override;
   void keyPressEvent(QKeyEvent* event) override;
   void keyReleaseEvent(QKeyEvent* event) override;
+  void inputMethodEvent(QInputMethodEvent* event) override;
   void timerEvent(QTimerEvent* event) override;
 
 private slots:
@@ -78,5 +80,6 @@ private:
 };
 
 } // namespace app::canvasview
+
 
 
