@@ -40,6 +40,7 @@ public:
   bool endTextRangeSelection();
   bool hasActiveTextRangeSelection() const noexcept { return m_editRangeSelectionActive; }
   bool hasSelectedTextRange() const noexcept;
+  std::optional<core::Rect> selectedTextRangeRect() const;
   bool hasActiveTextSession() const noexcept { return m_editSessionActive; }
 
   std::optional<std::string> hitTextIdAt(core::Point point) const;

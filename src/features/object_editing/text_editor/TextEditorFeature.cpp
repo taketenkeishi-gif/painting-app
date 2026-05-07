@@ -257,6 +257,20 @@ bool TextEditorFeature::hasSelectedTextRange() const noexcept {
   return m_editSessionActive && m_editSelectionAnchorIndex != m_editSelectionFocusIndex;
 }
 
+std::optional<core::Rect> TextEditorFeature::selectedTextRangeRect() const {
+  if (!hasSelectedTextRange()) {
+    return std::nullopt;
+  }
+
+  const ObjectOverlayModel overlay = selectionOverlay();
+  for (auto it = overlay.primitives.rbegin(); it != overlay.primitives.rend(); ++it) {
+    if (it->kind == OverlayPrimitive::Kind::Rect) {
+      return it->rect;
+    }
+  }
+  return std::nullopt;
+}
+
 
 bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
   if (!m_editSessionActive) {

@@ -364,6 +364,11 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
     view.objectSelectionRect = *m_textEditor.selectedBounds();
     view.objectSelectionId = m_textEditor.selectedId().value_or(std::string {});
     view.objectOverlay = m_textEditor.selectionOverlay();
+    /* text-editor-range-selection-to-selectionRect */
+    const auto textRangeRect = m_textEditor.selectedTextRangeRect();
+    if (textRangeRect.has_value()) {
+      view.selectionRect = *textRangeRect;
+    }
   }
   view.cloneSamplePoint = m_requestedToolsRuntime.cloneSamplePoint();
   for (std::size_t layerIndex = 0; layerIndex < m_document.layerCount(); ++layerIndex) {

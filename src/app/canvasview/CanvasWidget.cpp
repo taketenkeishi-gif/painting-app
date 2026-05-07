@@ -576,6 +576,12 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     if (!point.has_value()) {
       return;
     }
+    if (m_controller->currentSubToolId() == "text_basic") { // text-basic-right-click-picker-guard
+      updateCursorForState(point);
+      update();
+      event->accept();
+      return;
+    }
     m_controller->pickColorAt(point->x, point->y);
     updateCursorForState(point);
     update();
@@ -636,6 +642,17 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   }
 
   if (m_controller->currentSubToolId() == "text_basic") {
+    if (m_controller->textObjectIdAt(point->x, point->y).has_value()) { // text-basic-drag-range-route
+      m_mouseDrawing = true;
+      m_operationCursorLockMode = 0;
+      state.lastStrokeDispatchWidgetPos = event->position().toPoint();
+      state.hasLastStrokeDispatchPos = true;
+      state.lastStrokeDispatchNs = g_eventTimer.nsecsElapsed();
+      m_controller->beginStroke(point->x, point->y);
+      updateCursorForState(point);
+      event->accept();
+      return;
+    }
     beginTextEditSession(*point);
     event->accept();
     return;
