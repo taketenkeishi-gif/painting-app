@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/common/Point.h"
@@ -13,6 +14,18 @@ namespace features::object_editing::text_editor {
 
 class TextEditorFeature {
 public:
+  struct TextStyleRun {
+    int start {0};
+    int length {0};
+    int fontSize {16};
+    core::Color color {0, 0, 0, 255};
+    std::string fontFamily;
+    bool bold {false};
+    bool italic {false};
+    bool underline {false};
+    bool strikeOut {false};
+  };
+
   struct TextObject {
     std::string id;
     std::string text;
@@ -24,6 +37,7 @@ public:
     bool italic {false};
     bool underline {false};
     bool strikeOut {false};
+    std::vector<TextStyleRun> styleRuns;
     float rotationDeg {0.0F};
     float scaleX {1.0F};
     float scaleY {1.0F};
@@ -75,6 +89,12 @@ private:
   int caretIndexAtPoint(const TextObject& object, core::Point point) const;
   core::Point boundsAnchorPoint(const core::Rect& bounds, Handle handle) const;
   Handle hitHandle(const TextObject& object, core::Point point) const;
+  std::pair<int, int> selectedRangeBounds(int textLength) const;
+  TextStyleRun styleAtIndex(const TextObject& object, int index) const;
+  void applyStyleToSelectedTextRange(TextObject& object, const TextStyleRun& style);
+  bool deleteSelectedTextRange(TextObject& object);
+  void adjustStyleRunsAfterEdit(TextObject& object, int start, int removedLength, int insertedLength);
+  void sanitizeStyleRuns(TextObject& object);
 
   std::vector<TextObject> m_objects;
   std::optional<std::string> m_selectedId;

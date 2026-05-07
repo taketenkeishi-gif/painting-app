@@ -16,6 +16,7 @@
 #include <QPainter>
 #include <QTimerEvent>
 #include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QWheelEvent>
 
 #include "app/bridge/AppController.h"
@@ -383,26 +384,65 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       const QPointF p(
           target.x() + (static_cast<double>(textObj.point.x) + 0.5) * state.zoom,
           target.y() + (static_cast<double>(textObj.point.y) + 0.5) * state.zoom);
-      QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
-      font.setFamilies(QStringList {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo"), QStringLiteral("Noto Sans CJK JP"), font.family()});
-      if (!textObj.fontFamily.empty()) {
-        font.setFamily(QString::fromUtf8(textObj.fontFamily.data(), static_cast<int>(textObj.fontFamily.size())));
-      }
-      font.setPointSize(std::max(8, textObj.size));
-      font.setBold(textObj.bold);
-      font.setItalic(textObj.italic);
-      font.setUnderline(textObj.underline);
-      font.setStrikeOut(textObj.strikeOut);
+      auto makeTextFont = [&](int pointSize, const std::string& family, bool bold, bool italic, bool underline, bool strikeOut) {
+        QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
+        font.setFamilies(QStringList {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo"), QStringLiteral("Noto Sans CJK JP"), font.family()});
+        if (!family.empty()) {
+          font.setFamily(QString::fromUtf8(family.data(), static_cast<int>(family.size())));
+        }
+        font.setPointSize(std::max(8, pointSize));
+        font.setBold(bold);
+        font.setItalic(italic);
+        font.setUnderline(underline);
+        font.setStrikeOut(strikeOut);
+        return font;
+      };
+
       painter.save();
       painter.translate(p);
       painter.rotate(textObj.rotationDeg);
       painter.scale(std::max(0.1F, textObj.scaleX), std::max(0.1F, textObj.scaleY));
-      painter.setFont(font);
-      painter.setPen(QColor(textObj.color.r, textObj.color.g, textObj.color.b, textObj.color.a));
-      painter.drawText(QPointF(0.0, 0.0), QString::fromUtf8(textObj.text.c_str()));
+
+      const QString renderedText = QString::fromUtf8(textObj.text.c_str());
+      if (textObj.styleRuns.empty()) {
+        const QFont font = makeTextFont(textObj.size, textObj.fontFamily, textObj.bold, textObj.italic, textObj.underline, textObj.strikeOut);
+        painter.setFont(font);
+        painter.setPen(QColor(textObj.color.r, textObj.color.g, textObj.color.b, textObj.color.a));
+        painter.drawText(QPointF(0.0, 0.0), renderedText);
+      } else {
+        qreal advanceX = 0.0;
+        for (int i = 0; i < renderedText.size(); ++i) {
+          int runSize = textObj.size;
+          core::Color runColor = textObj.color;
+          std::string runFamily = textObj.fontFamily;
+          bool runBold = textObj.bold;
+          bool runItalic = textObj.italic;
+          bool runUnderline = textObj.underline;
+          bool runStrikeOut = textObj.strikeOut;
+
+          for (const auto& run : textObj.styleRuns) {
+            if (i >= run.start && i < run.start + run.length) {
+              runSize = run.size;
+              runColor = run.color;
+              runFamily = run.fontFamily;
+              runBold = run.bold;
+              runItalic = run.italic;
+              runUnderline = run.underline;
+              runStrikeOut = run.strikeOut;
+            }
+          }
+
+          const QString character = renderedText.mid(i, 1);
+          const QFont font = makeTextFont(runSize, runFamily, runBold, runItalic, runUnderline, runStrikeOut);
+          painter.setFont(font);
+          painter.setPen(QColor(runColor.r, runColor.g, runColor.b, runColor.a));
+          painter.drawText(QPointF(advanceX, 0.0), character);
+          QFontMetricsF metrics(font);
+          advanceX += metrics.horizontalAdvance(character);
+        }
+      }
       painter.restore();
-    }
-    // Text edit session is rendered by the same TextObject overlay. No duplicate editor overlay here.
+    }    // Text edit session is rendered by the same TextObject overlay. No duplicate editor overlay here.
 
     
 if (overlay.toolOverlay.hasLine) {

@@ -112,6 +112,18 @@ struct CanvasOverlayViewModel {
     bool italic {false};
     bool underline {false};
     bool strikeOut {false};
+    struct TextStyleRunViewModel {
+      int start {0};
+      int length {0};
+      int size {8};
+      core::Color color {0, 0, 0, 255};
+      std::string fontFamily;
+      bool bold {false};
+      bool italic {false};
+      bool underline {false};
+      bool strikeOut {false};
+    };
+    std::vector<TextStyleRunViewModel> styleRuns;
     float rotationDeg {0.0F};
     float scaleX {1.0F};
     float scaleY {1.0F};

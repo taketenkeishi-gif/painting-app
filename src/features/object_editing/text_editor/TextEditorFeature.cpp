@@ -51,6 +51,18 @@ QFont textFontForObject(const TextEditorFeature::TextObject& object) {
   return font;
 }
 
+QFont textFontForStyleRun(const TextEditorFeature::TextStyleRun& style) {
+  QFont font = baseTextFont(style.fontSize);
+  if (!style.fontFamily.empty()) {
+    font.setFamily(QString::fromUtf8(style.fontFamily.data(), static_cast<int>(style.fontFamily.size())));
+  }
+  font.setBold(style.bold);
+  font.setItalic(style.italic);
+  font.setUnderline(style.underline);
+  font.setStrikeOut(style.strikeOut);
+  return font;
+}
+
 QString toQString(const std::string& value) {
   return QString::fromUtf8(value.data(), static_cast<int>(value.size()));
 }
@@ -96,14 +108,36 @@ const TextEditorFeature::TextObject* TextEditorFeature::findById(const std::stri
 }
 
 core::Rect TextEditorFeature::measureBounds(const TextObject& object) const {
-  const QFont font = textFontForObject(object);
-  QFontMetricsF metrics(font);
   const QString text = toQString(object.text);
   const QString measured = text.isEmpty() ? QStringLiteral(" ") : text;
-  const qreal w = std::max<qreal>(16.0, metrics.horizontalAdvance(measured)) * std::max<qreal>(0.1, object.scaleX);
-  const qreal ascent = std::max<qreal>(1.0, metrics.ascent()) * std::max<qreal>(0.1, object.scaleY);
-  const qreal descent = std::max<qreal>(1.0, metrics.descent()) * std::max<qreal>(0.1, object.scaleY);
-  const QRectF localRect(0.0, -ascent, w, ascent + descent);
+
+  qreal w = 0.0;
+  qreal maxAscent = 1.0;
+  qreal maxDescent = 1.0;
+
+  if (object.styleRuns.empty()) {
+    const QFont font = textFontForObject(object);
+    QFontMetricsF metrics(font);
+    w = std::max<qreal>(16.0, metrics.horizontalAdvance(measured));
+    maxAscent = std::max<qreal>(1.0, metrics.ascent());
+    maxDescent = std::max<qreal>(1.0, metrics.descent());
+  } else {
+    for (int i = 0; i < measured.size(); ++i) {
+      const TextStyleRun style = styleAtIndex(object, i);
+      const QFont font = textFontForStyleRun(style);
+      QFontMetricsF metrics(font);
+      const QString character = measured.mid(i, 1);
+      w += metrics.horizontalAdvance(character);
+      maxAscent = std::max<qreal>(maxAscent, metrics.ascent());
+      maxDescent = std::max<qreal>(maxDescent, metrics.descent());
+    }
+    w = std::max<qreal>(16.0, w);
+  }
+
+  const qreal scaledW = w * std::max<qreal>(0.1, object.scaleX);
+  const qreal ascent = maxAscent * std::max<qreal>(0.1, object.scaleY);
+  const qreal descent = maxDescent * std::max<qreal>(0.1, object.scaleY);
+  const QRectF localRect(0.0, -ascent, scaledW, ascent + descent);
   QTransform transform;
   transform.translate(object.position.x, object.position.y);
   transform.rotate(object.rotationDeg);
@@ -127,21 +161,23 @@ int TextEditorFeature::caretIndexAtPoint(const TextObject& object, core::Point p
   const double dy = static_cast<double>(point.y - object.position.y);
   const double localX = (dx * c + dy * s) / std::max(0.1F, object.scaleX);
 
-  const QFont font = textFontForObject(object);
-  QFontMetricsF metrics(font);
   int bestIndex = 0;
+  double advance = 0.0;
   double bestDistance = std::abs(localX);
-  for (int i = 1; i <= text.size(); ++i) {
-    const double x = metrics.horizontalAdvance(text.left(i));
-    const double distance = std::abs(localX - x);
+  for (int i = 0; i < text.size(); ++i) {
+    const TextStyleRun style = styleAtIndex(object, i);
+    const QFont font = textFontForStyleRun(style);
+    QFontMetricsF metrics(font);
+    const QString character = text.mid(i, 1);
+    advance += metrics.horizontalAdvance(character);
+    const double distance = std::abs(localX - advance);
     if (distance < bestDistance) {
       bestDistance = distance;
-      bestIndex = i;
+      bestIndex = i + 1;
     }
   }
   return bestIndex;
 }
-
 core::Point TextEditorFeature::boundsAnchorPoint(const core::Rect& bounds, Handle handle) const {
   const int left = bounds.x;
   const int top = bounds.y;
@@ -271,6 +307,125 @@ std::optional<core::Rect> TextEditorFeature::selectedTextRangeRect() const {
   return std::nullopt;
 }
 
+std::pair<int, int> TextEditorFeature::selectedRangeBounds(int textLength) const {
+  const int a = std::clamp(m_editSelectionAnchorIndex, 0, std::max(0, textLength));
+  const int b = std::clamp(m_editSelectionFocusIndex, 0, std::max(0, textLength));
+  return {std::min(a, b), std::max(a, b)};
+}
+
+TextEditorFeature::TextStyleRun TextEditorFeature::styleAtIndex(const TextObject& object, int index) const {
+  TextStyleRun style;
+  style.start = std::max(0, index);
+  style.length = 0;
+  style.fontSize = object.fontSize;
+  style.color = object.color;
+  style.fontFamily = object.fontFamily;
+  style.bold = object.bold;
+  style.italic = object.italic;
+  style.underline = object.underline;
+  style.strikeOut = object.strikeOut;
+  for (const TextStyleRun& run : object.styleRuns) {
+    if (index >= run.start && index < run.start + run.length) {
+      style.fontSize = run.fontSize;
+      style.color = run.color;
+      style.fontFamily = run.fontFamily;
+      style.bold = run.bold;
+      style.italic = run.italic;
+      style.underline = run.underline;
+      style.strikeOut = run.strikeOut;
+    }
+  }
+  return style;
+}
+
+void TextEditorFeature::sanitizeStyleRuns(TextObject& object) {
+  const int textLength = static_cast<int>(toQString(object.text).size());
+  for (TextStyleRun& run : object.styleRuns) {
+    run.start = std::clamp(run.start, 0, std::max(0, textLength));
+    run.length = std::clamp(run.length, 0, std::max(0, textLength - run.start));
+    run.fontSize = std::max(8, run.fontSize);
+  }
+  object.styleRuns.erase(
+      std::remove_if(object.styleRuns.begin(), object.styleRuns.end(), [](const TextStyleRun& run) {
+        return run.length <= 0;
+      }),
+      object.styleRuns.end());
+}
+
+void TextEditorFeature::adjustStyleRunsAfterEdit(TextObject& object, int start, int removedLength, int insertedLength) {
+  start = std::max(0, start);
+  removedLength = std::max(0, removedLength);
+  insertedLength = std::max(0, insertedLength);
+
+  if (removedLength > 0) {
+    const int removedEnd = start + removedLength;
+    for (TextStyleRun& run : object.styleRuns) {
+      const int runEnd = run.start + run.length;
+      if (runEnd <= start) {
+        continue;
+      }
+      if (run.start >= removedEnd) {
+        run.start -= removedLength;
+        continue;
+      }
+      const int before = std::max(0, start - run.start);
+      const int after = std::max(0, runEnd - removedEnd);
+      run.start = std::min(run.start, start);
+      run.length = before + after;
+    }
+  }
+
+  if (insertedLength > 0) {
+    for (TextStyleRun& run : object.styleRuns) {
+      const int runEnd = run.start + run.length;
+      if (run.start >= start) {
+        run.start += insertedLength;
+      } else if (runEnd > start) {
+        run.length += insertedLength;
+      }
+    }
+  }
+
+  sanitizeStyleRuns(object);
+}
+
+void TextEditorFeature::applyStyleToSelectedTextRange(TextObject& object, const TextStyleRun& style) {
+  const int textLength = static_cast<int>(toQString(object.text).size());
+  const auto range = selectedRangeBounds(textLength);
+  if (range.first == range.second) {
+    return;
+  }
+  TextStyleRun run = style;
+  run.start = range.first;
+  run.length = range.second - range.first;
+  run.fontSize = std::max(8, run.fontSize);
+  object.styleRuns.push_back(run);
+  sanitizeStyleRuns(object);
+  object.bounds = measureBounds(object);
+  m_selectedBounds = object.bounds;
+}
+
+bool TextEditorFeature::deleteSelectedTextRange(TextObject& object) {
+  if (!hasSelectedTextRange()) {
+    return false;
+  }
+  QString current = toQString(object.text);
+  const auto range = selectedRangeBounds(static_cast<int>(current.size()));
+  if (range.first == range.second) {
+    return false;
+  }
+  const int removedLength = range.second - range.first;
+  current.remove(range.first, removedLength);
+  object.text = toUtf8String(current);
+  adjustStyleRunsAfterEdit(object, range.first, removedLength, 0);
+  m_editCaretIndex = range.first;
+  m_editSelectionAnchorIndex = range.first;
+  m_editSelectionFocusIndex = range.first;
+  m_editRangeSelectionActive = false;
+  object.bounds = measureBounds(object);
+  m_selectedBounds = object.bounds;
+  return true;
+}
 
 bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
   if (!m_editSessionActive) {
@@ -291,6 +446,7 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
         current.mid(preeditStart, preedit.size()) == preedit) {
       current.remove(preeditStart, preedit.size());
       object->text = toUtf8String(current);
+      adjustStyleRunsAfterEdit(*object, preeditStart, preedit.size(), 0);
       object->bounds = measureBounds(*object);
       m_selectedBounds = object->bounds;
     }
@@ -320,10 +476,26 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
     return true;
   }
   if (key == Qt::Key_Left) {
+    if (hasSelectedTextRange()) {
+      const auto range = selectedRangeBounds(static_cast<int>(current.size()));
+      m_editCaretIndex = range.first;
+      m_editSelectionAnchorIndex = m_editCaretIndex;
+      m_editSelectionFocusIndex = m_editCaretIndex;
+      m_editRangeSelectionActive = false;
+      return true;
+    }
     m_editCaretIndex = std::max(0, m_editCaretIndex - 1);
     return true;
   }
   if (key == Qt::Key_Right) {
+    if (hasSelectedTextRange()) {
+      const auto range = selectedRangeBounds(static_cast<int>(current.size()));
+      m_editCaretIndex = range.second;
+      m_editSelectionAnchorIndex = m_editCaretIndex;
+      m_editSelectionFocusIndex = m_editCaretIndex;
+      m_editRangeSelectionActive = false;
+      return true;
+    }
     const int size = static_cast<int>(current.size());
     if (m_editCaretIndex < size) {
       m_editCaretIndex += 1;
@@ -332,15 +504,26 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
   }
   if (key == Qt::Key_Home) {
     m_editCaretIndex = 0;
+    m_editSelectionAnchorIndex = m_editCaretIndex;
+    m_editSelectionFocusIndex = m_editCaretIndex;
+    m_editRangeSelectionActive = false;
     return true;
   }
   if (key == Qt::Key_End) {
     m_editCaretIndex = static_cast<int>(current.size());
+    m_editSelectionAnchorIndex = m_editCaretIndex;
+    m_editSelectionFocusIndex = m_editCaretIndex;
+    m_editRangeSelectionActive = false;
     return true;
   }
   if (key == Qt::Key_Backspace) {
+    if (deleteSelectedTextRange(*object)) {
+      return true;
+    }
+    current = toQString(object->text);
     if (m_editCaretIndex > 0) {
       current.remove(m_editCaretIndex - 1, 1);
+      adjustStyleRunsAfterEdit(*object, m_editCaretIndex - 1, 1, 0);
       m_editCaretIndex -= 1;
       object->text = toUtf8String(current);
       object->bounds = measureBounds(*object);
@@ -349,8 +532,13 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
     return true;
   }
   if (key == Qt::Key_Delete) {
+    if (deleteSelectedTextRange(*object)) {
+      return true;
+    }
+    current = toQString(object->text);
     if (m_editCaretIndex < current.size()) {
       current.remove(m_editCaretIndex, 1);
+      adjustStyleRunsAfterEdit(*object, m_editCaretIndex, 1, 0);
       object->text = toUtf8String(current);
       object->bounds = measureBounds(*object);
       m_selectedBounds = object->bounds;
@@ -359,9 +547,20 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
   }
 
   if (!textUtf8.empty()) {
+    if (deleteSelectedTextRange(*object)) {
+      current = toQString(object->text);
+    } else {
+      current = toQString(object->text);
+    }
+    m_editCaretIndex = clampedCaretIndex(m_editCaretIndex, current);
     const QString insertion = toQString(textUtf8);
-    current.insert(m_editCaretIndex, insertion);
+    const int insertAt = m_editCaretIndex;
+    current.insert(insertAt, insertion);
+    adjustStyleRunsAfterEdit(*object, insertAt, 0, insertion.size());
     m_editCaretIndex += insertion.size();
+    m_editSelectionAnchorIndex = m_editCaretIndex;
+    m_editSelectionFocusIndex = m_editCaretIndex;
+    m_editRangeSelectionActive = false;
     object->text = toUtf8String(current);
     object->bounds = measureBounds(*object);
     m_selectedBounds = object->bounds;
@@ -370,7 +569,6 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
 
   return false;
 }
-
 bool TextEditorFeature::handlePreeditText(const std::string& textUtf8) {
   if (!m_editSessionActive) {
     return false;
@@ -380,6 +578,10 @@ bool TextEditorFeature::handlePreeditText(const std::string& textUtf8) {
     return false;
   }
 
+  if (hasSelectedTextRange() && m_editPreeditText.empty()) {
+    deleteSelectedTextRange(*object);
+  }
+
   QString current = toQString(object->text);
   const QString previousPreedit = toQString(m_editPreeditText);
   int preeditStart = clampedCaretIndex(m_editPreeditStartIndex, current);
@@ -387,6 +589,9 @@ bool TextEditorFeature::handlePreeditText(const std::string& textUtf8) {
   if (!previousPreedit.isEmpty() && preeditStart + previousPreedit.size() <= current.size() &&
       current.mid(preeditStart, previousPreedit.size()) == previousPreedit) {
     current.remove(preeditStart, previousPreedit.size());
+    object->text = toUtf8String(current);
+    adjustStyleRunsAfterEdit(*object, preeditStart, previousPreedit.size(), 0);
+    current = toQString(object->text);
   } else {
     preeditStart = clampedCaretIndex(m_editCaretIndex, current);
   }
@@ -394,11 +599,15 @@ bool TextEditorFeature::handlePreeditText(const std::string& textUtf8) {
   const QString nextPreedit = toQString(textUtf8);
   if (!nextPreedit.isEmpty()) {
     current.insert(preeditStart, nextPreedit);
+    adjustStyleRunsAfterEdit(*object, preeditStart, 0, nextPreedit.size());
     m_editCaretIndex = preeditStart + nextPreedit.size();
   } else {
     m_editCaretIndex = preeditStart;
   }
 
+  m_editSelectionAnchorIndex = m_editCaretIndex;
+  m_editSelectionFocusIndex = m_editCaretIndex;
+  m_editRangeSelectionActive = false;
   m_editPreeditText = textUtf8;
   m_editPreeditStartIndex = preeditStart;
   object->text = toUtf8String(current);
@@ -406,7 +615,6 @@ bool TextEditorFeature::handlePreeditText(const std::string& textUtf8) {
   m_selectedBounds = object->bounds;
   return true;
 }
-
 std::optional<std::string> TextEditorFeature::hitTextIdAt(core::Point point) const {
   for (std::size_t i = m_objects.size(); i > 0; --i) {
     const auto& object = m_objects[i - 1];
@@ -439,6 +647,7 @@ bool TextEditorFeature::setTextForId(const std::string& id, const std::string& t
     return false;
   }
   object->text = text;
+  object->styleRuns.clear();
   object->bounds = measureBounds(*object);
   if (m_selectedId.has_value() && *m_selectedId == id) {
     m_selectedBounds = object->bounds;
@@ -454,6 +663,12 @@ bool TextEditorFeature::setSelectedTextColor(const core::Color& color) {
   if (object == nullptr) {
     return false;
   }
+  if (hasSelectedTextRange()) {
+    TextStyleRun style = styleAtIndex(*object, selectedRangeBounds(static_cast<int>(toQString(object->text).size())).first);
+    style.color = color;
+    applyStyleToSelectedTextRange(*object, style);
+    return true;
+  }
   object->color = color;
   return true;
 }
@@ -465,6 +680,12 @@ bool TextEditorFeature::setSelectedTextFontSize(int fontSize) {
   auto* object = findById(*m_selectedId);
   if (object == nullptr) {
     return false;
+  }
+  if (hasSelectedTextRange()) {
+    TextStyleRun style = styleAtIndex(*object, selectedRangeBounds(static_cast<int>(toQString(object->text).size())).first);
+    style.fontSize = std::max(8, fontSize * 2);
+    applyStyleToSelectedTextRange(*object, style);
+    return true;
   }
   object->fontSize = std::max(8, fontSize * 2);
   object->bounds = measureBounds(*object);
@@ -480,6 +701,12 @@ bool TextEditorFeature::setSelectedTextFontFamily(const std::string& fontFamily)
   if (object == nullptr) {
     return false;
   }
+  if (hasSelectedTextRange()) {
+    TextStyleRun style = styleAtIndex(*object, selectedRangeBounds(static_cast<int>(toQString(object->text).size())).first);
+    style.fontFamily = fontFamily;
+    applyStyleToSelectedTextRange(*object, style);
+    return true;
+  }
   object->fontFamily = fontFamily;
   object->bounds = measureBounds(*object);
   m_selectedBounds = object->bounds;
@@ -493,6 +720,12 @@ bool TextEditorFeature::setSelectedTextBold(bool enabled) {
   auto* object = findById(*m_selectedId);
   if (object == nullptr) {
     return false;
+  }
+  if (hasSelectedTextRange()) {
+    TextStyleRun style = styleAtIndex(*object, selectedRangeBounds(static_cast<int>(toQString(object->text).size())).first);
+    style.bold = enabled;
+    applyStyleToSelectedTextRange(*object, style);
+    return true;
   }
   object->bold = enabled;
   object->bounds = measureBounds(*object);
@@ -508,6 +741,12 @@ bool TextEditorFeature::setSelectedTextItalic(bool enabled) {
   if (object == nullptr) {
     return false;
   }
+  if (hasSelectedTextRange()) {
+    TextStyleRun style = styleAtIndex(*object, selectedRangeBounds(static_cast<int>(toQString(object->text).size())).first);
+    style.italic = enabled;
+    applyStyleToSelectedTextRange(*object, style);
+    return true;
+  }
   object->italic = enabled;
   object->bounds = measureBounds(*object);
   m_selectedBounds = object->bounds;
@@ -522,6 +761,12 @@ bool TextEditorFeature::setSelectedTextUnderline(bool enabled) {
   if (object == nullptr) {
     return false;
   }
+  if (hasSelectedTextRange()) {
+    TextStyleRun style = styleAtIndex(*object, selectedRangeBounds(static_cast<int>(toQString(object->text).size())).first);
+    style.underline = enabled;
+    applyStyleToSelectedTextRange(*object, style);
+    return true;
+  }
   object->underline = enabled;
   object->bounds = measureBounds(*object);
   m_selectedBounds = object->bounds;
@@ -535,6 +780,12 @@ bool TextEditorFeature::setSelectedTextStrikeOut(bool enabled) {
   auto* object = findById(*m_selectedId);
   if (object == nullptr) {
     return false;
+  }
+  if (hasSelectedTextRange()) {
+    TextStyleRun style = styleAtIndex(*object, selectedRangeBounds(static_cast<int>(toQString(object->text).size())).first);
+    style.strikeOut = enabled;
+    applyStyleToSelectedTextRange(*object, style);
+    return true;
   }
   object->strikeOut = enabled;
   object->bounds = measureBounds(*object);

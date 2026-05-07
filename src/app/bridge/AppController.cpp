@@ -393,6 +393,19 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
     textView.italic = textObject.italic;
     textView.underline = textObject.underline;
     textView.strikeOut = textObject.strikeOut;
+    for (const auto& styleRun : textObject.styleRuns) {
+      CanvasOverlayViewModel::TextObjectViewModel::TextStyleRunViewModel runView;
+      runView.start = styleRun.start;
+      runView.length = styleRun.length;
+      runView.size = std::max(6, styleRun.fontSize);
+      runView.color = styleRun.color;
+      runView.fontFamily = styleRun.fontFamily;
+      runView.bold = styleRun.bold;
+      runView.italic = styleRun.italic;
+      runView.underline = styleRun.underline;
+      runView.strikeOut = styleRun.strikeOut;
+      textView.styleRuns.push_back(std::move(runView));
+    }
     textView.rotationDeg = textObject.rotationDeg;
     textView.scaleX = textObject.scaleX;
     textView.scaleY = textObject.scaleY;
