@@ -433,6 +433,8 @@ if (overlay.toolOverlay.hasLine) {
       painter.drawRect(previewRect);
     }
 
+    const bool hasTextRangeSelection = overlay.textRangeSelectionRect.has_value();
+
     if (overlay.selectionRect.has_value()) {
       const core::Rect rect = *overlay.selectionRect;
       const QRectF selectionRect(
@@ -443,6 +445,24 @@ if (overlay.toolOverlay.hasLine) {
       drawSelectionHandles(painter, selectionRect, QColor(255, 210, 80, 210), 4.0);
     }
 
+    if (hasTextRangeSelection) { // text-range-highlight-fill-ui-v14
+      const core::Rect rect = *overlay.textRangeSelectionRect;
+      const QRectF textRangeRect(
+          target.x() + static_cast<double>(rect.x) * state.zoom,
+          target.y() + static_cast<double>(rect.y) * state.zoom,
+          std::max(1.0, static_cast<double>(rect.width) * state.zoom),
+          std::max(1.0, static_cast<double>(rect.height) * state.zoom));
+      painter.save();
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      painter.setPen(Qt::NoPen);
+      painter.setBrush(QColor(85, 145, 255, 96));
+      painter.drawRoundedRect(textRangeRect.adjusted(-1.0, -1.0, 1.0, 1.0), 2.0, 2.0);
+      painter.setBrush(Qt::NoBrush);
+      painter.setPen(QPen(QColor(255, 255, 255, 84), 1.0));
+      painter.drawRoundedRect(textRangeRect.adjusted(-0.5, -0.5, 0.5, 0.5), 2.0, 2.0);
+      painter.restore();
+    }
+
     if (overlay.objectSelectionRect.has_value()) {
       const core::Rect rect = *overlay.objectSelectionRect;
       const QRectF selectionRect(
@@ -450,9 +470,16 @@ if (overlay.toolOverlay.hasLine) {
           target.y() + static_cast<double>(rect.y) * state.zoom,
           std::max(1.0, static_cast<double>(rect.width) * state.zoom),
           std::max(1.0, static_cast<double>(rect.height) * state.zoom));
-      drawSelectionHandles(painter, selectionRect, QColor(255, 64, 64, 235), 7.0);
+      if (hasTextRangeSelection) {
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(QColor(255, 64, 64, 110), 1.0, Qt::DashLine));
+        painter.drawRect(selectionRect);
+      } else {
+        drawSelectionHandles(painter, selectionRect, QColor(255, 64, 64, 235), 7.0);
+      }
     }
-    for (const auto& primitive : overlay.objectOverlay.primitives) {
+    if (!hasTextRangeSelection) {
+      for (const auto& primitive : overlay.objectOverlay.primitives) {
       if (primitive.kind == features::object_editing::OverlayPrimitive::Kind::Line) {
         const QPointF p1(
             target.x() + (static_cast<double>(primitive.p1.x) + 0.5) * state.zoom,
@@ -470,6 +497,7 @@ if (overlay.toolOverlay.hasLine) {
         painter.setPen(QPen(QColor(20, 20, 20, 220), 1.0));
         painter.drawEllipse(p, 4.0, 4.0);
       }
+    }
     }
 
     if (overlay.cloneSamplePoint.has_value()) {

@@ -119,6 +119,7 @@ struct CanvasOverlayViewModel {
 
   core::ToolOverlayState toolOverlay;
   std::optional<core::Rect> selectionRect;
+  std::optional<core::Rect> textRangeSelectionRect;
   std::optional<core::Rect> objectSelectionRect;
   std::optional<std::string> objectSelectionId;
   features::object_editing::ObjectOverlayModel objectOverlay;
