@@ -28,10 +28,26 @@ bool nearPoint(core::Point a, core::Point b, int radius = 10) {
   return distanceSquared(a, b) <= radius * radius;
 }
 
-QFont textFont(int fontSize) {
+QFont baseTextFont(int fontSize) {
   QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
   font.setFamilies(QStringList {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo"), QStringLiteral("Noto Sans CJK JP"), font.family()});
   font.setPointSize(std::max(8, fontSize));
+  return font;
+}
+
+QFont textFont(int fontSize) {
+  return baseTextFont(fontSize);
+}
+
+QFont textFontForObject(const TextEditorFeature::TextObject& object) {
+  QFont font = baseTextFont(object.fontSize);
+  if (!object.fontFamily.empty()) {
+    font.setFamily(QString::fromUtf8(object.fontFamily.data(), static_cast<int>(object.fontFamily.size())));
+  }
+  font.setBold(object.bold);
+  font.setItalic(object.italic);
+  font.setUnderline(object.underline);
+  font.setStrikeOut(object.strikeOut);
   return font;
 }
 
@@ -80,7 +96,7 @@ const TextEditorFeature::TextObject* TextEditorFeature::findById(const std::stri
 }
 
 core::Rect TextEditorFeature::measureBounds(const TextObject& object) const {
-  const QFont font = textFont(object.fontSize);
+  const QFont font = textFontForObject(object);
   QFontMetricsF metrics(font);
   const QString text = toQString(object.text);
   const QString measured = text.isEmpty() ? QStringLiteral(" ") : text;
@@ -111,7 +127,7 @@ int TextEditorFeature::caretIndexAtPoint(const TextObject& object, core::Point p
   const double dy = static_cast<double>(point.y - object.position.y);
   const double localX = (dx * c + dy * s) / std::max(0.1F, object.scaleX);
 
-  const QFont font = textFont(object.fontSize);
+  const QFont font = textFontForObject(object);
   QFontMetricsF metrics(font);
   int bestIndex = 0;
   double bestDistance = std::abs(localX);
@@ -191,6 +207,56 @@ bool TextEditorFeature::beginTextInput(core::Point point, const core::Color& col
   m_editSessionActive = true;
   return true;
 }
+
+bool TextEditorFeature::beginTextRangeSelectionAt(core::Point point) {
+  const auto existing = hitTextIdAt(point);
+  if (!existing.has_value()) {
+    return false;
+  }
+  TextObject* object = findById(*existing);
+  if (object == nullptr) {
+    return false;
+  }
+  m_editId = *existing;
+  m_editOriginalText = object->text;
+  m_editCaretIndex = caretIndexAtPoint(*object, point);
+  m_editSelectionAnchorIndex = m_editCaretIndex;
+  m_editSelectionFocusIndex = m_editCaretIndex;
+  m_editRangeSelectionActive = true;
+  m_editCreatedNow = false;
+  m_editPreeditText.clear();
+  m_editPreeditStartIndex = m_editCaretIndex;
+  m_editSessionActive = true;
+  m_selectedId = object->id;
+  m_selectedBounds = object->bounds;
+  return true;
+}
+
+bool TextEditorFeature::updateTextRangeSelectionAt(core::Point point) {
+  if (!m_editRangeSelectionActive || !m_editSessionActive) {
+    return false;
+  }
+  TextObject* object = findById(m_editId);
+  if (object == nullptr) {
+    return false;
+  }
+  m_editSelectionFocusIndex = caretIndexAtPoint(*object, point);
+  m_editCaretIndex = m_editSelectionFocusIndex;
+  m_selectedId = object->id;
+  m_selectedBounds = object->bounds;
+  return true;
+}
+
+bool TextEditorFeature::endTextRangeSelection() {
+  const bool wasActive = m_editRangeSelectionActive;
+  m_editRangeSelectionActive = false;
+  return wasActive;
+}
+
+bool TextEditorFeature::hasSelectedTextRange() const noexcept {
+  return m_editSessionActive && m_editSelectionAnchorIndex != m_editSelectionFocusIndex;
+}
+
 
 bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
   if (!m_editSessionActive) {
@@ -363,6 +429,102 @@ bool TextEditorFeature::setTextForId(const std::string& id, const std::string& t
   if (m_selectedId.has_value() && *m_selectedId == id) {
     m_selectedBounds = object->bounds;
   }
+  return true;
+}
+
+bool TextEditorFeature::setSelectedTextColor(const core::Color& color) {
+  if (!m_selectedId.has_value()) {
+    return false;
+  }
+  auto* object = findById(*m_selectedId);
+  if (object == nullptr) {
+    return false;
+  }
+  object->color = color;
+  return true;
+}
+
+bool TextEditorFeature::setSelectedTextFontSize(int fontSize) {
+  if (!m_selectedId.has_value()) {
+    return false;
+  }
+  auto* object = findById(*m_selectedId);
+  if (object == nullptr) {
+    return false;
+  }
+  object->fontSize = std::max(8, fontSize * 2);
+  object->bounds = measureBounds(*object);
+  m_selectedBounds = object->bounds;
+  return true;
+}
+
+bool TextEditorFeature::setSelectedTextFontFamily(const std::string& fontFamily) {
+  if (!m_selectedId.has_value()) {
+    return false;
+  }
+  auto* object = findById(*m_selectedId);
+  if (object == nullptr) {
+    return false;
+  }
+  object->fontFamily = fontFamily;
+  object->bounds = measureBounds(*object);
+  m_selectedBounds = object->bounds;
+  return true;
+}
+
+bool TextEditorFeature::setSelectedTextBold(bool enabled) {
+  if (!m_selectedId.has_value()) {
+    return false;
+  }
+  auto* object = findById(*m_selectedId);
+  if (object == nullptr) {
+    return false;
+  }
+  object->bold = enabled;
+  object->bounds = measureBounds(*object);
+  m_selectedBounds = object->bounds;
+  return true;
+}
+
+bool TextEditorFeature::setSelectedTextItalic(bool enabled) {
+  if (!m_selectedId.has_value()) {
+    return false;
+  }
+  auto* object = findById(*m_selectedId);
+  if (object == nullptr) {
+    return false;
+  }
+  object->italic = enabled;
+  object->bounds = measureBounds(*object);
+  m_selectedBounds = object->bounds;
+  return true;
+}
+
+bool TextEditorFeature::setSelectedTextUnderline(bool enabled) {
+  if (!m_selectedId.has_value()) {
+    return false;
+  }
+  auto* object = findById(*m_selectedId);
+  if (object == nullptr) {
+    return false;
+  }
+  object->underline = enabled;
+  object->bounds = measureBounds(*object);
+  m_selectedBounds = object->bounds;
+  return true;
+}
+
+bool TextEditorFeature::setSelectedTextStrikeOut(bool enabled) {
+  if (!m_selectedId.has_value()) {
+    return false;
+  }
+  auto* object = findById(*m_selectedId);
+  if (object == nullptr) {
+    return false;
+  }
+  object->strikeOut = enabled;
+  object->bounds = measureBounds(*object);
+  m_selectedBounds = object->bounds;
   return true;
 }
 
@@ -557,7 +719,7 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
   if (m_editSessionActive && m_selectedId.has_value()) {
     const auto* object = findById(*m_selectedId);
     if (object != nullptr) {
-      const QFont font = textFont(object->fontSize);
+      const QFont font = textFontForObject(*object);
       const QFontMetricsF metrics(font);
       const QString text = toQString(object->text);
       const int caretIndex = clampedCaretIndex(m_editCaretIndex, text);
@@ -574,6 +736,30 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
             static_cast<int>(std::lround(static_cast<double>(object->position.x) + x * c - y * s)),
             static_cast<int>(std::lround(static_cast<double>(object->position.y) + x * s + y * c))};
       };
+      /* text-editor-range-selection-overlay */
+      if (hasSelectedTextRange()) {
+        const int selectionStart = std::min(clampedCaretIndex(m_editSelectionAnchorIndex, text), clampedCaretIndex(m_editSelectionFocusIndex, text));
+        const int selectionEnd = std::max(clampedCaretIndex(m_editSelectionAnchorIndex, text), clampedCaretIndex(m_editSelectionFocusIndex, text));
+        const qreal leftAdvance = std::max<qreal>(0.0, metrics.horizontalAdvance(text.left(selectionStart)));
+        const qreal rightAdvance = std::max<qreal>(leftAdvance, metrics.horizontalAdvance(text.left(selectionEnd)));
+        const double selectionLeft = static_cast<double>(leftAdvance) * scaleX;
+        const double selectionRight = static_cast<double>(rightAdvance) * scaleX;
+        const double selectionTop = -static_cast<double>(ascent) * scaleY;
+        const double selectionBottom = static_cast<double>(descent) * scaleY;
+        const core::Point p1 = mapLocal(selectionLeft, selectionTop);
+        const core::Point p2 = mapLocal(selectionRight, selectionTop);
+        const core::Point p3 = mapLocal(selectionRight, selectionBottom);
+        const core::Point p4 = mapLocal(selectionLeft, selectionBottom);
+        const int minX = std::min(std::min(p1.x, p2.x), std::min(p3.x, p4.x));
+        const int minY = std::min(std::min(p1.y, p2.y), std::min(p3.y, p4.y));
+        const int maxX = std::max(std::max(p1.x, p2.x), std::max(p3.x, p4.x));
+        const int maxY = std::max(std::max(p1.y, p2.y), std::max(p3.y, p4.y));
+        OverlayPrimitive selection;
+        selection.kind = OverlayPrimitive::Kind::Rect;
+        selection.rect = core::Rect {minX, minY, std::max(1, maxX - minX), std::max(1, maxY - minY)};
+        out.primitives.push_back(selection);
+      }
+
       OverlayPrimitive caret;
       caret.kind = OverlayPrimitive::Kind::Line;
       const double caretX = static_cast<double>(advance) * scaleX;

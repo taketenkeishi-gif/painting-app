@@ -19,6 +19,11 @@ public:
     core::Point position {0, 0}; // baseline origin
     int fontSize {16};
     core::Color color {0, 0, 0, 255};
+    std::string fontFamily;
+    bool bold {false};
+    bool italic {false};
+    bool underline {false};
+    bool strikeOut {false};
     float rotationDeg {0.0F};
     float scaleX {1.0F};
     float scaleY {1.0F};
@@ -30,12 +35,24 @@ public:
   bool beginTextInput(core::Point point, const core::Color& color, int fontSize);
   bool handleKeyPress(int key, const std::string& textUtf8);
   bool handlePreeditText(const std::string& textUtf8);
+  bool beginTextRangeSelectionAt(core::Point point);
+  bool updateTextRangeSelectionAt(core::Point point);
+  bool endTextRangeSelection();
+  bool hasActiveTextRangeSelection() const noexcept { return m_editRangeSelectionActive; }
+  bool hasSelectedTextRange() const noexcept;
   bool hasActiveTextSession() const noexcept { return m_editSessionActive; }
 
   std::optional<std::string> hitTextIdAt(core::Point point) const;
   std::optional<std::string> textForId(const std::string& id) const;
   std::optional<core::Rect> boundsForId(const std::string& id) const;
   bool setTextForId(const std::string& id, const std::string& text);
+  bool setSelectedTextColor(const core::Color& color);
+  bool setSelectedTextFontSize(int fontSize);
+  bool setSelectedTextFontFamily(const std::string& fontFamily);
+  bool setSelectedTextBold(bool enabled);
+  bool setSelectedTextItalic(bool enabled);
+  bool setSelectedTextUnderline(bool enabled);
+  bool setSelectedTextStrikeOut(bool enabled);
   bool removeById(const std::string& id);
 
   bool beginOperation(core::Point point);
@@ -69,6 +86,9 @@ private:
   int m_editCaretIndex {0};
   std::string m_editPreeditText;
   int m_editPreeditStartIndex {0};
+  bool m_editRangeSelectionActive {false};
+  int m_editSelectionAnchorIndex {0};
+  int m_editSelectionFocusIndex {0};
 
   bool m_operationActive {false};
   Handle m_activeHandle {Handle::None};

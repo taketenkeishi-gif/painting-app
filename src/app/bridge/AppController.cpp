@@ -383,6 +383,11 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
     textView.text = textObject.text;
     textView.color = textObject.color;
     textView.size = std::max(6, textObject.fontSize);
+    textView.fontFamily = textObject.fontFamily;
+    textView.bold = textObject.bold;
+    textView.italic = textObject.italic;
+    textView.underline = textObject.underline;
+    textView.strikeOut = textObject.strikeOut;
     textView.rotationDeg = textObject.rotationDeg;
     textView.scaleX = textObject.scaleX;
     textView.scaleY = textObject.scaleY;
@@ -1693,6 +1698,12 @@ bool AppController::currentToolSupportsAutoSelectReferAllLayers() const noexcept
 }
 
 void AppController::beginStroke(int x, int y) {
+  if (currentSubToolId() == "text_basic" && m_textEditor.beginTextRangeSelectionAt(core::Point {x, y})) {
+    rerender();
+    emit overlayChanged();
+    return;
+  }
+
   // operation-stroke-entry-route
   if (currentSubToolId() == "operation_object") {
     m_stroking = beginObjectOperation(core::Point {x, y});
@@ -1754,6 +1765,14 @@ void AppController::beginStroke(int x, int y) {
 }
 
 void AppController::continueStroke(int x, int y) {
+  if (m_textEditor.hasActiveTextRangeSelection()) {
+    if (m_textEditor.updateTextRangeSelectionAt(core::Point {x, y})) {
+      rerender();
+      emit overlayChanged();
+    }
+    return;
+  }
+
   // operation-stroke-continue-route
   if (currentSubToolId() == "operation_object") {
     if (m_stroking) {
@@ -1797,6 +1816,14 @@ void AppController::continueStroke(int x, int y) {
 }
 
 void AppController::endStroke() {
+  if (m_textEditor.hasActiveTextRangeSelection()) {
+    if (m_textEditor.endTextRangeSelection()) {
+      rerender();
+      emit overlayChanged();
+    }
+    return;
+  }
+
   // operation-stroke-end-route
   if (currentSubToolId() == "operation_object") {
     if (m_stroking) {
@@ -2139,6 +2166,12 @@ std::string AppController::nextRedoActionName() const {
 }
 
 void AppController::setBrushColor(const core::Color& color) {
+if (currentSubToolId() == "text_basic" && m_textEditor.setSelectedTextColor(color)) {
+    rerender();
+    emit overlayChanged();
+    emit documentChanged();
+  }
+
   if (m_currentColor.r == color.r && m_currentColor.g == color.g &&
       m_currentColor.b == color.b && m_currentColor.a == color.a) {
     return;
@@ -2152,6 +2185,13 @@ void AppController::setBrushColor(const core::Color& color) {
 }
 
 void AppController::setBrushSize(int size) {
+const int textFontSize = std::clamp(size, 1, 512);
+  if (currentSubToolId() == "text_basic" && m_textEditor.setSelectedTextFontSize(textFontSize)) {
+    rerender();
+    emit overlayChanged();
+    emit documentChanged();
+  }
+
   const int normalized = std::max(1, size);
   if (m_uiState.size == normalized) {
     return;
@@ -2162,6 +2202,45 @@ void AppController::setBrushSize(int size) {
   emit toolStateChanged();
 }
 
+void AppController::setSelectedTextFontFamily(const std::string& fontFamily) {
+  if (m_textEditor.setSelectedTextFontFamily(fontFamily)) {
+    rerender();
+    emit overlayChanged();
+    emit documentChanged();
+  }
+}
+
+void AppController::setSelectedTextBold(bool enabled) {
+  if (m_textEditor.setSelectedTextBold(enabled)) {
+    rerender();
+    emit overlayChanged();
+    emit documentChanged();
+  }
+}
+
+void AppController::setSelectedTextItalic(bool enabled) {
+  if (m_textEditor.setSelectedTextItalic(enabled)) {
+    rerender();
+    emit overlayChanged();
+    emit documentChanged();
+  }
+}
+
+void AppController::setSelectedTextUnderline(bool enabled) {
+  if (m_textEditor.setSelectedTextUnderline(enabled)) {
+    rerender();
+    emit overlayChanged();
+    emit documentChanged();
+  }
+}
+
+void AppController::setSelectedTextStrikeOut(bool enabled) {
+  if (m_textEditor.setSelectedTextStrikeOut(enabled)) {
+    rerender();
+    emit overlayChanged();
+    emit documentChanged();
+  }
+}
 void AppController::adjustBrushSize(int delta) {
   setBrushSize(m_uiState.size + delta);
 }

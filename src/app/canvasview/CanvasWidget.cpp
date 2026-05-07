@@ -385,7 +385,14 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
           target.y() + (static_cast<double>(textObj.point.y) + 0.5) * state.zoom);
       QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
       font.setFamilies(QStringList {QStringLiteral("Yu Gothic UI"), QStringLiteral("Meiryo"), QStringLiteral("Noto Sans CJK JP"), font.family()});
+      if (!textObj.fontFamily.empty()) {
+        font.setFamily(QString::fromUtf8(textObj.fontFamily.data(), static_cast<int>(textObj.fontFamily.size())));
+      }
       font.setPointSize(std::max(8, textObj.size));
+      font.setBold(textObj.bold);
+      font.setItalic(textObj.italic);
+      font.setUnderline(textObj.underline);
+      font.setStrikeOut(textObj.strikeOut);
       painter.save();
       painter.translate(p);
       painter.rotate(textObj.rotationDeg);

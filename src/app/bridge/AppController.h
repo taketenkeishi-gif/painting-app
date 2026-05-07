@@ -107,6 +107,11 @@ struct CanvasOverlayViewModel {
     std::string text;
     core::Color color {0, 0, 0, 255};
     int size {8};
+    std::string fontFamily;
+    bool bold {false};
+    bool italic {false};
+    bool underline {false};
+    bool strikeOut {false};
     float rotationDeg {0.0F};
     float scaleX {1.0F};
     float scaleY {1.0F};
@@ -267,6 +272,11 @@ public:
 
   void setBrushColor(const core::Color& color);
   void setBrushSize(int size);
+  void setSelectedTextFontFamily(const std::string& fontFamily);
+  void setSelectedTextBold(bool enabled);
+  void setSelectedTextItalic(bool enabled);
+  void setSelectedTextUnderline(bool enabled);
+  void setSelectedTextStrikeOut(bool enabled);
   void adjustBrushSize(int delta);
   void setBrushOpacity(int opacity);
   void setBrushHardness(int hardness);
