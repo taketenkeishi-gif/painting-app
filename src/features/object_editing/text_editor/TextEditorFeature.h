@@ -56,6 +56,12 @@ public:
   bool hasSelectedTextRange() const noexcept;
   std::optional<core::Rect> selectedTextRangeRect() const;
   bool hasActiveTextSession() const noexcept { return m_editSessionActive; }
+  int editCaretIndex() const noexcept { return m_editCaretIndex; }
+  int editSelectionAnchor() const noexcept { return m_editSelectionAnchorIndex; }
+  const std::string& editObjectId() const noexcept { return m_editId; }
+  bool selectAll() noexcept;
+  bool extendSelectionLeft() noexcept;
+  bool extendSelectionRight() noexcept;
 
   std::optional<std::string> hitTextIdAt(core::Point point) const;
   std::optional<std::string> textForId(const std::string& id) const;

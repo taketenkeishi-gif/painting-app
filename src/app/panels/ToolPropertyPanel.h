@@ -34,6 +34,10 @@ private slots:
   void refreshFromController();
   void onChooseColor();
   void onSizeChanged(int size);
+  void onTextBoldToggled(bool checked);
+  void onTextItalicToggled(bool checked);
+  void onTextUnderlineToggled(bool checked);
+  void onTextStrikeOutToggled(bool checked);
   void onOpacitySliderChanged(int value);
   void onOpacitySpinChanged(int value);
   void onHardnessSliderChanged(int value);
@@ -123,6 +127,10 @@ private:
   QLabel* m_autoSelectThresholdLabel {nullptr};
   QPushButton* m_colorButton {nullptr};
   QSpinBox* m_sizeSpin {nullptr};
+  QCheckBox* m_textBoldCheck {nullptr};
+  QCheckBox* m_textItalicCheck {nullptr};
+  QCheckBox* m_textUnderlineCheck {nullptr};
+  QCheckBox* m_textStrikeOutCheck {nullptr};
   QSlider* m_opacitySlider {nullptr};
   QSpinBox* m_opacitySpin {nullptr};
   QSlider* m_hardnessSlider {nullptr};

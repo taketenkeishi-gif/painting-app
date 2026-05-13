@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include <QApplication>
+#include <QClipboard>
 #include <QCursor>
 #include <QPixmap>
 #include <QElapsedTimer>
@@ -22,6 +23,12 @@
 #include "app/bridge/AppController.h"
 #include "core/tools/ToolType.h"
 #include "platform/qt/QtImageConverter.h"
+
+#if defined(Q_OS_WIN)
+#include <qt_windows.h>
+#include <imm.h>
+#include <cstring>
+#endif
 
 namespace app::canvasview {
 
@@ -888,10 +895,60 @@ void CanvasWidget::beginTextEditSession(const core::Point& canvasPoint) {
   update();
 }
 
+void CanvasWidget::attemptImeReconversion() {
+#if defined(Q_OS_WIN)
+  if (!m_textEditActive || m_controller == nullptr || !m_controller->textEditorHasSelection()) {
+    m_imeReconversionActive = false;
+    m_imeReconversionHasPreedit = false;
+    return;
+  }
+  const int anchor   = m_controller->textEditorSelectionAnchor();
+  const int caret    = m_controller->textEditorCaretIndex();
+  const int selStart = std::min(anchor, caret);
+  const int selLen   = std::abs(caret - anchor);
+  if (selLen <= 0) {
+    m_imeReconversionActive = false;
+    m_imeReconversionHasPreedit = false;
+    return;
+  }
+  const std::wstring wFull = m_controller->textEditorFullText().toStdWString();
+  const DWORD strOff = static_cast<DWORD>(sizeof(RECONVERTSTRING));
+  const DWORD bufSz  = strOff + static_cast<DWORD>((wFull.size() + 1) * sizeof(WCHAR));
+  BYTE* buf = new BYTE[bufSz]();
+  auto* rc = reinterpret_cast<RECONVERTSTRING*>(buf);
+  rc->dwSize            = bufSz;
+  rc->dwVersion         = 0;
+  rc->dwStrLen          = static_cast<DWORD>(wFull.size());
+  rc->dwStrOffset       = strOff;
+  rc->dwCompStrLen      = static_cast<DWORD>(selLen);
+  rc->dwCompStrOffset   = static_cast<DWORD>(selStart) * sizeof(WCHAR);
+  rc->dwTargetStrLen    = rc->dwCompStrLen;
+  rc->dwTargetStrOffset = rc->dwCompStrOffset;
+  std::memcpy(buf + strOff, wFull.c_str(), (wFull.size() + 1) * sizeof(WCHAR));
+  HWND hwnd = reinterpret_cast<HWND>(winId());
+  HIMC hIMC = ImmGetContext(hwnd);
+  if (hIMC) {
+    ImmSetOpenStatus(hIMC, TRUE);
+    // フラグをAPI呼び出し前にセット: 同期発火する inputMethodEvent を再変換ガードで捕捉するため
+    m_imeReconversionActive = true;
+    m_imeReconversionHasPreedit = false;
+    ImmSetCompositionString(hIMC, SCS_QUERYRECONVERTSTRING, rc, bufSz, nullptr, 0);
+    ImmSetCompositionString(hIMC, SCS_SETRECONVERTSTRING,   rc, bufSz, nullptr, 0);
+    ImmReleaseContext(hwnd, hIMC);
+  } else {
+    m_imeReconversionActive = false;
+    m_imeReconversionHasPreedit = false;
+  }
+  delete[] buf;
+#endif
+}
+
 void CanvasWidget::commitTextEditSession() {
   if (!m_textEditActive) {
     return;
   }
+  m_imeReconversionActive = false;
+  m_imeReconversionHasPreedit = false;
   m_controller->handleTextSessionKey(Qt::Key_Return, "");
   m_textEditActive = false;
   m_textEditObjectId.clear();
@@ -906,6 +963,8 @@ void CanvasWidget::cancelTextEditSession() {
   if (!m_textEditActive) {
     return;
   }
+  m_imeReconversionActive = false;
+  m_imeReconversionHasPreedit = false;
   m_controller->handleTextSessionKey(Qt::Key_Escape, "");
   m_textEditActive = false;
   m_textEditObjectId.clear();
@@ -991,13 +1050,95 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
   event->accept();
 }
 
+QVariant CanvasWidget::inputMethodQuery(Qt::InputMethodQuery query) const {
+  if (!m_textEditActive || m_controller == nullptr)
+    return QWidget::inputMethodQuery(query);
+  switch (query) {
+    case Qt::ImEnabled:          return true;
+    case Qt::ImCursorPosition:   return m_controller->textEditorCaretIndex();
+    case Qt::ImAnchorPosition:   return m_controller->textEditorSelectionAnchor();
+    case Qt::ImCurrentSelection: return m_controller->textEditorSelectedText();
+    case Qt::ImSurroundingText:  return m_controller->textEditorFullText();
+    case Qt::ImCursorRectangle: {
+      const auto bounds = m_controller->textBoundsForObjectId(m_textEditObjectId);
+      if (!bounds) return QWidget::inputMethodQuery(query);
+      const QRect cr = canvasRect();
+      const double zoom = stateFor(this).zoom;
+      const int wx = cr.x() + static_cast<int>(std::lround(static_cast<double>(bounds->x) * zoom));
+      const int wy = cr.y() + static_cast<int>(std::lround(static_cast<double>(bounds->y) * zoom));
+      const int ww = static_cast<int>(std::lround(static_cast<double>(bounds->width)  * zoom));
+      const int wh = static_cast<int>(std::lround(static_cast<double>(bounds->height) * zoom));
+      return QRect(wx, wy, std::max(1, ww), std::max(1, wh));
+    }
+    default:                     return QWidget::inputMethodQuery(query);
+  }
+}
+
 void CanvasWidget::inputMethodEvent(QInputMethodEvent* event) {
   if (m_controller == nullptr || event == nullptr || !m_textEditActive) {
     QWidget::inputMethodEvent(event);
     return;
   }
 
+  // --- Windows IME再変換モード ---
+  if (m_imeReconversionActive) {
+    const QString commit = event->commitString();
+    if (!commit.isEmpty()) {
+      // 変換確定: 選択削除 + 確定テキスト挿入（TextEditorFeatureが選択を削除して挿入）
+      const QByteArray utf8 = commit.toUtf8();
+      const std::string textUtf8(utf8.constData(), static_cast<std::string::size_type>(utf8.size()));
+      m_controller->handleTextSessionKey(0, textUtf8);
+      m_imeReconversionActive = false;
+      m_imeReconversionHasPreedit = false;
+      m_textCaretVisible = true;
+      update();
+      event->accept();
+      return;
+    }
+    if (!event->preeditString().isEmpty()) {
+      // 候補表示中（preedit非空）: ライブ変換 — 通常のpreeditハンドラに委譲して
+      // テキストオブジェクト内の表示をリアルタイム更新する
+      m_imeReconversionHasPreedit = true;
+      const QByteArray pu8 = event->preeditString().toUtf8();
+      const std::string ps(pu8.constData(), static_cast<std::string::size_type>(pu8.size()));
+      if (m_controller->handleTextSessionPreedit(ps)) {
+        m_textCaretVisible = true;
+      }
+      update();
+      event->accept();
+      return;
+    }
+    // 空preedit + 空commit: 2通りある
+    // (A) コンポジション開始前のIMEリセットイベント → 無視してフラグを維持
+    // (B) ユーザーがIMEをキャンセルした後のクリーンアップ → preeditをクリアしてフラグ解除
+    // (A)と(B)の区別: preeditをまだ一度も受信していなければ(A)
+    if (m_imeReconversionHasPreedit) {
+      // (B) キャンセル: preeditテキストを除去してから終了
+      m_controller->handleTextSessionPreedit("");
+      m_imeReconversionActive = false;
+      m_imeReconversionHasPreedit = false;
+    }
+    // (A) の場合はフラグをそのまま維持して続行
+    update();
+    event->accept();
+    return;
+  }
+
   const QString commitText = event->commitString();
+#if defined(Q_OS_WIN)
+  // 全角モード（かな入力など）でスペースを押すと keyPressEvent の前に
+  // inputMethodEvent(commitString=" " or "　") が発火するケースを捕捉する。
+  // 選択中にスペースコミットが来た場合は、通常挿入せずIME再変換を試みる。
+  if (!commitText.isEmpty() && m_controller->textEditorHasSelection()) {
+    if (commitText == " " || commitText == "　") { // 半角スペース / 全角スペース
+      m_imeReconversionActive = true;
+      m_imeReconversionHasPreedit = false;
+      QMetaObject::invokeMethod(this, &CanvasWidget::attemptImeReconversion, Qt::QueuedConnection);
+      event->accept();
+      return;
+    }
+  }
+#endif
   if (!commitText.isEmpty()) {
     const QByteArray utf8 = commitText.toUtf8();
     const std::string textUtf8(utf8.constData(), static_cast<std::string::size_type>(utf8.size()));
@@ -1042,6 +1183,52 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
         modifiers.testFlag(Qt::AltModifier));
   }
   if (m_textEditActive) {
+    if (event->key() == Qt::Key_A && (event->modifiers() & Qt::ControlModifier)) {
+      m_controller->textEditorSelectAll();
+      QGuiApplication::inputMethod()->update(Qt::ImCursorPosition | Qt::ImAnchorPosition | Qt::ImCurrentSelection);
+      update();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_C && (event->modifiers() & Qt::ControlModifier)) {
+      const QString sel = m_controller->textEditorSelectedText();
+      if (!sel.isEmpty()) QApplication::clipboard()->setText(sel);
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_X && (event->modifiers() & Qt::ControlModifier)) {
+      const QString sel = m_controller->textEditorSelectedText();
+      if (!sel.isEmpty()) {
+        QApplication::clipboard()->setText(sel);
+        m_controller->handleTextSessionKey(Qt::Key_Backspace, "");
+        update();
+      }
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_V && (event->modifiers() & Qt::ControlModifier)) {
+      const QString text = QApplication::clipboard()->text();
+      if (!text.isEmpty()) {
+        m_controller->handleTextSessionKey(0, text.toUtf8().toStdString());
+        update();
+      }
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Left && (event->modifiers() & Qt::ShiftModifier)) {
+      m_controller->textEditorExtendSelectionLeft();
+      QGuiApplication::inputMethod()->update(Qt::ImCursorPosition | Qt::ImAnchorPosition);
+      update();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Right && (event->modifiers() & Qt::ShiftModifier)) {
+      m_controller->textEditorExtendSelectionRight();
+      QGuiApplication::inputMethod()->update(Qt::ImCursorPosition | Qt::ImAnchorPosition);
+      update();
+      event->accept();
+      return;
+    }
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
       commitTextEditSession();
       event->accept();
@@ -1065,6 +1252,14 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
       event->accept();
       return;
     }
+#if defined(Q_OS_WIN)
+    if (event->key() == Qt::Key_Space && m_controller->textEditorHasSelection()) {
+      // 半角スペース: keyPressEvent 経由で到達。IME再変換を試みる。
+      attemptImeReconversion();
+      event->accept();
+      return;
+    }
+#endif
     const QString t = event->text();
     if (!t.isEmpty() && t.at(0).isPrint()) {
       m_controller->handleTextSessionKey(event->key(), t.toUtf8().toStdString());

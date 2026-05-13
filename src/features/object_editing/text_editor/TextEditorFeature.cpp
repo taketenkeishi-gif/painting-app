@@ -293,6 +293,40 @@ bool TextEditorFeature::hasSelectedTextRange() const noexcept {
   return m_editSessionActive && m_editSelectionAnchorIndex != m_editSelectionFocusIndex;
 }
 
+bool TextEditorFeature::selectAll() noexcept {
+  if (!m_editSessionActive) {
+    return false;
+  }
+  const TextObject* object = findById(m_editId);
+  if (object == nullptr) {
+    return false;
+  }
+  const int len = static_cast<int>(toQString(object->text).size());
+  m_editSelectionAnchorIndex = 0;
+  m_editSelectionFocusIndex  = len;
+  m_editCaretIndex           = len;
+  return true;
+}
+
+bool TextEditorFeature::extendSelectionLeft() noexcept {
+  if (!m_editSessionActive) return false;
+  const TextObject* obj = findById(m_editId);
+  if (!obj) return false;
+  if (m_editCaretIndex > 0) m_editCaretIndex -= 1;
+  m_editSelectionFocusIndex = m_editCaretIndex;
+  return true;
+}
+
+bool TextEditorFeature::extendSelectionRight() noexcept {
+  if (!m_editSessionActive) return false;
+  const TextObject* obj = findById(m_editId);
+  if (!obj) return false;
+  const int len = static_cast<int>(toQString(obj->text).size());
+  if (m_editCaretIndex < len) m_editCaretIndex += 1;
+  m_editSelectionFocusIndex = m_editCaretIndex;
+  return true;
+}
+
 std::optional<core::Rect> TextEditorFeature::selectedTextRangeRect() const {
   if (!hasSelectedTextRange()) {
     return std::nullopt;

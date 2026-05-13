@@ -121,4 +121,7 @@ if(PAINT_BUILD_APP)
       Qt6::Gui
       Qt6::Widgets
   )
+  if(WIN32)
+    target_link_libraries(paint_app PRIVATE imm32)
+  endif()
 endif()

@@ -951,6 +951,34 @@ void ToolPropertyPanel::onSizeChanged(int size) {
   m_controller->setBrushSize(size);
 }
 
+void ToolPropertyPanel::onTextBoldToggled(bool checked) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->setSelectedTextBold(checked);
+}
+
+void ToolPropertyPanel::onTextItalicToggled(bool checked) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->setSelectedTextItalic(checked);
+}
+
+void ToolPropertyPanel::onTextUnderlineToggled(bool checked) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->setSelectedTextUnderline(checked);
+}
+
+void ToolPropertyPanel::onTextStrikeOutToggled(bool checked) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->setSelectedTextStrikeOut(checked);
+}
+
 void ToolPropertyPanel::onOpacitySliderChanged(int value) {
   if (m_controller == nullptr || !m_controller->currentToolSupportsOpacity()) {
     return;

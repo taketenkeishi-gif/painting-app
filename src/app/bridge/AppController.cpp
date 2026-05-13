@@ -3402,6 +3402,49 @@ bool AppController::handleTextSessionPreedit(const std::string& textUtf8) {
 bool AppController::hasActiveTextSession() const noexcept {
   return m_textEditor.hasActiveTextSession();
 }
+bool AppController::textEditorHasSelection() const noexcept {
+  return m_textEditor.hasSelectedTextRange();
+}
+int AppController::textEditorCaretIndex() const noexcept {
+  return m_textEditor.editCaretIndex();
+}
+int AppController::textEditorSelectionAnchor() const noexcept {
+  return m_textEditor.editSelectionAnchor();
+}
+QString AppController::textEditorSelectedText() const {
+  if (!m_textEditor.hasActiveTextSession() || !m_textEditor.hasSelectedTextRange())
+    return {};
+  const auto text = m_textEditor.textForId(m_textEditor.editObjectId());
+  if (!text) return {};
+  const int caret  = m_textEditor.editCaretIndex();
+  const int anchor = m_textEditor.editSelectionAnchor();
+  const int lo = std::min(caret, anchor);
+  const int hi = std::max(caret, anchor);
+  const QString full = QString::fromStdString(*text);
+  return full.mid(lo, hi - lo);
+}
+QString AppController::textEditorFullText() const {
+  if (!m_textEditor.hasActiveTextSession()) return {};
+  const auto text = m_textEditor.textForId(m_textEditor.editObjectId());
+  return text ? QString::fromStdString(*text) : QString {};
+}
+bool AppController::textEditorSelectAll() {
+  if (!m_textEditor.selectAll()) {
+    return false;
+  }
+  emit overlayChanged();
+  return true;
+}
+bool AppController::textEditorExtendSelectionLeft() {
+  if (!m_textEditor.extendSelectionLeft()) return false;
+  emit overlayChanged();
+  return true;
+}
+bool AppController::textEditorExtendSelectionRight() {
+  if (!m_textEditor.extendSelectionRight()) return false;
+  emit overlayChanged();
+  return true;
+}
 
 features::object_editing::ObjectLayerModel* AppController::ensureObjectLayerForActiveLayer() {
   if (m_document.layerCount() == 0) {

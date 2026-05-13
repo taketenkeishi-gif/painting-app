@@ -14,6 +14,7 @@ class QKeyEvent;
 class QEvent;
 class QTimerEvent;
 class QInputMethodEvent;
+class QVariant;
 
 namespace app::bridge {
 class AppController;
@@ -51,10 +52,12 @@ protected:
   void keyPressEvent(QKeyEvent* event) override;
   void keyReleaseEvent(QKeyEvent* event) override;
   void inputMethodEvent(QInputMethodEvent* event) override;
+  QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
   void timerEvent(QTimerEvent* event) override;
 
 private slots:
   void refreshFromController();
+  void attemptImeReconversion();
 
 private:
   QRect canvasRect() const;
@@ -76,6 +79,8 @@ private:
   std::string m_textEditObjectId;
   int m_operationCursorLockMode {0};
   bool m_textCaretVisible {true};
+  bool m_imeReconversionActive {false};
+  bool m_imeReconversionHasPreedit {false};
   QBasicTimer m_textCaretTimer;
 };
 

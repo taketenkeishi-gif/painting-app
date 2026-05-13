@@ -273,6 +273,14 @@ public:
   bool handleTextSessionKey(int key, const std::string& textUtf8);
   bool handleTextSessionPreedit(const std::string& textUtf8);
   bool hasActiveTextSession() const noexcept;
+  bool textEditorHasSelection() const noexcept;
+  int textEditorCaretIndex() const noexcept;
+  int textEditorSelectionAnchor() const noexcept;
+  QString textEditorSelectedText() const;
+  QString textEditorFullText() const;
+  bool textEditorSelectAll();
+  bool textEditorExtendSelectionLeft();
+  bool textEditorExtendSelectionRight();
   bool pickColorAt(int x, int y);
   void setInputModifiers(bool shift, bool ctrl, bool alt);
 
