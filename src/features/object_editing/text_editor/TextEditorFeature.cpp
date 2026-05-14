@@ -110,34 +110,92 @@ const TextEditorFeature::TextObject* TextEditorFeature::findById(const std::stri
 core::Rect TextEditorFeature::measureBounds(const TextObject& object) const {
   const QString text = toQString(object.text);
   const QString measured = text.isEmpty() ? QStringLiteral(" ") : text;
+  const qreal sx = std::max<qreal>(0.1, object.scaleX);
+  const qreal sy = std::max<qreal>(0.1, object.scaleY);
 
-  qreal w = 0.0;
-  qreal maxAscent = 1.0;
-  qreal maxDescent = 1.0;
+  QRectF localRect;
+  if (object.vertical) {
+    // Vertical multi-column: \n = 次列へ
+    const float ls = std::max(0.5f, object.lineSpacing);
+    const QFont baseFont = textFontForObject(object);
+    QFontMetricsF bfm(baseFont);
+    const qreal colWidth = std::max(16.0, bfm.ascent() + bfm.descent());
 
-  if (object.styleRuns.empty()) {
-    const QFont font = textFontForObject(object);
-    QFontMetricsF metrics(font);
-    w = std::max<qreal>(16.0, metrics.horizontalAdvance(measured));
-    maxAscent = std::max<qreal>(1.0, metrics.ascent());
-    maxDescent = std::max<qreal>(1.0, metrics.descent());
-  } else {
+    int numCols = 1;
+    qreal maxColH = 0.0;
+    qreal currentColH = 0.0;
     for (int i = 0; i < measured.size(); ++i) {
+      if (measured[i] == QChar('\n')) {
+        maxColH = std::max(maxColH, currentColH);
+        currentColH = 0.0;
+        ++numCols;
+        continue;
+      }
       const TextStyleRun style = styleAtIndex(object, i);
-      const QFont font = textFontForStyleRun(style);
-      QFontMetricsF metrics(font);
-      const QString character = measured.mid(i, 1);
-      w += metrics.horizontalAdvance(character);
-      maxAscent = std::max<qreal>(maxAscent, metrics.ascent());
-      maxDescent = std::max<qreal>(maxDescent, metrics.descent());
+      QFontMetricsF m(textFontForStyleRun(style));
+      currentColH += (m.ascent() + m.descent()) * static_cast<qreal>(ls);
     }
-    w = std::max<qreal>(16.0, w);
+    maxColH = std::max(maxColH, currentColH);
+    if (maxColH < 16.0) maxColH = 16.0;
+
+    const qreal totalWidth = static_cast<qreal>(numCols) * colWidth;
+    if (object.verticalRTL) {
+      localRect = QRectF(-totalWidth * sx, 0.0, totalWidth * sx, maxColH * sy);
+    } else {
+      localRect = QRectF(0.0, 0.0, totalWidth * sx, maxColH * sy);
+    }
+  } else {
+    // Horizontal multi-line: split by \n and compute per-line metrics
+    qreal maxLineWidth = 16.0;
+    qreal firstLineAscent = 1.0;
+    qreal lastLineAscent = 1.0;
+    qreal cumY = 0.0; // accumulates lineH for each line; final value = sum of all lineH
+    bool firstLine = true;
+    int lineStart = 0;
+    while (lineStart <= measured.size()) {
+      int lineEnd = lineStart;
+      while (lineEnd < measured.size() && measured[lineEnd] != QChar('\n')) {
+        ++lineEnd;
+      }
+      qreal lineW = 0.0;
+      qreal lineAscent = 1.0;
+      qreal lineDescent = 1.0;
+      if (object.styleRuns.empty()) {
+        const QFont font = textFontForObject(object);
+        QFontMetricsF metrics(font);
+        const QString lineText = (lineStart == lineEnd) ? QStringLiteral(" ") : measured.mid(lineStart, lineEnd - lineStart);
+        lineW = std::max<qreal>(16.0, metrics.horizontalAdvance(lineText));
+        lineAscent = std::max<qreal>(1.0, metrics.ascent());
+        lineDescent = std::max<qreal>(1.0, metrics.descent());
+      } else {
+        for (int i = lineStart; i < lineEnd; ++i) {
+          const TextStyleRun style = styleAtIndex(object, i);
+          QFontMetricsF metrics(textFontForStyleRun(style));
+          lineW += metrics.horizontalAdvance(measured.mid(i, 1));
+          lineAscent = std::max<qreal>(lineAscent, metrics.ascent());
+          lineDescent = std::max<qreal>(lineDescent, metrics.descent());
+        }
+        if (lineStart == lineEnd) {
+          QFontMetricsF metrics(textFontForObject(object));
+          lineAscent = std::max<qreal>(lineAscent, metrics.ascent());
+          lineDescent = std::max<qreal>(lineDescent, metrics.descent());
+        }
+        lineW = std::max<qreal>(16.0, lineW);
+      }
+      maxLineWidth = std::max(maxLineWidth, lineW);
+      if (firstLine) {
+        firstLineAscent = lineAscent;
+        firstLine = false;
+      }
+      lastLineAscent = lineAscent;
+      cumY += lineAscent + lineDescent;
+      lineStart = lineEnd + 1;
+    }
+    // top = -firstLineAscent, height = (cumY - lastLineAscent + firstLineAscent)
+    const qreal rectHeight = (cumY - lastLineAscent + firstLineAscent) * sy;
+    localRect = QRectF(0.0, -firstLineAscent * sy, maxLineWidth * sx, rectHeight);
   }
 
-  const qreal scaledW = w * std::max<qreal>(0.1, object.scaleX);
-  const qreal ascent = maxAscent * std::max<qreal>(0.1, object.scaleY);
-  const qreal descent = maxDescent * std::max<qreal>(0.1, object.scaleY);
-  const QRectF localRect(0.0, -ascent, scaledW, ascent + descent);
   QTransform transform;
   transform.translate(object.position.x, object.position.y);
   transform.rotate(object.rotationDeg);
@@ -159,17 +217,97 @@ int TextEditorFeature::caretIndexAtPoint(const TextObject& object, core::Point p
   const double s = std::sin(radians);
   const double dx = static_cast<double>(point.x - object.position.x);
   const double dy = static_cast<double>(point.y - object.position.y);
-  const double localX = (dx * c + dy * s) / std::max(0.1F, object.scaleX);
 
-  int bestIndex = 0;
+  if (object.vertical) {
+    // Vertical multi-column: \n = 次列へ
+    // Qt clockwise rotation: localX = dx*c - dy*s, localY = dx*s + dy*c
+    const double localX = (dx * c - dy * s) / std::max(0.1F, object.scaleX);
+    const double localY = (dx * s + dy * c) / std::max(0.1F, object.scaleY);
+    const double ls = static_cast<double>(std::max(0.5f, object.lineSpacing));
+    const QFont baseFont = textFontForObject(object);
+    QFontMetricsF bfm(baseFont);
+    const double colWidth = std::max(16.0, bfm.ascent() + bfm.descent());
+
+    // クリック位置の列インデックスを決定
+    int targetCol;
+    if (object.verticalRTL) {
+      // col n の中心 X = -n * colWidth
+      targetCol = std::max(0, static_cast<int>((-localX + colWidth / 2.0) / colWidth));
+    } else {
+      targetCol = std::max(0, static_cast<int>((localX + colWidth / 2.0) / colWidth));
+    }
+
+    // 対象列の文字を順に比較
+    int currentCol = 0;
+    double accumY = 0.0;
+    for (int i = 0; i <= text.size(); ++i) {
+      if (i == text.size()) return i;
+      if (text[i] == QChar('\n')) {
+        if (currentCol == targetCol) return i; // 列末尾
+        ++currentCol;
+        accumY = 0.0;
+        continue;
+      }
+      const TextStyleRun style = styleAtIndex(object, i);
+      QFontMetricsF metrics(textFontForStyleRun(style));
+      const double step = (metrics.ascent() + metrics.descent()) * ls;
+      if (currentCol == targetCol && localY <= accumY + step / 2.0) return i;
+      if (currentCol == targetCol) accumY += step;
+    }
+    return static_cast<int>(text.size());
+  }
+
+  const double localX = (dx * c + dy * s) / std::max(0.1F, object.scaleX);
+  const double localY = (-dx * s + dy * c) / std::max(0.1F, object.scaleY);
+
+  // Multi-line horizontal: find which line by localY, then find X within that line
+  auto getLineH = [&](int ls, int le) -> qreal {
+    qreal la = 1.0, ld = 1.0;
+    if (object.styleRuns.empty()) {
+      QFontMetricsF m(textFontForObject(object));
+      return std::max(1.0, m.ascent()) + std::max(1.0, m.descent());
+    }
+    for (int i = ls; i < le; ++i) {
+      QFontMetricsF m(textFontForStyleRun(styleAtIndex(object, i)));
+      la = std::max(la, m.ascent());
+      ld = std::max(ld, m.descent());
+    }
+    if (ls == le) {
+      QFontMetricsF m(textFontForObject(object));
+      la = std::max(la, m.ascent());
+      ld = std::max(ld, m.descent());
+    }
+    return la + ld;
+  };
+
+  // Scan lines until the target is found by Y comparison
+  int targetLineStart = 0;
+  int targetLineEnd = 0;
+  {
+    int ls = 0;
+    qreal cumY = 0.0;
+    while (true) {
+      int le = ls;
+      while (le < text.size() && text[le] != QChar('\n')) ++le;
+      const qreal lh = getLineH(ls, le);
+      targetLineStart = ls;
+      targetLineEnd = le;
+      if (le >= text.size() || localY < cumY + lh) {
+        break;
+      }
+      cumY += lh;
+      ls = le + 1;
+    }
+  }
+
+  // Find X position within the target line
+  int bestIndex = targetLineStart;
   double advance = 0.0;
   double bestDistance = std::abs(localX);
-  for (int i = 0; i < text.size(); ++i) {
+  for (int i = targetLineStart; i < targetLineEnd && i < text.size(); ++i) {
     const TextStyleRun style = styleAtIndex(object, i);
-    const QFont font = textFontForStyleRun(style);
-    QFontMetricsF metrics(font);
-    const QString character = text.mid(i, 1);
-    advance += metrics.horizontalAdvance(character);
+    QFontMetricsF metrics(textFontForStyleRun(style));
+    advance += metrics.horizontalAdvance(text.mid(i, 1));
     const double distance = std::abs(localX - advance);
     if (distance < bestDistance) {
       bestDistance = distance;
@@ -210,7 +348,7 @@ core::Point TextEditorFeature::boundsAnchorPoint(const core::Rect& bounds, Handl
   return core::Point {left, top};
 }
 
-bool TextEditorFeature::beginTextInput(core::Point point, const core::Color& color, int fontSize) {
+bool TextEditorFeature::beginTextInput(core::Point point, const core::Color& color, int fontSize, bool vertical) {
   const auto existing = hitTextIdAt(point);
   if (existing.has_value()) {
     m_editId = *existing;
@@ -222,8 +360,10 @@ bool TextEditorFeature::beginTextInput(core::Point point, const core::Color& col
     TextObject object;
     object.id = "txt_" + std::to_string(m_objects.size() + 1) + "_" + std::to_string(point.x) + "_" + std::to_string(point.y);
     object.position = point;
-    object.fontSize = std::max(8, fontSize * 2);
+    object.fontSize = std::clamp(fontSize, 8, 24);
     object.color = color;
+    object.vertical = vertical;
+    object.lineSpacing = vertical ? 0.8f : 1.0f;
     object.text.clear();
     object.bounds = measureBounds(object);
     m_objects.push_back(object);
@@ -325,6 +465,62 @@ bool TextEditorFeature::extendSelectionRight() noexcept {
   if (m_editCaretIndex < len) m_editCaretIndex += 1;
   m_editSelectionFocusIndex = m_editCaretIndex;
   return true;
+}
+
+TextEditorFeature::TextStyleRun TextEditorFeature::caretStyle() const noexcept {
+  if (!m_editSessionActive) return {};
+  const TextObject* obj = findById(m_editId);
+  if (!obj) return {};
+  const int idx = m_editCaretIndex > 0 ? m_editCaretIndex - 1 : 0;
+  return styleAtIndex(*obj, idx);
+}
+
+bool TextEditorFeature::toggleVertical() noexcept {
+  if (!m_selectedId.has_value()) return false;
+  TextObject* obj = findById(*m_selectedId);
+  if (!obj) return false;
+  obj->vertical = !obj->vertical;
+  obj->bounds = measureBounds(*obj);
+  m_selectedBounds = obj->bounds;
+  return true;
+}
+
+bool TextEditorFeature::isVertical() const noexcept {
+  if (!m_selectedId.has_value()) return false;
+  const TextObject* obj = findById(*m_selectedId);
+  return obj ? obj->vertical : false;
+}
+
+bool TextEditorFeature::setVerticalRTL(bool rtl) noexcept {
+  if (!m_selectedId.has_value()) return false;
+  TextObject* obj = findById(*m_selectedId);
+  if (!obj) return false;
+  obj->verticalRTL = rtl;
+  obj->bounds = measureBounds(*obj);
+  m_selectedBounds = obj->bounds;
+  return true;
+}
+
+bool TextEditorFeature::getVerticalRTL() const noexcept {
+  if (!m_selectedId.has_value()) return true;
+  const TextObject* obj = findById(*m_selectedId);
+  return obj ? obj->verticalRTL : true;
+}
+
+bool TextEditorFeature::setLineSpacing(float spacing) {
+  if (!m_selectedId.has_value()) return false;
+  TextObject* obj = findById(*m_selectedId);
+  if (!obj) return false;
+  obj->lineSpacing = std::max(0.5f, spacing);
+  obj->bounds = measureBounds(*obj);
+  m_selectedBounds = obj->bounds;
+  return true;
+}
+
+float TextEditorFeature::getLineSpacing() const noexcept {
+  if (!m_selectedId.has_value()) return 1.0f;
+  const TextObject* obj = findById(*m_selectedId);
+  return obj ? obj->lineSpacing : 1.0f;
 }
 
 std::optional<core::Rect> TextEditorFeature::selectedTextRangeRect() const {
@@ -490,6 +686,7 @@ bool TextEditorFeature::handleKeyPress(int key, const std::string& textUtf8) {
   }
 
   if (key == Qt::Key_Return || key == Qt::Key_Enter) {
+    // Key_Return = 確定（セッション終了）。改行挿入は handleTextSessionKey(0, "\n") 経由
     object->bounds = measureBounds(*object);
     m_selectedBounds = object->bounds;
     m_editSessionActive = false;
@@ -1018,13 +1215,8 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
   if (m_editSessionActive && m_selectedId.has_value()) {
     const auto* object = findById(*m_selectedId);
     if (object != nullptr) {
-      const QFont font = textFontForObject(*object);
-      const QFontMetricsF metrics(font);
       const QString text = toQString(object->text);
       const int caretIndex = clampedCaretIndex(m_editCaretIndex, text);
-      const qreal advance = std::max<qreal>(0.0, metrics.horizontalAdvance(text.left(caretIndex)));
-      const qreal ascent = std::max<qreal>(1.0, metrics.ascent());
-      const qreal descent = std::max<qreal>(1.0, metrics.descent());
       const double scaleX = std::max(0.1F, object->scaleX);
       const double scaleY = std::max(0.1F, object->scaleY);
       const double radians = static_cast<double>(object->rotationDeg) * 3.14159265358979323846 / 180.0;
@@ -1035,36 +1227,178 @@ ObjectOverlayModel TextEditorFeature::selectionOverlay() const {
             static_cast<int>(std::lround(static_cast<double>(object->position.x) + x * c - y * s)),
             static_cast<int>(std::lround(static_cast<double>(object->position.y) + x * s + y * c))};
       };
-      /* text-editor-range-selection-overlay */
-      if (hasSelectedTextRange()) {
-        const int selectionStart = std::min(clampedCaretIndex(m_editSelectionAnchorIndex, text), clampedCaretIndex(m_editSelectionFocusIndex, text));
-        const int selectionEnd = std::max(clampedCaretIndex(m_editSelectionAnchorIndex, text), clampedCaretIndex(m_editSelectionFocusIndex, text));
-        const qreal leftAdvance = std::max<qreal>(0.0, metrics.horizontalAdvance(text.left(selectionStart)));
-        const qreal rightAdvance = std::max<qreal>(leftAdvance, metrics.horizontalAdvance(text.left(selectionEnd)));
-        const double selectionLeft = static_cast<double>(leftAdvance) * scaleX;
-        const double selectionRight = static_cast<double>(rightAdvance) * scaleX;
-        const double selectionTop = -static_cast<double>(ascent) * scaleY;
-        const double selectionBottom = static_cast<double>(descent) * scaleY;
-        const core::Point p1 = mapLocal(selectionLeft, selectionTop);
-        const core::Point p2 = mapLocal(selectionRight, selectionTop);
-        const core::Point p3 = mapLocal(selectionRight, selectionBottom);
-        const core::Point p4 = mapLocal(selectionLeft, selectionBottom);
-        const int minX = std::min(std::min(p1.x, p2.x), std::min(p3.x, p4.x));
-        const int minY = std::min(std::min(p1.y, p2.y), std::min(p3.y, p4.y));
-        const int maxX = std::max(std::max(p1.x, p2.x), std::max(p3.x, p4.x));
-        const int maxY = std::max(std::max(p1.y, p2.y), std::max(p3.y, p4.y));
-        OverlayPrimitive selection;
-        selection.kind = OverlayPrimitive::Kind::Rect;
-        selection.rect = core::Rect {minX, minY, std::max(1, maxX - minX), std::max(1, maxY - minY)};
-        out.primitives.push_back(selection);
-      }
+      if (object->vertical) {
+        // ---- VERTICAL mode (multi-column) ----
+        const double ls = static_cast<double>(std::max(0.5f, object->lineSpacing));
+        const QFont baseFont = textFontForObject(*object);
+        QFontMetricsF bfm(baseFont);
+        const qreal colWidth = std::max(16.0, bfm.ascent() + bfm.descent());
 
-      OverlayPrimitive caret;
-      caret.kind = OverlayPrimitive::Kind::Line;
-      const double caretX = static_cast<double>(advance) * scaleX;
-      caret.p1 = mapLocal(caretX, -static_cast<double>(ascent) * scaleY);
-      caret.p2 = mapLocal(caretX, static_cast<double>(descent) * scaleY);
-      out.primitives.push_back(caret);
+        // \n をスキップして (列, 列内Y) を返す
+        auto charColAndY = [&](int idx) -> std::pair<int, qreal> {
+          int col = 0;
+          qreal y = 0.0;
+          for (int i = 0; i < idx && i < text.size(); ++i) {
+            if (text[i] == QChar('\n')) { ++col; y = 0.0; continue; }
+            QFontMetricsF m(textFontForStyleRun(styleAtIndex(*object, i)));
+            y += (m.ascent() + m.descent()) * ls;
+          }
+          return {col, y};
+        };
+        auto colCenterLocalX = [&](int col) -> qreal {
+          return object->verticalRTL ? -(static_cast<qreal>(col) * colWidth)
+                                     : +(static_cast<qreal>(col) * colWidth);
+        };
+
+        /* text-editor-range-selection-overlay (vertical) */
+        if (hasSelectedTextRange()) {
+          const int selStart = std::min(clampedCaretIndex(m_editSelectionAnchorIndex, text), clampedCaretIndex(m_editSelectionFocusIndex, text));
+          const int selEnd   = std::max(clampedCaretIndex(m_editSelectionAnchorIndex, text), clampedCaretIndex(m_editSelectionFocusIndex, text));
+          bool hasVisual = false;
+          qreal minLX = 1e9, maxLX = -1e9, minLY = 1e9, maxLY = -1e9;
+          for (int i = selStart; i < selEnd && i < text.size(); ++i) {
+            if (text[i] == QChar('\n')) continue;
+            const auto [col, localY] = charColAndY(i);
+            QFontMetricsF m(textFontForStyleRun(styleAtIndex(*object, i)));
+            const qreal step = (m.ascent() + m.descent()) * ls;
+            const qreal cx = colCenterLocalX(col);
+            minLX = std::min(minLX, cx - colWidth / 2.0);
+            maxLX = std::max(maxLX, cx + colWidth / 2.0);
+            minLY = std::min(minLY, localY);
+            maxLY = std::max(maxLY, localY + step);
+            hasVisual = true;
+          }
+          if (hasVisual) {
+            const core::Point p1 = mapLocal(minLX * scaleX, minLY * scaleY);
+            const core::Point p2 = mapLocal(maxLX * scaleX, minLY * scaleY);
+            const core::Point p3 = mapLocal(maxLX * scaleX, maxLY * scaleY);
+            const core::Point p4 = mapLocal(minLX * scaleX, maxLY * scaleY);
+            const int minX = std::min(std::min(p1.x, p2.x), std::min(p3.x, p4.x));
+            const int minY = std::min(std::min(p1.y, p2.y), std::min(p3.y, p4.y));
+            const int maxX = std::max(std::max(p1.x, p2.x), std::max(p3.x, p4.x));
+            const int maxY = std::max(std::max(p1.y, p2.y), std::max(p3.y, p4.y));
+            OverlayPrimitive selection;
+            selection.kind = OverlayPrimitive::Kind::Rect;
+            selection.rect = core::Rect {minX, minY, std::max(1, maxX - minX), std::max(1, maxY - minY)};
+            out.primitives.push_back(selection);
+          }
+        }
+        // Caret: 列対応 横線
+        const auto [caretCol, caretLocalY] = charColAndY(caretIndex);
+        const qreal cx = colCenterLocalX(caretCol) * scaleX;
+        const qreal cy = caretLocalY * scaleY;
+        const qreal halfW = colWidth / 2.0 * scaleX;
+        OverlayPrimitive caret;
+        caret.kind = OverlayPrimitive::Kind::Line;
+        caret.p1 = mapLocal(cx - halfW, cy);
+        caret.p2 = mapLocal(cx + halfW, cy);
+        out.primitives.push_back(caret);
+      } else {
+        // ---- HORIZONTAL mode (multi-line) ----
+        struct HLineInfo { int start; int end; qreal baseline; qreal ascent; qreal descent; };
+        constexpr int kMaxLines = 64;
+        HLineInfo lines[kMaxLines];
+        int lineCount = 0;
+        {
+          int ls = 0;
+          qreal cumY = 0.0;
+          while (ls <= text.size() && lineCount < kMaxLines) {
+            int le = ls;
+            while (le < text.size() && text[le] != QChar('\n')) ++le;
+            qreal la = 1.0, ld = 1.0;
+            if (object->styleRuns.empty()) {
+              QFontMetricsF m(textFontForObject(*object));
+              la = m.ascent(); ld = m.descent();
+            } else {
+              for (int i = ls; i < le; ++i) {
+                QFontMetricsF m(textFontForStyleRun(styleAtIndex(*object, i)));
+                la = std::max(la, m.ascent());
+                ld = std::max(ld, m.descent());
+              }
+              if (ls == le) {
+                QFontMetricsF m(textFontForObject(*object));
+                la = std::max(la, m.ascent());
+                ld = std::max(ld, m.descent());
+              }
+            }
+            lines[lineCount++] = {ls, le, cumY, la, ld};
+            cumY += la + ld;
+            ls = le + 1;
+          }
+        }
+        if (lineCount == 0) {
+          QFontMetricsF m(textFontForObject(*object));
+          lines[0] = {0, 0, 0.0, m.ascent(), m.descent()};
+          lineCount = 1;
+        }
+
+        // Get (lineIdx, xAdvance within that line) for a given char index
+        auto posForChar = [&](int idx) -> std::pair<int, qreal> {
+          for (int li = 0; li < lineCount; ++li) {
+            if (idx >= lines[li].start && (idx <= lines[li].end || li == lineCount - 1)) {
+              qreal adv = 0.0;
+              for (int i = lines[li].start; i < idx && i < lines[li].end; ++i) {
+                QFontMetricsF m(textFontForStyleRun(styleAtIndex(*object, i)));
+                adv += m.horizontalAdvance(text.mid(i, 1));
+              }
+              return {li, adv};
+            }
+          }
+          return {lineCount - 1, 0.0};
+        };
+
+        // Full line width (for spanning-line selection)
+        auto fullLineWidth = [&](int li) -> qreal {
+          qreal adv = 0.0;
+          for (int i = lines[li].start; i < lines[li].end; ++i) {
+            QFontMetricsF m(textFontForStyleRun(styleAtIndex(*object, i)));
+            adv += m.horizontalAdvance(text.mid(i, 1));
+          }
+          return adv + 2.0;
+        };
+
+        /* text-editor-range-selection-overlay */
+        if (hasSelectedTextRange()) {
+          const int selStart = std::min(clampedCaretIndex(m_editSelectionAnchorIndex, text), clampedCaretIndex(m_editSelectionFocusIndex, text));
+          const int selEnd = std::max(clampedCaretIndex(m_editSelectionAnchorIndex, text), clampedCaretIndex(m_editSelectionFocusIndex, text));
+          const auto [startLine, startX] = posForChar(selStart);
+          const auto [endLine, endX] = posForChar(selEnd);
+          for (int li = startLine; li <= endLine && li < lineCount; ++li) {
+            const qreal xL = (li == startLine ? startX : 0.0) * scaleX;
+            const qreal xR = (li == endLine ? endX : fullLineWidth(li)) * scaleX;
+            const qreal yT = (lines[li].baseline - lines[li].ascent) * scaleY;
+            const qreal yB = (lines[li].baseline + lines[li].descent) * scaleY;
+            const core::Point p1 = mapLocal(xL, yT);
+            const core::Point p2 = mapLocal(xR, yT);
+            const core::Point p3 = mapLocal(xR, yB);
+            const core::Point p4 = mapLocal(xL, yB);
+            const int minX = std::min(std::min(p1.x, p2.x), std::min(p3.x, p4.x));
+            const int minY = std::min(std::min(p1.y, p2.y), std::min(p3.y, p4.y));
+            const int maxX = std::max(std::max(p1.x, p2.x), std::max(p3.x, p4.x));
+            const int maxY = std::max(std::max(p1.y, p2.y), std::max(p3.y, p4.y));
+            OverlayPrimitive selection;
+            selection.kind = OverlayPrimitive::Kind::Rect;
+            selection.rect = core::Rect {minX, minY, std::max(1, maxX - minX), std::max(1, maxY - minY)};
+            out.primitives.push_back(selection);
+          }
+        }
+        // Caret
+        const auto [caretLine, caretXAdv] = posForChar(caretIndex);
+        const HLineInfo& cl = lines[std::min(caretLine, lineCount - 1)];
+        const int caretFontIdx = caretIndex < text.size() ? caretIndex : std::max(0, caretIndex - 1);
+        const QFont caretFont = text.isEmpty()
+                                ? textFontForObject(*object)
+                                : textFontForStyleRun(styleAtIndex(*object, caretFontIdx));
+        QFontMetricsF caretM(caretFont);
+        OverlayPrimitive caret;
+        caret.kind = OverlayPrimitive::Kind::Line;
+        const double caretX = caretXAdv * scaleX;
+        const double caretTop = (cl.baseline - std::max<qreal>(1.0, caretM.ascent())) * scaleY;
+        const double caretBottom = (cl.baseline + std::max<qreal>(1.0, caretM.descent())) * scaleY;
+        caret.p1 = mapLocal(caretX, caretTop);
+        caret.p2 = mapLocal(caretX, caretBottom);
+        out.primitives.push_back(caret);
+      }
     }
   }
   return out;

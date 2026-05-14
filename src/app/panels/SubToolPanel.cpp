@@ -103,6 +103,17 @@ void drawSubToolPreviewStroke(
     painter->drawText(r.toRect(), Qt::AlignVCenter | Qt::AlignLeft, "T");
     return;
   }
+  if (id == "text_vertical") {
+    painter->setPen(QPen(stroke, 1.1));
+    QFont font = painter->font();
+    font.setBold(true);
+    font.setPixelSize(9);
+    painter->setFont(font);
+    QRectF textR = QRectF(r).adjusted(0, 0, -5, 0);
+    painter->drawText(textR, Qt::AlignVCenter | Qt::AlignLeft, "T");
+    painter->drawLine(QPointF(r.right() - 3, r.top() + 2), QPointF(r.right() - 3, r.bottom() - 2));
+    return;
+  }
   if (id == "comic_panel") {
     painter->setPen(QPen(stroke, 1.3));
     painter->setBrush(Qt::NoBrush);
@@ -305,6 +316,8 @@ QString subToolNameJa(QString id, const QString& displayName) {
   if (id == "hand_default") return QString::fromUtf8(u8"手のひら移動");
   if (id == "zoom_default") return QString::fromUtf8(u8"ズーム");
   if (id == "eyedropper_default") return QString::fromUtf8(u8"色取得");
+  if (id == "text_basic")    return QString::fromUtf8(u8"テキスト");
+  if (id == "text_vertical") return QString::fromUtf8(u8"縦書きテキスト");
   const QString requested = ::features::requested_tools::detail::requestedToolJaLabel(id.toStdString());
   if (!requested.isEmpty()) return requested;
   return displayName;

@@ -37,6 +37,9 @@ public:
     bool italic {false};
     bool underline {false};
     bool strikeOut {false};
+    bool vertical {false};
+    bool verticalRTL {true}; // true = RTL (伝統的: 列が右から左), false = LTR
+    float lineSpacing {1.0f};
     std::vector<TextStyleRun> styleRuns;
     float rotationDeg {0.0F};
     float scaleX {1.0F};
@@ -46,7 +49,7 @@ public:
     bool locked {false};
   };
 
-  bool beginTextInput(core::Point point, const core::Color& color, int fontSize);
+  bool beginTextInput(core::Point point, const core::Color& color, int fontSize, bool vertical = false);
   bool handleKeyPress(int key, const std::string& textUtf8);
   bool handlePreeditText(const std::string& textUtf8);
   bool beginTextRangeSelectionAt(core::Point point);
@@ -62,6 +65,13 @@ public:
   bool selectAll() noexcept;
   bool extendSelectionLeft() noexcept;
   bool extendSelectionRight() noexcept;
+  TextStyleRun caretStyle() const noexcept;
+  bool toggleVertical() noexcept;
+  bool isVertical() const noexcept;
+  bool setVerticalRTL(bool rtl) noexcept;
+  bool getVerticalRTL() const noexcept;
+  bool setLineSpacing(float spacing);
+  float getLineSpacing() const noexcept;
 
   std::optional<std::string> hitTextIdAt(core::Point point) const;
   std::optional<std::string> textForId(const std::string& id) const;

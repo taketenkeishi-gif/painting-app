@@ -100,6 +100,30 @@ void drawSelectionHandles(QPainter& painter, const QRectF& selectionRect, const 
   painter.drawRect(QRectF(selectionRect.bottomRight().x() - h / 2.0, selectionRect.bottomRight().y() - h / 2.0, h, h));
 }
 
+// 縦書きテキスト用の横向きIビームカーソル（回転なし・直接描画）
+QCursor makeVerticalIBeamCursor() {
+  // Qt::IBeamCursor と同じデザインを横向きで直接描く（W=22, H=9）
+  constexpr int W = 22, H = 9;
+  QPixmap rotated(W, H);
+  rotated.fill(Qt::transparent);
+  {
+    QPainter p(&rotated);
+    p.setRenderHint(QPainter::Antialiasing, false);
+    const int midY = H / 2; // = 4（中央横ライン）
+    // 白縁（視認性）
+    p.setPen(QPen(Qt::white, 3, Qt::SolidLine, Qt::FlatCap));
+    p.drawLine(0, midY, W - 1, midY);    // 横ステム
+    p.drawLine(0, 0, 0, H - 1);          // 左キャップ（縦）
+    p.drawLine(W - 1, 0, W - 1, H - 1); // 右キャップ（縦）
+    // 黒本体
+    p.setPen(QPen(Qt::black, 1, Qt::SolidLine, Qt::FlatCap));
+    p.drawLine(0, midY, W - 1, midY);
+    p.drawLine(0, 0, 0, H - 1);
+    p.drawLine(W - 1, 0, W - 1, H - 1);
+  }
+  return QCursor(rotated, rotated.width() / 2, rotated.height() / 2);
+}
+
 Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
   switch (tool) {
     case core::ToolKind::Brush:
@@ -411,13 +435,66 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.scale(std::max(0.1F, textObj.scaleX), std::max(0.1F, textObj.scaleY));
 
       const QString renderedText = QString::fromUtf8(textObj.text.c_str());
-      if (textObj.styleRuns.empty()) {
+      if (textObj.vertical) {
+        // Vertical multi-column: \n = 次列へ
+        const qreal ls = static_cast<qreal>(std::max(0.5f, textObj.lineSpacing));
+        // 列幅: ベースフォントの ascent+descent
+        const QFont baseFont = makeTextFont(textObj.size, textObj.fontFamily, textObj.bold, textObj.italic, textObj.underline, textObj.strikeOut);
+        QFontMetricsF bfm(baseFont);
+        const qreal colWidth = std::max(16.0, bfm.ascent() + bfm.descent());
+        int colIdx = 0;
+        qreal advanceY = 0.0;
+        for (int i = 0; i < renderedText.size(); ++i) {
+          if (renderedText[i] == QChar('\n')) {
+            ++colIdx;
+            advanceY = 0.0;
+            continue;
+          }
+          int runSize = textObj.size;
+          core::Color runColor = textObj.color;
+          std::string runFamily = textObj.fontFamily;
+          bool runBold = textObj.bold, runItalic = textObj.italic;
+          bool runUnderline = textObj.underline, runStrikeOut = textObj.strikeOut;
+          for (const auto& run : textObj.styleRuns) {
+            if (i >= run.start && i < run.start + run.length) {
+              runSize = run.size; runColor = run.color; runFamily = run.fontFamily;
+              runBold = run.bold; runItalic = run.italic;
+              runUnderline = run.underline; runStrikeOut = run.strikeOut;
+            }
+          }
+          const QString character = renderedText.mid(i, 1);
+          const QFont font = makeTextFont(runSize, runFamily, runBold, runItalic, runUnderline, runStrikeOut);
+          QFontMetricsF metrics(font);
+          const qreal charW = metrics.horizontalAdvance(character);
+          const qreal ascent = metrics.ascent();
+          const qreal descent = metrics.descent();
+          // RTL: 列 n の中心 X = -n * colWidth; LTR: +n * colWidth
+          const qreal colCenterX = textObj.verticalRTL ? -(static_cast<qreal>(colIdx) * colWidth)
+                                                       : +(static_cast<qreal>(colIdx) * colWidth);
+          painter.setFont(font);
+          painter.setPen(QColor(runColor.r, runColor.g, runColor.b, runColor.a));
+          painter.drawText(QPointF(colCenterX - charW / 2.0, advanceY + ascent), character);
+          advanceY += (ascent + descent) * ls;
+        }
+      } else if (textObj.styleRuns.empty()) {
+        // Single-font multi-line
         const QFont font = makeTextFont(textObj.size, textObj.fontFamily, textObj.bold, textObj.italic, textObj.underline, textObj.strikeOut);
+        QFontMetricsF metrics(font);
         painter.setFont(font);
         painter.setPen(QColor(textObj.color.r, textObj.color.g, textObj.color.b, textObj.color.a));
-        painter.drawText(QPointF(0.0, 0.0), renderedText);
+        const qreal lineH = metrics.ascent() + metrics.descent();
+        qreal lineY = 0.0;
+        const QStringList textLines = renderedText.split(u'\n');
+        for (const QString& line : textLines) {
+          painter.drawText(QPointF(0.0, lineY), line);
+          lineY += lineH;
+        }
       } else {
+        // Style-run multi-line: track advanceX and lineBaseY; reset on \n
         qreal advanceX = 0.0;
+        qreal lineBaseY = 0.0;
+        qreal lineMaxAscent = 0.0;
+        qreal lineMaxDescent = 0.0;
         for (int i = 0; i < renderedText.size(); ++i) {
           int runSize = textObj.size;
           core::Color runColor = textObj.color;
@@ -439,12 +516,22 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
             }
           }
 
+          const QChar ch = renderedText[i];
+          if (ch == u'\n') {
+            lineBaseY += lineMaxAscent + lineMaxDescent;
+            advanceX = 0.0;
+            lineMaxAscent = 0.0;
+            lineMaxDescent = 0.0;
+            continue;
+          }
           const QString character = renderedText.mid(i, 1);
           const QFont font = makeTextFont(runSize, runFamily, runBold, runItalic, runUnderline, runStrikeOut);
+          QFontMetricsF metrics(font);
+          lineMaxAscent = std::max(lineMaxAscent, metrics.ascent());
+          lineMaxDescent = std::max(lineMaxDescent, metrics.descent());
           painter.setFont(font);
           painter.setPen(QColor(runColor.r, runColor.g, runColor.b, runColor.a));
-          painter.drawText(QPointF(advanceX, 0.0), character);
-          QFontMetricsF metrics(font);
+          painter.drawText(QPointF(advanceX, lineBaseY), character);
           advanceX += metrics.horizontalAdvance(character);
         }
       }
@@ -651,7 +738,8 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     if (!point.has_value()) {
       return;
     }
-    if (m_controller->currentSubToolId() == "text_basic") { // text-basic-right-click-picker-guard
+    const std::string rcSubTool = m_controller->currentSubToolId();
+    if (rcSubTool == "text_basic" || rcSubTool == "text_vertical") { // text-basic-right-click-picker-guard
       updateCursorForState(point);
       update();
       event->accept();
@@ -716,7 +804,8 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     }
   }
 
-  if (m_controller->currentSubToolId() == "text_basic") {
+  if (const std::string lpSubTool = m_controller->currentSubToolId();
+      lpSubTool == "text_basic" || lpSubTool == "text_vertical") {
     if (m_controller->textObjectIdAt(point->x, point->y).has_value()) { // text-basic-drag-range-route
       m_mouseDrawing = true;
       m_operationCursorLockMode = 0;
@@ -1068,6 +1157,16 @@ QVariant CanvasWidget::inputMethodQuery(Qt::InputMethodQuery query) const {
       const int wy = cr.y() + static_cast<int>(std::lround(static_cast<double>(bounds->y) * zoom));
       const int ww = static_cast<int>(std::lround(static_cast<double>(bounds->width)  * zoom));
       const int wh = static_cast<int>(std::lround(static_cast<double>(bounds->height) * zoom));
+      if (m_controller->textEditorIsVertical()) {
+        // 縦書き: キャレット文字のY位置に絞ってカーソル矩形を返す
+        // → 変換候補がテキスト列全体ではなくキャレット文字の直下に出るため被りにくくなる
+        const QString fullText = m_controller->textEditorFullText();
+        const int totalChars = std::max(1, static_cast<int>(fullText.size()));
+        const int caretIdx  = std::clamp(m_controller->textEditorCaretIndex(), 0, totalChars);
+        const int charWH    = std::max(8, wh / totalChars);
+        const int caretWY   = wy + caretIdx * charWH;
+        return QRect(wx, std::min(caretWY, wy + wh - charWH), std::max(1, ww), charWH);
+      }
       return QRect(wx, wy, std::max(1, ww), std::max(1, wh));
     }
     default:                     return QWidget::inputMethodQuery(query);
@@ -1215,6 +1314,27 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
       event->accept();
       return;
     }
+    // 縦書きモードの上下キー → 前後文字移動
+    if (m_controller->textEditorIsVertical()) {
+      if (event->key() == Qt::Key_Up && !(event->modifiers() & Qt::ShiftModifier)) {
+        m_controller->handleTextSessionKey(Qt::Key_Left, "");
+        update(); event->accept(); return;
+      }
+      if (event->key() == Qt::Key_Down && !(event->modifiers() & Qt::ShiftModifier)) {
+        m_controller->handleTextSessionKey(Qt::Key_Right, "");
+        update(); event->accept(); return;
+      }
+      if (event->key() == Qt::Key_Up && (event->modifiers() & Qt::ShiftModifier)) {
+        m_controller->textEditorExtendSelectionLeft();
+        QGuiApplication::inputMethod()->update(Qt::ImCursorPosition | Qt::ImAnchorPosition);
+        update(); event->accept(); return;
+      }
+      if (event->key() == Qt::Key_Down && (event->modifiers() & Qt::ShiftModifier)) {
+        m_controller->textEditorExtendSelectionRight();
+        QGuiApplication::inputMethod()->update(Qt::ImCursorPosition | Qt::ImAnchorPosition);
+        update(); event->accept(); return;
+      }
+    }
     if (event->key() == Qt::Key_Left && (event->modifiers() & Qt::ShiftModifier)) {
       m_controller->textEditorExtendSelectionLeft();
       QGuiApplication::inputMethod()->update(Qt::ImCursorPosition | Qt::ImAnchorPosition);
@@ -1230,7 +1350,9 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
       return;
     }
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-      commitTextEditSession();
+      // Enter = 改行挿入（セッションは閉じない）。確定は Escape またはクリックアウト
+      m_controller->handleTextSessionKey(0, "\n");
+      update();
       event->accept();
       return;
     }
@@ -1437,7 +1559,15 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
 
   const std::string subToolId = m_controller->currentSubToolId();
   if (subToolId == "text_basic") {
-    setCursor(Qt::IBeamCursor);
+    if (m_controller->textEditorIsVertical()) {
+      setCursor(makeVerticalIBeamCursor());
+    } else {
+      setCursor(Qt::IBeamCursor);
+    }
+    return;
+  }
+  if (subToolId == "text_vertical") {
+    setCursor(makeVerticalIBeamCursor());
     return;
   }
   if (subToolId == "operation_object") {

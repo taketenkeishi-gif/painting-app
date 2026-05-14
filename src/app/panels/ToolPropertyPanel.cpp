@@ -106,6 +106,16 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_autoSelectThresholdLabel(new QLabel("自動選択しきい値", this)),
       m_colorButton(new QPushButton("色を選択", this)),
       m_sizeSpin(new QSpinBox(this)),
+      m_textBoldBtn(new QPushButton("B", this)),
+      m_textItalicBtn(new QPushButton("I", this)),
+      m_textUnderlineBtn(new QPushButton("U", this)),
+      m_textStrikeOutBtn(new QPushButton("S", this)),
+      m_textVerticalBtn(new QPushButton("縦", this)),
+      m_vertDirRightBtn(new QPushButton("←列", this)),
+      m_vertDirLeftBtn(new QPushButton("列→", this)),
+      m_textLineSpacingLabel(new QLabel("行間", this)),
+      m_textLineSpacingSlider(new QSlider(Qt::Horizontal, this)),
+      m_textLineSpacingSpin(new QSpinBox(this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
       m_opacitySpin(new QSpinBox(this)),
       m_hardnessSlider(new QSlider(Qt::Horizontal, this)),
@@ -397,6 +407,96 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(selectionGroup);
   m_selectionSection = selectionGroup;
 
+  // テキスト書式ボタンのスタイル設定
+  {
+    const QString btnStyle =
+        "QPushButton { border: 1px solid #555; border-radius: 3px; background: #2d2d2d;"
+        " color: #ccc; min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; }"
+        "QPushButton:checked { background: #3a6ea8; border-color: #5090d0; color: #fff; }"
+        "QPushButton:hover { background: #3d3d3d; }";
+
+    QFont boldFont = m_textBoldBtn->font();
+    boldFont.setBold(true);
+    boldFont.setPointSize(10);
+    m_textBoldBtn->setFont(boldFont);
+    m_textBoldBtn->setCheckable(true);
+    m_textBoldBtn->setToolTip("太字");
+    m_textBoldBtn->setStyleSheet(btnStyle);
+
+    QFont italicFont = m_textItalicBtn->font();
+    italicFont.setItalic(true);
+    italicFont.setPointSize(10);
+    m_textItalicBtn->setFont(italicFont);
+    m_textItalicBtn->setCheckable(true);
+    m_textItalicBtn->setToolTip("斜体");
+    m_textItalicBtn->setStyleSheet(btnStyle);
+
+    QFont underlineFont = m_textUnderlineBtn->font();
+    underlineFont.setUnderline(true);
+    underlineFont.setPointSize(10);
+    m_textUnderlineBtn->setFont(underlineFont);
+    m_textUnderlineBtn->setCheckable(true);
+    m_textUnderlineBtn->setToolTip("下線");
+    m_textUnderlineBtn->setStyleSheet(btnStyle);
+
+    QFont strikeFont = m_textStrikeOutBtn->font();
+    strikeFont.setStrikeOut(true);
+    strikeFont.setPointSize(10);
+    m_textStrikeOutBtn->setFont(strikeFont);
+    m_textStrikeOutBtn->setCheckable(true);
+    m_textStrikeOutBtn->setToolTip("取り消し線");
+    m_textStrikeOutBtn->setStyleSheet(btnStyle);
+
+    m_textVerticalBtn->setCheckable(true);
+    m_textVerticalBtn->setToolTip("縦書き");
+    m_textVerticalBtn->setStyleSheet(btnStyle);
+
+    m_vertDirRightBtn->setCheckable(true);
+    m_vertDirRightBtn->setToolTip("RTL: 列が右から左へ（伝統的縦書き）");
+    m_vertDirRightBtn->setStyleSheet(btnStyle);
+    m_vertDirLeftBtn->setCheckable(true);
+    m_vertDirLeftBtn->setToolTip("LTR: 列が左から右へ");
+    m_vertDirLeftBtn->setStyleSheet(btnStyle);
+
+    // 行間: 50〜300 → 0.5x〜3.0x, default 100 = 1.0x
+    m_textLineSpacingSlider->setRange(50, 300);
+    m_textLineSpacingSlider->setValue(100);
+    m_textLineSpacingSpin->setRange(50, 300);
+    m_textLineSpacingSpin->setValue(100);
+    m_textLineSpacingSpin->setSuffix("%");
+  }
+
+  auto* textGroup = new QGroupBox("テキスト書式", m_contentWidget);
+  auto* textGroupLayout = new QVBoxLayout(textGroup);
+  textGroupLayout->setContentsMargins(4, 4, 4, 4);
+  textGroupLayout->setSpacing(4);
+  // 1行目: B/I/U/S/縦 アイコンボタン
+  auto* textBtnRow = new QHBoxLayout();
+  textBtnRow->setSpacing(4);
+  textBtnRow->addWidget(m_textBoldBtn);
+  textBtnRow->addWidget(m_textItalicBtn);
+  textBtnRow->addWidget(m_textUnderlineBtn);
+  textBtnRow->addWidget(m_textStrikeOutBtn);
+  textBtnRow->addWidget(m_textVerticalBtn);
+  textBtnRow->addStretch(1);
+  textGroupLayout->addLayout(textBtnRow);
+  // 2行目: 縦書き方向（text_verticalツールのときのみ表示）
+  auto* vertDirRow = new QHBoxLayout();
+  vertDirRow->setSpacing(4);
+  vertDirRow->addWidget(m_vertDirRightBtn);
+  vertDirRow->addWidget(m_vertDirLeftBtn);
+  vertDirRow->addStretch(1);
+  textGroupLayout->addLayout(vertDirRow);
+  // 3行目: 行間スライダー
+  textGroupLayout->addWidget(m_textLineSpacingLabel);
+  auto* lsRow = new QHBoxLayout();
+  markResponsiveRow(lsRow);
+  lsRow->addWidget(m_textLineSpacingSlider, 1);
+  lsRow->addWidget(m_textLineSpacingSpin);
+  textGroupLayout->addLayout(lsRow);
+  contentLayout->addWidget(textGroup);
+  m_textSection = textGroup;
+
   contentLayout->addStretch(1);
 
   m_scrollArea->setWidgetResizable(true);
@@ -462,6 +562,35 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onBlendModeChanged);
   connect(m_eraseModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onEraseModeToggled);
   connect(m_lockAlphaRespectCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onLockAlphaRespectToggled);
+  connect(m_textBoldBtn, &QPushButton::toggled, this, &ToolPropertyPanel::onTextBoldToggled);
+  connect(m_textItalicBtn, &QPushButton::toggled, this, &ToolPropertyPanel::onTextItalicToggled);
+  connect(m_textUnderlineBtn, &QPushButton::toggled, this, &ToolPropertyPanel::onTextUnderlineToggled);
+  connect(m_textStrikeOutBtn, &QPushButton::toggled, this, &ToolPropertyPanel::onTextStrikeOutToggled);
+  connect(m_textVerticalBtn, &QPushButton::clicked, this, [this]() {
+    if (m_controller) {
+      m_controller->textEditorToggleVertical();
+    }
+  });
+  connect(m_vertDirRightBtn, &QPushButton::clicked, this, [this]() {
+    if (m_controller) {
+      m_controller->textEditorSetVerticalRTL(true);
+      const QSignalBlocker b1(m_vertDirRightBtn);
+      const QSignalBlocker b2(m_vertDirLeftBtn);
+      m_vertDirRightBtn->setChecked(true);
+      m_vertDirLeftBtn->setChecked(false);
+    }
+  });
+  connect(m_vertDirLeftBtn, &QPushButton::clicked, this, [this]() {
+    if (m_controller) {
+      m_controller->textEditorSetVerticalRTL(false);
+      const QSignalBlocker b1(m_vertDirRightBtn);
+      const QSignalBlocker b2(m_vertDirLeftBtn);
+      m_vertDirRightBtn->setChecked(false);
+      m_vertDirLeftBtn->setChecked(true);
+    }
+  });
+  connect(m_textLineSpacingSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onTextLineSpacingChanged);
+  connect(m_textLineSpacingSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onTextLineSpacingChanged);
   applyResponsiveLayout();
 }
 
@@ -476,6 +605,8 @@ void ToolPropertyPanel::setController(app::bridge::AppController* controller) {
   }
 
   connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &ToolPropertyPanel::refreshFromController);
+  connect(m_controller, &app::bridge::AppController::overlayChanged, this, &ToolPropertyPanel::refreshTextStyleButtons);
+  connect(m_controller, &app::bridge::AppController::textCaretChanged, this, &ToolPropertyPanel::refreshTextStyleButtons);
   loadPinnedForCurrentTool();
   refreshDetailToggleText();
   refreshFromController();
@@ -700,6 +831,47 @@ void ToolPropertyPanel::onConfigurePinnedRequested() {
   refreshFromController();
 }
 
+void ToolPropertyPanel::refreshTextStyleButtons() {
+  if (m_controller == nullptr || m_textSection == nullptr) return;
+  const std::string refreshSubTool = m_controller->currentSubToolId();
+  const bool isTextTool = m_controller->currentTool() == core::ToolKind::MoveLayer
+                          && (refreshSubTool == "text_basic" || refreshSubTool == "text_vertical");
+  if (!isTextTool) return;
+  const QSignalBlocker b1(m_textBoldBtn);
+  const QSignalBlocker b2(m_textItalicBtn);
+  const QSignalBlocker b3(m_textUnderlineBtn);
+  const QSignalBlocker b4(m_textStrikeOutBtn);
+  m_textBoldBtn->setChecked(m_controller->textEditorAtCaretBold());
+  m_textItalicBtn->setChecked(m_controller->textEditorAtCaretItalic());
+  m_textUnderlineBtn->setChecked(m_controller->textEditorAtCaretUnderline());
+  m_textStrikeOutBtn->setChecked(m_controller->textEditorAtCaretStrikeOut());
+  {
+    // 縦書きボタン: text_vertical ツールでは非表示（常に縦書きなので不要）
+    const QSignalBlocker bv(m_textVerticalBtn);
+    const bool isVerticalTool = (refreshSubTool == "text_vertical");
+    m_textVerticalBtn->setChecked(isVerticalTool || m_controller->textEditorIsVertical());
+    m_textVerticalBtn->setEnabled(!isVerticalTool);
+    m_textVerticalBtn->setVisible(!isVerticalTool);
+    // 方向ボタン: text_vertical ツールのときのみ表示
+    const bool rtl = m_controller->textEditorGetVerticalRTL();
+    {
+      const QSignalBlocker br(m_vertDirRightBtn);
+      const QSignalBlocker bl(m_vertDirLeftBtn);
+      m_vertDirRightBtn->setChecked(rtl);
+      m_vertDirLeftBtn->setChecked(!rtl);
+      m_vertDirRightBtn->setVisible(isVerticalTool);
+      m_vertDirLeftBtn->setVisible(isVerticalTool);
+    }
+  }
+  {
+    const QSignalBlocker b1(m_textLineSpacingSlider);
+    const QSignalBlocker b2(m_textLineSpacingSpin);
+    const int lsVal = static_cast<int>(m_controller->textEditorGetLineSpacing() * 100.0f);
+    m_textLineSpacingSlider->setValue(lsVal);
+    m_textLineSpacingSpin->setValue(lsVal);
+  }
+}
+
 void ToolPropertyPanel::refreshFromController() {
   if (m_controller == nullptr) {
     return;
@@ -841,6 +1013,10 @@ void ToolPropertyPanel::refreshFromController() {
       m_showDetails &&
       (supportsSelectionMode || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
        supportsAutoSelectReferAllLayers));
+  const std::string refreshFromSubTool = m_controller->currentSubToolId();
+  const bool isTextTool = m_controller->currentTool() == core::ToolKind::MoveLayer
+                          && (refreshFromSubTool == "text_basic" || refreshFromSubTool == "text_vertical");
+  m_textSection->setVisible(isTextTool);
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);
@@ -930,6 +1106,36 @@ void ToolPropertyPanel::refreshFromController() {
   m_vectorEraseModeCombo->setCurrentIndex(m_vectorEraseModeCombo->findData(static_cast<int>(state.vectorEraseMode)));
   m_vectorTrimOutsideCheck->setChecked(state.vectorTrimOutside);
   updateColorButton();
+  if (isTextTool) {
+    const QSignalBlocker b1(m_textBoldBtn);
+    const QSignalBlocker b2(m_textItalicBtn);
+    const QSignalBlocker b3(m_textUnderlineBtn);
+    const QSignalBlocker b4(m_textStrikeOutBtn);
+    m_textBoldBtn->setChecked(m_controller->textEditorAtCaretBold());
+    m_textItalicBtn->setChecked(m_controller->textEditorAtCaretItalic());
+    m_textUnderlineBtn->setChecked(m_controller->textEditorAtCaretUnderline());
+    m_textStrikeOutBtn->setChecked(m_controller->textEditorAtCaretStrikeOut());
+    {
+      const QSignalBlocker bv(m_textVerticalBtn);
+      const bool isVerticalTool = (m_controller->currentSubToolId() == "text_vertical");
+      m_textVerticalBtn->setChecked(isVerticalTool || m_controller->textEditorIsVertical());
+      m_textVerticalBtn->setVisible(!isVerticalTool);
+      const bool rtl = m_controller->textEditorGetVerticalRTL();
+      const QSignalBlocker br(m_vertDirRightBtn);
+      const QSignalBlocker bl(m_vertDirLeftBtn);
+      m_vertDirRightBtn->setChecked(rtl);
+      m_vertDirLeftBtn->setChecked(!rtl);
+      m_vertDirRightBtn->setVisible(isVerticalTool);
+      m_vertDirLeftBtn->setVisible(isVerticalTool);
+    }
+    {
+      const QSignalBlocker b1(m_textLineSpacingSlider);
+      const QSignalBlocker b2(m_textLineSpacingSpin);
+      const int lsVal = static_cast<int>(m_controller->textEditorGetLineSpacing() * 100.0f);
+      m_textLineSpacingSlider->setValue(lsVal);
+      m_textLineSpacingSpin->setValue(lsVal);
+    }
+  }
 }
 
 void ToolPropertyPanel::onChooseColor() {
@@ -977,6 +1183,17 @@ void ToolPropertyPanel::onTextStrikeOutToggled(bool checked) {
     return;
   }
   m_controller->setSelectedTextStrikeOut(checked);
+}
+
+void ToolPropertyPanel::onTextLineSpacingChanged(int value) {
+  if (m_controller == nullptr) return;
+  {
+    const QSignalBlocker b1(m_textLineSpacingSlider);
+    const QSignalBlocker b2(m_textLineSpacingSpin);
+    m_textLineSpacingSlider->setValue(value);
+    m_textLineSpacingSpin->setValue(value);
+  }
+  m_controller->textEditorSetLineSpacing(static_cast<float>(value) / 100.0f);
 }
 
 void ToolPropertyPanel::onOpacitySliderChanged(int value) {

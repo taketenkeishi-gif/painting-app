@@ -32,12 +32,14 @@ protected:
 
 private slots:
   void refreshFromController();
+  void refreshTextStyleButtons();
   void onChooseColor();
   void onSizeChanged(int size);
   void onTextBoldToggled(bool checked);
   void onTextItalicToggled(bool checked);
   void onTextUnderlineToggled(bool checked);
   void onTextStrikeOutToggled(bool checked);
+  void onTextLineSpacingChanged(int value);
   void onOpacitySliderChanged(int value);
   void onOpacitySpinChanged(int value);
   void onHardnessSliderChanged(int value);
@@ -102,6 +104,7 @@ private:
   QWidget* m_vectorSection {nullptr};
   QWidget* m_fillSection {nullptr};
   QWidget* m_selectionSection {nullptr};
+  QWidget* m_textSection {nullptr};
   QLabel* m_toolNameLabel {nullptr};
   QLabel* m_guideLabel {nullptr};
   QLabel* m_compatibilityLabel {nullptr};
@@ -127,10 +130,16 @@ private:
   QLabel* m_autoSelectThresholdLabel {nullptr};
   QPushButton* m_colorButton {nullptr};
   QSpinBox* m_sizeSpin {nullptr};
-  QCheckBox* m_textBoldCheck {nullptr};
-  QCheckBox* m_textItalicCheck {nullptr};
-  QCheckBox* m_textUnderlineCheck {nullptr};
-  QCheckBox* m_textStrikeOutCheck {nullptr};
+  QPushButton* m_textBoldBtn {nullptr};
+  QPushButton* m_textItalicBtn {nullptr};
+  QPushButton* m_textUnderlineBtn {nullptr};
+  QPushButton* m_textStrikeOutBtn {nullptr};
+  QPushButton* m_textVerticalBtn {nullptr};
+  QPushButton* m_vertDirRightBtn {nullptr}; // 縦書き: RTL (右→左)
+  QPushButton* m_vertDirLeftBtn  {nullptr}; // 縦書き: LTR (左→右)
+  QLabel* m_textLineSpacingLabel {nullptr};
+  QSlider* m_textLineSpacingSlider {nullptr};
+  QSpinBox* m_textLineSpacingSpin {nullptr};
   QSlider* m_opacitySlider {nullptr};
   QSpinBox* m_opacitySpin {nullptr};
   QSlider* m_hardnessSlider {nullptr};

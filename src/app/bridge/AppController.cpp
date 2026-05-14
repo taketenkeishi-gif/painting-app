@@ -113,7 +113,7 @@ bool requestedSubToolWritesSelection(std::string_view subToolId) {
 std::string_view subToolUiGroup(std::string_view subToolId) {
   if (subToolId == "gradient_linear") return "requested.gradient";
   if (subToolId == "comic_panel") return "requested.comic";
-  if (subToolId == "text_basic") return "requested.text";
+  if (subToolId == "text_basic" || subToolId == "text_vertical") return "requested.text";
   if (subToolId == "ruler_straight") return "requested.ruler";
   if (subToolId == "line_correction_smooth") return "requested.line_correction";
   if (subToolId == "operation_object") return "requested.operation";
@@ -140,6 +140,7 @@ std::string requestedToolDisplayName(std::string_view subToolId) {
   if (subToolId == "gradient_linear") return u8"グラデーション";
   if (subToolId == "comic_panel") return u8"コミック";
   if (subToolId == "text_basic") return u8"テキスト";
+  if (subToolId == "text_vertical") return u8"縦書きテキスト";
   if (subToolId == "ruler_straight") return u8"定規";
   if (subToolId == "line_correction_smooth") return u8"線修正";
   if (subToolId == "operation_object") return u8"操作";
@@ -409,6 +410,9 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
     textView.rotationDeg = textObject.rotationDeg;
     textView.scaleX = textObject.scaleX;
     textView.scaleY = textObject.scaleY;
+    textView.vertical = textObject.vertical;
+    textView.verticalRTL = textObject.verticalRTL;
+    textView.lineSpacing = textObject.lineSpacing;
     view.textObjects.push_back(std::move(textView));
   }
   return view;
@@ -1492,7 +1496,7 @@ bool AppController::currentToolSupportsColor() const noexcept {
   if (!isCurrentSubToolCompatibleWithActiveLayer()) {
     return false;
   }
-  if (currentSubToolId() == "text_basic") {
+  if (currentSubToolId() == "text_basic" || currentSubToolId() == "text_vertical") {
     return true;
   }
   return !m_uiState.eraseMode &&
@@ -1716,7 +1720,8 @@ bool AppController::currentToolSupportsAutoSelectReferAllLayers() const noexcept
 }
 
 void AppController::beginStroke(int x, int y) {
-  if (currentSubToolId() == "text_basic" && m_textEditor.beginTextRangeSelectionAt(core::Point {x, y})) {
+  const std::string beginStrokeSubTool = currentSubToolId();
+  if ((beginStrokeSubTool == "text_basic" || beginStrokeSubTool == "text_vertical") && m_textEditor.beginTextRangeSelectionAt(core::Point {x, y})) {
     rerender();
     emit overlayChanged();
     return;
@@ -2184,7 +2189,7 @@ std::string AppController::nextRedoActionName() const {
 }
 
 void AppController::setBrushColor(const core::Color& color) {
-if (currentSubToolId() == "text_basic" && m_textEditor.setSelectedTextColor(color)) {
+if ((currentSubToolId() == "text_basic" || currentSubToolId() == "text_vertical") && m_textEditor.setSelectedTextColor(color)) {
     rerender();
     emit overlayChanged();
     emit documentChanged();
@@ -2204,7 +2209,7 @@ if (currentSubToolId() == "text_basic" && m_textEditor.setSelectedTextColor(colo
 
 void AppController::setBrushSize(int size) {
 const int textFontSize = std::clamp(size, 1, 512);
-  if (currentSubToolId() == "text_basic" && m_textEditor.setSelectedTextFontSize(textFontSize)) {
+  if ((currentSubToolId() == "text_basic" || currentSubToolId() == "text_vertical") && m_textEditor.setSelectedTextFontSize(textFontSize)) {
     rerender();
     emit overlayChanged();
     emit documentChanged();
@@ -2962,7 +2967,23 @@ void AppController::loadSubToolCatalogFromSettings() {
           loaded.push_back(std::move(loadedSub));
         }
         if (!loaded.empty()) {
+          // 組み込みサブツールで保存済みリストにないものを末尾に追加（新規サブツール追加時の後方互換）
+          for (const auto& builtin : defaultTool->subTools) {
+            const bool alreadyPresent = std::any_of(loaded.begin(), loaded.end(),
+                [&](const app::ui::SubToolDescriptor& s) { return s.id == builtin.id; });
+            if (!alreadyPresent) {
+              loaded.push_back(builtin);
+            }
+          }
           mutableTool->subTools = std::move(loaded);
+          // Cap text subtool sizes: prevent inherited large brush sizes from prior sessions
+          for (auto& sub : mutableTool->subTools) {
+            if (sub.id == "text_basic" || sub.id == "text_vertical") {
+              sub.preset.size = std::clamp(sub.preset.size, 8, 24);
+              // profile.stroke.size も同じ値に合わせる（m_uiState.size はここから読まれる）
+              sub.profile.stroke.size = sub.preset.size;
+            }
+          }
         }
       }
     }
@@ -3377,7 +3398,8 @@ bool AppController::removeObjectById(const std::string& objectId) {
 }
 
 bool AppController::beginTextSessionAt(int x, int y) {
-  const bool ok = m_textEditor.beginTextInput(core::Point {x, y}, m_currentColor, std::max(8, m_uiState.size));
+  const bool isVerticalTool = (currentSubToolId() == "text_vertical");
+  const bool ok = m_textEditor.beginTextInput(core::Point {x, y}, m_currentColor, std::max(8, m_uiState.size), isVerticalTool);
   if (ok) emit overlayChanged();
   return ok;
 }
@@ -3387,6 +3409,7 @@ bool AppController::handleTextSessionKey(int key, const std::string& textUtf8) {
   if (changed) {
     rerender();
     emit documentChanged();
+    emit textCaretChanged();
   }
   return changed;
 }
@@ -3438,12 +3461,63 @@ bool AppController::textEditorSelectAll() {
 bool AppController::textEditorExtendSelectionLeft() {
   if (!m_textEditor.extendSelectionLeft()) return false;
   emit overlayChanged();
+  emit textCaretChanged();
   return true;
 }
 bool AppController::textEditorExtendSelectionRight() {
   if (!m_textEditor.extendSelectionRight()) return false;
   emit overlayChanged();
+  emit textCaretChanged();
   return true;
+}
+
+bool AppController::textEditorAtCaretBold() const noexcept {
+  return m_textEditor.caretStyle().bold;
+}
+bool AppController::textEditorAtCaretItalic() const noexcept {
+  return m_textEditor.caretStyle().italic;
+}
+bool AppController::textEditorAtCaretUnderline() const noexcept {
+  return m_textEditor.caretStyle().underline;
+}
+bool AppController::textEditorAtCaretStrikeOut() const noexcept {
+  return m_textEditor.caretStyle().strikeOut;
+}
+
+bool AppController::textEditorToggleVertical() {
+  if (!m_textEditor.toggleVertical()) return false;
+  rerender();
+  emit overlayChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::textEditorIsVertical() const noexcept {
+  return m_textEditor.isVertical();
+}
+
+bool AppController::textEditorSetLineSpacing(float spacing) {
+  if (!m_textEditor.setLineSpacing(spacing)) return false;
+  rerender();
+  emit overlayChanged();
+  emit documentChanged();
+  return true;
+}
+
+float AppController::textEditorGetLineSpacing() const noexcept {
+  return m_textEditor.getLineSpacing();
+}
+
+bool AppController::textEditorSetVerticalRTL(bool rtl) {
+  if (!m_textEditor.setVerticalRTL(rtl)) return false;
+  rerender();
+  emit overlayChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::textEditorGetVerticalRTL() const noexcept {
+  return m_textEditor.getVerticalRTL();
 }
 
 features::object_editing::ObjectLayerModel* AppController::ensureObjectLayerForActiveLayer() {

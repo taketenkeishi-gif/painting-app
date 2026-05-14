@@ -112,6 +112,9 @@ struct CanvasOverlayViewModel {
     bool italic {false};
     bool underline {false};
     bool strikeOut {false};
+    bool vertical {false};
+    bool verticalRTL {true};
+    float lineSpacing {1.0f};
     struct TextStyleRunViewModel {
       int start {0};
       int length {0};
@@ -281,6 +284,16 @@ public:
   bool textEditorSelectAll();
   bool textEditorExtendSelectionLeft();
   bool textEditorExtendSelectionRight();
+  bool textEditorAtCaretBold() const noexcept;
+  bool textEditorAtCaretItalic() const noexcept;
+  bool textEditorAtCaretUnderline() const noexcept;
+  bool textEditorAtCaretStrikeOut() const noexcept;
+  bool textEditorToggleVertical();
+  bool textEditorIsVertical() const noexcept;
+  bool textEditorSetVerticalRTL(bool rtl);
+  bool textEditorGetVerticalRTL() const noexcept;
+  bool textEditorSetLineSpacing(float spacing);
+  float textEditorGetLineSpacing() const noexcept;
   bool pickColorAt(int x, int y);
   void setInputModifiers(bool shift, bool ctrl, bool alt);
 
@@ -335,6 +348,7 @@ signals:
   void toolStateChanged();
   void foregroundColorUsed();
   void overlayChanged();
+  void textCaretChanged();
 
 private:
   enum class HistoryKind {

@@ -115,7 +115,7 @@ bool inRect(const core::Rect& rect, core::Point p, int padding = 0) {
 } // namespace
 
 bool RequestedToolsRuntime::handles(std::string_view subToolId) const noexcept {
-  return subToolId == "gradient_linear" || subToolId == "comic_panel" || subToolId == "text_basic" ||
+  return subToolId == "gradient_linear" || subToolId == "comic_panel" || subToolId == "text_basic" || subToolId == "text_vertical" ||
       subToolId == "ruler_straight" || subToolId == "line_correction_smooth" || subToolId == "clone_stamp_basic" ||
       subToolId == "color_mix_blend" || subToolId == "liquify_push" || subToolId == "operation_object";
 }
@@ -130,7 +130,7 @@ core::ToolResult RequestedToolsRuntime::onPointerPress(
   if (subToolId == "gradient_linear") {
     return pressGradient(context, event);
   }
-  if (subToolId == "text_basic") {
+  if (subToolId == "text_basic" || subToolId == "text_vertical") {
     return pressText(context, event, color, size, opacityPercent);
   }
   if (subToolId == "clone_stamp_basic") {
