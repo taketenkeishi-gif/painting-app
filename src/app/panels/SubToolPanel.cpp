@@ -166,7 +166,7 @@ public:
     }
 
     painter->save();
-    painter->setClipRect(rect.adjusted(1, 1, -1, -1));
+    painter->setClipRect(QRectF(rect.left() + 1, rect.top() + 1, rect.width() - 2, rect.height() - labelH - 1));
     QPen strokePen(stroke, penW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     painter->setPen(strokePen);
     QPainterPath path;

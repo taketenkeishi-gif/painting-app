@@ -20,6 +20,7 @@
 #include <QFrame>
 #include <QGridLayout>
 #include <QGuiApplication>
+#include <QScreen>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QImage>
@@ -185,8 +186,12 @@ MainWindow::MainWindow(QWidget* parent)
       m_subToolPanel(new app::panels::SubToolPanel(this)),
       m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
   setWindowTitle("自作イラストアプリ");
-  resize(1400, 860);
   setWindowFlag(Qt::FramelessWindowHint);
+  resize(1400, 860);
+  if (auto* scr = QGuiApplication::primaryScreen()) {
+    const QRect ag = scr->availableGeometry();
+    move(ag.center() - rect().center());
+  }
 
   m_canvasWidget->setController(m_controller);
   m_layerPanel->setController(m_controller);
@@ -1284,6 +1289,8 @@ void MainWindow::createToolBar() {
   // Title bar integration — drag area + title label + window controls
   m_quickToolBar->addSeparator();
   auto* dragAreaLeft = new TitleBarDragArea(this, m_quickToolBar);
+  dragAreaLeft->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+  dragAreaLeft->setMinimumWidth(8);
   m_quickToolBar->addWidget(dragAreaLeft);
 
   auto* titleLabel = new QLabel(windowTitle(), m_quickToolBar);
@@ -1294,6 +1301,8 @@ void MainWindow::createToolBar() {
   connect(this, &QMainWindow::windowTitleChanged, titleLabel, &QLabel::setText);
 
   auto* dragAreaRight = new TitleBarDragArea(this, m_quickToolBar);
+  dragAreaRight->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+  dragAreaRight->setMinimumWidth(8);
   m_quickToolBar->addWidget(dragAreaRight);
 
   auto makeWinBtn = [&](const QString& text, const QString& tip, const QString& hoverBg) {
