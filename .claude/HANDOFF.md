@@ -24,32 +24,39 @@
 
 ---
 
+## 完了（追加）
+
+### VectorPath float 化（commit 219cb34）
+全ツールの VectorPath::points を FPoint に移行。描画座標がピクセルグリッドにスナップしなくなった。
+
+### 筆圧ダイナミクス UI（commit ad85c34）
+ToolPropertyPanel に「筆圧ダイナミクス」セクション追加。
+pressureSize / pressureOpacity の ON/OFF チェックボックスと最小値スライダー（0–100%）。
+詳細表示モードで表示。
+
+### SubToolPanel グリッド表示（commit ccafa36）
+リスト → アイコングリッドへ刷新。90×74 タイル、ベジェストロークプレビュー付き。
+
+---
+
 ## 次のタスク（優先順）
 
-### 1. VectorPath の座標を float 化（UX 直結）
-現状 `VectorPath::points` は `std::vector<Point>`（整数）のため、
-ベクターストロークの座標が入力時点でスナップされジャギが残る。
+### 1. EraserTool AA 向上（UX 直結）
+`eraseCircle` が整数半径ループで旧 `stampCircle` と同じ問題。
+`brushCoverage` を使った float 精度 + 1px AA fringe に置換。
 
 **変更ファイル:**
-- `src/core/layer/Layer.h` — `VectorPath::points: std::vector<FPoint>`
-- `src/core/layer/Layer.cpp` — `moveVectorPathsBy` を FPoint 対応に
-- `src/core/tools/BrushTool.h` — `m_vectorPoints: std::vector<FPoint>`
-- `src/core/tools/BrushTool.cpp` — 各イベントで `event.fpoint` を push
-- `src/core/tools/EraserTool.cpp` — `samplePathPoint` / `slicePath` を FPoint 対応に（要注意）
-- `src/core/render/Renderer.cpp` — `rasterizeVectorLayer` の Point→float キャスト削除
+- `src/core/tools/EraserTool.cpp` — `eraseCircle` を `eraseCircleAA(FPoint center, float radius)` に
 
-### 2. 筆圧カーブダイアログ（UX 直結）
-`BrushDynamics` に `pressureSizeMin` / `pressureOpacityMin` はあるが UI がない。
-ベジェ曲線エディタ（最低限はスライダー）を `ToolPropertyPanel` に追加。
+### 2. spacing を float radius ベースに（UX 直結）
+現状 `spacingPx = spacing * size_int` で小さいブラシでスタンプが粗い。
+`spacing * baseRadius * 2.0f` に変更するだけで滑らかになる。
 
 **変更ファイル:**
-- `src/app/panels/ToolPropertyPanel.cpp` — pressureSizeMin/pressureOpacityMin スライダー追加
-- `src/app/bridge/AppController.h/.cpp` — setPressureSizeMin 等のブリッジ追加
+- `src/core/tools/BrushTool.cpp` — `strokeSegment` 内の `spacingPx` 計算
+- `src/core/tools/EraserTool.cpp` — `eraseStroke` 内の `spacingPixels` 計算
 
-### 3. SubToolPanel のビジュアル刷新
-現状テキストリストのみ。サムネイル付きグリッド表示にするとプロらしい見た目になる。
-
-### 4. Skia バックエンド移行（中期）
+### 3. Skia バックエンド移行（中期）
 `src/platform/skia/` を新設し、`PixelBuffer` 裏側を `SkSurface` に置換。
 vcpkg で Skia を導入: `vcpkg install skia`
 
