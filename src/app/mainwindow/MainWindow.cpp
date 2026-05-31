@@ -187,10 +187,15 @@ MainWindow::MainWindow(QWidget* parent)
       m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
   setWindowTitle("自作イラストアプリ");
   setWindowFlag(Qt::FramelessWindowHint);
-  resize(1400, 860);
-  if (auto* scr = QGuiApplication::primaryScreen()) {
-    const QRect ag = scr->availableGeometry();
-    move(ag.center() - rect().center());
+  {
+    const QRect ag = QGuiApplication::primaryScreen()
+                         ? QGuiApplication::primaryScreen()->availableGeometry()
+                         : QRect(0, 0, 1920, 1080);
+    const int w = qMin(1400, ag.width()  - 40);
+    const int h = qMin(860,  ag.height() - 40);
+    resize(w, h);
+    move(ag.left() + (ag.width()  - w) / 2,
+         ag.top()  + (ag.height() - h) / 2);
   }
 
   m_canvasWidget->setController(m_controller);
