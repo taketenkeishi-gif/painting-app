@@ -90,7 +90,11 @@ protected:
         m_win->showNormal();
         m_dragOffset = QPoint(m_win->width() / 2, 10);
       }
-      m_win->move(e->globalPosition().toPoint() - m_dragOffset);
+      QPoint target = e->globalPosition().toPoint() - m_dragOffset;
+      if (m_win->screen() != nullptr) {
+        target.setY(std::max(target.y(), m_win->screen()->availableGeometry().top() + 4));
+      }
+      m_win->move(target);
       e->accept();
     }
   }

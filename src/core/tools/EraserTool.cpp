@@ -304,10 +304,11 @@ Point EraserTool::applyStabilization(const Point& from, const Point& to) const {
 void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) const {
   PixelBuffer& buffer = layer.buffer();
   const int radius = std::max(1, m_size) / 2;
+  const float fRadius = static_cast<float>(m_size) * 0.5f;
   const int dx = to.x - from.x;
   const int dy = to.y - from.y;
   const float distance = std::hypot(static_cast<float>(dx), static_cast<float>(dy));
-  const float spacingPixels = std::max(1.0F, m_spacing * static_cast<float>(std::max(1, m_size)));
+  const float spacingPixels = std::max(1.0F, m_spacing * fRadius * 2.0F);
   const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacingPixels)));
 
   if (distance <= 0.001F) {
@@ -340,10 +341,11 @@ void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point&
   const std::vector<VectorPath> originalPaths = editablePaths;
 
   const int radius = std::max(1, m_size) / 2;
+  const float fRadius2 = static_cast<float>(m_size) * 0.5f;
   const int dx = to.x - from.x;
   const int dy = to.y - from.y;
   const float distance = std::hypot(static_cast<float>(dx), static_cast<float>(dy));
-  const float spacingPixels = std::max(1.0F, m_spacing * static_cast<float>(std::max(1, m_size)));
+  const float spacingPixels = std::max(1.0F, m_spacing * fRadius2 * 2.0F);
   const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacingPixels)));
 
   std::vector<Point> stamps;

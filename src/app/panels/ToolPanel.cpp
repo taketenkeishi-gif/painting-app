@@ -370,11 +370,11 @@ ToolPanel::ToolPanel(QWidget* parent)
   m_buttonGrid->setContentsMargins(4, 4, 4, 4);
   m_buttonGrid->setHorizontalSpacing(2);
   m_buttonGrid->setVerticalSpacing(2);
-  m_buttonGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-  m_buttonGridHost->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Maximum);
+  m_buttonGrid->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+  m_buttonGridHost->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
   m_buttonGridHost->setStyleSheet(QStringLiteral("background: #1a1d27; border-right: 1px solid #2a2e3e;"));
   m_buttonGridHost->setLayout(m_buttonGrid);
-  m_rootLayout->addWidget(m_buttonGridHost, 0, Qt::AlignLeft | Qt::AlignTop);
+  m_rootLayout->addWidget(m_buttonGridHost, 0);
 
   auto* quickWrap = new QHBoxLayout(m_quickHost);
   quickWrap->setContentsMargins(0, 3, 0, 4);
@@ -643,7 +643,7 @@ void ToolPanel::relayoutButtons() {
     const int logicalRow = i / columns;
     const int row = logicalRow * 2;
     const int col = i % columns;
-    m_buttonGrid->addWidget(m_buttonOrder[static_cast<std::size_t>(i)], row, col, Qt::AlignLeft | Qt::AlignTop);
+    m_buttonGrid->addWidget(m_buttonOrder[static_cast<std::size_t>(i)], row, col, Qt::AlignHCenter | Qt::AlignVCenter);
   }
 
   const int rowCount = (static_cast<int>(m_buttonOrder.size()) + columns - 1) / columns;
@@ -669,9 +669,8 @@ void ToolPanel::relayoutButtons() {
     }
   }
 
-  const int buttonSize = m_buttonOrder.empty() ? 28 : m_buttonOrder.front()->width();
-  const int gridWidth = columns * buttonSize + std::max(0, columns - 1) * 2;
-  m_buttonGridHost->setFixedWidth(gridWidth);
+  m_buttonGridHost->setMinimumWidth(0);
+  m_buttonGridHost->setMaximumWidth(QWIDGETSIZE_MAX);
   m_buttonGridHost->adjustSize();
 }
 

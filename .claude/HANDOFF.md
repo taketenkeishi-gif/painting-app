@@ -39,6 +39,24 @@ pressureSize / pressureOpacity の ON/OFF チェックボックスと最小値�
 
 ---
 
+## 完了（追加2）
+
+### 全画面モード回避（Aero Snap 防止）
+`TitleBarDragArea::mouseMoveEvent` に Y 座標クランプを追加。
+ドラッグ先 Y が画面 availableGeometry.top()+4 を下回らないよう制限。
+
+### ツールパネルボタン整列修正
+`ToolPanel::relayoutButtons()`:
+- `setFixedWidth` 削除 → ホスト幅を Expanding で dock 全体に広がる
+- `buttonGridHost` の alignLeft 削除 → Qt::AlignHCenter で中央揃え
+- グリッドレイアウトのアライメントも HCenter に変更
+
+### spacing float 化
+- `BrushTool.cpp`: `spacing * size_int` → `spacing * baseRadius * 2.0f`
+- `EraserTool.cpp`: 同様に `fRadius * 2.0F` 基準に
+
+---
+
 ## 次のタスク（優先順）
 
 ### 1. EraserTool AA 向上（UX 直結）
@@ -48,15 +66,7 @@ pressureSize / pressureOpacity の ON/OFF チェックボックスと最小値�
 **変更ファイル:**
 - `src/core/tools/EraserTool.cpp` — `eraseCircle` を `eraseCircleAA(FPoint center, float radius)` に
 
-### 2. spacing を float radius ベースに（UX 直結）
-現状 `spacingPx = spacing * size_int` で小さいブラシでスタンプが粗い。
-`spacing * baseRadius * 2.0f` に変更するだけで滑らかになる。
-
-**変更ファイル:**
-- `src/core/tools/BrushTool.cpp` — `strokeSegment` 内の `spacingPx` 計算
-- `src/core/tools/EraserTool.cpp` — `eraseStroke` 内の `spacingPixels` 計算
-
-### 3. Skia バックエンド移行（中期）
+### 2. Skia バックエンド移行（中期）
 `src/platform/skia/` を新設し、`PixelBuffer` 裏側を `SkSurface` に置換。
 vcpkg で Skia を導入: `vcpkg install skia`
 
@@ -65,5 +75,3 @@ vcpkg で Skia を導入: `vcpkg install skia`
 ## 既知の問題
 
 - マウス入力の pressure は常に 1.0f（仕様）。ペンタブは `tabletEvent` 経由で正常取得済み。
-- `BrushTool` の `spacingPx` が整数ブラシサイズ基準のため、小さいブラシで spacing が粗い場合がある。
-  → spacing を float radius ベースに変更するとより滑らか。

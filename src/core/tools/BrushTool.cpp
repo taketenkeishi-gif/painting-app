@@ -371,7 +371,7 @@ void BrushTool::strokeSegment(
   const float segLen = std::sqrt(dx * dx + dy * dy);
 
   // spacingはブラシ直径の比率
-  const float spacingPx = std::max(0.5f, m_settings.spacing * static_cast<float>(std::max(1, m_settings.size)));
+  const float spacingPx = std::max(0.5f, m_settings.spacing * baseRadius * 2.0f);
 
   if (segLen < 0.001f) {
     // 点のみ
