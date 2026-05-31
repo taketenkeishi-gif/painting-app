@@ -35,7 +35,9 @@ public:
   void setLockAlphaRespect(bool lockAlpha) noexcept { m_settings.lockAlphaRespect = lockAlpha; }
   void setBuildupMode(bool buildup) noexcept { m_settings.buildupMode = buildup; }
   void setPressureSizeEnabled(bool enabled) noexcept { m_settings.dynamics.pressureSize = enabled; }
+  void setPressureSizeMin(float min) noexcept { m_settings.dynamics.pressureSizeMin = std::clamp(min, 0.0F, 1.0F); }
   void setPressureOpacityEnabled(bool enabled) noexcept { m_settings.dynamics.pressureOpacity = enabled; }
+  void setPressureOpacityMin(float min) noexcept { m_settings.dynamics.pressureOpacityMin = std::clamp(min, 0.0F, 1.0F); }
 
   const BrushSettings& settings() const noexcept { return m_settings; }
 

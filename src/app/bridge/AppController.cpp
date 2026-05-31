@@ -363,7 +363,11 @@ ToolStateViewModel AppController::toolState() const noexcept {
       m_uiState.eraseMode,
       m_uiState.lockAlphaRespect,
       m_uiState.vectorEraseMode,
-      m_uiState.vectorTrimOutside};
+      m_uiState.vectorTrimOutside,
+      m_uiState.pressureSize,
+      static_cast<int>(m_uiState.pressureSizeMin * 100.0f + 0.5f),
+      m_uiState.pressureOpacity,
+      static_cast<int>(m_uiState.pressureOpacityMin * 100.0f + 0.5f)};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -2160,6 +2164,44 @@ void AppController::setAutoSelectReferAllLayers(bool enabled) {
   emit toolStateChanged();
 }
 
+void AppController::setPressureSizeEnabled(bool enabled) {
+  if (m_uiState.pressureSize == enabled) {
+    return;
+  }
+  m_uiState.pressureSize = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setPressureSizeMin(int value) {
+  const float f = std::clamp(value, 0, 100) / 100.0f;
+  if (std::abs(m_uiState.pressureSizeMin - f) < 0.001f) {
+    return;
+  }
+  m_uiState.pressureSizeMin = f;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setPressureOpacityEnabled(bool enabled) {
+  if (m_uiState.pressureOpacity == enabled) {
+    return;
+  }
+  m_uiState.pressureOpacity = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setPressureOpacityMin(int value) {
+  const float f = std::clamp(value, 0, 100) / 100.0f;
+  if (std::abs(m_uiState.pressureOpacityMin - f) < 0.001f) {
+    return;
+  }
+  m_uiState.pressureOpacityMin = f;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
 bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
   switch (kind) {
     case core::ToolKind::Brush:
@@ -2304,6 +2346,10 @@ void AppController::applyUiStateToTools() {
     m_brushTool->setEraseMode(m_uiState.eraseMode);
     m_brushTool->setLockAlphaRespect(m_uiState.lockAlphaRespect);
     m_brushTool->setColor(m_currentColor);
+    m_brushTool->setPressureSizeEnabled(m_uiState.pressureSize);
+    m_brushTool->setPressureSizeMin(m_uiState.pressureSizeMin);
+    m_brushTool->setPressureOpacityEnabled(m_uiState.pressureOpacity);
+    m_brushTool->setPressureOpacityMin(m_uiState.pressureOpacityMin);
   }
 
   if (m_eraserTool != nullptr) {

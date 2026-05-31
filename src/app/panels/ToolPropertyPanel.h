@@ -77,6 +77,12 @@ private slots:
   void onLockAlphaRespectToggled(bool checked);
   void onToggleDetailRequested();
   void onConfigurePinnedRequested();
+  void onPressureSizeToggled(bool checked);
+  void onPressureSizeMinSliderChanged(int value);
+  void onPressureSizeMinSpinChanged(int value);
+  void onPressureOpacityToggled(bool checked);
+  void onPressureOpacityMinSliderChanged(int value);
+  void onPressureOpacityMinSpinChanged(int value);
 
 private:
   void applyResponsiveLayout();
@@ -164,6 +170,13 @@ private:
   QComboBox* m_blendModeCombo {nullptr};
   QCheckBox* m_eraseModeCheck {nullptr};
   QCheckBox* m_lockAlphaRespectCheck {nullptr};
+  QWidget* m_pressureSection {nullptr};
+  QCheckBox* m_pressureSizeCheck {nullptr};
+  QSlider* m_pressureSizeMinSlider {nullptr};
+  QSpinBox* m_pressureSizeMinSpin {nullptr};
+  QCheckBox* m_pressureOpacityCheck {nullptr};
+  QSlider* m_pressureOpacityMinSlider {nullptr};
+  QSpinBox* m_pressureOpacityMinSpin {nullptr};
   bool m_compactLayout {false};
   bool m_showDetails {false};
   QSet<QString> m_pinnedKeys;

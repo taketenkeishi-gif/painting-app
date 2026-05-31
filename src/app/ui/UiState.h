@@ -41,6 +41,10 @@ struct UiState {
   int autoSelectThreshold {16};
   bool autoSelectContiguous {true};
   bool autoSelectReferAllLayers {true};
+  bool pressureSize {false};
+  float pressureSizeMin {0.0f};
+  bool pressureOpacity {false};
+  float pressureOpacityMin {0.0f};
 };
 
 } // namespace app::ui

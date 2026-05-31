@@ -146,7 +146,14 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_autoSelectReferAllLayersCheck(new QCheckBox("全レイヤーを参照", this)),
       m_blendModeCombo(new QComboBox(this)),
       m_eraseModeCheck(new QCheckBox("消しゴムモード", this)),
-      m_lockAlphaRespectCheck(new QCheckBox("透明保護を尊重", this)) {
+      m_lockAlphaRespectCheck(new QCheckBox("透明保護を尊重", this)),
+      m_pressureSection(nullptr),
+      m_pressureSizeCheck(new QCheckBox("筆圧→サイズ", this)),
+      m_pressureSizeMinSlider(new QSlider(Qt::Horizontal, this)),
+      m_pressureSizeMinSpin(new QSpinBox(this)),
+      m_pressureOpacityCheck(new QCheckBox("筆圧→不透明度", this)),
+      m_pressureOpacityMinSlider(new QSlider(Qt::Horizontal, this)),
+      m_pressureOpacityMinSpin(new QSpinBox(this)) {
   auto* hostLayout = new QVBoxLayout(this);
   hostLayout->setContentsMargins(0, 0, 0, 0);
   hostLayout->setSpacing(0);
@@ -185,6 +192,10 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_fillGapCloseSpin->setRange(0, 8);
   m_autoSelectThresholdSlider->setRange(0, 255);
   m_autoSelectThresholdSpin->setRange(0, 255);
+  m_pressureSizeMinSlider->setRange(0, 100);
+  m_pressureSizeMinSpin->setRange(0, 100);
+  m_pressureOpacityMinSlider->setRange(0, 100);
+  m_pressureOpacityMinSpin->setRange(0, 100);
 
   m_shapeTypeCombo->addItem("円",   static_cast<int>(core::BrushShapeType::Circle));
   m_shapeTypeCombo->addItem("四角", static_cast<int>(core::BrushShapeType::Square));
@@ -306,6 +317,25 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   correctionLayout->addWidget(m_velocityCorrectionCheck);
   contentLayout->addWidget(correctionGroup);
   m_correctionSection = correctionGroup;
+
+  auto* pressureGroup = new QGroupBox("筆圧ダイナミクス", m_contentWidget);
+  auto* pressureLayout = new QVBoxLayout(pressureGroup);
+  pressureLayout->setContentsMargins(4, 4, 4, 4);
+  pressureLayout->setSpacing(4);
+  auto* pressureSizeMinRow = new QHBoxLayout();
+  markResponsiveRow(pressureSizeMinRow);
+  pressureSizeMinRow->addWidget(m_pressureSizeMinSlider, 1);
+  pressureSizeMinRow->addWidget(m_pressureSizeMinSpin);
+  auto* pressureOpacityMinRow = new QHBoxLayout();
+  markResponsiveRow(pressureOpacityMinRow);
+  pressureOpacityMinRow->addWidget(m_pressureOpacityMinSlider, 1);
+  pressureOpacityMinRow->addWidget(m_pressureOpacityMinSpin);
+  pressureLayout->addWidget(m_pressureSizeCheck);
+  pressureLayout->addLayout(pressureSizeMinRow);
+  pressureLayout->addWidget(m_pressureOpacityCheck);
+  pressureLayout->addLayout(pressureOpacityMinRow);
+  contentLayout->addWidget(pressureGroup);
+  m_pressureSection = pressureGroup;
 
   auto* shapeGroup = new QGroupBox("形状", m_contentWidget);
   auto* shapeLayout = new QVBoxLayout(shapeGroup);
@@ -474,6 +504,12 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onBlendModeChanged);
   connect(m_eraseModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onEraseModeToggled);
   connect(m_lockAlphaRespectCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onLockAlphaRespectToggled);
+  connect(m_pressureSizeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onPressureSizeToggled);
+  connect(m_pressureSizeMinSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onPressureSizeMinSliderChanged);
+  connect(m_pressureSizeMinSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onPressureSizeMinSpinChanged);
+  connect(m_pressureOpacityCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onPressureOpacityToggled);
+  connect(m_pressureOpacityMinSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onPressureOpacityMinSliderChanged);
+  connect(m_pressureOpacityMinSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onPressureOpacityMinSpinChanged);
   applyResponsiveLayout();
 }
 
@@ -753,6 +789,14 @@ void ToolPropertyPanel::refreshFromController() {
   m_velocityCorrectionCheck->setVisible(m_showDetails && supportsVelocityCorrection);
   m_correctionSection->setVisible(
       showAntiAlias || showStabilization || (m_showDetails && (supportsPostCorrection || supportsVelocityCorrection)));
+  const bool showPressure = m_showDetails && supportsFlow;
+  m_pressureSection->setVisible(showPressure);
+  m_pressureSizeCheck->setVisible(showPressure);
+  m_pressureSizeMinSlider->setVisible(showPressure);
+  m_pressureSizeMinSpin->setVisible(showPressure);
+  m_pressureOpacityCheck->setVisible(showPressure);
+  m_pressureOpacityMinSlider->setVisible(showPressure);
+  m_pressureOpacityMinSpin->setVisible(showPressure);
   m_shapeTypeCombo->setVisible(supportsShape);
   m_angleLabel->setVisible(supportsAngle);
   m_angleSlider->setVisible(supportsAngle);
@@ -849,6 +893,12 @@ void ToolPropertyPanel::refreshFromController() {
   const QSignalBlocker blocker41(m_autoSelectReferAllLayersCheck);
   const QSignalBlocker blocker42(m_vectorEraseModeCombo);
   const QSignalBlocker blocker43(m_vectorTrimOutsideCheck);
+  const QSignalBlocker blocker44(m_pressureSizeCheck);
+  const QSignalBlocker blocker45(m_pressureSizeMinSlider);
+  const QSignalBlocker blocker46(m_pressureSizeMinSpin);
+  const QSignalBlocker blocker47(m_pressureOpacityCheck);
+  const QSignalBlocker blocker48(m_pressureOpacityMinSlider);
+  const QSignalBlocker blocker49(m_pressureOpacityMinSpin);
   m_sizeSpin->setValue(state.size);
   m_opacitySlider->setValue(state.opacity);
   m_opacitySpin->setValue(state.opacity);
@@ -892,6 +942,12 @@ void ToolPropertyPanel::refreshFromController() {
   m_autoSelectReferAllLayersCheck->setChecked(state.autoSelectReferAllLayers);
   m_vectorEraseModeCombo->setCurrentIndex(m_vectorEraseModeCombo->findData(static_cast<int>(state.vectorEraseMode)));
   m_vectorTrimOutsideCheck->setChecked(state.vectorTrimOutside);
+  m_pressureSizeCheck->setChecked(state.pressureSizeEnabled);
+  m_pressureSizeMinSlider->setValue(state.pressureSizeMin);
+  m_pressureSizeMinSpin->setValue(state.pressureSizeMin);
+  m_pressureOpacityCheck->setChecked(state.pressureOpacityEnabled);
+  m_pressureOpacityMinSlider->setValue(state.pressureOpacityMin);
+  m_pressureOpacityMinSpin->setValue(state.pressureOpacityMin);
   updateColorButton();
 }
 
@@ -1278,6 +1334,56 @@ void ToolPropertyPanel::onLockAlphaRespectToggled(bool checked) {
     return;
   }
   m_controller->setBrushLockAlphaRespect(checked);
+}
+
+void ToolPropertyPanel::onPressureSizeToggled(bool checked) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->setPressureSizeEnabled(checked);
+}
+
+void ToolPropertyPanel::onPressureSizeMinSliderChanged(int value) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  const QSignalBlocker blocker(m_pressureSizeMinSpin);
+  m_pressureSizeMinSpin->setValue(value);
+  m_controller->setPressureSizeMin(value);
+}
+
+void ToolPropertyPanel::onPressureSizeMinSpinChanged(int value) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  const QSignalBlocker blocker(m_pressureSizeMinSlider);
+  m_pressureSizeMinSlider->setValue(value);
+  m_controller->setPressureSizeMin(value);
+}
+
+void ToolPropertyPanel::onPressureOpacityToggled(bool checked) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->setPressureOpacityEnabled(checked);
+}
+
+void ToolPropertyPanel::onPressureOpacityMinSliderChanged(int value) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  const QSignalBlocker blocker(m_pressureOpacityMinSpin);
+  m_pressureOpacityMinSpin->setValue(value);
+  m_controller->setPressureOpacityMin(value);
+}
+
+void ToolPropertyPanel::onPressureOpacityMinSpinChanged(int value) {
+  if (m_controller == nullptr) {
+    return;
+  }
+  const QSignalBlocker blocker(m_pressureOpacityMinSlider);
+  m_pressureOpacityMinSlider->setValue(value);
+  m_controller->setPressureOpacityMin(value);
 }
 
 void ToolPropertyPanel::updateColorButton() {

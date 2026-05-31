@@ -86,6 +86,10 @@ struct ToolStateViewModel {
   bool lockAlphaRespect {false};
   app::ui::VectorEraserMode vectorEraseMode {app::ui::VectorEraserMode::TouchedOnly};
   bool vectorTrimOutside {false};
+  bool pressureSizeEnabled {false};
+  int pressureSizeMin {0};
+  bool pressureOpacityEnabled {false};
+  int pressureOpacityMin {0};
 };
 
 struct CanvasOverlayViewModel {
@@ -255,6 +259,10 @@ public:
   void setAutoSelectThreshold(int threshold);
   void setAutoSelectContiguous(bool contiguous);
   void setAutoSelectReferAllLayers(bool enabled);
+  void setPressureSizeEnabled(bool enabled);
+  void setPressureSizeMin(int value);
+  void setPressureOpacityEnabled(bool enabled);
+  void setPressureOpacityMin(int value);
 
 signals:
   void canvasChanged();
