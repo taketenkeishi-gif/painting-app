@@ -1,0 +1,166 @@
+#include "core/document/Document.h"
+
+#include <cstddef>
+#include <stdexcept>
+#include <utility>
+
+namespace core {
+
+Document::Document(int width, int height)
+    : m_canvasSize {width, height},
+      m_selection(width, height) {
+  addRasterLayer("Layer 1");
+}
+
+Layer& Document::layerAt(std::size_t index) {
+  if (index >= m_layers.size()) {
+    throw std::out_of_range("Layer index out of range.");
+  }
+  return m_layers[index];
+}
+
+const Layer& Document::layerAt(std::size_t index) const {
+  if (index >= m_layers.size()) {
+    throw std::out_of_range("Layer index out of range.");
+  }
+  return m_layers[index];
+}
+
+bool Document::setActiveLayer(std::size_t index) noexcept {
+  if (index >= m_layers.size()) {
+    return false;
+  }
+  m_activeLayerIndex = index;
+  return true;
+}
+
+Layer* Document::activeLayer() noexcept {
+  if (m_layers.empty()) {
+    return nullptr;
+  }
+  return &m_layers[m_activeLayerIndex];
+}
+
+const Layer* Document::activeLayer() const noexcept {
+  if (m_layers.empty()) {
+    return nullptr;
+  }
+  return &m_layers[m_activeLayerIndex];
+}
+
+std::size_t Document::addLayer(const std::string& name, LayerKind kind) {
+  const std::string finalName = name.empty() ? makeDefaultLayerName(m_layers.size()) : name;
+  m_layers.emplace_back(finalName, m_canvasSize.width, m_canvasSize.height, kind);
+  m_layers.back().setPaperLayer(false);
+  m_layers.back().setBlendMode(BlendMode::Normal);
+  m_activeLayerIndex = m_layers.size() - 1;
+  return m_activeLayerIndex;
+}
+
+std::size_t Document::addRasterLayer(const std::string& name) {
+  return addLayer(name, LayerKind::Raster);
+}
+
+std::size_t Document::addVectorLayer(const std::string& name) {
+  return addLayer(name, LayerKind::Vector);
+}
+
+std::size_t Document::addFolderLayer(const std::string& name) {
+  return addLayer(name, LayerKind::Folder);
+}
+
+std::size_t Document::duplicateLayer(std::size_t index) {
+  if (index >= m_layers.size()) {
+    return m_activeLayerIndex;
+  }
+
+  Layer duplicated = m_layers[index];
+  duplicated.setName(duplicated.name() + " Copy");
+  const auto insertPos = m_layers.begin() + static_cast<std::ptrdiff_t>(index + 1);
+  m_layers.insert(insertPos, duplicated);
+  m_activeLayerIndex = index + 1;
+  return m_activeLayerIndex;
+}
+
+bool Document::removeLayer(std::size_t index) noexcept {
+  if (index >= m_layers.size() || m_layers.size() <= 1 || m_layers[index].isPaperLayer()) {
+    return false;
+  }
+
+  m_layers.erase(m_layers.begin() + static_cast<std::ptrdiff_t>(index));
+  if (m_activeLayerIndex == index) {
+    m_activeLayerIndex = index < m_layers.size() ? index : m_layers.size() - 1;
+  } else if (m_activeLayerIndex > index) {
+    --m_activeLayerIndex;
+  }
+
+  return true;
+}
+
+bool Document::renameLayer(std::size_t index, const std::string& newName) {
+  if (index >= m_layers.size() || newName.empty()) {
+    return false;
+  }
+
+  m_layers[index].setName(newName);
+  return true;
+}
+
+bool Document::setLayerVisible(std::size_t index, bool visible) noexcept {
+  if (index >= m_layers.size()) {
+    return false;
+  }
+  m_layers[index].setVisible(visible);
+  return true;
+}
+
+bool Document::setLayerOpacity(std::size_t index, float opacity) noexcept {
+  if (index >= m_layers.size()) {
+    return false;
+  }
+  m_layers[index].setOpacity(opacity);
+  return true;
+}
+
+bool Document::moveLayer(std::size_t fromIndex, std::size_t toIndex) noexcept {
+  if (fromIndex >= m_layers.size() || toIndex >= m_layers.size() || fromIndex == toIndex) {
+    return false;
+  }
+  if (m_layers[fromIndex].isPaperLayer() || m_layers[toIndex].isPaperLayer()) {
+    return false;
+  }
+
+  Layer movedLayer = std::move(m_layers[fromIndex]);
+  m_layers.erase(m_layers.begin() + static_cast<std::ptrdiff_t>(fromIndex));
+  m_layers.insert(m_layers.begin() + static_cast<std::ptrdiff_t>(toIndex), std::move(movedLayer));
+
+  if (m_activeLayerIndex == fromIndex) {
+    m_activeLayerIndex = toIndex;
+  } else if (fromIndex < m_activeLayerIndex && m_activeLayerIndex <= toIndex) {
+    --m_activeLayerIndex;
+  } else if (toIndex <= m_activeLayerIndex && m_activeLayerIndex < fromIndex) {
+    ++m_activeLayerIndex;
+  }
+
+  return true;
+}
+
+bool Document::moveLayerUp(std::size_t index) noexcept {
+  if (index + 1 >= m_layers.size()) {
+    return false;
+  }
+  return moveLayer(index, index + 1);
+}
+
+bool Document::moveLayerDown(std::size_t index) noexcept {
+  if (index == 0 || index >= m_layers.size()) {
+    return false;
+  }
+  return moveLayer(index, index - 1);
+}
+
+std::string Document::makeDefaultLayerName(std::size_t currentLayerCount) {
+  return "Layer " + std::to_string(currentLayerCount + 1);
+}
+
+} // namespace core
