@@ -112,73 +112,84 @@ public:
     const bool enabled  = index.data(kSubToolEnabledRole).toBool();
     const QString id    = index.data(kSubToolIdRole).toString().toLower();
 
-    // ── Background ────────────────────────────────────────────────────────
-    QColor bg = selected ? QColor(0x1e, 0x5b, 0x94)
-              : hovered  ? QColor(0x35, 0x35, 0x35)
-              :             QColor(0x25, 0x25, 0x25);
+    const QRect rect = option.rect.adjusted(2, 2, -2, -2);
+
+    // ── Card background ──────────────────────────────────────────────────
+    QColor bg = selected ? QColor(0x1d, 0x3a, 0x7a)
+              : hovered  ? QColor(0x27, 0x2c, 0x3c)
+              :             QColor(0x1a, 0x1d, 0x27);
     if (!enabled && !selected) {
-      bg = QColor(0x20, 0x20, 0x20);
+      bg = QColor(0x16, 0x18, 0x20);
     }
-    painter->fillRect(option.rect, bg);
+    QPainterPath cardPath;
+    cardPath.addRoundedRect(rect, 5, 5);
+    painter->fillPath(cardPath, bg);
 
-    // Bottom separator line
-    if (!selected) {
-      painter->setPen(QColor(0x1e, 0x1e, 0x1e));
-      painter->drawLine(option.rect.bottomLeft(), option.rect.bottomRight());
-    }
+    // Card border
+    QColor border = selected ? QColor(0x4e, 0x8e, 0xf7, 200)
+                  : hovered  ? QColor(0x36, 0x3d, 0x54, 180)
+                  :             QColor(0x2a, 0x2e, 0x3e, 120);
+    painter->setPen(QPen(border, selected ? 1.5 : 1.0));
+    painter->drawPath(cardPath);
 
-    // ── Stroke preview (left ~60% of row, scales with item width) ────────
-    const int previewW = qBound(60, static_cast<int>(option.rect.width() * 0.62), 180);
-    QRectF r(
-        option.rect.left() + 4,
-        option.rect.top() + 5,
-        previewW,
-        option.rect.height() - 10);
+    // ── Stroke preview area (top portion of tile) ────────────────────────
+    const int labelH = 18;
+    const QRectF previewRect(
+        rect.left() + 4.0,
+        rect.top() + 4.0,
+        rect.width() - 8.0,
+        rect.height() - labelH - 8.0);
 
-    QColor stroke = selected ? QColor(255, 255, 255, 160) : QColor(210, 220, 235, 100);
-    qreal penW = 2.6;
+    QColor stroke = selected ? QColor(255, 255, 255, 180) : QColor(210, 225, 248, 140);
+    qreal penW = 2.8;
     if (id.contains("hard")) {
-      penW = 4.0;
-      stroke.setAlpha(selected ? 190 : 140);
+      penW = 4.5;
+      stroke.setAlpha(selected ? 210 : 170);
     } else if (id.contains("soft")) {
-      penW = 5.5;
-      stroke.setAlpha(selected ? 85 : 55);
+      penW = 6.5;
+      stroke.setAlpha(selected ? 100 : 65);
     } else if (id.contains("airbrush")) {
-      penW = 7.0;
-      stroke.setAlpha(selected ? 65 : 40);
+      penW = 9.0;
+      stroke.setAlpha(selected ? 70 : 45);
     } else if (id.contains("fill")) {
-      penW = 8.0;
-      stroke.setAlpha(selected ? 90 : 55);
+      penW = 10.0;
+      stroke.setAlpha(selected ? 100 : 60);
     } else if (id.contains("vector")) {
       penW = 1.8;
-      stroke.setAlpha(selected ? 200 : 140);
+      stroke.setAlpha(selected ? 220 : 160);
     } else if (id.contains("eraser")) {
-      stroke = QColor(230, 235, 245, selected ? 130 : 85);
-      penW = 3.5;
+      stroke = QColor(230, 235, 245, selected ? 150 : 95);
+      penW = 4.0;
     }
     if (!enabled) {
-      stroke.setAlpha(stroke.alpha() / 3);
+      stroke.setAlpha(stroke.alpha() / 4);
     }
 
-    QPen pen(stroke, penW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    painter->setPen(pen);
+    painter->save();
+    painter->setClipRect(rect.adjusted(1, 1, -1, -1));
+    QPen strokePen(stroke, penW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    painter->setPen(strokePen);
     QPainterPath path;
-    path.moveTo(r.left(), r.center().y() + r.height() * 0.12);
+    path.moveTo(previewRect.left(), previewRect.center().y() + previewRect.height() * 0.15);
     path.cubicTo(
-        r.left() + r.width() * 0.22, r.top() + 1,
-        r.left() + r.width() * 0.58, r.bottom() - 1,
-        r.right(), r.center().y() - r.height() * 0.10);
+        previewRect.left() + previewRect.width() * 0.25, previewRect.top() + 2,
+        previewRect.left() + previewRect.width() * 0.60, previewRect.bottom() - 2,
+        previewRect.right(), previewRect.center().y() - previewRect.height() * 0.12);
     painter->drawPath(path);
+    painter->restore();
 
-    // ── Text (right-aligned, right portion of row) ────────────────────────
-    const QRect textRect = option.rect.adjusted(previewW + 6, 0, -6, 0);
+    // ── Label (bottom of tile) ────────────────────────────────────────────
+    const QRect labelRect(rect.left(), rect.bottom() - labelH, rect.width(), labelH);
+    painter->fillRect(labelRect, selected ? QColor(0x18, 0x32, 0x68, 180) : QColor(0x13, 0x15, 0x1c, 160));
+
     const QString text = index.data(Qt::DisplayRole).toString();
-    painter->setPen(enabled ? (selected ? QColor("#ffffff") : QColor("#d4d4d4"))
-                            : QColor("#787878"));
+    painter->setPen(enabled ? (selected ? QColor("#edf0f9") : QColor("#c5cde0"))
+                            : QColor("#4a5268"));
     QFont f = painter->font();
-    f.setPointSize(9);
+    f.setPointSizeF(7.5);
+    f.setBold(selected);
     painter->setFont(f);
-    painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignRight, text);
+    painter->drawText(labelRect.adjusted(3, 0, -3, 0), Qt::AlignVCenter | Qt::AlignHCenter, text);
 
     painter->restore();
   }
@@ -186,7 +197,7 @@ public:
   QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
     Q_UNUSED(option);
     Q_UNUSED(index);
-    return QSize(120, 40);
+    return QSize(86, 70);
   }
 };
 
@@ -287,18 +298,23 @@ SubToolPanel::SubToolPanel(QWidget* parent)
   auto* deleteAction = m_settingsMenu->addAction(app::ui::icon("delete", 16), QString::fromUtf8(u8"削除"));
   auto* resetAction = m_settingsMenu->addAction(QString::fromUtf8(u8"初期化"));
 
+  m_subToolList->setViewMode(QListWidget::IconMode);
+  m_subToolList->setResizeMode(QListWidget::Adjust);
+  m_subToolList->setMovement(QListWidget::Static);
   m_subToolList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_subToolList->setEditTriggers(QAbstractItemView::NoEditTriggers);
   m_subToolList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   m_subToolList->setUniformItemSizes(true);
   m_subToolList->setItemDelegate(new SubToolDelegate(m_subToolList));
-  m_subToolList->setSpacing(0);
+  m_subToolList->setSpacing(2);
+  m_subToolList->setGridSize(QSize(90, 74));
   m_subToolList->setMouseTracking(true);
+  m_subToolList->setWordWrap(true);
   m_subToolList->setStyleSheet(
-      "QListWidget { background: #252525; border: none; outline: none; }"
-      "QListWidget::item { border: none; padding: 0; }"
-      "QListWidget::item:hover { background: #353535; }"
-      "QListWidget::item:selected { background: #1e5b94; }");
+      "QListWidget { background: #13151c; border: none; outline: none; padding: 2px; }"
+      "QListWidget::item { border: none; padding: 0; background: transparent; }"
+      "QListWidget::item:hover { background: transparent; }"
+      "QListWidget::item:selected { background: transparent; }");
 
   m_searchRowLayout = new QHBoxLayout();
   m_searchRowLayout->setContentsMargins(0, 0, 0, 0);
@@ -402,7 +418,7 @@ void SubToolPanel::refreshFromController() {
         item.enabled
             ? (item.hint.empty() ? localizedName : QString::fromStdString(item.hint))
             : QString::fromUtf8(u8"現在のレイヤー種別では使用できません"));
-    row->setSizeHint(QSize(row->sizeHint().width(), 28));
+    row->setSizeHint(QSize(86, 70));
     hasEnabledRow = hasEnabledRow || item.enabled;
     if (item.active) {
       m_subToolList->setCurrentItem(row);
