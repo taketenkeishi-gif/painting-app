@@ -71,6 +71,12 @@ std::size_t Document::addFolderLayer(const std::string& name) {
   return addLayer(name, LayerKind::Folder);
 }
 
+std::size_t Document::addAdjustmentLayer(const AdjustmentParams& params, const std::string& name) {
+  const std::size_t idx = addLayer(name.empty() ? "Adjustment" : name, LayerKind::Adjustment);
+  m_layers[idx].setAdjustmentParams(params);
+  return idx;
+}
+
 std::size_t Document::duplicateLayer(std::size_t index) {
   if (index >= m_layers.size()) {
     return m_activeLayerIndex;

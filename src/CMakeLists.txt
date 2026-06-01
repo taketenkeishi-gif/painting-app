@@ -4,6 +4,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/layer/Layer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/render/Renderer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/selection/SelectionMask.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/selection/SelectionEngine.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolType.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/BrushTool.cpp

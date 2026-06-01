@@ -14,7 +14,43 @@ namespace core {
 enum class LayerKind {
   Raster,
   Vector,
-  Folder
+  Folder,
+  Adjustment  ///< 非破壊調整レイヤー（Photoshop Adjustment Layer）
+};
+
+// ── Adjustment Layer ──────────────────────────────────────────────────────
+enum class AdjustmentKind {
+  BrightnessContrast,
+  HueSaturation,
+  ColorBalance,
+  Levels,
+  Curves,
+  GradientMap,
+  Invert,
+  Threshold,
+  Vibrance,
+};
+
+/// 各調整レイヤーのパラメータを一つの struct にまとめる。
+/// 使用するフィールドは AdjustmentKind によって異なる。
+struct AdjustmentParams {
+  AdjustmentKind kind     {AdjustmentKind::BrightnessContrast};
+  // BrightnessContrast
+  float brightness        {0.0f};   ///< -1.0 〜 +1.0
+  float contrast          {0.0f};   ///< -1.0 〜 +1.0
+  // HueSaturation / Vibrance
+  float hue               {0.0f};   ///< -180 〜 +180 (degrees)
+  float saturation        {0.0f};   ///< -1.0 〜 +1.0
+  float lightness         {0.0f};   ///< -1.0 〜 +1.0
+  float vibrance          {0.0f};   ///< -1.0 〜 +1.0
+  // Levels
+  float inputBlack        {0.0f};   ///< 0.0 〜 1.0
+  float inputWhite        {1.0f};   ///< 0.0 〜 1.0
+  float gamma             {1.0f};   ///< 0.1 〜 9.99
+  float outputBlack       {0.0f};   ///< 0.0 〜 1.0
+  float outputWhite       {1.0f};   ///< 0.0 〜 1.0
+  // Threshold
+  float threshold         {0.5f};   ///< 0.0 〜 1.0
 };
 
 struct VectorPath {
@@ -76,6 +112,11 @@ public:
   void createMask(Color fill = Color::OpaqueWhite()) noexcept;
   void removeMask() noexcept;
 
+  // Adjustment Layer
+  bool isAdjustment() const noexcept { return m_kind == LayerKind::Adjustment; }
+  const AdjustmentParams& adjustmentParams() const noexcept { return m_adjParams; }
+  void setAdjustmentParams(const AdjustmentParams& p) noexcept { m_adjParams = p; }
+
 private:
   std::string m_name;
   LayerKind m_kind {LayerKind::Raster};
@@ -92,6 +133,7 @@ private:
   bool m_maskEnabled {false};
   PixelBuffer m_maskBuffer;
   std::vector<VectorPath> m_vectorPaths;
+  AdjustmentParams m_adjParams;
 };
 
 } // namespace core

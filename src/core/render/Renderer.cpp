@@ -4,6 +4,7 @@
 #include <cmath>
 #include <vector>
 
+#include "core/layer/Layer.h"
 #include "core/render/RenderUtils.h"
 
 namespace core {
@@ -302,6 +303,122 @@ void rasterizeVectorLayer(const Layer& layer, PixelBuffer& out) {
   }
 }
 
+/// 色を HSL に変換してパラメータを適用し RGB に戻す
+static RGB applyHSLAdjust(RGB c, float dHue, float dSat, float dLight) {
+  // RGB → HSL
+  const float maxC = std::max({c.r, c.g, c.b});
+  const float minC = std::min({c.r, c.g, c.b});
+  const float delta = maxC - minC;
+  float l = (maxC + minC) * 0.5f;
+  float s = 0.0f;
+  float h = 0.0f;
+  if (delta > 0.0001f) {
+    s = delta / (1.0f - std::abs(2.0f * l - 1.0f));
+    if (maxC == c.r)      h = std::fmod((c.g - c.b) / delta, 6.0f);
+    else if (maxC == c.g) h = (c.b - c.r) / delta + 2.0f;
+    else                  h = (c.r - c.g) / delta + 4.0f;
+    h = h * 60.0f;
+    if (h < 0.0f) h += 360.0f;
+  }
+  // Apply adjustments
+  h = std::fmod(h + dHue + 360.0f, 360.0f);
+  s = std::clamp(s + dSat, 0.0f, 1.0f);
+  l = std::clamp(l + dLight, 0.0f, 1.0f);
+  // HSL → RGB
+  const float chroma = (1.0f - std::abs(2.0f * l - 1.0f)) * s;
+  const float hh = h / 60.0f;
+  const float xx = chroma * (1.0f - std::abs(std::fmod(hh, 2.0f) - 1.0f));
+  RGB out {0, 0, 0};
+  if      (hh < 1) { out = {chroma, xx, 0}; }
+  else if (hh < 2) { out = {xx, chroma, 0}; }
+  else if (hh < 3) { out = {0, chroma, xx}; }
+  else if (hh < 4) { out = {0, xx, chroma}; }
+  else if (hh < 5) { out = {xx, 0, chroma}; }
+  else             { out = {chroma, 0, xx}; }
+  const float m = l - chroma * 0.5f;
+  return {out.r + m, out.g + m, out.b + m};
+}
+
+/// AdjustmentLayer を1ピクセルに適用する
+static Color applyAdjustment(const AdjustmentParams& p, Color src) {
+  const float r = static_cast<float>(src.r) / 255.0f;
+  const float g = static_cast<float>(src.g) / 255.0f;
+  const float b = static_cast<float>(src.b) / 255.0f;
+  const float a = static_cast<float>(src.a) / 255.0f;
+  float nr = r, ng = g, nb = b;
+
+  switch (p.kind) {
+    case AdjustmentKind::BrightnessContrast: {
+      // Photoshop 互換: brightness でシフト、contrast で S 字カーブ近似
+      auto brighten = [&](float v) {
+        return p.brightness >= 0.0f
+            ? v + p.brightness * (1.0f - v)
+            : v + p.brightness * v;
+      };
+      auto contrast_fn = [&](float v) {
+        if (p.contrast >= 0.0f) {
+          const float k = 1.0f - p.contrast;
+          return k > 0.0001f ? (v - 0.5f) / k + 0.5f : v;
+        }
+        return v * (1.0f + p.contrast) + 0.5f * (-p.contrast);
+      };
+      nr = std::clamp(contrast_fn(brighten(r)), 0.0f, 1.0f);
+      ng = std::clamp(contrast_fn(brighten(g)), 0.0f, 1.0f);
+      nb = std::clamp(contrast_fn(brighten(b)), 0.0f, 1.0f);
+      break;
+    }
+    case AdjustmentKind::HueSaturation: {
+      RGB adj = applyHSLAdjust({r, g, b}, p.hue, p.saturation, p.lightness);
+      nr = std::clamp(adj.r, 0.0f, 1.0f);
+      ng = std::clamp(adj.g, 0.0f, 1.0f);
+      nb = std::clamp(adj.b, 0.0f, 1.0f);
+      break;
+    }
+    case AdjustmentKind::Levels: {
+      auto levelMap = [&](float v) {
+        const float inRange = p.inputWhite - p.inputBlack;
+        if (inRange < 0.0001f) return 0.0f;
+        float t = std::clamp((v - p.inputBlack) / inRange, 0.0f, 1.0f);
+        t = std::pow(t, 1.0f / std::clamp(p.gamma, 0.01f, 9.99f));
+        return p.outputBlack + t * (p.outputWhite - p.outputBlack);
+      };
+      nr = std::clamp(levelMap(r), 0.0f, 1.0f);
+      ng = std::clamp(levelMap(g), 0.0f, 1.0f);
+      nb = std::clamp(levelMap(b), 0.0f, 1.0f);
+      break;
+    }
+    case AdjustmentKind::Invert:
+      nr = 1.0f - r; ng = 1.0f - g; nb = 1.0f - b;
+      break;
+    case AdjustmentKind::Threshold: {
+      const float lum = 0.299f * r + 0.587f * g + 0.114f * b;
+      const float v = lum >= p.threshold ? 1.0f : 0.0f;
+      nr = ng = nb = v;
+      break;
+    }
+    case AdjustmentKind::Vibrance: {
+      // Vibrance: 飽和度の低いピクセルに強く作用するSaturation
+      const float maxC = std::max({r, g, b});
+      const float minC = std::min({r, g, b});
+      const float sat = maxC - minC;
+      const float amount = p.vibrance * (1.0f - sat);
+      RGB adj = applyHSLAdjust({r, g, b}, 0.0f, amount, 0.0f);
+      nr = std::clamp(adj.r, 0.0f, 1.0f);
+      ng = std::clamp(adj.g, 0.0f, 1.0f);
+      nb = std::clamp(adj.b, 0.0f, 1.0f);
+      break;
+    }
+    default: break;
+  }
+
+  return Color {
+      static_cast<std::uint8_t>(std::lround(nr * 255.0f)),
+      static_cast<std::uint8_t>(std::lround(ng * 255.0f)),
+      static_cast<std::uint8_t>(std::lround(nb * 255.0f)),
+      static_cast<std::uint8_t>(std::lround(a  * 255.0f))
+  };
+}
+
 Color applyLayerMask(const Layer& layer, int x, int y, Color src) {
   if (!layer.hasMask() || !layer.maskEnabled()) {
     return src;
@@ -362,6 +479,23 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
       for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
         const Layer& layer = document.layerAt(layerIndex);
         if (!layer.visible() || layer.opacity() <= 0.0f || layer.kind() == LayerKind::Folder || layer.isPaperLayer()) {
+          continue;
+        }
+
+        if (layer.kind() == LayerKind::Adjustment) {
+          const float maskAlpha = (layer.hasMask() && layer.maskEnabled())
+              ? static_cast<float>(layer.maskBuffer().pixel(x, y).a) / 255.0f
+              : 1.0f;
+          const float t = std::clamp(layer.opacity() * maskAlpha, 0.0f, 1.0f);
+          if (t > 0.0001f) {
+            const Color adjusted = applyAdjustment(layer.adjustmentParams(), composed);
+            composed = Color {
+                static_cast<std::uint8_t>(std::lround(composed.r + t * (adjusted.r - composed.r))),
+                static_cast<std::uint8_t>(std::lround(composed.g + t * (adjusted.g - composed.g))),
+                static_cast<std::uint8_t>(std::lround(composed.b + t * (adjusted.b - composed.b))),
+                composed.a
+            };
+          }
           continue;
         }
 

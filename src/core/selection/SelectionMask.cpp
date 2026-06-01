@@ -301,4 +301,97 @@ bool SelectionMask::feather(int radius) {
   return m_mask != before;
 }
 
+bool SelectionMask::expand(int radius) {
+  if (radius <= 0 || m_width <= 0 || m_height <= 0 || !m_hasSelection) return false;
+
+  // モルフォロジー膨張: 各ピクセルを中心とする円形近傍の最大値を取る
+  const std::vector<std::uint8_t> src = m_mask;
+  const int r2 = radius * radius;
+  for (int y = 0; y < m_height; ++y) {
+    for (int x = 0; x < m_width; ++x) {
+      if (src[indexOf(x, y)] != 0U) continue;  // すでに選択済みはスキップ
+      bool hit = false;
+      for (int dy = -radius; dy <= radius && !hit; ++dy) {
+        const int ny = y + dy;
+        if (ny < 0 || ny >= m_height) continue;
+        for (int dx = -radius; dx <= radius && !hit; ++dx) {
+          if (dx * dx + dy * dy > r2) continue;
+          const int nx = x + dx;
+          if (nx < 0 || nx >= m_width) continue;
+          if (src[indexOf(nx, ny)] != 0U) hit = true;
+        }
+      }
+      if (hit) m_mask[indexOf(x, y)] = 1U;
+    }
+  }
+  recomputeBounds(m_mask, m_width, m_height, m_hasSelection, m_bounds);
+  return true;
+}
+
+bool SelectionMask::contract(int radius) {
+  if (radius <= 0 || m_width <= 0 || m_height <= 0 || !m_hasSelection) return false;
+
+  // モルフォロジー収縮: 各ピクセルの円形近傍に非選択が1つでもあれば除外
+  const std::vector<std::uint8_t> src = m_mask;
+  const int r2 = radius * radius;
+  for (int y = 0; y < m_height; ++y) {
+    for (int x = 0; x < m_width; ++x) {
+      if (src[indexOf(x, y)] == 0U) continue;  // 非選択はスキップ
+      bool removeIt = false;
+      for (int dy = -radius; dy <= radius && !removeIt; ++dy) {
+        const int ny = y + dy;
+        if (ny < 0 || ny >= m_height) { removeIt = true; continue; }
+        for (int dx = -radius; dx <= radius && !removeIt; ++dx) {
+          if (dx * dx + dy * dy > r2) continue;
+          const int nx = x + dx;
+          if (nx < 0 || nx >= m_width) { removeIt = true; continue; }
+          if (src[indexOf(nx, ny)] == 0U) removeIt = true;
+        }
+      }
+      if (removeIt) m_mask[indexOf(x, y)] = 0U;
+    }
+  }
+  recomputeBounds(m_mask, m_width, m_height, m_hasSelection, m_bounds);
+  return true;
+}
+
+bool SelectionMask::smooth(int radius) {
+  if (radius <= 0 || m_width <= 0 || m_height <= 0 || !m_hasSelection) return false;
+  // ガウスぼかし後に 50% 閾値で再二値化
+  std::vector<float> buf(m_mask.size());
+  for (std::size_t i = 0; i < m_mask.size(); ++i) {
+    buf[i] = m_mask[i] != 0U ? 1.0f : 0.0f;
+  }
+  const int r = radius;
+  std::vector<float> tmp(m_mask.size());
+  for (int pass = 0; pass < 3; ++pass) {
+    for (int y = 0; y < m_height; ++y) {
+      for (int x = 0; x < m_width; ++x) {
+        float sum = 0.0f; int cnt = 0;
+        for (int dx = -r; dx <= r; ++dx) {
+          const int nx = x + dx;
+          if (nx >= 0 && nx < m_width) { sum += buf[indexOf(nx, y)]; ++cnt; }
+        }
+        tmp[indexOf(x, y)] = cnt > 0 ? sum / static_cast<float>(cnt) : 0.0f;
+      }
+    }
+    for (int y = 0; y < m_height; ++y) {
+      for (int x = 0; x < m_width; ++x) {
+        float sum = 0.0f; int cnt = 0;
+        for (int dy = -r; dy <= r; ++dy) {
+          const int ny = y + dy;
+          if (ny >= 0 && ny < m_height) { sum += tmp[indexOf(x, ny)]; ++cnt; }
+        }
+        buf[indexOf(x, y)] = cnt > 0 ? sum / static_cast<float>(cnt) : 0.0f;
+      }
+    }
+  }
+  const std::vector<std::uint8_t> before = m_mask;
+  for (std::size_t i = 0; i < m_mask.size(); ++i) {
+    m_mask[i] = buf[i] >= 0.5f ? 1U : 0U;
+  }
+  recomputeBounds(m_mask, m_width, m_height, m_hasSelection, m_bounds);
+  return m_mask != before;
+}
+
 } // namespace core

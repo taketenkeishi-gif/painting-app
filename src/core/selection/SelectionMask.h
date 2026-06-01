@@ -36,6 +36,12 @@ public:
   bool translate(int dx, int dy);
   /// ガウスぼかし近似でエッジをフェザリングする（radius ピクセル）。
   bool feather(int radius);
+  /// 選択範囲を radius ピクセル拡張する（モルフォロジー膨張）。
+  bool expand(int radius);
+  /// 選択範囲を radius ピクセル縮小する（モルフォロジー収縮）。
+  bool contract(int radius);
+  /// 選択エッジをスムージングする（ガウスぼかし後に再二値化）。
+  bool smooth(int radius);
   /// マスク値を返す（0=非選択、255=完全選択、中間値=フェザー部分）。
   std::uint8_t maskValue(int x, int y) const noexcept;
 

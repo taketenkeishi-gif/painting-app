@@ -30,6 +30,7 @@ public:
   std::size_t addRasterLayer(const std::string& name = {});
   std::size_t addVectorLayer(const std::string& name = {});
   std::size_t addFolderLayer(const std::string& name = {});
+  std::size_t addAdjustmentLayer(const AdjustmentParams& params, const std::string& name = {});
   std::size_t duplicateLayer(std::size_t index);
   bool removeLayer(std::size_t index) noexcept;
   bool renameLayer(std::size_t index, const std::string& newName);
