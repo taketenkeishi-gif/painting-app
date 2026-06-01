@@ -22,6 +22,7 @@ signals:
 
 protected:
   void paintEvent(QPaintEvent* event) override;
+  void resizeEvent(QResizeEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
@@ -41,6 +42,10 @@ private:
   QColor m_color {Qt::black};
   bool m_dragHue {false};
   bool m_dragSv {false};
+  // HiDPI キャッシュ
+  mutable QImage m_ringCache;
+  mutable QSize m_ringCacheSize;
+  mutable qreal m_ringCacheDpr {0.0};
 };
 
 } // namespace app::panels

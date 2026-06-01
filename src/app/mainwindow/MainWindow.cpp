@@ -58,6 +58,7 @@
 #include "app/bridge/AppController.h"
 #include "app/canvasview/CanvasWidget.h"
 #include "app/panels/AiPanel.h"
+#include "app/ui/Theme.h"
 #include "app/panels/GenerativeFillDialog.h"
 #include "app/panels/LayerPanel.h"
 #include "app/panels/SubToolPanel.h"
@@ -695,79 +696,28 @@ void MainWindow::setupShellLayout() {
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
-  auto applyTabIntegratedTitleBar = [this](QDockWidget* dock) {
-    if (dock == nullptr) {
-      return;
-    }
-
+  // 完全非表示タイトルバー: 2px の不可視ドラッグストリップのみ残す
+  // (ユーザーは右クリックコンテキストメニューまたはTabBarからフロート/クローズ可能)
+  auto applyInvisibleTitleBar = [](QDockWidget* dock) {
+    if (dock == nullptr) return;
     auto* bar = new QWidget(dock);
-    bar->setObjectName(QStringLiteral("TabIntegratedDockTitleBar"));
-    bar->setFixedHeight(17);
+    bar->setFixedHeight(2);
     bar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    bar->setStyleSheet(QStringLiteral(
-        "QWidget#TabIntegratedDockTitleBar {"
-        " background: #333333;"
-        " border-left: 1px solid #1a1a1a;"
-        " border-right: 1px solid #1a1a1a;"
-        " border-bottom: 1px solid #1a1a1a;"
-        "}"));
-
-    auto* row = new QHBoxLayout(bar);
-    row->setContentsMargins(4, 0, 3, 0);
-    row->setSpacing(3);
-
-    auto* grip = new QLabel(QStringLiteral("⋮⋮"), bar);
-    grip->setFixedWidth(16);
-    grip->setAlignment(Qt::AlignCenter);
-    grip->setStyleSheet(QStringLiteral("color: #666666; font-size: 10px;"));
-    row->addWidget(grip);
-    row->addStretch(1);
-
-    auto makeTinyDockButton = [](const QString& text, QWidget* parent) {
-      auto* button = new QPushButton(text, parent);
-      button->setFixedSize(14, 14);
-      button->setFocusPolicy(Qt::NoFocus);
-      button->setFlat(true);
-      button->setStyleSheet(QStringLiteral(
-          "QPushButton {"
-          " margin: 0px; padding: 0px;"
-          " border: 1px solid transparent;"
-          " border-radius: 2px;"
-          " color: #888888;"
-          " background: transparent;"
-          " font-size: 10px;"
-          "}"
-          "QPushButton:hover {"
-          " border: 1px solid #5a5a5a;"
-          " background: #484848;"
-          " color: #e0e0e0;"
-          "}"));
-      return button;
-    };
-
-    auto* floatButton = makeTinyDockButton(QStringLiteral("□"), bar);
-    floatButton->setToolTip(QStringLiteral("パネルを分離/戻す"));
-    row->addWidget(floatButton);
-
-    auto* closeButton = makeTinyDockButton(QStringLiteral("×"), bar);
-    closeButton->setToolTip(QStringLiteral("パネルを閉じる"));
-    row->addWidget(closeButton);
-
-    connect(floatButton, &QPushButton::clicked, dock, [dock]() {
-      dock->setFloating(!dock->isFloating());
-    });
-    connect(closeButton, &QPushButton::clicked, dock, [dock]() {
-      dock->hide();
-    });
-
+    bar->setStyleSheet("background: #0d0f14;");
+    bar->setCursor(Qt::SizeAllCursor);
     dock->setTitleBarWidget(bar);
   };
 
-  applyTabIntegratedTitleBar(m_subToolDock);
-  applyTabIntegratedTitleBar(m_toolPropertyDock);
-  applyTabIntegratedTitleBar(m_colorDock);
-  applyTabIntegratedTitleBar(colorSliderDock);
-  applyTabIntegratedTitleBar(colorHistoryDock);
+  applyInvisibleTitleBar(m_toolDock);
+  applyInvisibleTitleBar(m_toolSliderDock);
+  applyInvisibleTitleBar(m_subToolDock);
+  applyInvisibleTitleBar(m_toolPropertyDock);
+  applyInvisibleTitleBar(m_colorDock);
+  applyInvisibleTitleBar(colorSliderDock);
+  applyInvisibleTitleBar(colorHistoryDock);
+  applyInvisibleTitleBar(m_layerDock);
+  applyInvisibleTitleBar(m_aiDock);
+  applyInvisibleTitleBar(m_infoDock);
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolSliderDock);
@@ -803,6 +753,7 @@ void MainWindow::createMenus() {
   auto* layerMenu  = menuBar()->addMenu(QString::fromUtf8(u8"レイヤー(&L)"));
   auto* selectMenu = menuBar()->addMenu(QString::fromUtf8(u8"選択範囲(&S)"));
   auto* filterMenu = menuBar()->addMenu(QString::fromUtf8(u8"フィルター(&I)"));
+  auto* aiMenu     = menuBar()->addMenu(QString::fromUtf8(u8"AI(&A)"));
   auto* toolMenu   = menuBar()->addMenu(QString::fromUtf8(u8"ツール(&T)"));
   auto* viewMenu   = menuBar()->addMenu(QString::fromUtf8(u8"表示(&V)"));
   auto* windowMenu = menuBar()->addMenu(QString::fromUtf8(u8"ウィンドウ(&W)"));
@@ -1006,9 +957,24 @@ void MainWindow::createMenus() {
     auto* adjustSubMenu = filterMenu->addMenu(QString::fromUtf8(u8"色調補正(&A)"));
     adjustSubMenu->addAction(m_brightnessContrastAction);
     adjustSubMenu->addAction(m_hueSatLightAction);
-    filterMenu->addSeparator();
-    filterMenu->addAction(m_generativeFillAction);
-    filterMenu->addAction(m_connectComfyUiAction);
+  }
+
+  // ── AI メニュー ─────────────────────────────────────────────────────────
+  {
+    auto* connGroup = aiMenu->addMenu(QString::fromUtf8(u8"バックエンド接続(&B)"));
+    connGroup->addAction(m_connectComfyUiAction);
+    aiMenu->addSeparator();
+    aiMenu->addAction(m_generativeFillAction);
+    auto* removeAction = aiMenu->addAction(QString::fromUtf8(u8"背景削除..."));
+    removeAction->setEnabled(false);  // Phase C で有効化
+    auto* inpaintAction = aiMenu->addAction(QString::fromUtf8(u8"生成塗りつぶし..."));
+    inpaintAction->setEnabled(false);  // Phase D で有効化
+    auto* upscaleAction = aiMenu->addAction(QString::fromUtf8(u8"高解像度化..."));
+    upscaleAction->setEnabled(false);
+    aiMenu->addSeparator();
+    if (m_aiDock != nullptr) {
+      aiMenu->addAction(m_aiDock->toggleViewAction());
+    }
   }
 
   auto* toolGroup = new QActionGroup(this);
@@ -1123,6 +1089,48 @@ void MainWindow::createMenus() {
     windowMenu->addAction(m_infoDock->toggleViewAction());
   }
   windowMenu->addSeparator();
+  // ── ワークスペースプリセット ─────────────────────────────────────────────
+  {
+    auto* presetMenu = windowMenu->addMenu(QString::fromUtf8(u8"ワークスペース切替(&X)"));
+    auto addPreset = [&](const QString& label, auto fn) {
+      connect(presetMenu->addAction(label), &QAction::triggered, this, fn);
+    };
+    addPreset(QString::fromUtf8(u8"Painting（作画）"), [this] {
+      // ブラシ系中心: ツール/サブツール/カラー/レイヤー表示, AI非表示
+      if (m_toolDock)         m_toolDock->setVisible(true);
+      if (m_toolSliderDock)   m_toolSliderDock->setVisible(true);
+      if (m_subToolDock)      m_subToolDock->setVisible(true);
+      if (m_toolPropertyDock) m_toolPropertyDock->setVisible(true);
+      if (m_colorDock)        m_colorDock->setVisible(true);
+      if (m_layerDock)        m_layerDock->setVisible(true);
+      if (m_aiDock)           m_aiDock->setVisible(false);
+      if (m_infoDock)         m_infoDock->setVisible(false);
+    });
+    addPreset(QString::fromUtf8(u8"Photo Editing（写真編集）"), [this] {
+      // レイヤー/カラー/情報中心
+      if (m_toolDock)         m_toolDock->setVisible(true);
+      if (m_toolSliderDock)   m_toolSliderDock->setVisible(false);
+      if (m_subToolDock)      m_subToolDock->setVisible(false);
+      if (m_toolPropertyDock) m_toolPropertyDock->setVisible(true);
+      if (m_colorDock)        m_colorDock->setVisible(true);
+      if (m_layerDock)        m_layerDock->setVisible(true);
+      if (m_aiDock)           m_aiDock->setVisible(false);
+      if (m_infoDock)         m_infoDock->setVisible(true);
+    });
+    addPreset(QString::fromUtf8(u8"AI Editing（AI編集）"), [this] {
+      // AI Studio中心
+      if (m_toolDock)         m_toolDock->setVisible(true);
+      if (m_toolSliderDock)   m_toolSliderDock->setVisible(false);
+      if (m_subToolDock)      m_subToolDock->setVisible(false);
+      if (m_toolPropertyDock) m_toolPropertyDock->setVisible(false);
+      if (m_colorDock)        m_colorDock->setVisible(false);
+      if (m_layerDock)        m_layerDock->setVisible(true);
+      if (m_aiDock)           m_aiDock->setVisible(true);
+      if (m_infoDock)         m_infoDock->setVisible(false);
+      if (m_aiDock)           m_aiDock->raise();
+    });
+  }
+  windowMenu->addSeparator();
   m_workspaceLayoutsMenu = windowMenu->addMenu("ワークスペースを読み込み");
   windowMenu->addAction(m_saveWorkspaceAction);
   windowMenu->addAction(m_deleteWorkspaceAction);
@@ -1173,8 +1181,7 @@ void MainWindow::createMenus() {
   scEdit->addAction(m_brushSizeDownAction);
   scEdit->addAction(m_brushSizeUpAction);
   scEdit->addSeparator();
-  scEdit->addAction(m_generativeFillAction);
-  scEdit->addAction(m_connectComfyUiAction);
+  // AI アクションは AI メニューへ移動済み
 
   // ── ツール ────────────────────────────────────────────────────────────
   auto* scTool = shortcutMenu->addMenu("ツール");
@@ -1818,6 +1825,8 @@ void MainWindow::applyUiChrome() {
       "QCheckBox:disabled { color: #4a5268; }"
 
       // ── Sliders ───────────────────────────────────────────────────
+      // groove に水平マージンを設けてハンドルが切れないようにする
+      "QSlider { padding: 0 7px; }"
       "QSlider::groove:horizontal {"
       "  background: #13151c;"
       "  height: 4px;"
@@ -1830,13 +1839,15 @@ void MainWindow::applyUiChrome() {
       "}"
       "QSlider::handle:horizontal {"
       "  background: #edf0f9;"
-      "  border: 2px solid #4e8ef7;"
-      "  width: 12px; height: 12px;"
-      "  border-radius: 6px;"
-      "  margin: -5px 0;"
+      "  border: 1px solid #3a4252;"
+      "  width: 14px; height: 14px;"
+      "  border-radius: 7px;"
+      "  margin: -6px -7px;"
       "}"
       "QSlider::handle:horizontal:hover { background: #ffffff; border-color: #6da6ff; }"
-      "QSlider::handle:horizontal:pressed { background: #4e8ef7; }"
+      "QSlider::handle:horizontal:pressed { background: #4e8ef7; border-color: #4e8ef7; }"
+      "QSlider::groove:horizontal:disabled { background: #0e1016; border-color: #1a1d24; }"
+      "QSlider::handle:horizontal:disabled { background: #2a2e3a; border-color: #1e2230; }"
 
       // ── Status bar ────────────────────────────────────────────────
       "QStatusBar {"

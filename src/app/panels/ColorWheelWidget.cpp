@@ -5,6 +5,7 @@
 
 #include <QMouseEvent>
 #include <QPainter>
+#include <QResizeEvent>
 #include <QPainterPath>
 #include <QPaintEvent>
 #include <QPen>
@@ -104,36 +105,56 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
   QPainter painter(this);
   painter.setRenderHint(QPainter::Antialiasing, true);
+  painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
   painter.fillRect(rect(), palette().window());
 
+  const qreal dpr = devicePixelRatioF();
   const QPointF c = centerPoint();
   const double outer = outerRadius();
   const double inner = innerRadius();
   const double ringMid = ringRadius();
 
-  QImage ringImage(size(), QImage::Format_ARGB32_Premultiplied);
-  ringImage.fill(Qt::transparent);
-  const QRectF ringBounds(c.x() - outer, c.y() - outer, outer * 2.0, outer * 2.0);
-  const int xBegin = std::max(0, static_cast<int>(std::floor(ringBounds.left())));
-  const int yBegin = std::max(0, static_cast<int>(std::floor(ringBounds.top())));
-  const int xEnd = std::min(width() - 1, static_cast<int>(std::ceil(ringBounds.right())));
-  const int yEnd = std::min(height() - 1, static_cast<int>(std::ceil(ringBounds.bottom())));
+  // HiDPI キャッシュ: サイズまたはDPRが変わったら再生成
+  if (m_ringCache.isNull() || m_ringCacheSize != size() || std::abs(m_ringCacheDpr - dpr) > 0.01) {
+    const int pw = static_cast<int>(std::ceil(width()  * dpr));
+    const int ph = static_cast<int>(std::ceil(height() * dpr));
+    m_ringCache = QImage(pw, ph, QImage::Format_ARGB32_Premultiplied);
+    m_ringCache.setDevicePixelRatio(dpr);
+    m_ringCache.fill(Qt::transparent);
 
-  for (int y = yBegin; y <= yEnd; ++y) {
-    QRgb* scan = reinterpret_cast<QRgb*>(ringImage.scanLine(y));
-    for (int x = xBegin; x <= xEnd; ++x) {
-      const QPointF p(static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5);
-      const double dx = p.x() - c.x();
-      const double dy = p.y() - c.y();
-      const double dist = std::sqrt(dx * dx + dy * dy);
-      if (dist < inner || dist > outer) {
-        continue;
+    const double scale = dpr;
+    const QPointF sc(c.x() * scale, c.y() * scale);
+    const double sOuter = outer * scale;
+    const double sInner = inner * scale;
+
+    const int xBegin = std::max(0, static_cast<int>(std::floor(sc.x() - sOuter)));
+    const int yBegin = std::max(0, static_cast<int>(std::floor(sc.y() - sOuter)));
+    const int xEnd = std::min(pw - 1, static_cast<int>(std::ceil(sc.x() + sOuter)));
+    const int yEnd = std::min(ph - 1, static_cast<int>(std::ceil(sc.y() + sOuter)));
+
+    for (int y = yBegin; y <= yEnd; ++y) {
+      QRgb* scan = reinterpret_cast<QRgb*>(m_ringCache.scanLine(y));
+      for (int x = xBegin; x <= xEnd; ++x) {
+        const double px = (static_cast<double>(x) + 0.5) / scale;
+        const double py = (static_cast<double>(y) + 0.5) / scale;
+        const double dx = px - c.x();
+        const double dy = py - c.y();
+        const double dist = std::sqrt(dx * dx + dy * dy);
+        // AA: 境界付近で alpha をフェードさせてギザギザを消す
+        const double outerFade = std::clamp((outer - dist) / (1.0 / scale + 0.5), 0.0, 1.0);
+        const double innerFade = std::clamp((dist - inner) / (1.0 / scale + 0.5), 0.0, 1.0);
+        const double alpha = outerFade * innerFade;
+        if (alpha < 0.001) continue;
+        const int hue = static_cast<int>(std::lround(hueFromPoint(c, QPointF(px, py)))) % 360;
+        QColor col = QColor::fromHsv(hue, 255, 255);
+        col.setAlphaF(static_cast<float>(alpha));
+        scan[x] = col.rgba();
       }
-      const int hue = static_cast<int>(std::lround(hueFromPoint(c, p))) % 360;
-      scan[x] = QColor::fromHsv(hue, 255, 255).rgba();
     }
+    m_ringCacheSize = size();
+    m_ringCacheDpr  = dpr;
   }
-  painter.drawImage(QPoint(0, 0), ringImage);
+  painter.drawImage(QPoint(0, 0), m_ringCache);
 
   // Clear the ring interior to avoid color bleed artifacts at the inner edge.
   painter.save();  painter.setPen(Qt::NoPen);
@@ -194,6 +215,11 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   painter.setBrush(QColor(132, 150, 172));
   painter.drawRoundedRect(hueHandleInner, 1.0, 1.0);
   painter.restore();
+}
+
+void ColorWheelWidget::resizeEvent(QResizeEvent* event) {
+  QWidget::resizeEvent(event);
+  m_ringCache = QImage();  // サイズ変更時にキャッシュを破棄
 }
 
 bool ColorWheelWidget::updateHueFromPoint(const QPointF& point) {
