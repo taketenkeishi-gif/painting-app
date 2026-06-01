@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include <QAction>
@@ -72,85 +73,7 @@ namespace app::mainwindow {
 
 namespace {
 
-// Adaptive dock title bar: 22 px when floating (draggable), 2 px when tabified/docked.
-class DockTitleBar : public QWidget {
-  Q_OBJECT
-public:
-  explicit DockTitleBar(QDockWidget* dock)
-      : QWidget(dock), m_dock(dock) {
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    setCursor(Qt::SizeAllCursor);
 
-    m_label = new QLabel(dock->windowTitle(), this);
-    m_label->setStyleSheet("color: #5a6480; font-size: 10px; background: transparent;");
-
-    m_floatBtn = new QPushButton(this);
-    m_floatBtn->setFixedSize(16, 16);
-    m_floatBtn->setFlat(true);
-    m_floatBtn->setFocusPolicy(Qt::NoFocus);
-    m_floatBtn->setStyleSheet(
-        "QPushButton { background: transparent; border: none; color: #5a6480; font-size: 11px; padding: 0; }"
-        "QPushButton:hover { color: #c5cde0; }");
-
-    auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(6, 0, 4, 0);
-    layout->setSpacing(2);
-    layout->addWidget(m_label, 1);
-    layout->addWidget(m_floatBtn);
-
-    connect(dock, &QDockWidget::topLevelChanged, this, &DockTitleBar::onTopLevelChanged);
-    connect(m_floatBtn, &QPushButton::clicked, this, [this] {
-      m_dock->setFloating(!m_dock->isFloating());
-    });
-
-    onTopLevelChanged(dock->isFloating());
-  }
-
-private slots:
-  void onTopLevelChanged(bool floating) {
-    if (floating) {
-      setFixedHeight(22);
-      setStyleSheet("background: #1e2230; border-bottom: 1px solid #2a2e3e;");
-      m_label->setVisible(true);
-      m_floatBtn->setVisible(true);
-      m_floatBtn->setText(QStringLiteral("⊟"));
-      m_floatBtn->setToolTip("ドックに戻す");
-    } else {
-      setFixedHeight(2);
-      setStyleSheet("background: #0d0f14;");
-      m_label->setVisible(false);
-      m_floatBtn->setVisible(false);
-    }
-  }
-
-protected:
-  void mousePressEvent(QMouseEvent* e) override {
-    if (e->button() == Qt::LeftButton && m_dock->isFloating()) {
-      m_dragging = true;
-      m_dragOffset = e->globalPosition().toPoint() - m_dock->frameGeometry().topLeft();
-      e->accept();
-    }
-  }
-  void mouseMoveEvent(QMouseEvent* e) override {
-    if (m_dragging && (e->buttons() & Qt::LeftButton)) {
-      m_dock->move(e->globalPosition().toPoint() - m_dragOffset);
-      e->accept();
-    }
-  }
-  void mouseReleaseEvent(QMouseEvent* e) override {
-    if (e->button() == Qt::LeftButton) m_dragging = false;
-  }
-  void mouseDoubleClickEvent(QMouseEvent* e) override {
-    if (e->button() == Qt::LeftButton) m_dock->setFloating(!m_dock->isFloating());
-  }
-
-private:
-  QDockWidget* m_dock;
-  QLabel* m_label {nullptr};
-  QPushButton* m_floatBtn {nullptr};
-  QPoint m_dragOffset;
-  bool m_dragging {false};
-};
 
 class TitleBarDragArea : public QWidget {
 public:
@@ -197,6 +120,141 @@ private:
   QMainWindow* m_win;
   QPoint m_dragOffset;
   bool m_dragging {false};
+};
+
+class ColorSwatchWidget : public QWidget {
+public:
+  explicit ColorSwatchWidget(QWidget* parent = nullptr)
+      : QWidget(parent), m_fgColor(255, 0, 0, 255), m_bgColor(255, 255, 255, 255) {
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+  }
+
+  void setForegroundColor(const QColor& color) { m_fgColor = color; update(); }
+  void setBackgroundColor(const QColor& color) { m_bgColor = color; update(); }
+
+  QSize sizeHint() const override { return QSize(80, 80); }
+  int heightForWidth(int w) const override { return w; }
+
+  // Simple callback mechanism for clicks (no Qt signals needed)
+  std::function<void()> onForegroundClicked;
+  std::function<void()> onBackgroundClicked;
+
+protected:
+  void mousePressEvent(QMouseEvent* e) override {
+    const int sz = std::min(width(), height());
+    const int fgSize = (sz * 70) / 100;
+    const int fgX = (sz - fgSize) / 2;
+    const int fgY = (sz - fgSize) / 2;
+
+    QRect fgRect(fgX, fgY, fgSize, fgSize);
+    if (fgRect.contains(e->pos())) {
+      if (onForegroundClicked) onForegroundClicked();
+    } else {
+      if (onBackgroundClicked) onBackgroundClicked();
+    }
+  }
+
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    const int sz = std::min(width(), height());
+    const int fgSize = (sz * 70) / 100;
+    const int bgSize = (sz * 50) / 100;
+    const int fgX = (sz - fgSize) / 2;
+    const int fgY = (sz - fgSize) / 2;
+    const int bgX = fgX + (fgSize * 30) / 100;
+    const int bgY = fgY + (fgSize * 30) / 100;
+
+    // BG square (behind)
+    painter.fillRect(bgX, bgY, bgSize, bgSize, m_bgColor);
+    painter.setPen(QPen(QColor(160, 160, 160), 1));
+    painter.drawRect(bgX, bgY, bgSize - 1, bgSize - 1);
+
+    // FG square (front)
+    painter.fillRect(fgX, fgY, fgSize, fgSize, m_fgColor);
+    painter.setPen(QPen(QColor(200, 200, 200), 2));
+    painter.drawRect(fgX, fgY, fgSize - 1, fgSize - 1);
+  }
+
+private:
+  QColor m_fgColor;
+  QColor m_bgColor;
+};
+
+class DockTabBarEventFilter : public QObject {
+public:
+  explicit DockTabBarEventFilter(QMainWindow* mainWindow)
+      : QObject(nullptr), m_mainWindow(mainWindow), m_draggedTabIndex(-1) {}
+
+protected:
+  bool eventFilter(QObject* obj, QEvent* event) override {
+    auto* tabBar = qobject_cast<QTabBar*>(obj);
+    if (!tabBar) return QObject::eventFilter(obj, event);
+
+    if (event->type() == QEvent::MouseButtonPress) {
+      auto* me = static_cast<QMouseEvent*>(event);
+      if (me->button() == Qt::LeftButton) {
+        m_draggedTabIndex = tabBar->tabAt(me->pos());
+        m_dragStartPos = me->globalPosition().toPoint();
+      }
+    } else if (event->type() == QEvent::MouseMove && m_draggedTabIndex >= 0) {
+      auto* me = static_cast<QMouseEvent*>(event);
+      if (me->buttons() & Qt::LeftButton) {
+        QPoint delta = me->globalPosition().toPoint() - m_dragStartPos;
+        // Drag threshold: 8 pixels
+        if (std::abs(delta.x()) + std::abs(delta.y()) > 8) {
+          floatDockForTab(tabBar, m_draggedTabIndex);
+          m_draggedTabIndex = -1;
+        }
+      }
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+      m_draggedTabIndex = -1;
+    }
+
+    return QObject::eventFilter(obj, event);
+  }
+
+private:
+  void floatDockForTab(QTabBar* tabBar, int tabIndex) {
+    QDockWidget* dockToFloat = nullptr;
+
+    // Find the QDockWidget corresponding to this tab by matching the parent dock area
+    const auto allDocks = m_mainWindow->findChildren<QDockWidget*>();
+    for (auto* dock : allDocks) {
+      // Check if this dock's tab is at the given index in the tabBar
+      if (isDockInTabBar(dock, tabBar) && getTabIndexForDock(dock, tabBar) == tabIndex) {
+        dockToFloat = dock;
+        break;
+      }
+    }
+
+    if (dockToFloat && !dockToFloat->isFloating()) {
+      dockToFloat->setFloating(true);
+    }
+  }
+
+  bool isDockInTabBar(QDockWidget* dock, QTabBar* tabBar) const {
+    QWidget* parent = tabBar->parentWidget();
+    while (parent) {
+      if (parent == dock->parentWidget()) return true;
+      parent = parent->parentWidget();
+    }
+    return false;
+  }
+
+  int getTabIndexForDock(QDockWidget* dock, QTabBar* tabBar) const {
+    for (int i = 0; i < tabBar->count(); ++i) {
+      if (tabBar->tabText(i) == dock->windowTitle()) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  QMainWindow* m_mainWindow;
+  int m_draggedTabIndex {-1};
+  QPoint m_dragStartPos;
 };
 
 QColor toQColor(const core::Color& color) {
@@ -336,9 +394,12 @@ void MainWindow::setupShellLayout() {
   colorTitle->setStyleSheet("font-weight: 700; font-size: 11px;");
   m_foregroundColorButton = new QPushButton(colorPanel);
   m_backgroundColorButton = new QPushButton(colorPanel);
+  m_foregroundColorButton->setVisible(false);
+  m_backgroundColorButton->setVisible(false);
   auto* swapColorButton = new QPushButton(colorPanel);
   auto* resetColorButton = new QPushButton(colorPanel);
   auto* transparentColorButton = new QPushButton(colorPanel);
+  m_colorSwatchWidget = new ColorSwatchWidget(colorPanel);
   m_hueSlider = new QSlider(Qt::Horizontal, colorPanel);
   m_satSlider = new QSlider(Qt::Horizontal, colorPanel);
   m_valSlider = new QSlider(Qt::Horizontal, colorPanel);
@@ -349,17 +410,15 @@ void MainWindow::setupShellLayout() {
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
   m_colorWheelWidget->setMinimumSize(104, 104);
-  m_foregroundColorButton->setFixedSize(22, 22);
-  m_backgroundColorButton->setFixedSize(22, 22);
+  // Swatch widget: Preferred (doesn't stretch)
+  m_colorSwatchWidget->setMinimumHeight(50);
+  m_colorSwatchWidget->setMaximumWidth(100);
   swapColorButton->setFixedSize(20, 20);
   resetColorButton->setFixedSize(20, 20);
-  transparentColorButton->setFixedSize(18, 10);
   swapColorButton->setIcon(app::ui::icon("swap"));
   swapColorButton->setIconSize(QSize(12, 12));
   resetColorButton->setIcon(app::ui::icon("reset_bw"));
   resetColorButton->setIconSize(QSize(12, 12));
-  transparentColorButton->setIcon(app::ui::icon("transparent"));
-  transparentColorButton->setIconSize(QSize(10, 10));
   swapColorButton->setFlat(true);
   resetColorButton->setFlat(true);
   transparentColorButton->setFlat(true);
@@ -381,70 +440,53 @@ void MainWindow::setupShellLayout() {
   m_alphaSpin->setRange(0, 255);
   swapColorButton->setToolTip("描画色と背景色を入れ替え");
   resetColorButton->setToolTip("描画色/背景色を白黒に戻す");
-  transparentColorButton->setToolTip("前景色を透明にする");
-  auto* colorButtons = new QHBoxLayout();
-  colorButtons->setContentsMargins(0, 0, 0, 0);
-  colorButtons->setSpacing(1);
-  auto* colorSwatchHost = new QWidget(colorPanel);
-  colorSwatchHost->setFixedSize(42, 36);
-  colorSwatchHost->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  colorSwatchHost->setStyleSheet("background: transparent;");
+  transparentColorButton->setToolTip("透明色で描画（アルファ消去）");
 
-  m_backgroundColorButton->setParent(colorSwatchHost);
-  m_backgroundColorButton->move(16, 7);
-  m_backgroundColorButton->setFixedSize(22, 22);
-
-  m_foregroundColorButton->setParent(colorSwatchHost);
-  m_foregroundColorButton->move(2, 0);
-  m_foregroundColorButton->setFixedSize(22, 22);
-
-  transparentColorButton->setParent(colorSwatchHost);
-  transparentColorButton->move(2, 24);
-  transparentColorButton->setFixedSize(18, 10);
-
-  m_backgroundColorButton->show();
-  m_foregroundColorButton->show();
-  transparentColorButton->show();
-  auto makeTransparentCheckerIcon = []() {
-    QPixmap pixmap(16, 8);
+  // Checker pattern icon for transparent button
+  {
+    QPixmap pixmap(24, 12);
     pixmap.fill(QColor(244, 244, 244));
-
-    QPainter checkerPainter(&pixmap);
-    const QColor light(244, 244, 244);
-    const QColor dark(142, 151, 164);
-    constexpr int cell = 2;
+    QPainter cp(&pixmap);
+    constexpr int cell = 3;
     for (int y = 0; y < pixmap.height(); y += cell) {
       for (int x = 0; x < pixmap.width(); x += cell) {
-        const bool useDark = ((x / cell) + (y / cell)) % 2 == 1;
-        checkerPainter.fillRect(QRect(x, y, cell, cell), useDark ? dark : light);
+        if (((x / cell) + (y / cell)) % 2 == 1)
+          cp.fillRect(QRect(x, y, cell, cell), QColor(142, 151, 164));
       }
     }
-    checkerPainter.end();
-    return QIcon(pixmap);
-  };
-
-  transparentColorButton->setIcon(makeTransparentCheckerIcon());
-  transparentColorButton->setIconSize(QSize(16, 8));
-  transparentColorButton->setText(QString());
-  transparentColorButton->setToolTip(QStringLiteral("透明色"));
+    cp.end();
+    transparentColorButton->setIcon(QIcon(pixmap));
+    transparentColorButton->setIconSize(QSize(24, 12));
+    transparentColorButton->setText(QString());
+  }
+  transparentColorButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  transparentColorButton->setMinimumHeight(14);
+  transparentColorButton->setMaximumHeight(16);
   transparentColorButton->setStyleSheet(QStringLiteral(
-      "QPushButton { min-width: 18px; max-width: 18px; min-height: 10px; max-height: 10px; "
-      "padding: 0px; margin: 0px; border: 1px solid #6a7484; border-radius: 0px; background: transparent; }"
+      "QPushButton { padding: 0px; margin: 0px; border: 1px solid #6a7484;"
+      "  border-radius: 2px; background: transparent; }"
       "QPushButton:hover { border: 1px solid #eef3fb; }"));
 
-  m_backgroundColorButton->raise();
-  m_foregroundColorButton->raise();
-  transparentColorButton->raise();
+  // Swatch widget (fixed proportions), transparent below, ops column on right
+  auto* swatchCol = new QVBoxLayout();
+  swatchCol->setContentsMargins(0, 0, 0, 0);
+  swatchCol->setSpacing(2);
+  swatchCol->addWidget(m_colorSwatchWidget, 0, Qt::AlignCenter);
+  swatchCol->addWidget(transparentColorButton);
+  swatchCol->addStretch();
 
-  colorButtons->addWidget(colorSwatchHost, 0, Qt::AlignLeft | Qt::AlignTop);
-  auto* colorOps = new QHBoxLayout();
-  colorOps->setContentsMargins(0, 0, 0, 0);
-  colorOps->setSpacing(1);
-  colorOps->addStretch(1);
-  colorOps->addWidget(swapColorButton);
-  colorOps->addWidget(resetColorButton);
-  // transparentColorButton is shown in colorSwatchHost.
-  colorButtons->addLayout(colorOps, 1);
+  auto* opsCol = new QVBoxLayout();
+  opsCol->setContentsMargins(0, 0, 0, 0);
+  opsCol->setSpacing(2);
+  opsCol->addWidget(swapColorButton);
+  opsCol->addWidget(resetColorButton);
+  opsCol->addStretch(1);
+
+  auto* colorButtons = new QHBoxLayout();
+  colorButtons->setContentsMargins(0, 0, 0, 0);
+  colorButtons->setSpacing(4);
+  colorButtons->addLayout(swatchCol, 1);
+  colorButtons->addLayout(opsCol, 0);
   auto addHsvRow = [this, colorPanel](const QString& label, QSlider* slider, QSpinBox* spin) {
     auto* row = new QHBoxLayout();
     row->setContentsMargins(2, 1, 2, 1);
@@ -625,6 +667,12 @@ void MainWindow::setupShellLayout() {
 
   connect(m_foregroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseForegroundColor);
   connect(m_backgroundColorButton, &QPushButton::clicked, this, &MainWindow::onChooseBackgroundColor);
+  // ColorSwatchWidget callbacks
+  {
+    auto* swatchWidget = static_cast<ColorSwatchWidget*>(m_colorSwatchWidget);
+    swatchWidget->onForegroundClicked = [this]() { onChooseForegroundColor(); };
+    swatchWidget->onBackgroundClicked = [this]() { onChooseBackgroundColor(); };
+  }
   connect(swapColorButton, &QPushButton::clicked, this, &MainWindow::onSwapColors);
   connect(resetColorButton, &QPushButton::clicked, this, &MainWindow::onResetBlackWhiteColors);
   connect(transparentColorButton, &QPushButton::clicked, this, &MainWindow::onUseTransparentColor);
@@ -781,22 +829,9 @@ void MainWindow::setupShellLayout() {
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
-  // Adaptive dock title bar: 22 px when floating (draggable header), 2 px when tabified.
-  auto applyDockTitleBar = [](QDockWidget* dock) {
-    if (dock == nullptr) return;
-    dock->setTitleBarWidget(new DockTitleBar(dock));
-  };
-
-  applyDockTitleBar(m_toolDock);
-  applyDockTitleBar(m_toolSliderDock);
-  applyDockTitleBar(m_subToolDock);
-  applyDockTitleBar(m_toolPropertyDock);
-  applyDockTitleBar(m_colorDock);
-  applyDockTitleBar(colorSliderDock);
-  applyDockTitleBar(colorHistoryDock);
-  applyDockTitleBar(m_layerDock);
-  applyDockTitleBar(m_aiDock);
-  applyDockTitleBar(m_infoDock);
+  // Native title bars are kept so Qt's dock drag/float/rearrange machinery works.
+  // They are styled compact and dark via QSS in applyUiChrome().
+  // Tabified docks can be floated by right-clicking the tab (Qt standard behavior).
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolSliderDock);
@@ -826,8 +861,9 @@ void MainWindow::setupShellLayout() {
   adjustRightDockLayout();
 
   // After layout pass, find dock-area QTabBars (not QTabWidget children) and
-  // strip close buttons / apply custom styling.
+  // strip close buttons / apply custom styling. Install drag-to-float event filter.
   QTimer::singleShot(0, this, [this] {
+    auto* dragFilter = new DockTabBarEventFilter(this);
     const auto allTabBars = findChildren<QTabBar*>();
     for (auto* tb : allTabBars) {
       if (qobject_cast<QTabWidget*>(tb->parentWidget())) continue;
@@ -836,6 +872,7 @@ void MainWindow::setupShellLayout() {
       tb->setExpanding(false);
       tb->setDocumentMode(true);
       tb->setProperty("dockTabBar", true);
+      tb->installEventFilter(dragFilter);
     }
   });
 }
@@ -1719,25 +1756,23 @@ void MainWindow::applyUiChrome() {
       "QWidget { background: #1a1d27; color: #c5cde0; }"
 
       // ── Dock widgets ─────────────────────────────────────────────
+      // Native title bar kept for drag/float/rearrange; styled compact+dark.
       "QDockWidget { color: #c5cde0; font-size: 11px; }"
       "QDockWidget::title {"
-      "  background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #23283a, stop:1 #1e2230);"
-      "  border-bottom: 1px solid #2a2e3e;"
-      "  padding: 4px 8px;"
-      "  font-weight: 600;"
+      "  background: #181b22;"
+      "  border-bottom: 1px solid #23283a;"
+      "  padding: 2px 6px;"
       "  font-size: 10px;"
-      "  letter-spacing: 0.5px;"
-      "  color: #7a86a3;"
-      "  text-transform: uppercase;"
+      "  color: #4a5268;"
+      "  text-align: left;"
       "}"
       "QDockWidget > QWidget { background: #1a1d27; }"
-      "QDockWidget::close-button, QDockWidget::float-button {"
-      "  background: transparent; border: none; padding: 2px;"
+      "QDockWidget::float-button {"
+      "  background: transparent; border: none; padding: 1px;"
       "  subcontrol-position: top right; subcontrol-origin: margin;"
+      "  width: 14px; height: 14px;"
       "}"
-      "QDockWidget::close-button:hover, QDockWidget::float-button:hover {"
-      "  background: #363d54; border-radius: 3px;"
-      "}"
+      "QDockWidget::float-button:hover { background: #363d54; border-radius: 3px; }"
 
       // ── Group boxes ───────────────────────────────────────────────
       "QGroupBox {"
@@ -3092,45 +3127,16 @@ void MainWindow::onUseTransparentColor() {
 }
 
 void MainWindow::updateColorPanel() {
-  if (m_foregroundColorButton == nullptr || m_backgroundColorButton == nullptr) {
+  if (m_colorSwatchWidget == nullptr) {
     return;
   }
 
   const QColor fg = toQColor(m_controller->toolState().color);
   const QColor bg = toQColor(m_backgroundColor);
 
-  const auto swatchStyle = [](const QColor& color, int size, bool primary) {
-    const QString border = primary ? QStringLiteral("#eef3fb") : QStringLiteral("#d8e0ec");
-    const QString hover = primary ? QStringLiteral("#ffffff") : QStringLiteral("#eef3fb");
-    const int displayAlpha = color.alpha() == 0 ? 255 : color.alpha();
-
-    const QString background = QStringLiteral("rgba(%1,%2,%3,%4)")
-        .arg(color.red())
-        .arg(color.green())
-        .arg(color.blue())
-        .arg(displayAlpha);
-
-    return QStringLiteral(
-               "QPushButton { min-width: %1px; max-width: %1px; min-height: %1px; max-height: %1px; "
-               "padding: 0px; margin: 0px; border: %2px solid %3; border-radius: 2px; background: %4; }"
-               "QPushButton:hover { border-color: %5; }"
-               "QPushButton:pressed { border-color: #9fb5d6; }")
-        .arg(size)
-        .arg(primary ? 2 : 1)
-        .arg(border)
-        .arg(background)
-        .arg(hover);
-  };
-
-  m_foregroundColorButton->setText(QString());
-  m_backgroundColorButton->setText(QString());
-  m_foregroundColorButton->setFixedSize(22, 22);
-  m_backgroundColorButton->setFixedSize(22, 22);
-  m_foregroundColorButton->setStyleSheet(swatchStyle(fg, 22, true));
-  m_backgroundColorButton->setStyleSheet(swatchStyle(bg, 22, false));
-  m_foregroundColorButton->setToolTip(
-      fg.alpha() == 0 ? QStringLiteral("前景色: 透明") : QString("前景色: %1").arg(fg.name(QColor::HexArgb).toUpper()));
-  m_backgroundColorButton->setToolTip(QString("背景色: %1").arg(bg.name(QColor::HexArgb).toUpper()));
+  auto* swatchWidget = static_cast<ColorSwatchWidget*>(m_colorSwatchWidget);
+  swatchWidget->setForegroundColor(fg);
+  swatchWidget->setBackgroundColor(bg);
 
   refreshColorHistoryButtons();
 }
@@ -3495,9 +3501,6 @@ QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, cons
 }
 
 } // namespace app::mainwindow
-
-// DockTitleBar uses Q_OBJECT inside this .cpp — moc include required
-#include "MainWindow.moc"
 
 
 

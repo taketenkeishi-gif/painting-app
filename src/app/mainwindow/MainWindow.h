@@ -185,6 +185,7 @@ private:
   QPushButton* m_foregroundColorButton {nullptr};
   QPushButton* m_backgroundColorButton {nullptr};
   QWidget* m_colorPanelWidget {nullptr};
+  QWidget* m_colorSwatchWidget {nullptr};
   QSlider* m_hueSlider {nullptr};
   QSlider* m_satSlider {nullptr};
   QSlider* m_valSlider {nullptr};

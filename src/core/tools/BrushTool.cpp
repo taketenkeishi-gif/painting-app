@@ -223,6 +223,17 @@ void BrushTool::blendPixel(
     return;
   }
 
+  // Transparent color mode: src.a==0 means "paint with transparency" = erase alpha
+  if (src.a == 0) {
+    const float keep = 1.0f - alphaScale;
+    buffer.setPixel(x, y, Color {
+        static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.r) * keep)),
+        static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.g) * keep)),
+        static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.b) * keep)),
+        static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))});
+    return;
+  }
+
   const Color effectiveSrc {
       src.r, src.g, src.b,
       static_cast<std::uint8_t>(std::lround(static_cast<float>(src.a) * alphaScale))};
@@ -548,7 +559,9 @@ void BrushTool::stampAt(
           blendPixel(buffer, px, py, drawColor, delta, lockAlpha);
         } else {
           const float dstA = static_cast<float>(buffer.pixel(px, py).a) / 255.0f;
-          if (dstA >= 0.999f) continue; // already fully opaque
+          // Skip already-opaque pixels UNLESS in transparent-erase mode
+          const bool isTransparentMode = (drawColor.a == 0);
+          if (dstA >= 0.999f && !isTransparentMode) continue;
           const float srcANeeded = std::clamp(
               (pixelStrength - dstA) / (1.0f - dstA), 0.0f, 1.0f);
           if (srcANeeded <= 0.001f) continue;
