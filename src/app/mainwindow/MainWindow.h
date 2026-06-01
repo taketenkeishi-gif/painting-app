@@ -108,6 +108,7 @@ private slots:
   void onSwapColors();
   void onResetBlackWhiteColors();
   void onUseTransparentColor();
+  void onGenerativeFillTriggered();
 
 private:
   void setupShellLayout();
@@ -251,6 +252,7 @@ private:
   QAction* m_swapColorsAction {nullptr};
   QAction* m_resetColorsAction {nullptr};
   QAction* m_transparentColorAction {nullptr};
+  QAction* m_generativeFillAction {nullptr};
   QAction* m_clearRecentFilesAction {nullptr};
   QMenu* m_recentFilesMenu {nullptr};
   QMenu* m_workspaceLayoutsMenu {nullptr};

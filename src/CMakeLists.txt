@@ -15,10 +15,15 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/RectSelectionTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FillTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/MoveLayerTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/GenerativeFillEngine.cpp
 )
 
 add_library(paint_core STATIC ${CORE_SOURCES})
+set_target_properties(paint_core PROPERTIES
+  AUTOMOC ON
+)
 target_include_directories(paint_core PUBLIC ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(paint_core PUBLIC Qt6::Core)
 if(MSVC)
   target_compile_options(paint_core PUBLIC /utf-8)
 endif()
@@ -49,8 +54,10 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/SubToolPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPropertyPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ColorWheelWidget.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/GenerativeFillDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
 )
+
 
 if(PAINT_BUILD_APP)
   add_executable(paint_app ${APP_SOURCES})

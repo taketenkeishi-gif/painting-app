@@ -57,6 +57,7 @@
 
 #include "app/bridge/AppController.h"
 #include "app/canvasview/CanvasWidget.h"
+#include "app/panels/GenerativeFillDialog.h"
 #include "app/panels/LayerPanel.h"
 #include "app/panels/SubToolPanel.h"
 #include "app/panels/ToolPanel.h"
@@ -858,6 +859,7 @@ void MainWindow::createMenus() {
   m_swapColorsAction = new QAction("描画色と背景色を切り替え(&C)", this);
   m_resetColorsAction = new QAction("描画色/背景色を白黒に戻す(&D)", this);
   m_transparentColorAction = new QAction("描画色と透明色を切り替え(&X)", this);
+  m_generativeFillAction = new QAction("AI 生成塗りつぶし(&A)...", this);
   m_clearRecentFilesAction = new QAction("最近使ったファイルをクリア", this);
 
   m_recentFilesMenu = fileMenu->addMenu("最近使ったファイル");
@@ -916,6 +918,7 @@ void MainWindow::createMenus() {
   m_swapColorsAction->setShortcut(QKeySequence(Qt::Key_C));
   m_resetColorsAction->setShortcut(QKeySequence(Qt::Key_D));
   m_transparentColorAction->setShortcut(QKeySequence(Qt::Key_X));
+  m_generativeFillAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
   m_toggleGridAction->setCheckable(true);
   m_toggleGridAction->setChecked(m_canvasWidget->isGridVisible());
   m_toggleOverlayAction->setCheckable(true);
@@ -949,6 +952,8 @@ void MainWindow::createMenus() {
   editMenu->addSeparator();
   editMenu->addAction(m_brushSizeDownAction);
   editMenu->addAction(m_brushSizeUpAction);
+  editMenu->addSeparator();
+  editMenu->addAction(m_generativeFillAction);
 
   auto* toolGroup = new QActionGroup(this);
   toolGroup->setExclusive(true);
@@ -1052,14 +1057,102 @@ void MainWindow::createMenus() {
   helpMenu->addAction(aboutAction);
   helpMenu->addAction(m_openDocsAction);
 
-  // ── ショートカットメニュー（メニューバー）────────────────────────────────
+  // ── ショートカットメニュー（メニューバー）————全カテゴリ網羅────────────
+  // NOTE: このセクションは markCommand の直後に配置すること。
+  // ツールアクションは m_toolActions に格納済み。
   auto* shortcutMenu = menuBar()->addMenu("ショートカット(&K)");
   shortcutMenu->addAction(m_shortcutSettingsAction);
+  shortcutMenu->addAction(m_commandPaletteAction);
   shortcutMenu->addAction(m_shortcutSummaryAction);
   shortcutMenu->addSeparator();
-  shortcutMenu->addAction(m_swapColorsAction);
-  shortcutMenu->addAction(m_transparentColorAction);
-  shortcutMenu->addAction(m_resetColorsAction);
+
+  // ── ファイル ──────────────────────────────────────────────────────────
+  auto* scFile = shortcutMenu->addMenu("ファイル");
+  scFile->addAction(m_newCanvasAction);
+  scFile->addAction(m_openAction);
+  scFile->addAction(m_newFromClipboardAction);
+  scFile->addAction(m_importAsLayerAction);
+  scFile->addSeparator();
+  scFile->addAction(m_saveAction);
+  scFile->addAction(m_saveAsAction);
+  scFile->addAction(m_exportPngAction);
+  scFile->addAction(m_exportFlattenedAction);
+  scFile->addSeparator();
+  scFile->addAction(m_exitAction);
+
+  // ── 編集 ─────────────────────────────────────────────────────────────
+  auto* scEdit = shortcutMenu->addMenu("編集");
+  scEdit->addAction(m_undoAction);
+  scEdit->addAction(m_redoAction);
+  scEdit->addSeparator();
+  scEdit->addAction(m_cutAction);
+  scEdit->addAction(m_copyAction);
+  scEdit->addAction(m_pasteAction);
+  scEdit->addAction(m_deletePixelsAction);
+  scEdit->addAction(m_fillAction);
+  scEdit->addAction(m_clearAction);
+  scEdit->addSeparator();
+  scEdit->addAction(m_brushSizeDownAction);
+  scEdit->addAction(m_brushSizeUpAction);
+  scEdit->addSeparator();
+  scEdit->addAction(m_generativeFillAction);
+
+  // ── ツール ────────────────────────────────────────────────────────────
+  auto* scTool = shortcutMenu->addMenu("ツール");
+  for (const auto& [kind, action] : m_toolActions) {
+    if (action != nullptr) {
+      scTool->addAction(action);
+    }
+  }
+  scTool->addSeparator();
+  scTool->addAction(m_swapColorsAction);
+  scTool->addAction(m_transparentColorAction);
+  scTool->addAction(m_resetColorsAction);
+
+  // ── 選択 ─────────────────────────────────────────────────────────────
+  auto* scSelect = shortcutMenu->addMenu("選択");
+  scSelect->addAction(m_selectAllAction);
+  scSelect->addAction(m_deselectAction);
+  scSelect->addAction(m_clearSelectionAction);
+  scSelect->addAction(m_invertSelectionAction);
+
+  // ── レイヤー ──────────────────────────────────────────────────────────
+  auto* scLayer = shortcutMenu->addMenu("レイヤー");
+  scLayer->addAction(m_addRasterLayerAction);
+  scLayer->addAction(m_addVectorLayerAction);
+  scLayer->addAction(m_addFolderLayerAction);
+  scLayer->addAction(m_duplicateLayerAction);
+  scLayer->addAction(m_deleteLayerAction);
+  scLayer->addAction(m_mergeDownAction);
+  scLayer->addAction(m_rasterizeLayerAction);
+  scLayer->addSeparator();
+  scLayer->addAction(m_toggleLayerVisibilityAction);
+  scLayer->addAction(m_toggleLayerClipAction);
+  scLayer->addAction(m_toggleLayerMaskAction);
+  scLayer->addAction(m_removeLayerMaskAction);
+  scLayer->addAction(m_toggleLayerLockAction);
+  scLayer->addAction(m_toggleLayerAlphaLockAction);
+  scLayer->addAction(m_toggleLayerPositionLockAction);
+  scLayer->addSeparator();
+  scLayer->addAction(m_moveLayerUpAction);
+  scLayer->addAction(m_moveLayerDownAction);
+
+  // ── 表示 ─────────────────────────────────────────────────────────────
+  auto* scView = shortcutMenu->addMenu("表示");
+  scView->addAction(m_zoomInAction);
+  scView->addAction(m_zoomOutAction);
+  scView->addAction(m_resetZoomAction);
+  scView->addAction(m_fitToScreenAction);
+  scView->addSeparator();
+  scView->addAction(m_toggleGridAction);
+  scView->addAction(m_toggleOverlayAction);
+
+  // ── ウィンドウ ────────────────────────────────────────────────────────
+  auto* scWindow = shortcutMenu->addMenu("ウィンドウ");
+  scWindow->addAction(m_saveWorkspaceAction);
+  scWindow->addAction(m_deleteWorkspaceAction);
+  scWindow->addAction(m_restoreLastWorkspaceAction);
+  scWindow->addAction(m_resetWorkspaceAction);
 
   connect(m_newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
   connect(m_openAction, &QAction::triggered, this, &MainWindow::onOpenTriggered);
@@ -1119,6 +1212,7 @@ void MainWindow::createMenus() {
   connect(m_swapColorsAction, &QAction::triggered, this, &MainWindow::onSwapColors);
   connect(m_resetColorsAction, &QAction::triggered, this, &MainWindow::onResetBlackWhiteColors);
   connect(m_transparentColorAction, &QAction::triggered, this, &MainWindow::onUseTransparentColor);
+  connect(m_generativeFillAction, &QAction::triggered, this, &MainWindow::onGenerativeFillTriggered);
   connect(m_clearRecentFilesAction, &QAction::triggered, this, [this]() {
     m_recentFiles.clear();
     rebuildRecentFilesMenu();
@@ -1225,6 +1319,7 @@ void MainWindow::createMenus() {
   markCommand(m_swapColorsAction, "color.swap");
   markCommand(m_resetColorsAction, "color.reset_bw");
   markCommand(m_transparentColorAction, "color.transparent");
+  markCommand(m_generativeFillAction, "edit.generative_fill");
   for (const auto& [kind, action] : m_toolActions) {
     if (action != nullptr) {
       markCommand(action, QString("tool.%1").arg(static_cast<int>(kind)));
@@ -2561,6 +2656,26 @@ void MainWindow::onResetBlackWhiteColors() {
   m_backgroundColor = core::Color {255, 255, 255, 255};
   m_controller->setPaperColor(m_backgroundColor);
   updateColorPanel();
+}
+
+void MainWindow::onGenerativeFillTriggered() {
+  const core::PixelBuffer& canvas = m_controller->compositedBuffer();
+  if (canvas.width() <= 0 || canvas.height() <= 0) {
+    statusBar()->showMessage("キャンバスが空です", 1800);
+    return;
+  }
+  const core::SelectionMask& mask = m_controller->document().selection();
+
+  app::panels::GenerativeFillDialog dlg(canvas, mask, this);
+  if (dlg.exec() != QDialog::Accepted || !dlg.hasResult()) {
+    return;
+  }
+
+  // 生成結果を新規ラスターレイヤーとして追加
+  if (m_controller->pasteBufferAsNewRasterLayer(dlg.result(), "AI 生成塗りつぶし")) {
+    updateUndoRedoState();
+    statusBar()->showMessage("AI 生成結果を新規レイヤーとして追加しました", 2500);
+  }
 }
 
 void MainWindow::onUseTransparentColor() {
