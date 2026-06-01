@@ -54,10 +54,14 @@ constexpr int kPositionLockedRole = Qt::UserRole + 10;
 constexpr int kBlendModeRole = Qt::UserRole + 11;
 constexpr int kPaperRole = Qt::UserRole + 12;
 constexpr int kActiveRole = Qt::UserRole + 13;
+constexpr int kEditTargetRole = Qt::UserRole + 14;  ///< 0=Image, 1=Mask
 
-constexpr int kLayerRowHeight = 30;
-constexpr int kLayerThumbWidth = 38;
-constexpr int kLayerThumbHeight = 24;
+constexpr int kLayerRowHeight = 42;
+constexpr int kLayerThumbWidth = 34;
+constexpr int kLayerThumbHeight = 26;
+constexpr int kMaskThumbWidth = 26;
+constexpr int kMaskThumbHeight = 26;
+constexpr int kThumbGap = 3;
 constexpr int kVisibilitySlotWidth = 20;
 constexpr int kActiveSlotWidth = 16;
 
@@ -179,6 +183,37 @@ QIcon layerThumbnailIcon(
   border.drawRect(QRect(0, 0, thumbW - 1, thumbH - 1));
   border.end();
   return QIcon(pixmap);
+}
+
+QPixmap maskThumbnailPixmap(
+    const app::bridge::AppController* controller,
+    std::size_t layerIndex) {
+  QImage image(kMaskThumbWidth, kMaskThumbHeight, QImage::Format_ARGB32_Premultiplied);
+  if (layerIndex < controller->document().layerCount()) {
+    const core::Layer& layer = controller->document().layerAt(layerIndex);
+    if (layer.hasMask()) {
+      const core::PixelBuffer& maskBuf = layer.maskBuffer();
+      for (int y = 0; y < kMaskThumbHeight; ++y) {
+        const int sy = std::clamp((y * maskBuf.height()) / kMaskThumbHeight, 0, maskBuf.height() - 1);
+        for (int x = 0; x < kMaskThumbWidth; ++x) {
+          const int sx = std::clamp((x * maskBuf.width()) / kMaskThumbWidth, 0, maskBuf.width() - 1);
+          const std::uint8_t g = maskBuf.pixel(sx, sy).r;
+          image.setPixelColor(x, y, QColor(g, g, g));
+        }
+      }
+    } else {
+      image.fill(QColor(40, 40, 40));
+    }
+  } else {
+    image.fill(QColor(40, 40, 40));
+  }
+  QPixmap pm = QPixmap::fromImage(image);
+  QPainter border(&pm);
+  border.setPen(QPen(QColor(40, 46, 56), 1.0));
+  border.setBrush(Qt::NoBrush);
+  border.drawRect(QRect(0, 0, kMaskThumbWidth - 1, kMaskThumbHeight - 1));
+  border.end();
+  return pm;
 }
 
 QString layerBadge(const app::bridge::LayerViewModel& model) {
@@ -330,9 +365,14 @@ QRect layerThumbnailRect(const QRect& rect) {
   return QRect(left, rect.top() + (rect.height() - kLayerThumbHeight) / 2, kLayerThumbWidth, kLayerThumbHeight);
 }
 
+QRect layerMaskThumbnailRect(const QRect& rect) {
+  const QRect img = layerThumbnailRect(rect);
+  return QRect(img.right() + kThumbGap, rect.top() + (rect.height() - kMaskThumbHeight) / 2, kMaskThumbWidth, kMaskThumbHeight);
+}
+
 QRect layerNameRect(const QRect& rect) {
-  const QRect thumb = layerThumbnailRect(rect);
-  return QRect(thumb.right() + 7, rect.top(), rect.right() - thumb.right() - 10, rect.height());
+  const QRect mask = layerMaskThumbnailRect(rect);
+  return QRect(mask.right() + 5, rect.top(), rect.right() - mask.right() - 7, rect.height());
 }
 
 QString layerPaintName(const QModelIndex& index) {
@@ -394,12 +434,48 @@ QString layerPaintName(const QModelIndex& index) {
     }
 
     const QRect thumbRect = layerThumbnailRect(rect);
+    const bool hasMask = index.data(kHasMaskRole).toBool();
+    const int editTarget = index.data(kEditTargetRole).toInt();
+    const bool editingMask = hasMask && (editTarget == 1);
+    const bool editingImage = !editingMask;
+
     const QIcon thumbnail = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
     thumbnail.paint(painter, thumbRect, Qt::AlignCenter, QIcon::Normal);
 
-    painter->setPen(QColor(0x1e, 0x1e, 0x1e));
+    // Image thumbnail highlight border
+    if (editingImage && !index.data(kPaperRole).toBool()) {
+      painter->setPen(QPen(QColor(0x4e, 0x8e, 0xf7), 2));
+    } else {
+      painter->setPen(QColor(0x1e, 0x1e, 0x1e));
+    }
     painter->setBrush(Qt::NoBrush);
     painter->drawRect(thumbRect.adjusted(0, 0, -1, -1));
+
+    // Mask thumbnail
+    const QRect maskThumbRect = layerMaskThumbnailRect(rect);
+    if (hasMask) {
+      const QPixmap maskPm = qvariant_cast<QPixmap>(index.data(Qt::UserRole + 100));
+      painter->drawPixmap(maskThumbRect, maskPm);
+      if (editingMask) {
+        painter->setPen(QPen(QColor(0x4e, 0x8e, 0xf7), 2));
+      } else {
+        const bool maskEnabled = index.data(kMaskEnabledRole).toBool();
+        painter->setPen(QPen(maskEnabled ? QColor(0x1e, 0x1e, 0x1e) : QColor(0xe0, 0x50, 0x50), 1));
+      }
+      painter->setBrush(Qt::NoBrush);
+      painter->drawRect(maskThumbRect.adjusted(0, 0, -1, -1));
+      // Disabled mask: red X overlay
+      if (!index.data(kMaskEnabledRole).toBool()) {
+        painter->setPen(QPen(QColor(0xe0, 0x50, 0x50, 180), 1));
+        painter->drawLine(maskThumbRect.topLeft(), maskThumbRect.bottomRight());
+        painter->drawLine(maskThumbRect.topRight(), maskThumbRect.bottomLeft());
+      }
+    } else {
+      // Slot placeholder for mask (dashed outline)
+      painter->setPen(QPen(QColor(0x3c, 0x3c, 0x3c), 1, Qt::DashLine));
+      painter->setBrush(Qt::NoBrush);
+      painter->drawRect(maskThumbRect.adjusted(1, 1, -2, -2));
+    }
 
     QFont nameFont = option.font;
     nameFont.setBold(active);
@@ -421,10 +497,34 @@ QString layerPaintName(const QModelIndex& index) {
 
     if (event->type() == QEvent::MouseButtonRelease) {
       auto* mouseEvent = static_cast<QMouseEvent*>(event);
-      if (mouseEvent->button() == Qt::LeftButton && layerVisibilityRect(option.rect).contains(mouseEvent->pos())) {
-        const bool visible = index.data(kVisibilityRole).toBool();
-        model->setData(index, visible ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
-        return true;
+      if (mouseEvent->button() == Qt::LeftButton) {
+        if (layerVisibilityRect(option.rect).contains(mouseEvent->pos())) {
+          const bool visible = index.data(kVisibilityRole).toBool();
+          model->setData(index, visible ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
+          return true;
+        }
+        // Mask thumbnail click → switch edit target
+        if (index.data(kHasMaskRole).toBool() &&
+            layerMaskThumbnailRect(option.rect).contains(mouseEvent->pos())) {
+          model->setData(index, 1, kEditTargetRole);
+          return true;
+        }
+        // Image thumbnail click → switch edit target to image
+        if (layerThumbnailRect(option.rect).contains(mouseEvent->pos())) {
+          model->setData(index, 0, kEditTargetRole);
+          return true;
+        }
+      }
+      // Shift+click mask thumbnail → toggle mask enable
+      if (event->type() == QEvent::MouseButtonRelease) {
+        auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() == Qt::LeftButton && me->modifiers().testFlag(Qt::ShiftModifier) &&
+            index.data(kHasMaskRole).toBool() &&
+            layerMaskThumbnailRect(option.rect).contains(me->pos())) {
+          const bool enabled = index.data(kMaskEnabledRole).toBool();
+          model->setData(index, !enabled ? 2 : 3, kEditTargetRole);  // 2=enable, 3=disable
+          return true;
+        }
       }
     }
 
@@ -701,6 +801,24 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_filterEdit, &QLineEdit::textChanged, this, &LayerPanel::onFilterTextChanged);
   connect(m_layerList, &QListWidget::customContextMenuRequested, this, &LayerPanel::onLayerContextMenuRequested);
   connect(m_layerList->model(), &QAbstractItemModel::rowsMoved, this, &LayerPanel::onLayerRowsMoved);
+  // Delegate edit-target / mask toggle signals
+  connect(m_layerList->model(), &QAbstractItemModel::dataChanged,
+          this, [this](const QModelIndex& topLeft, const QModelIndex&, const QVector<int>& roles) {
+    if (m_controller == nullptr || m_isRefreshing) return;
+    if (!roles.contains(kEditTargetRole)) return;
+    const QListWidgetItem* item = m_layerList->item(topLeft.row());
+    if (item == nullptr) return;
+    const int val = item->data(kEditTargetRole).toInt();
+    if (val == 0) {
+      m_controller->setEditTarget(app::ui::UiState::EditTarget::Image);
+    } else if (val == 1) {
+      m_controller->setEditTarget(app::ui::UiState::EditTarget::Mask);
+    } else if (val == 2) {
+      m_controller->enableLayerMask(true);
+    } else if (val == 3) {
+      m_controller->enableLayerMask(false);
+    }
+  });
   connect(m_opacitySlider, &QSlider::valueChanged, this, &LayerPanel::onOpacityChanged);
   connect(m_opacitySpin, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
     if (m_isRefreshing) {
@@ -866,6 +984,18 @@ void LayerPanel::refreshLayers() {
     item->setData(kClippedRole, model.clippedToBelow);
     item->setData(kHasMaskRole, model.hasMask);
     item->setData(kMaskEnabledRole, model.maskEnabled);
+    // editTarget: 0=Image, 1=Mask (only meaningful for active layer)
+    const int editTargetVal = (model.active && m_controller != nullptr)
+        ? (m_controller->editTarget() == app::ui::UiState::EditTarget::Mask ? 1 : 0)
+        : 0;
+    item->setData(kEditTargetRole, editTargetVal);
+    // Mask thumbnail pixmap
+    if (model.hasMask && !model.paperLayer) {
+      const std::size_t realLayerIdx = static_cast<std::size_t>(
+          model.paperLayer ? -1 : static_cast<int>(layerIndex - 1));
+      item->setData(Qt::UserRole + 100,
+                    QVariant::fromValue(maskThumbnailPixmap(m_controller, realLayerIdx)));
+    }
     item->setData(kLockedRole, model.locked);
     item->setData(kAlphaLockedRole, model.alphaLocked);
     item->setData(kPositionLockedRole, model.positionLocked);

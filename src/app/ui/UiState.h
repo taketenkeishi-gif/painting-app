@@ -69,6 +69,10 @@ struct UiState {
   // ── グラデーション ────────────────────────────────────────────────────────
   int gradientType {0};  ///< 0=Linear, 1=Radial
   int gradientFill {0};  ///< 0=FgToBg, 1=FgToTransparent
+
+  // ── レイヤー編集対象 ─────────────────────────────────────────────────────
+  enum class EditTarget { Image, Mask };
+  EditTarget editTarget {EditTarget::Image};
 };
 
 } // namespace app::ui

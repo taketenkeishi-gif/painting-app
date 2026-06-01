@@ -647,6 +647,13 @@ void AppController::setActiveLayer(std::size_t index) {
   if (!m_document.setActiveLayer(index)) {
     return;
   }
+  // マスク編集中にマスクのないレイヤーに切り替わった場合はImageに戻す
+  if (m_uiState.editTarget == app::ui::UiState::EditTarget::Mask) {
+    const core::Layer* layer = m_document.activeLayer();
+    if (layer == nullptr || !layer->hasMask()) {
+      m_uiState.editTarget = app::ui::UiState::EditTarget::Image;
+    }
+  }
   ensureCurrentSubToolCompatibility();
   emit toolStateChanged();
   emit layersChanged();
@@ -867,6 +874,185 @@ bool AppController::removeActiveLayerMask() {
   emit layersChanged();
   emit documentChanged();
   return true;
+}
+
+// ── LayerMask Photoshop-style operations ─────────────────────────────────────
+
+bool AppController::createLayerMaskFromSelection(bool invertMask) {
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || active->isPaperLayer()) return false;
+
+  const core::Layer before = *active;
+  const core::SelectionMask& sel = m_document.selection();
+  const int w = m_document.canvasSize().width;
+  const int h = m_document.canvasSize().height;
+
+  active->createMask(core::Color::OpaqueWhite());
+  core::PixelBuffer& maskBuf = active->maskBuffer();
+
+  const bool hasSelection = sel.hasSelection();
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      std::uint8_t val = hasSelection ? sel.maskValue(x, y) : 255;
+      if (invertMask) val = 255 - val;
+      maskBuf.setPixel(x, y, core::Color {val, val, val, 255});
+    }
+  }
+
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Create Mask from Selection";
+  entry.layerIndex = m_document.activeLayerIndex();
+  entry.beforeLayer = before;
+  entry.afterLayer = *active;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::deleteLayerMask() {
+  return removeActiveLayerMask();
+}
+
+bool AppController::enableLayerMask(bool enable) {
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || !active->hasMask()) return false;
+  active->setMaskEnabled(enable);
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::invertLayerMask() {
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || !active->hasMask()) return false;
+
+  const core::Layer before = *active;
+  core::PixelBuffer& maskBuf = active->maskBuffer();
+  for (int y = 0; y < maskBuf.height(); ++y) {
+    for (int x = 0; x < maskBuf.width(); ++x) {
+      const core::Color c = maskBuf.pixel(x, y);
+      maskBuf.setPixel(x, y, core::Color {
+          static_cast<std::uint8_t>(255 - c.r),
+          static_cast<std::uint8_t>(255 - c.g),
+          static_cast<std::uint8_t>(255 - c.b),
+          255});
+    }
+  }
+
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Invert Mask";
+  entry.layerIndex = m_document.activeLayerIndex();
+  entry.beforeLayer = before;
+  entry.afterLayer = *active;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::applyLayerMask() {
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || !active->hasMask() || active->kind() != core::LayerKind::Raster) {
+    return false;
+  }
+
+  const core::Layer before = *active;
+  core::PixelBuffer& buf = active->buffer();
+  const core::PixelBuffer& maskBuf = active->maskBuffer();
+
+  for (int y = 0; y < buf.height(); ++y) {
+    for (int x = 0; x < buf.width(); ++x) {
+      core::Color px = buf.pixel(x, y);
+      const float maskVal = static_cast<float>(maskBuf.pixel(x, y).r) / 255.0f;
+      px.a = static_cast<std::uint8_t>(
+          std::lround(static_cast<float>(px.a) * maskVal));
+      buf.setPixel(x, y, px);
+    }
+  }
+  active->removeMask();
+
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Apply Mask";
+  entry.layerIndex = m_document.activeLayerIndex();
+  entry.beforeLayer = before;
+  entry.afterLayer = *active;
+  pushHistoryEntry(std::move(entry));
+  setEditTarget(app::ui::UiState::EditTarget::Image);
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::clearLayerMask() {
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr) return false;
+  if (!active->hasMask()) {
+    active->createMask(core::Color::OpaqueWhite());
+    emit layersChanged();
+    return true;
+  }
+  const core::Layer before = *active;
+  core::PixelBuffer& maskBuf = active->maskBuffer();
+  for (int y = 0; y < maskBuf.height(); ++y) {
+    for (int x = 0; x < maskBuf.width(); ++x) {
+      maskBuf.setPixel(x, y, core::Color {255, 255, 255, 255});
+    }
+  }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "Clear Mask";
+  entry.layerIndex = m_document.activeLayerIndex();
+  entry.beforeLayer = before;
+  entry.afterLayer = *active;
+  pushHistoryEntry(std::move(entry));
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+void AppController::setEditTarget(app::ui::UiState::EditTarget target) {
+  if (m_uiState.editTarget == target) return;
+  core::Layer* active = m_document.activeLayer();
+  if (target == app::ui::UiState::EditTarget::Mask) {
+    if (active == nullptr || !active->hasMask()) return;
+  }
+  m_uiState.editTarget = target;
+  emit layersChanged();
+  emit toolStateChanged();
+}
+
+std::size_t AppController::addAdjustmentLayerByKind(core::AdjustmentKind kind) {
+  core::AdjustmentParams params;
+  params.kind = kind;
+  const char* name = [kind]() -> const char* {
+    using K = core::AdjustmentKind;
+    switch (kind) {
+      case K::BrightnessContrast: return "明るさ・コントラスト";
+      case K::HueSaturation:      return "色相・彩度";
+      case K::Levels:             return "レベル補正";
+      case K::Curves:             return "トーンカーブ";
+      case K::Invert:             return "階調の反転";
+      case K::Threshold:          return "2階調化";
+      case K::Vibrance:           return "自然な彩度";
+      default:                    return "色調補正";
+    }
+  }();
+  const std::size_t idx = m_document.addAdjustmentLayer(params, name);
+  // 新規AdjustmentLayerに自動的にreveal-allマスクを作成
+  m_document.layerAt(idx).createMask(core::Color::OpaqueWhite());
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return idx;
 }
 
 bool AppController::toggleActiveLayerLock() {
@@ -3228,12 +3414,14 @@ void AppController::saveSubToolCatalogToSettings() const {
 }
 
 core::ToolContext AppController::makeToolContext() {
+  const bool maskMode = m_uiState.editTarget == app::ui::UiState::EditTarget::Mask;
   return core::ToolContext {
       m_document,
       m_composited,
       m_currentColor,
       m_secondaryColor,
-      m_uiState.size};
+      m_uiState.size,
+      maskMode};
 }
 
 void AppController::applyToolResult(const core::ToolResult& result) {

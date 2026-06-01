@@ -153,6 +153,10 @@ ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEve
     return {};
   }
 
+  m_maskEditMode = context.maskEditMode;
+  if (m_maskEditMode && !active->hasMask()) {
+    active->createMask();
+  }
   m_erasing = true;
   m_lastPoint = event.fpoint;
   m_lastPressure = event.pressure;
@@ -287,6 +291,43 @@ FPoint EraserTool::applyStabilization(const FPoint& from, const FPoint& to) cons
 // ラスターストローク（subpixel + spacing accumulation）
 // ---------------------------------------------------------------
 void EraserTool::eraseStroke(Layer& layer, const FPoint& from, const FPoint& to, float pressure) {
+  // マスク編集モード: 消去ではなく黒を描画（非表示化）
+  if (m_maskEditMode) {
+    PixelBuffer& maskBuf = layer.maskBuffer();
+    const float p = std::clamp(pressure, 0.0f, 1.0f);
+    float sizeScale = 1.0f;
+    if (m_pressureSizeEnabled) sizeScale = m_pressureSizeMin + (1.0f - m_pressureSizeMin) * p;
+    const float fRadius = static_cast<float>(std::max(1, m_size)) * 0.5f * sizeScale;
+    const float spacingPx = std::max(0.5f, m_spacing * fRadius * 2.0f);
+    const float dx = to.x - from.x;
+    const float dy = to.y - from.y;
+    const float segLen = std::sqrt(dx * dx + dy * dy);
+    auto paintBlack = [&](FPoint pos) {
+      const int r = static_cast<int>(std::ceil(fRadius));
+      for (int py = -r; py <= r; ++py) {
+        for (int px2 = -r; px2 <= r; ++px2) {
+          const float d2 = static_cast<float>(px2 * px2 + py * py);
+          if (d2 > fRadius * fRadius) continue;
+          const int bx = static_cast<int>(pos.x) + px2;
+          const int by = static_cast<int>(pos.y) + py;
+          if (!maskBuf.inBounds(bx, by)) continue;
+          maskBuf.setPixel(bx, by, Color {0, 0, 0, 255});
+        }
+      }
+    };
+    if (segLen < 0.001f) { paintBlack(from); return; }
+    float traveled = spacingPx - m_distanceAccum;
+    if (traveled < 0.0f) traveled = 0.0f;
+    while (traveled <= segLen + 0.001f) {
+      const float t = std::clamp(traveled / segLen, 0.0f, 1.0f);
+      paintBlack({from.x + dx * t, from.y + dy * t});
+      traveled += spacingPx;
+    }
+    m_distanceAccum = segLen - (traveled - spacingPx);
+    if (m_distanceAccum < 0.0f) m_distanceAccum = 0.0f;
+    return;
+  }
+
   PixelBuffer& buffer = layer.buffer();
 
   // 筆圧によるサイズ・不透明度スケーリング（BrushTool と同じロジック）

@@ -840,6 +840,13 @@ void MainWindow::createMenus() {
   m_toggleLayerClipAction = new QAction("クリッピングを切替(&C)", this);
   m_toggleLayerMaskAction = new QAction("マスクを切替(&K)", this);
   m_removeLayerMaskAction = new QAction("マスクを削除(&H)", this);
+  m_createMaskFromSelAction = new QAction("選択範囲からマスク作成(&M)", this);
+  m_invertLayerMaskAction   = new QAction("マスクを反転(&I)", this);
+  m_applyLayerMaskAction    = new QAction("マスクを適用(&A)", this);
+  m_addAdjBrightnessAction  = new QAction("明るさ・コントラスト", this);
+  m_addAdjHueSatAction      = new QAction("色相・彩度", this);
+  m_addAdjLevelsAction      = new QAction("レベル補正", this);
+  m_addAdjInvertAction      = new QAction("階調の反転", this);
   m_toggleLayerLockAction = new QAction("ロックを切替(&L)", this);
   m_toggleLayerAlphaLockAction = new QAction("透明保護を切替(&A)", this);
   m_toggleLayerPositionLockAction = new QAction("位置固定を切替(&P)", this);
@@ -1043,8 +1050,19 @@ void MainWindow::createMenus() {
   layerMenu->addAction(m_mergeDownAction);
   layerMenu->addAction(m_rasterizeLayerAction);
   layerMenu->addSeparator();
+  // 色調補正レイヤーサブメニュー
+  auto* adjMenu = layerMenu->addMenu(QString::fromUtf8(u8"新規色調補正レイヤー(&J)"));
+  adjMenu->addAction(m_addAdjBrightnessAction);
+  adjMenu->addAction(m_addAdjHueSatAction);
+  adjMenu->addAction(m_addAdjLevelsAction);
+  adjMenu->addSeparator();
+  adjMenu->addAction(m_addAdjInvertAction);
+  layerMenu->addSeparator();
   layerMenu->addAction(m_toggleLayerClipAction);
   layerMenu->addAction(m_toggleLayerMaskAction);
+  layerMenu->addAction(m_createMaskFromSelAction);
+  layerMenu->addAction(m_invertLayerMaskAction);
+  layerMenu->addAction(m_applyLayerMaskAction);
   layerMenu->addAction(m_removeLayerMaskAction);
   layerMenu->addAction(m_toggleLayerLockAction);
   layerMenu->addAction(m_toggleLayerAlphaLockAction);
@@ -1252,6 +1270,27 @@ void MainWindow::createMenus() {
   connect(m_toggleLayerClipAction, &QAction::triggered, this, &MainWindow::onToggleLayerClipTriggered);
   connect(m_toggleLayerMaskAction, &QAction::triggered, this, &MainWindow::onToggleLayerMaskTriggered);
   connect(m_removeLayerMaskAction, &QAction::triggered, this, &MainWindow::onRemoveLayerMaskTriggered);
+  connect(m_createMaskFromSelAction, &QAction::triggered, this, [this] {
+    m_controller->createLayerMaskFromSelection();
+  });
+  connect(m_invertLayerMaskAction, &QAction::triggered, this, [this] {
+    m_controller->invertLayerMask();
+  });
+  connect(m_applyLayerMaskAction, &QAction::triggered, this, [this] {
+    m_controller->applyLayerMask();
+  });
+  connect(m_addAdjBrightnessAction, &QAction::triggered, this, [this] {
+    m_controller->addAdjustmentLayerByKind(core::AdjustmentKind::BrightnessContrast);
+  });
+  connect(m_addAdjHueSatAction, &QAction::triggered, this, [this] {
+    m_controller->addAdjustmentLayerByKind(core::AdjustmentKind::HueSaturation);
+  });
+  connect(m_addAdjLevelsAction, &QAction::triggered, this, [this] {
+    m_controller->addAdjustmentLayerByKind(core::AdjustmentKind::Levels);
+  });
+  connect(m_addAdjInvertAction, &QAction::triggered, this, [this] {
+    m_controller->addAdjustmentLayerByKind(core::AdjustmentKind::Invert);
+  });
   connect(m_toggleLayerLockAction, &QAction::triggered, this, &MainWindow::onToggleLayerLockTriggered);
   connect(m_toggleLayerAlphaLockAction, &QAction::triggered, this, &MainWindow::onToggleLayerAlphaLockTriggered);
   connect(

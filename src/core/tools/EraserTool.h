@@ -69,6 +69,7 @@ private:
   float m_pressureOpacityMin     {0.1F};
 
   bool m_erasing {false};
+  bool m_maskEditMode {false};
   FPoint m_lastPoint {0.0f, 0.0f};
   float m_lastPressure {1.0f};
   mutable float m_distanceAccum {0.0f};

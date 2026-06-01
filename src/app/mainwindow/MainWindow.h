@@ -249,6 +249,13 @@ private:
   QAction* m_toggleLayerClipAction {nullptr};
   QAction* m_toggleLayerMaskAction {nullptr};
   QAction* m_removeLayerMaskAction {nullptr};
+  QAction* m_createMaskFromSelAction {nullptr};
+  QAction* m_invertLayerMaskAction   {nullptr};
+  QAction* m_applyLayerMaskAction    {nullptr};
+  QAction* m_addAdjBrightnessAction  {nullptr};
+  QAction* m_addAdjHueSatAction      {nullptr};
+  QAction* m_addAdjLevelsAction      {nullptr};
+  QAction* m_addAdjInvertAction      {nullptr};
   QAction* m_toggleLayerLockAction {nullptr};
   QAction* m_toggleLayerAlphaLockAction {nullptr};
   QAction* m_toggleLayerPositionLockAction {nullptr};

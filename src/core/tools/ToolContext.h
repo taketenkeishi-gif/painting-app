@@ -68,6 +68,7 @@ struct ToolContext {
   Color currentColor;
   Color secondaryColor {255, 255, 255, 255};  ///< 背景色（グラデーション用）
   int brushSize {1};
+  bool maskEditMode {false};  ///< true = brush/eraser writes to layer maskBuffer (grayscale)
 };
 
 } // namespace core

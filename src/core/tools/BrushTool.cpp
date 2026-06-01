@@ -515,7 +515,12 @@ void BrushTool::stampAt(
 
       // ── ウェットミックス / スメア: 描画色を決定 ──────────────────────────
       Color drawColor = m_settings.color;
-      if (dyn.smear) {
+      if (m_maskEditMode) {
+        // マスク編集: 輝度でグレースケール化して alpha=255 にする
+        const std::uint8_t lum = static_cast<std::uint8_t>(std::lround(
+            0.299f * drawColor.r + 0.587f * drawColor.g + 0.114f * drawColor.b));
+        drawColor = Color {lum, lum, lum, 255};
+      } else if (dyn.smear) {
         // スメア: キャンバス色を押し広げる（ブラシ色を使わない）
         drawColor = m_smearColor;
       } else if (dyn.wetMix && composited.inBounds(px, py)) {
@@ -567,8 +572,8 @@ void BrushTool::strokeSegment(
     float strokeT, float strokeLen) {
   if (layer.locked()) return;
 
-  PixelBuffer& buffer = layer.buffer();
-  const bool lockAlpha = m_settings.lockAlphaRespect || layer.alphaLocked();
+  PixelBuffer& buffer = m_maskEditMode ? layer.maskBuffer() : layer.buffer();
+  const bool lockAlpha = m_maskEditMode ? false : (m_settings.lockAlphaRespect || layer.alphaLocked());
   const auto& dyn = m_settings.dynamics;
 
   const float baseRadius = static_cast<float>(std::max(1, m_settings.size)) * 0.5f;
@@ -650,6 +655,10 @@ ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEven
     return {};
   }
 
+  m_maskEditMode = context.maskEditMode;
+  if (m_maskEditMode && !active->hasMask()) {
+    active->createMask();
+  }
   m_drawing = true;
   m_lastPoint = event.fpoint;
   m_lastPressure = event.pressure;
@@ -676,7 +685,8 @@ ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEven
 
   // ストロークバッファ初期化
   if (!m_settings.buildupMode && !m_settings.eraseMode) {
-    m_strokeAccum.resize(active->buffer().width(), active->buffer().height(),
+    const PixelBuffer& targetBuf = m_maskEditMode ? active->maskBuffer() : active->buffer();
+    m_strokeAccum.resize(targetBuf.width(), targetBuf.height(),
                          Color::Transparent());
     m_strokeAccumDirty = false;
   }

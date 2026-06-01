@@ -176,6 +176,20 @@ public:
   bool toggleActiveLayerAlphaLock();
   bool toggleActiveLayerPositionLock();
 
+  // LayerMask Photoshop-style operations
+  bool createLayerMaskFromSelection(bool invertMask = false);
+  bool deleteLayerMask();
+  bool enableLayerMask(bool enable);
+  bool invertLayerMask();
+  bool applyLayerMask();
+  bool clearLayerMask();
+
+  app::ui::UiState::EditTarget editTarget() const noexcept { return m_uiState.editTarget; }
+  void setEditTarget(app::ui::UiState::EditTarget target);
+
+  // AdjustmentLayer
+  std::size_t addAdjustmentLayerByKind(core::AdjustmentKind kind);
+
   bool clearSelection();
   bool selectAll();
   bool deselect();
