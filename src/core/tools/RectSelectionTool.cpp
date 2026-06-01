@@ -60,6 +60,9 @@ ToolResult RectSelectionTool::onPointerRelease(ToolContext& context, const ToolP
       m_lassoPoints.push_back(event.point);
     }
     changed = applyLassoSelection(context);
+    if (changed) {
+      m_committedLassoPoints = m_lassoPoints;
+    }
   } else {
     const Rect rect = normalizeRect(m_start, m_current);
     changed = context.document.selection().setRect(rect);
@@ -91,12 +94,25 @@ ToolResult RectSelectionTool::onWheel(ToolContext& context, int deltaSteps, cons
 ToolOverlayState RectSelectionTool::overlay() const {
   ToolOverlayState state;
   if (!m_selecting) {
+    // After lasso commit: keep the polygon outline visible
+    if (m_mode == Mode::Lasso && !m_committedLassoPoints.empty()) {
+      state.hasPolygon = true;
+      state.polygonClosed = true;
+      state.polygonPoints = m_committedLassoPoints;
+    }
     return state;
   }
   if (m_mode == Mode::Lasso) {
-    state.hasLine = true;
-    state.lineStart = m_start;
-    state.lineEnd = m_current;
+    if (!m_lassoPoints.empty()) {
+      state.hasPolygon = true;
+      state.polygonClosed = false;  // open path while drawing
+      state.polygonPoints = m_lassoPoints;
+      // Append current pointer so the path follows cursor in real time
+      if (state.polygonPoints.back().x != m_current.x ||
+          state.polygonPoints.back().y != m_current.y) {
+        state.polygonPoints.push_back(m_current);
+      }
+    }
   } else if (m_mode == Mode::Rectangle) {
     state.hasRect = true;
     state.rect = normalizeRect(m_start, m_current);

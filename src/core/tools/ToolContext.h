@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 
 #include "core/buffer/PixelBuffer.h"
 #include "core/color/Color.h"
@@ -30,6 +31,11 @@ struct ToolOverlayState {
 
   bool hasRect {false};
   Rect rect;
+
+  // Polygon / freehand path overlay (e.g. lasso selection preview)
+  bool hasPolygon {false};
+  bool polygonClosed {false};           // draw as closed polygon vs open path
+  std::vector<Point> polygonPoints;
 };
 
 struct ToolResult {

@@ -3,6 +3,7 @@
 #include <optional>
 
 #include <QImage>
+#include <QTimer>
 #include <QWidget>
 
 #include "core/common/FPoint.h"
@@ -55,6 +56,8 @@ private:
 
   app::bridge::AppController* m_controller {nullptr};
   QImage m_image;
+  QTimer* m_marchingTimer {nullptr};
+  int m_marchingOffset {0};
   bool m_mouseDrawing {false};
   bool m_showGrid {false};
   bool m_showOverlay {true};

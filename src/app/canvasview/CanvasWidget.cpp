@@ -110,6 +110,13 @@ CanvasWidget::CanvasWidget(QWidget* parent)
   setMouseTracking(true);
   setMinimumSize(400, 300);
   updateZoomStatusLabel(this);
+
+  m_marchingTimer = new QTimer(this);
+  m_marchingTimer->setInterval(80);
+  connect(m_marchingTimer, &QTimer::timeout, this, [this]() {
+    m_marchingOffset = (m_marchingOffset + 1) % 16;
+    update();
+  });
 }
 
 void CanvasWidget::setController(app::bridge::AppController* controller) {
@@ -215,6 +222,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     const core::ToolKind activeTool = m_controller->currentTool();
     painter.setRenderHint(QPainter::Antialiasing, true);
 
+    // ── Tool line overlay (LineTool / MoveLayer) ────────────────────────────
     if (overlay.toolOverlay.hasLine) {
       const QPointF p1(
           target.x() + (static_cast<double>(overlay.toolOverlay.lineStart.x) + 0.5) * state.zoom,
@@ -232,6 +240,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.drawEllipse(p2, 4.0, 4.0);
     }
 
+    // ── Rect selection preview (dashed box) ─────────────────────────────────
     if (overlay.toolOverlay.hasRect) {
       const QRectF previewRect(
           target.x() + static_cast<double>(overlay.toolOverlay.rect.x) * state.zoom,
@@ -239,10 +248,56 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
           std::max(1.0, static_cast<double>(overlay.toolOverlay.rect.width) * state.zoom),
           std::max(1.0, static_cast<double>(overlay.toolOverlay.rect.height) * state.zoom));
       painter.setBrush(Qt::NoBrush);
-      painter.setPen(QPen(QColor(88, 188, 255, 220), 1.6, Qt::DashLine));
+      // Shadow stroke
+      painter.setPen(QPen(QColor(0, 0, 0, 160), 2.4, Qt::SolidLine));
+      painter.drawRect(previewRect);
+      // Dashed white stroke
+      QPen rectPen(QColor(255, 255, 255, 230), 1.4, Qt::DashLine);
+      rectPen.setDashOffset(m_marchingOffset);
+      painter.setPen(rectPen);
       painter.drawRect(previewRect);
     }
 
+    // ── Lasso / polygon overlay ──────────────────────────────────────────────
+    if (overlay.toolOverlay.hasPolygon && overlay.toolOverlay.polygonPoints.size() >= 2) {
+      QPolygonF poly;
+      poly.reserve(static_cast<int>(overlay.toolOverlay.polygonPoints.size()));
+      for (const auto& pt : overlay.toolOverlay.polygonPoints) {
+        poly.append(QPointF(
+            target.x() + (static_cast<double>(pt.x) + 0.5) * state.zoom,
+            target.y() + (static_cast<double>(pt.y) + 0.5) * state.zoom));
+      }
+      painter.setBrush(Qt::NoBrush);
+      // Shadow
+      painter.setPen(QPen(QColor(0, 0, 0, 160), 2.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+      if (overlay.toolOverlay.polygonClosed) {
+        painter.drawPolygon(poly);
+      } else {
+        painter.drawPolyline(poly);
+        // Dashed closing line hint: last point → first point
+        painter.setPen(QPen(QColor(0, 0, 0, 100), 2.0, Qt::DashLine, Qt::RoundCap));
+        painter.drawLine(poly.last(), poly.first());
+      }
+      // Foreground dashed
+      QPen lassoFg(QColor(255, 255, 255, 230), 1.4, Qt::DashLine, Qt::RoundCap, Qt::RoundJoin);
+      lassoFg.setDashOffset(m_marchingOffset);
+      painter.setPen(lassoFg);
+      if (overlay.toolOverlay.polygonClosed) {
+        painter.drawPolygon(poly);
+      } else {
+        painter.drawPolyline(poly);
+        QPen closingFg(QColor(200, 200, 255, 140), 1.2, Qt::DashLine, Qt::RoundCap);
+        closingFg.setDashOffset(m_marchingOffset);
+        painter.setPen(closingFg);
+        painter.drawLine(poly.last(), poly.first());
+      }
+      // Dot at start (close indicator)
+      painter.setBrush(QColor(255, 255, 255, 220));
+      painter.setPen(QPen(QColor(0, 0, 0, 180), 1.0));
+      painter.drawEllipse(poly.first(), 4.0, 4.0);
+    }
+
+    // ── Committed selection — marching ants ─────────────────────────────────
     if (overlay.selectionRect.has_value()) {
       const core::Rect rect = *overlay.selectionRect;
       const QRectF selectionRect(
@@ -251,15 +306,19 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
           std::max(1.0, static_cast<double>(rect.width) * state.zoom),
           std::max(1.0, static_cast<double>(rect.height) * state.zoom));
       painter.setBrush(Qt::NoBrush);
-      painter.setPen(QPen(QColor(255, 210, 80, 230), 1.4, Qt::SolidLine));
+      // Outer black stroke
+      painter.setPen(QPen(QColor(0, 0, 0, 200), 2.5, Qt::SolidLine));
       painter.drawRect(selectionRect);
-      painter.setBrush(QColor(255, 210, 80, 210));
-      painter.setPen(Qt::NoPen);
-      constexpr double handle = 4.0;
-      painter.drawRect(QRectF(selectionRect.topLeft().x() - handle / 2.0, selectionRect.topLeft().y() - handle / 2.0, handle, handle));
-      painter.drawRect(QRectF(selectionRect.topRight().x() - handle / 2.0, selectionRect.topRight().y() - handle / 2.0, handle, handle));
-      painter.drawRect(QRectF(selectionRect.bottomLeft().x() - handle / 2.0, selectionRect.bottomLeft().y() - handle / 2.0, handle, handle));
-      painter.drawRect(QRectF(selectionRect.bottomRight().x() - handle / 2.0, selectionRect.bottomRight().y() - handle / 2.0, handle, handle));
+      // Marching white dashes
+      QPen marchWhite(QColor(255, 255, 255, 240), 1.2, Qt::DashLine);
+      marchWhite.setDashOffset(m_marchingOffset);
+      painter.setPen(marchWhite);
+      painter.drawRect(selectionRect);
+      // Marching black dashes (offset by half period for two-tone effect)
+      QPen marchBlack(QColor(0, 0, 0, 200), 1.2, Qt::DashLine);
+      marchBlack.setDashOffset(m_marchingOffset + 4);
+      painter.setPen(marchBlack);
+      painter.drawRect(selectionRect);
     }
 
   }
@@ -624,6 +683,16 @@ void CanvasWidget::refreshFromController() {
   updateZoomStatusLabel(this);
   const auto& state = stateFor(this);
   updateCursorForState(state.hasMousePos ? mapToCanvas(state.lastMousePos) : std::optional<core::Point> {});
+
+  // Start/stop marching ants animation based on whether there's a selection
+  if (m_marchingTimer != nullptr) {
+    const bool hasSelection = m_controller->canvasOverlay().selectionRect.has_value();
+    if (hasSelection && !m_marchingTimer->isActive()) {
+      m_marchingTimer->start();
+    } else if (!hasSelection && m_marchingTimer->isActive()) {
+      m_marchingTimer->stop();
+    }
+  }
   if (canPatchRegion) {
     const core::Rect dirty = *dirtyRect;
     const QRect target = canvasRect();

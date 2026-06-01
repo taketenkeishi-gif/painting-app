@@ -242,27 +242,27 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
           {
               makeSubTool(
                   "rect_default",
-                  "Rectangle",
+                  "矩形選択",
                   []() {
                     BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
                     p.selectionMode = SelectionMode::Rectangle;
                     return p;
                   }(),
                   {ToolPropertyKey::SelectionMode},
-                  "Drag to create rectangular selection."),
+                  "ドラッグして矩形選択を作成。Shift で加算、Alt で減算。"),
               makeSubTool(
                   "lasso_default",
-                  "Lasso",
+                  "投げ縄",
                   []() {
                     BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
                     p.selectionMode = SelectionMode::Lasso;
                     return p;
                   }(),
                   {ToolPropertyKey::SelectionMode},
-                  "Drag freehand to create lasso selection."),
+                  "フリーハンドでドラッグして任意形状を選択。"),
               makeSubTool(
                   "auto_select",
-                  "Auto Select",
+                  "自動選択",
                   []() {
                     BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
                     p.selectionMode = SelectionMode::AutoSelect;
@@ -272,7 +272,7 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                     return p;
                   }(),
                   {ToolPropertyKey::SelectionMode, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
-                  "Click to select similar colors by threshold.")},
+                  "クリックで類似色を自動選択。しきい値で感度を調整。")},
           {ToolPropertyKey::SelectionMode, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
           "Create rectangular selection."},
       ToolDescriptor {

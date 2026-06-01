@@ -29,7 +29,12 @@ public:
   ToolResult onWheel(ToolContext& context, int deltaSteps, const ToolPointerEvent& event) override;
   ToolOverlayState overlay() const override;
 
-  void setMode(Mode mode) noexcept { m_mode = mode; }
+  void setMode(Mode mode) noexcept {
+    if (m_mode != mode) {
+      m_committedLassoPoints.clear();
+    }
+    m_mode = mode;
+  }
   Mode mode() const noexcept { return m_mode; }
   void setAutoSelectThreshold(int threshold) noexcept { m_autoSelectThreshold = std::clamp(threshold, 0, 255); }
   void setAutoSelectContiguous(bool contiguous) noexcept { m_autoSelectContiguous = contiguous; }
@@ -47,6 +52,7 @@ private:
   Point m_start {0, 0};
   Point m_current {0, 0};
   std::vector<Point> m_lassoPoints;
+  std::vector<Point> m_committedLassoPoints;  // shown after commit until next op
   int m_autoSelectThreshold {16};
   bool m_autoSelectContiguous {true};
   bool m_autoSelectReferAllLayers {true};
