@@ -43,6 +43,10 @@ public:
   const SelectionMask& selection() const noexcept { return m_selection; }
   void clearSelection() noexcept { m_selection.clear(); }
 
+  /// キャンバスをリサイズする。既存コンテンツは (offsetX, offsetY) に配置される。
+  /// offsetX/Y は新サイズ内での元コンテンツの原点（左上）位置。
+  bool resizeCanvas(int newWidth, int newHeight, int offsetX = 0, int offsetY = 0);
+
   bool paperVisible() const noexcept { return m_paperVisible; }
   void setPaperVisible(bool visible) noexcept { m_paperVisible = visible; }
   Color paperColor() const noexcept { return m_paperColor; }

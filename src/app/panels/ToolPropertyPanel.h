@@ -72,7 +72,11 @@ private slots:
   void onAutoSelectThresholdSpinChanged(int value);
   void onAutoSelectContiguousToggled(bool checked);
   void onAutoSelectReferAllLayersToggled(bool checked);
+  void onSelectionFeatherSliderChanged(int value);
+  void onSelectionFeatherSpinChanged(int value);
+  void onSelectionAntiAliasToggled(bool checked);
   void onBlendModeChanged(int index);
+  void onBuildupModeToggled(bool checked);
   void onEraseModeToggled(bool checked);
   void onLockAlphaRespectToggled(bool checked);
   void onToggleDetailRequested();
@@ -140,6 +144,7 @@ private:
   QLabel* m_fillGapCloseLabel {nullptr};
   QLabel* m_selectionModeLabel {nullptr};
   QLabel* m_autoSelectThresholdLabel {nullptr};
+  QLabel* m_selectionFeatherLabel {nullptr};
   QPushButton* m_colorButton {nullptr};
   QSpinBox* m_sizeSpin {nullptr};
   QSlider* m_opacitySlider {nullptr};
@@ -181,7 +186,11 @@ private:
   QSpinBox* m_autoSelectThresholdSpin {nullptr};
   QCheckBox* m_autoSelectContiguousCheck {nullptr};
   QCheckBox* m_autoSelectReferAllLayersCheck {nullptr};
+  QSlider*   m_selectionFeatherSlider {nullptr};
+  QSpinBox*  m_selectionFeatherSpin {nullptr};
+  QCheckBox* m_selectionAntiAliasCheck {nullptr};
   QComboBox* m_blendModeCombo {nullptr};
+  QCheckBox* m_buildupModeCheck {nullptr};
   QCheckBox* m_eraseModeCheck {nullptr};
   QCheckBox* m_lockAlphaRespectCheck {nullptr};
   QWidget* m_pressureSection {nullptr};

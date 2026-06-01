@@ -25,6 +25,11 @@ public:
   void setShapeType(BrushShapeType shapeType) noexcept { m_shapeType = shapeType; }
   void setVectorEraseMode(VectorEraseMode mode) noexcept { m_vectorEraseMode = mode; }
   void setVectorTrimOutside(bool enabled) noexcept { m_vectorTrimOutside = enabled; }
+  // 筆圧マッピング
+  void setPressureSizeEnabled(bool v) noexcept { m_pressureSizeEnabled = v; }
+  void setPressureSizeMin(float v) noexcept { m_pressureSizeMin = std::clamp(v, 0.0F, 1.0F); }
+  void setPressureOpacityEnabled(bool v) noexcept { m_pressureOpacityEnabled = v; }
+  void setPressureOpacityMin(float v) noexcept { m_pressureOpacityMin = std::clamp(v, 0.0F, 1.0F); }
   int size() const noexcept { return m_size; }
 
   ToolKind kind() const noexcept override { return ToolKind::Eraser; }
@@ -37,20 +42,19 @@ public:
   ToolResult onWheel(ToolContext& context, int deltaSteps, const ToolPointerEvent& event) override;
 
 private:
-  Point applyStabilization(const Point& from, const Point& to) const;
-  void eraseStroke(Layer& layer, const Point& from, const Point& to) const;
-  void eraseVectorStroke(Layer& layer, const Point& from, const Point& to) const;
+  FPoint applyStabilization(const FPoint& from, const FPoint& to) const;
+  void eraseStroke(Layer& layer, const FPoint& from, const FPoint& to, float pressure = 1.0f);
+  void eraseVectorStroke(Layer& layer, const FPoint& from, const FPoint& to) const;
   static float distancePointToSegment(FPoint p, FPoint a, FPoint b) noexcept;
-  void eraseCircle(PixelBuffer& buffer, const Point& center, int radius) const;
-  void eraseCircleAA(PixelBuffer& buffer, FPoint center, float radius) const;
-  void eraseSquare(PixelBuffer& buffer, const Point& center, int radius) const;
+  void eraseCircleAA(PixelBuffer& buffer, FPoint center, float radius, float opacity) const;
+  void eraseSquare(PixelBuffer& buffer, FPoint center, float radius, float opacity) const;
   void erasePixel(PixelBuffer& buffer, int x, int y, float strength) const;
 
   int m_size {8};
   float m_opacity {1.0F};
   float m_hardness {1.0F};
   float m_flow {1.0F};
-  float m_spacing {0.25F};
+  float m_spacing {0.1F};   // BrushTool に合わせ 10%
   bool m_antiAlias {true};
   float m_stabilization {0.0F};
   bool m_postCorrection {false};
@@ -58,8 +62,16 @@ private:
   BrushShapeType m_shapeType {BrushShapeType::Circle};
   VectorEraseMode m_vectorEraseMode {VectorEraseMode::TouchedOnly};
   bool m_vectorTrimOutside {false};
+  // 筆圧マッピング
+  bool  m_pressureSizeEnabled    {true};
+  float m_pressureSizeMin        {0.1F};
+  bool  m_pressureOpacityEnabled {false};
+  float m_pressureOpacityMin     {0.1F};
+
   bool m_erasing {false};
-  Point m_lastPoint {0, 0};
+  FPoint m_lastPoint {0.0f, 0.0f};
+  float m_lastPressure {1.0f};
+  mutable float m_distanceAccum {0.0f};
 };
 
 } // namespace core

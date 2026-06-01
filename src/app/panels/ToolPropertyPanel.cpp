@@ -144,7 +144,11 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_autoSelectThresholdSpin(new QSpinBox(this)),
       m_autoSelectContiguousCheck(new QCheckBox("連結領域のみ", this)),
       m_autoSelectReferAllLayersCheck(new QCheckBox("全レイヤーを参照", this)),
+      m_selectionFeatherSlider(new QSlider(Qt::Horizontal, this)),
+      m_selectionFeatherSpin(new QSpinBox(this)),
+      m_selectionAntiAliasCheck(new QCheckBox("アンチエイリアス", this)),
       m_blendModeCombo(new QComboBox(this)),
+      m_buildupModeCheck(new QCheckBox("積み上げモード（Buildup）", this)),
       m_eraseModeCheck(new QCheckBox("消しゴムモード", this)),
       m_lockAlphaRespectCheck(new QCheckBox("透明保護を尊重", this)),
       m_pressureSection(nullptr),
@@ -206,6 +210,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_fillGapCloseSpin->setRange(0, 8);
   m_autoSelectThresholdSlider->setRange(0, 255);
   m_autoSelectThresholdSpin->setRange(0, 255);
+  m_selectionFeatherSlider->setRange(0, 100);
+  m_selectionFeatherSpin->setRange(0, 100);
   m_pressureSizeMinSlider->setRange(0, 100);
   m_pressureSizeMinSpin->setRange(0, 100);
   m_pressureOpacityMinSlider->setRange(0, 100);
@@ -228,21 +234,43 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto addBrushBlend = [&](const char* label, core::BlendMode mode) {
     m_blendModeCombo->addItem(label, static_cast<int>(mode));
   };
+  // 基本
   addBrushBlend("通常",              core::BlendMode::Normal);
+  addBrushBlend("ディザ合成",        core::BlendMode::Dissolve);
+  // 暗くする
+  addBrushBlend("比較（暗）",        core::BlendMode::Darken);
   addBrushBlend("乗算",              core::BlendMode::Multiply);
+  addBrushBlend("焼き込みカラー",    core::BlendMode::ColorBurn);
+  addBrushBlend("焼き込みリニア",    core::BlendMode::LinearBurn);
+  addBrushBlend("カラー比較（暗）",  core::BlendMode::DarkerColor);
+  // 明るくする
+  addBrushBlend("比較（明）",        core::BlendMode::Lighten);
   addBrushBlend("スクリーン",        core::BlendMode::Screen);
+  addBrushBlend("覆い焼きカラー",    core::BlendMode::ColorDodge);
+  addBrushBlend("加算",              core::BlendMode::LinearDodge);
+  addBrushBlend("カラー比較（明）",  core::BlendMode::LighterColor);
+  // コントラスト
   addBrushBlend("オーバーレイ",      core::BlendMode::Overlay);
   addBrushBlend("ソフトライト",      core::BlendMode::SoftLight);
   addBrushBlend("ハードライト",      core::BlendMode::HardLight);
-  addBrushBlend("覆い焼きカラー",    core::BlendMode::ColorDodge);
-  addBrushBlend("焼き込みカラー",    core::BlendMode::ColorBurn);
-  addBrushBlend("加算",              core::BlendMode::LinearDodge);
-  addBrushBlend("減算",              core::BlendMode::Subtract);
+  addBrushBlend("ビビットライト",    core::BlendMode::VividLight);
+  addBrushBlend("リニアライト",      core::BlendMode::LinearLight);
+  addBrushBlend("ピンライト",        core::BlendMode::PinLight);
+  addBrushBlend("ハードミックス",    core::BlendMode::HardMix);
+  // 比較
   addBrushBlend("差の絶対値",        core::BlendMode::Difference);
   addBrushBlend("除外",              core::BlendMode::Exclusion);
+  addBrushBlend("減算",              core::BlendMode::Subtract);
+  addBrushBlend("除算",              core::BlendMode::Divide);
+  // カラー成分 (HSL)
+  addBrushBlend("色相",              core::BlendMode::Hue);
+  addBrushBlend("彩度",              core::BlendMode::HslSat);
+  addBrushBlend("カラー",            core::BlendMode::HslColor);
+  addBrushBlend("輝度",              core::BlendMode::Luminosity);
 
   m_selectionModeCombo->addItem("矩形", static_cast<int>(app::ui::SelectionMode::Rectangle));
   m_selectionModeCombo->addItem("なげなわ", static_cast<int>(app::ui::SelectionMode::Lasso));
+  m_selectionModeCombo->addItem("多角形選択", static_cast<int>(app::ui::SelectionMode::PolygonLasso));
   m_selectionModeCombo->addItem("自動選択", static_cast<int>(app::ui::SelectionMode::AutoSelect));
   m_vectorEraseModeCombo->addItem("触れた部分を削除", static_cast<int>(app::ui::VectorEraserMode::TouchedOnly));
   m_vectorEraseModeCombo->addItem("交点まで削除", static_cast<int>(app::ui::VectorEraserMode::ToIntersection));
@@ -459,6 +487,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   drawControlLayout->setContentsMargins(4, 4, 4, 4);
   drawControlLayout->setSpacing(4);
   drawControlLayout->addWidget(m_blendModeCombo);
+  drawControlLayout->addWidget(m_buildupModeCheck);
   drawControlLayout->addWidget(m_eraseModeCheck);
   drawControlLayout->addWidget(m_lockAlphaRespectCheck);
   contentLayout->addWidget(drawControlGroup);
@@ -507,6 +536,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(fillGroup);
   m_fillSection = fillGroup;
 
+  m_selectionFeatherLabel = new QLabel("フェザー半径", this);
   auto* selectionGroup = new QGroupBox("選択", m_contentWidget);
   auto* selectionLayout = new QVBoxLayout(selectionGroup);
   selectionLayout->setContentsMargins(4, 4, 4, 4);
@@ -515,12 +545,19 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   markResponsiveRow(autoSelectThresholdRow);
   autoSelectThresholdRow->addWidget(m_autoSelectThresholdSlider, 1);
   autoSelectThresholdRow->addWidget(m_autoSelectThresholdSpin);
+  auto* featherRow = new QHBoxLayout();
+  markResponsiveRow(featherRow);
+  featherRow->addWidget(m_selectionFeatherSlider, 1);
+  featherRow->addWidget(m_selectionFeatherSpin);
   selectionLayout->addWidget(m_selectionModeLabel);
   selectionLayout->addWidget(m_selectionModeCombo);
   selectionLayout->addWidget(m_autoSelectThresholdLabel);
   selectionLayout->addLayout(autoSelectThresholdRow);
   selectionLayout->addWidget(m_autoSelectContiguousCheck);
   selectionLayout->addWidget(m_autoSelectReferAllLayersCheck);
+  selectionLayout->addWidget(m_selectionFeatherLabel);
+  selectionLayout->addLayout(featherRow);
+  selectionLayout->addWidget(m_selectionAntiAliasCheck);
   contentLayout->addWidget(selectionGroup);
   m_selectionSection = selectionGroup;
 
@@ -570,6 +607,9 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_fillGapCloseSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onFillGapCloseSliderChanged);
   connect(m_fillGapCloseSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onFillGapCloseSpinChanged);
   connect(m_selectionModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onSelectionModeChanged);
+  connect(m_selectionFeatherSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onSelectionFeatherSliderChanged);
+  connect(m_selectionFeatherSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSelectionFeatherSpinChanged);
+  connect(m_selectionAntiAliasCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onSelectionAntiAliasToggled);
   connect(
       m_autoSelectThresholdSlider,
       &QSlider::valueChanged,
@@ -587,6 +627,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       this,
       &ToolPropertyPanel::onAutoSelectReferAllLayersToggled);
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onBlendModeChanged);
+  connect(m_buildupModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onBuildupModeToggled);
   connect(m_eraseModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onEraseModeToggled);
   connect(m_lockAlphaRespectCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onLockAlphaRespectToggled);
   connect(m_pressureSizeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onPressureSizeToggled);
@@ -919,6 +960,7 @@ void ToolPropertyPanel::refreshFromController() {
   m_shapeSection->setVisible(
       m_showDetails && (supportsShape || supportsAngle || supportsRoundness || supportsTaperStart || supportsTaperEnd));
   m_blendModeCombo->setVisible(showBlend);
+  m_buildupModeCheck->setVisible(m_showDetails && showBlend);
   m_eraseModeCheck->setVisible(m_showDetails && supportsEraseMode);
   m_lockAlphaRespectCheck->setVisible(m_showDetails && supportsLockAlpha);
   m_snapAngleLabel->setVisible(supportsSnapAngle);
@@ -945,6 +987,12 @@ void ToolPropertyPanel::refreshFromController() {
   m_autoSelectThresholdSpin->setVisible(supportsAutoSelectThreshold);
   m_autoSelectContiguousCheck->setVisible(supportsAutoSelectContiguous);
   m_autoSelectReferAllLayersCheck->setVisible(supportsAutoSelectReferAllLayers);
+  const bool supportsSelectionFeather = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionFeather);
+  const bool supportsSelectionAA      = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionAntiAlias);
+  if (m_selectionFeatherLabel != nullptr) m_selectionFeatherLabel->setVisible(supportsSelectionFeather);
+  if (m_selectionFeatherSlider != nullptr) m_selectionFeatherSlider->setVisible(supportsSelectionFeather);
+  if (m_selectionFeatherSpin != nullptr) m_selectionFeatherSpin->setVisible(supportsSelectionFeather);
+  if (m_selectionAntiAliasCheck != nullptr) m_selectionAntiAliasCheck->setVisible(supportsSelectionAA);
   m_drawingControlSection->setVisible(showBlend || (m_showDetails && (supportsEraseMode || supportsLockAlpha)));
   m_vectorSection->setVisible(
       m_showDetails && (supportsSnapAngle || supportsSimplify || showVectorMode || showVectorTrim));
@@ -953,7 +1001,7 @@ void ToolPropertyPanel::refreshFromController() {
   m_selectionSection->setVisible(
       m_showDetails &&
       (supportsSelectionMode || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
-       supportsAutoSelectReferAllLayers));
+       supportsAutoSelectReferAllLayers || supportsSelectionFeather || supportsSelectionAA));
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);
@@ -984,6 +1032,7 @@ void ToolPropertyPanel::refreshFromController() {
   const QSignalBlocker blocker26(m_simplifySlider);
   const QSignalBlocker blocker27(m_simplifySpin);
   const QSignalBlocker blocker28(m_blendModeCombo);
+  const QSignalBlocker blockerBuildupMode(m_buildupModeCheck);
   const QSignalBlocker blocker29(m_eraseModeCheck);
   const QSignalBlocker blocker30(m_lockAlphaRespectCheck);
   const QSignalBlocker blocker31(m_fillThresholdSlider);
@@ -1033,6 +1082,7 @@ void ToolPropertyPanel::refreshFromController() {
   m_simplifySlider->setValue(state.simplifyLevel);
   m_simplifySpin->setValue(state.simplifyLevel);
   m_blendModeCombo->setCurrentIndex(m_blendModeCombo->findData(static_cast<int>(state.blendMode)));
+  m_buildupModeCheck->setChecked(state.buildupMode);
   m_eraseModeCheck->setChecked(state.eraseMode);
   m_lockAlphaRespectCheck->setChecked(state.lockAlphaRespect);
   m_fillThresholdSlider->setValue(state.fillThreshold);
@@ -1046,6 +1096,9 @@ void ToolPropertyPanel::refreshFromController() {
   m_autoSelectThresholdSpin->setValue(state.autoSelectThreshold);
   m_autoSelectContiguousCheck->setChecked(state.autoSelectContiguous);
   m_autoSelectReferAllLayersCheck->setChecked(state.autoSelectReferAllLayers);
+  if (m_selectionFeatherSlider != nullptr) m_selectionFeatherSlider->setValue(state.selectionFeather);
+  if (m_selectionFeatherSpin != nullptr) m_selectionFeatherSpin->setValue(state.selectionFeather);
+  if (m_selectionAntiAliasCheck != nullptr) m_selectionAntiAliasCheck->setChecked(state.selectionAntiAlias);
   m_vectorEraseModeCombo->setCurrentIndex(m_vectorEraseModeCombo->findData(static_cast<int>(state.vectorEraseMode)));
   m_vectorTrimOutsideCheck->setChecked(state.vectorTrimOutside);
   m_pressureSizeCheck->setChecked(state.pressureSizeEnabled);
@@ -1431,6 +1484,29 @@ void ToolPropertyPanel::onAutoSelectReferAllLayersToggled(bool checked) {
   m_controller->setAutoSelectReferAllLayers(checked);
 }
 
+void ToolPropertyPanel::onSelectionFeatherSliderChanged(int value) {
+  if (m_controller == nullptr) return;
+  if (m_selectionFeatherSpin != nullptr) {
+    const QSignalBlocker blocker(m_selectionFeatherSpin);
+    m_selectionFeatherSpin->setValue(value);
+  }
+  m_controller->setSelectionFeather(value);
+}
+
+void ToolPropertyPanel::onSelectionFeatherSpinChanged(int value) {
+  if (m_controller == nullptr) return;
+  if (m_selectionFeatherSlider != nullptr) {
+    const QSignalBlocker blocker(m_selectionFeatherSlider);
+    m_selectionFeatherSlider->setValue(value);
+  }
+  m_controller->setSelectionFeather(value);
+}
+
+void ToolPropertyPanel::onSelectionAntiAliasToggled(bool checked) {
+  if (m_controller == nullptr) return;
+  m_controller->setSelectionAntiAlias(checked);
+}
+
 void ToolPropertyPanel::onBlendModeChanged(int index) {
   if (m_controller == nullptr || !m_controller->currentToolSupportsBlendMode()) {
     return;
@@ -1440,6 +1516,11 @@ void ToolPropertyPanel::onBlendModeChanged(int index) {
     return;
   }
   m_controller->setBrushBlendMode(static_cast<core::BlendMode>(value.toInt()));
+}
+
+void ToolPropertyPanel::onBuildupModeToggled(bool checked) {
+  if (m_controller == nullptr) return;
+  m_controller->setBrushBuildupMode(checked);
 }
 
 void ToolPropertyPanel::onEraseModeToggled(bool checked) {

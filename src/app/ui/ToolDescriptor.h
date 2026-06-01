@@ -55,7 +55,9 @@ enum class ToolPropertyKey {
   SelectionMode,
   AutoSelectThreshold,
   AutoSelectContiguous,
-  AutoSelectReferAllLayers
+  AutoSelectReferAllLayers,
+  SelectionFeather,
+  SelectionAntiAlias
 };
 
 struct StrokeSettings {
@@ -97,7 +99,9 @@ struct FillSettings {
 enum class SelectionMode {
   Rectangle,
   Lasso,
-  AutoSelect
+  PolygonLasso,  ///< クリック頂点追加、ダブルクリック確定
+  AutoSelect,
+  ObjectSelect,  ///< 全体類似色 / SAM2
 };
 
 enum class VectorEraserMode {
@@ -111,6 +115,8 @@ struct SelectionSettings {
   int autoSelectThreshold {16};
   bool autoSelectContiguous {true};
   bool autoSelectReferAllLayers {true};
+  int featherRadius {0};
+  bool antiAlias {true};
 };
 
 struct ToolBehaviorProfile {
@@ -160,8 +166,13 @@ struct BrushPreset {
   int autoSelectThreshold {16};
   bool autoSelectContiguous {true};
   bool autoSelectReferAllLayers {true};
+  int selectionFeather {0};
+  bool selectionAntiAlias {true};
   VectorEraserMode vectorEraseMode {VectorEraserMode::TouchedOnly};
   bool vectorTrimOutside {false};
+  bool buildupMode {false};   // Krita非積み上げ / Photoshop積み上げ切替
+  int gradientType {0};       // 0=Linear, 1=Radial
+  int gradientFill {0};       // 0=ForegroundToBackground, 1=ForegroundToTransparent
 };
 
 struct SubToolDescriptor {

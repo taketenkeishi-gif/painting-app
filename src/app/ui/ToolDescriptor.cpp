@@ -36,6 +36,8 @@ ToolBehaviorProfile makeProfile(const BrushPreset& preset) {
   profile.selection.autoSelectThreshold = preset.autoSelectThreshold;
   profile.selection.autoSelectContiguous = preset.autoSelectContiguous;
   profile.selection.autoSelectReferAllLayers = preset.autoSelectReferAllLayers;
+  profile.selection.featherRadius = preset.selectionFeather;
+  profile.selection.antiAlias = preset.selectionAntiAlias;
   profile.blendMode = preset.blendMode;
   profile.eraseMode = preset.eraseMode;
   profile.lockAlphaRespect = preset.lockAlphaRespect;
@@ -265,7 +267,7 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
       ToolDescriptor {
           core::ToolKind::RectSelection,
           "rect_selection",
-          "Rect Selection",
+          "選択",
           {
               makeSubTool(
                   "rect_default",
@@ -273,20 +275,33 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   []() {
                     BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
                     p.selectionMode = SelectionMode::Rectangle;
+                    p.selectionAntiAlias = true;
                     return p;
                   }(),
-                  {ToolPropertyKey::SelectionMode},
-                  "ドラッグして矩形選択を作成。Shift で加算、Alt で減算。"),
+                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias},
+                  "ドラッグして矩形選択。Shift=正方形制約。選択範囲内ドラッグで移動。"),
               makeSubTool(
                   "lasso_default",
                   "投げ縄",
                   []() {
                     BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
                     p.selectionMode = SelectionMode::Lasso;
+                    p.selectionAntiAlias = true;
                     return p;
                   }(),
-                  {ToolPropertyKey::SelectionMode},
-                  "フリーハンドでドラッグして任意形状を選択。"),
+                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias},
+                  "フリーハンドで任意形状を選択。選択範囲内ドラッグで移動。"),
+              makeSubTool(
+                  "poly_lasso",
+                  "多角形選択",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
+                    p.selectionMode = SelectionMode::PolygonLasso;
+                    p.selectionAntiAlias = true;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias},
+                  "クリックで頂点を追加。始点付近クリックまたはダブルクリックで確定。Escでキャンセル。"),
               makeSubTool(
                   "auto_select",
                   "自動選択",
@@ -298,10 +313,24 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                     p.autoSelectReferAllLayers = true;
                     return p;
                   }(),
-                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
-                  "クリックで類似色を自動選択。しきい値で感度を調整。")},
-          {ToolPropertyKey::SelectionMode, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
-          "Create rectangular selection."},
+                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
+                  "クリック点と類似した連続した色域を選択。Shift=追加、Alt=減算。"),
+              makeSubTool(
+                  "object_select",
+                  "オブジェクト選択",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
+                    p.selectionMode = SelectionMode::ObjectSelect;
+                    p.autoSelectThreshold = 24;
+                    p.autoSelectContiguous = false;
+                    p.autoSelectReferAllLayers = true;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
+                  "クリックで全レイヤーの類似色をまとめて選択。ComfyUI 接続時は SAM2 で高精度化。Shift=追加、Alt=減算。"),
+          },
+          {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
+          "選択範囲を作成します。"},
       ToolDescriptor {
           core::ToolKind::MoveLayer,
           "move_layer",
@@ -324,64 +353,76 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
           {},
           "Zoom viewport."},
       ToolDescriptor {
-          core::ToolKind::AiSelect,
-          "ai_select",
-          "AI 選択",
+          core::ToolKind::Gradient,
+          "gradient",
+          "グラデーション",
           {
-              // ── オブジェクト選択（クリックで単体オブジェクトを選択）──────────────
               makeSubTool(
-                  "ai_select_object",
-                  "オブジェクト選択",
-                  []{
+                  "gradient_linear_fg_bg",
+                  "直線 (描画色→背景色)",
+                  []() {
                     BrushPreset p {};
-                    p.size = 8;
-                    p.selectionMode          = SelectionMode::AutoSelect;
-                    p.autoSelectThreshold    = 24;
-                    p.autoSelectContiguous   = false;
-                    p.autoSelectReferAllLayers = true;
-                    p.targetLayerKind        = TargetLayerKind::Both;
-                    p.cursorStyle            = CursorStyle::Cross;
+                    p.opacity       = 100;
+                    p.blendMode     = core::BlendMode::Normal;
+                    p.eraseMode     = false;
+                    p.gradientType  = 0;  // Linear
+                    p.gradientFill  = 0;  // FgToBg
+                    p.targetLayerKind = TargetLayerKind::Raster;
+                    p.cursorStyle   = CursorStyle::Cross;
                     return p;
                   }(),
-                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
-                  "クリックでオブジェクトを自動認識して選択。Shift=除外点追加。ComfyUI 接続時は SAM2 で高精度化。"),
-              // ── 追加選択（Shift クリックで選択に追加）──────────────────────────
+                  {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
+                  "ドラッグで直線グラデーションを描画色→背景色で適用。"),
               makeSubTool(
-                  "ai_select_add",
-                  "選択に追加",
-                  []{
+                  "gradient_linear_fg_trans",
+                  "直線 (描画色→透明)",
+                  []() {
                     BrushPreset p {};
-                    p.size = 8;
-                    p.selectionMode          = SelectionMode::AutoSelect;
-                    p.autoSelectThreshold    = 24;
-                    p.autoSelectContiguous   = false;
-                    p.autoSelectReferAllLayers = true;
-                    p.targetLayerKind        = TargetLayerKind::Both;
-                    p.cursorStyle            = CursorStyle::Cross;
+                    p.opacity       = 100;
+                    p.blendMode     = core::BlendMode::Normal;
+                    p.eraseMode     = false;
+                    p.gradientType  = 0;  // Linear
+                    p.gradientFill  = 1;  // FgToTransparent
+                    p.targetLayerKind = TargetLayerKind::Raster;
+                    p.cursorStyle   = CursorStyle::Cross;
                     return p;
                   }(),
-                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
-                  "クリックで現在の選択範囲に追加。ComfyUI 接続時は SAM2 を使用。"),
-              // ── 選択から除外（クリックで選択範囲を削除）─────────────────────────
+                  {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
+                  "ドラッグで直線グラデーションを描画色→透明で適用。"),
               makeSubTool(
-                  "ai_select_subtract",
-                  "選択から除外",
-                  []{
+                  "gradient_radial_fg_bg",
+                  "放射 (描画色→背景色)",
+                  []() {
                     BrushPreset p {};
-                    p.size = 8;
-                    p.selectionMode          = SelectionMode::AutoSelect;
-                    p.autoSelectThreshold    = 24;
-                    p.autoSelectContiguous   = false;
-                    p.autoSelectReferAllLayers = true;
-                    p.targetLayerKind        = TargetLayerKind::Both;
-                    p.cursorStyle            = CursorStyle::Cross;
+                    p.opacity       = 100;
+                    p.blendMode     = core::BlendMode::Normal;
+                    p.eraseMode     = false;
+                    p.gradientType  = 1;  // Radial
+                    p.gradientFill  = 0;  // FgToBg
+                    p.targetLayerKind = TargetLayerKind::Raster;
+                    p.cursorStyle   = CursorStyle::Cross;
                     return p;
                   }(),
-                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
-                  "クリックした部分を選択範囲から除外します。"),
-          },
-          {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
-          "AI で画像内オブジェクトを自動検出して選択します。"}};
+                  {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
+                  "ドラッグで放射グラデーションを描画色→背景色で適用。"),
+              makeSubTool(
+                  "gradient_radial_fg_trans",
+                  "放射 (描画色→透明)",
+                  []() {
+                    BrushPreset p {};
+                    p.opacity       = 100;
+                    p.blendMode     = core::BlendMode::Normal;
+                    p.eraseMode     = false;
+                    p.gradientType  = 1;  // Radial
+                    p.gradientFill  = 1;  // FgToTransparent
+                    p.targetLayerKind = TargetLayerKind::Raster;
+                    p.cursorStyle   = CursorStyle::Cross;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
+                  "ドラッグで放射グラデーションを描画色→透明で適用。")},
+          {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
+          "ドラッグでグラデーションをアクティブレイヤーに適用。"}};
 
 }
 

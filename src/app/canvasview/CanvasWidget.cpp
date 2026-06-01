@@ -303,6 +303,57 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.drawEllipse(poly.first(), 4.0, 4.0);
     }
 
+    // ── Polygon lasso in-progress overlay ───────────────────────────────────
+    if (overlay.toolOverlay.hasPolyLasso && !overlay.toolOverlay.polyLassoVertices.empty()) {
+      const auto& verts = overlay.toolOverlay.polyLassoVertices;
+      const core::Point& mouse = overlay.toolOverlay.polyLassoMouse;
+
+      QPolygonF poly;
+      poly.reserve(static_cast<int>(verts.size()) + 1);
+      for (const auto& pt : verts) {
+        poly.append(QPointF(
+            target.x() + (static_cast<double>(pt.x) + 0.5) * state.zoom,
+            target.y() + (static_cast<double>(pt.y) + 0.5) * state.zoom));
+      }
+      const QPointF mousePt(
+          target.x() + (static_cast<double>(mouse.x) + 0.5) * state.zoom,
+          target.y() + (static_cast<double>(mouse.y) + 0.5) * state.zoom);
+
+      painter.setBrush(Qt::NoBrush);
+      // Shadow
+      painter.setPen(QPen(QColor(0, 0, 0, 160), 2.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+      painter.drawPolyline(poly);
+      if (!poly.isEmpty()) {
+        painter.drawLine(poly.last(), mousePt);
+        // 始点への閉じ線ヒント
+        QPen closePen(QColor(0, 0, 0, 100), 2.0, Qt::DashLine, Qt::RoundCap);
+        painter.setPen(closePen);
+        painter.drawLine(mousePt, poly.first());
+      }
+      // Foreground dashed
+      QPen fgPen(QColor(255, 255, 255, 230), 1.4, Qt::DashLine, Qt::RoundCap, Qt::RoundJoin);
+      fgPen.setDashOffset(m_marchingOffset);
+      painter.setPen(fgPen);
+      painter.drawPolyline(poly);
+      if (!poly.isEmpty()) {
+        painter.drawLine(poly.last(), mousePt);
+        QPen closeFg(QColor(200, 200, 255, 140), 1.2, Qt::DashLine, Qt::RoundCap);
+        closeFg.setDashOffset(m_marchingOffset);
+        painter.setPen(closeFg);
+        painter.drawLine(mousePt, poly.first());
+      }
+      // 各頂点ドット
+      painter.setBrush(QColor(255, 255, 255, 220));
+      painter.setPen(QPen(QColor(0, 0, 0, 180), 1.0));
+      for (const QPointF& v : poly) {
+        painter.drawEllipse(v, 3.0, 3.0);
+      }
+      // 始点は大きめのドット（閉じインジケータ）
+      if (!poly.isEmpty()) {
+        painter.drawEllipse(poly.first(), 5.0, 5.0);
+      }
+    }
+
     // ── Committed selection — marching ants ─────────────────────────────────
     if (overlay.selectionRect.has_value()) {
       const core::Rect rect = *overlay.selectionRect;
@@ -568,6 +619,25 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
   m_mouseDrawing = false;
   state.hasLastStrokeDispatchPos = false;
   updateCursorForState(mapToCanvas(state.lastMousePos));
+  update();
+}
+
+void CanvasWidget::mouseDoubleClickEvent(QMouseEvent* event) {
+  if (m_controller == nullptr || event->button() != Qt::LeftButton) return;
+
+  m_controller->setInputModifiers(
+      event->modifiers().testFlag(Qt::ShiftModifier),
+      event->modifiers().testFlag(Qt::ControlModifier),
+      event->modifiers().testFlag(Qt::AltModifier));
+
+  const auto fpt = mapToCanvasF(event->position());
+  if (fpt.has_value()) {
+    m_controller->doubleClickAt(fpt->x, fpt->y);
+  }
+  // 2回目のrelease (Qt からは通常 mouseReleaseEvent も続けて来る) でm_mouseDrawingをリセット
+  m_mouseDrawing = false;
+  auto& state = stateFor(this);
+  state.hasLastStrokeDispatchPos = false;
   update();
 }
 
@@ -875,7 +945,26 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
   }
 
   const bool dragging = m_mouseDrawing || (state.panning && (QApplication::mouseButtons() & Qt::LeftButton));
-  setCursor(cursorForTool(m_controller->currentTool(), dragging));
+  const core::ToolKind activeTool = m_controller->currentTool();
+
+  // 選択ツール: 選択範囲内ではSizeAllCursor（移動カーソル）
+  if (activeTool == core::ToolKind::RectSelection) {
+    const core::ToolOverlayState toolOverlay = m_controller->canvasOverlay().toolOverlay;
+    if (toolOverlay.cursorHint == core::OverlayCursorHint::Move) {
+      setCursor(Qt::SizeAllCursor);
+      return;
+    }
+    // 選択範囲内にホバー中 → 移動カーソルを先出し
+    const auto& sel = m_controller->documentSelection();
+    if (sel.hasSelection() && sel.contains(canvasPoint->x, canvasPoint->y)) {
+      setCursor(Qt::SizeAllCursor);
+      return;
+    }
+    setCursor(Qt::CrossCursor);
+    return;
+  }
+
+  setCursor(cursorForTool(activeTool, dragging));
 }
 
 } // namespace app::canvasview

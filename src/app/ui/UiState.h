@@ -41,6 +41,9 @@ struct UiState {
   int autoSelectThreshold {16};
   bool autoSelectContiguous {true};
   bool autoSelectReferAllLayers {true};
+  int selectionFeather {0};
+  bool selectionAntiAlias {true};
+  bool buildupMode {false};   // trueで積み上げ、falseでKritaスタイル非積み上げ
   bool pressureSize {false};
   float pressureSizeMin {0.0f};
   bool pressureOpacity {false};
@@ -62,6 +65,10 @@ struct UiState {
   float wetMixRate{0.5f};
   bool  smear     {false};
   float smearRate {0.9f};
+
+  // ── グラデーション ────────────────────────────────────────────────────────
+  int gradientType {0};  ///< 0=Linear, 1=Radial
+  int gradientFill {0};  ///< 0=FgToBg, 1=FgToTransparent
 };
 
 } // namespace app::ui

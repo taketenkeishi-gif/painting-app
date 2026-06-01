@@ -24,6 +24,8 @@ const char* toolKindDisplayName(ToolKind kind) noexcept {
       return "Fill";
     case ToolKind::AiSelect:
       return "AI Select";
+    case ToolKind::Gradient:
+      return "Gradient";
     default:
       return "Unknown";
   }

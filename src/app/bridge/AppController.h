@@ -116,6 +116,9 @@ struct ToolStateViewModel {
   int  gradientType {0};  ///< 0=Linear, 1=Radial
   int  gradientFill {0};  ///< 0=FgToBg, 1=FgToTransparent
   core::Color secondaryColor {255, 255, 255, 255};  ///< 背景色
+  // 選択ツール追加オプション
+  int  selectionFeather   {0};
+  bool selectionAntiAlias {true};
 };
 
 struct CanvasOverlayViewModel {
@@ -131,6 +134,7 @@ public:
 
   const core::Document& document() const noexcept { return m_document; }
   const core::PixelBuffer& compositedBuffer() const noexcept { return m_composited; }
+  const core::SelectionMask& documentSelection() const noexcept { return m_document.selection(); }
   std::uint64_t compositeRevision() const noexcept { return m_compositeRevision; }
   CanvasOverlayViewModel canvasOverlay() const;
 
@@ -237,6 +241,7 @@ public:
   bool currentToolSupportsSelectionMode() const noexcept;
   bool currentToolSupportsAutoSelectThreshold() const noexcept;
   bool currentToolSupportsAutoSelectContiguous() const noexcept;
+  bool currentToolHasProperty(app::ui::ToolPropertyKey key) const noexcept;
   bool currentToolSupportsAutoSelectReferAllLayers() const noexcept;
 
   void beginStroke(int x, int y);
@@ -244,6 +249,8 @@ public:
   void endStroke();
   void beginStrokeF(float x, float y, float pressure = 1.0f, float tiltX = 0.0f, float tiltY = 0.0f);
   void continueStrokeF(float x, float y, float pressure = 1.0f, float tiltX = 0.0f, float tiltY = 0.0f);
+  /// ダブルクリック（多角形ラッソ確定など）
+  void doubleClickAt(float x, float y);
   bool pickColorAt(int x, int y);
   void setInputModifiers(bool shift, bool ctrl, bool alt);
 
@@ -286,6 +293,8 @@ public:
   void setAutoSelectThreshold(int threshold);
   void setAutoSelectContiguous(bool contiguous);
   void setAutoSelectReferAllLayers(bool enabled);
+  void setSelectionFeather(int radius);
+  void setSelectionAntiAlias(bool enabled);
   void setPressureSizeEnabled(bool enabled);
   void setPressureSizeMin(int value);
   void setPressureOpacityEnabled(bool enabled);

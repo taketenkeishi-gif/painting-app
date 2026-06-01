@@ -47,6 +47,8 @@ QString toolNameJa(core::ToolKind kind) {
       return QStringLiteral("手のひら");
     case core::ToolKind::Zoom:
       return QStringLiteral("ズーム");
+    case core::ToolKind::Gradient:
+      return QStringLiteral("グラデーション");
     default:
       return QStringLiteral("ツール");
   }
@@ -72,6 +74,8 @@ QString toolShortcut(core::ToolKind kind) {
       return "H";
     case core::ToolKind::Zoom:
       return "Z";
+    case core::ToolKind::Gradient:
+      return {};  // ショートカットなし（MainMenu で登録）
     default:
       return {};
   }
@@ -97,6 +101,8 @@ QString iconName(core::ToolKind kind) {
       return "hand";
     case core::ToolKind::Zoom:
       return "zoom";
+    case core::ToolKind::Gradient:
+      return "fill";  // グラデーションアイコンがない場合は fill を流用
     default:
       return "brush";
   }
@@ -596,6 +602,7 @@ void ToolPanel::rebuildButtons() {
       core::ToolKind::Eraser,
       core::ToolKind::Eyedropper,
       core::ToolKind::Fill,
+      core::ToolKind::Gradient,
       core::ToolKind::Line,
       core::ToolKind::RectSelection,
       core::ToolKind::MoveLayer,

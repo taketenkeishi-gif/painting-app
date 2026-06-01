@@ -22,6 +22,15 @@ struct ToolPointerEvent {
   bool shift {false};
   bool ctrl {false};
   bool alt {false};
+  bool isDblClick {false}; // ダブルクリック（PolygonLasso確定など）
+};
+
+enum class OverlayCursorHint {
+  Default,
+  Cross,         // 新規選択中
+  Move,          // 選択範囲移動中
+  AddSelection,  // Shift: 追加
+  SubSelection,  // Alt: 減算
 };
 
 struct ToolOverlayState {
@@ -36,6 +45,13 @@ struct ToolOverlayState {
   bool hasPolygon {false};
   bool polygonClosed {false};           // draw as closed polygon vs open path
   std::vector<Point> polygonPoints;
+
+  // 多角形ラッソ: クリック頂点リスト + マウス追従線
+  bool hasPolyLasso {false};
+  std::vector<Point> polyLassoVertices;  // 確定頂点
+  Point polyLassoMouse {0, 0};           // 現在マウス位置
+
+  OverlayCursorHint cursorHint {OverlayCursorHint::Default};
 };
 
 struct ToolResult {
@@ -50,6 +66,7 @@ struct ToolContext {
   Document& document;
   const PixelBuffer& composited;
   Color currentColor;
+  Color secondaryColor {255, 255, 255, 255};  ///< 背景色（グラデーション用）
   int brushSize {1};
 };
 

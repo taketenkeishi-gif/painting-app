@@ -413,7 +413,9 @@ ToolStateViewModel AppController::toolState() const noexcept {
       // グラデーション
       m_uiState.gradientType,
       m_uiState.gradientFill,
-      m_secondaryColor};
+      m_secondaryColor,
+      m_uiState.selectionFeather,
+      m_uiState.selectionAntiAlias};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -1586,6 +1588,11 @@ bool AppController::currentToolSupportsAutoSelectReferAllLayers() const noexcept
       currentToolDescriptor(), currentSubToolDescriptor(), app::ui::ToolPropertyKey::AutoSelectReferAllLayers);
 }
 
+bool AppController::currentToolHasProperty(app::ui::ToolPropertyKey key) const noexcept {
+  if (!isCurrentSubToolCompatibleWithActiveLayer()) return false;
+  return containsProperty(currentToolDescriptor(), currentSubToolDescriptor(), key);
+}
+
 void AppController::beginStroke(int x, int y) {
   if (m_stroking) {
     return;
@@ -1745,6 +1752,43 @@ void AppController::continueStrokeF(float x, float y, float pressure, float tilt
   core::ToolContext context = makeToolContext();
   const core::ToolResult result = m_toolManager.pointerMove(context, moveEvent);
   applyToolResult(result);
+}
+
+void AppController::doubleClickAt(float x, float y) {
+  const core::Point pt {static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y))};
+  m_lastPointer  = pt;
+  m_lastFPointer = core::FPoint {x, y};
+
+  // PolygonLasso以外では通常のpress/releaseと同じ
+  const core::ToolKind activeKind = m_toolManager.activeToolKind();
+  if (activeKind == core::ToolKind::RectSelection) {
+    core::ToolPointerEvent dblEvent;
+    dblEvent.point     = pt;
+    dblEvent.fpoint    = core::FPoint {x, y};
+    dblEvent.pressure  = 1.0f;
+    dblEvent.shift     = m_shiftModifier;
+    dblEvent.ctrl      = m_ctrlModifier;
+    dblEvent.alt       = m_altModifier;
+    dblEvent.isDblClick = true;
+
+    if (!m_pendingStroke.has_value()) {
+      PendingStrokeState pending;
+      pending.actionName = actionNameForTool(activeKind);
+      if (toolWritesSelection(activeKind)) {
+        pending.trackSelection = true;
+        pending.beforeSelection = m_document.selection();
+      }
+      if (pending.trackPixels || pending.trackSelection) {
+        m_pendingStroke = std::move(pending);
+      }
+    }
+
+    core::ToolContext context = makeToolContext();
+    const core::ToolResult result = m_toolManager.pointerPress(context, dblEvent);
+    applyToolResult(result);
+    finishPendingStrokeHistory();
+    m_stroking = false;
+  }
 }
 
 bool AppController::pickColorAt(int x, int y) {
@@ -2215,6 +2259,21 @@ void AppController::setAutoSelectReferAllLayers(bool enabled) {
     return;
   }
   m_uiState.autoSelectReferAllLayers = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setSelectionFeather(int radius) {
+  const int normalized = std::max(0, radius);
+  if (m_uiState.selectionFeather == normalized) return;
+  m_uiState.selectionFeather = normalized;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setSelectionAntiAlias(bool enabled) {
+  if (m_uiState.selectionAntiAlias == enabled) return;
+  m_uiState.selectionAntiAlias = enabled;
   applyUiStateToTools();
   emit toolStateChanged();
 }
@@ -2857,23 +2916,27 @@ void AppController::applyUiStateToTools() {
   }
   if (m_rectSelectionTool != nullptr) {
     core::RectSelectionTool::Mode mode = core::RectSelectionTool::Mode::Rectangle;
-    if (m_uiState.selectionMode == app::ui::SelectionMode::Lasso) {
-      mode = core::RectSelectionTool::Mode::Lasso;
-    } else if (m_uiState.selectionMode == app::ui::SelectionMode::AutoSelect) {
-      mode = core::RectSelectionTool::Mode::AutoSelect;
+    switch (m_uiState.selectionMode) {
+      case app::ui::SelectionMode::Lasso:        mode = core::RectSelectionTool::Mode::Lasso;        break;
+      case app::ui::SelectionMode::PolygonLasso: mode = core::RectSelectionTool::Mode::PolygonLasso; break;
+      case app::ui::SelectionMode::AutoSelect:   mode = core::RectSelectionTool::Mode::AutoSelect;   break;
+      case app::ui::SelectionMode::ObjectSelect: mode = core::RectSelectionTool::Mode::ObjectSelect; break;
+      default: break;
     }
     m_rectSelectionTool->setMode(mode);
     m_rectSelectionTool->setAutoSelectThreshold(m_uiState.autoSelectThreshold);
     m_rectSelectionTool->setAutoSelectContiguous(m_uiState.autoSelectContiguous);
     m_rectSelectionTool->setAutoSelectReferAllLayers(m_uiState.autoSelectReferAllLayers);
+    m_rectSelectionTool->setFeatherRadius(m_uiState.selectionFeather);
+    m_rectSelectionTool->setSelectionAntiAlias(m_uiState.selectionAntiAlias);
   }
+  // ObjectSelect subtool → SAM2 がある場合は AiSelectTool のコールバックを注入
   if (m_aiSelectTool != nullptr) {
     m_aiSelectTool->setThreshold(m_uiState.autoSelectThreshold);
     m_aiSelectTool->setReferAllLayers(m_uiState.autoSelectReferAllLayers);
     m_aiSelectTool->setAntiAlias(m_uiState.antiAlias);
-    const std::string& sid = m_uiState.subToolId;
-    m_aiSelectTool->setAddMode     (sid == "ai_select_add");
-    m_aiSelectTool->setSubtractMode(sid == "ai_select_subtract");
+    m_aiSelectTool->setAddMode(false);
+    m_aiSelectTool->setSubtractMode(false);
   }
   if (m_gradientTool != nullptr) {
     m_gradientTool->setOpacity(static_cast<float>(m_uiState.opacity) / 100.0f);
@@ -2914,6 +2977,8 @@ void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescripto
   m_uiState.autoSelectThreshold = std::clamp(profile.selection.autoSelectThreshold, 0, 255);
   m_uiState.autoSelectContiguous = profile.selection.autoSelectContiguous;
   m_uiState.autoSelectReferAllLayers = profile.selection.autoSelectReferAllLayers;
+  m_uiState.selectionFeather   = std::max(0, profile.selection.featherRadius);
+  m_uiState.selectionAntiAlias = profile.selection.antiAlias;
   m_uiState.postCorrection = profile.stabilizer.postCorrection;
   m_uiState.velocityBasedCorrection = profile.stabilizer.velocityBasedCorrection;
   m_uiState.shapeType = profile.shape.shapeType;

@@ -10,12 +10,12 @@ namespace core {
 
 namespace {
 
-Rect strokeDirtyRect(const Point& from, const Point& to, int size) {
-  const int radius = std::max(1, size) / 2 + 2;
-  const int minX = std::min(from.x, to.x) - radius;
-  const int minY = std::min(from.y, to.y) - radius;
-  const int maxX = std::max(from.x, to.x) + radius;
-  const int maxY = std::max(from.y, to.y) + radius;
+Rect strokeDirtyRect(const FPoint& from, const FPoint& to, float size) {
+  const int r = static_cast<int>(std::ceil(size * 0.5f)) + 2;
+  const int minX = static_cast<int>(std::floor(std::min(from.x, to.x))) - r;
+  const int minY = static_cast<int>(std::floor(std::min(from.y, to.y))) - r;
+  const int maxX = static_cast<int>(std::ceil(std::max(from.x, to.x))) + r;
+  const int maxY = static_cast<int>(std::ceil(std::max(from.y, to.y))) + r;
   return Rect {minX, minY, maxX - minX + 1, maxY - minY + 1};
 }
 
@@ -77,30 +77,18 @@ bool segmentIntersection(
     const FPoint& b1,
     float& outT,
     float& outU) {
-  const float ax = a0.x;
-  const float ay = a0.y;
-  const float bx = a1.x;
-  const float by = a1.y;
-  const float cx = b0.x;
-  const float cy = b0.y;
-  const float dx = b1.x;
-  const float dy = b1.y;
-
-  const float rX = bx - ax;
-  const float rY = by - ay;
-  const float sX = dx - cx;
-  const float sY = dy - cy;
+  const float ax = a0.x, ay = a0.y;
+  const float bx = a1.x, by = a1.y;
+  const float cx = b0.x, cy = b0.y;
+  const float dx = b1.x, dy = b1.y;
+  const float rX = bx - ax, rY = by - ay;
+  const float sX = dx - cx, sY = dy - cy;
   const float denom = rX * sY - rY * sX;
-  if (std::abs(denom) < 0.0001F) {
-    return false;
-  }
-  const float qpx = cx - ax;
-  const float qpy = cy - ay;
+  if (std::abs(denom) < 0.0001F) return false;
+  const float qpx = cx - ax, qpy = cy - ay;
   const float t = (qpx * sY - qpy * sX) / denom;
   const float u = (qpx * rY - qpy * rX) / denom;
-  if (t < 0.0F || t > 1.0F || u < 0.0F || u > 1.0F) {
-    return false;
-  }
+  if (t < 0.0F || t > 1.0F || u < 0.0F || u > 1.0F) return false;
   outT = t;
   outU = u;
   return true;
@@ -111,26 +99,17 @@ std::vector<float> collectIntersectionPositions(
     const std::vector<VectorPath>& allPaths,
     std::size_t targetIndex) {
   std::vector<float> intersections;
-  if (target.points.size() < 2) {
-    return intersections;
-  }
+  if (target.points.size() < 2) return intersections;
   for (std::size_t i = 1; i < target.points.size(); ++i) {
     const FPoint& a0 = target.points[i - 1];
     const FPoint& a1 = target.points[i];
     for (std::size_t p = 0; p < allPaths.size(); ++p) {
-      if (p == targetIndex) {
-        continue;
-      }
+      if (p == targetIndex) continue;
       const VectorPath& other = allPaths[p];
-      if (other.points.size() < 2) {
-        continue;
-      }
+      if (other.points.size() < 2) continue;
       for (std::size_t j = 1; j < other.points.size(); ++j) {
-        float t = 0.0F;
-        float u = 0.0F;
-        if (!segmentIntersection(a0, a1, other.points[j - 1], other.points[j], t, u)) {
-          continue;
-        }
+        float t = 0.0F, u = 0.0F;
+        if (!segmentIntersection(a0, a1, other.points[j - 1], other.points[j], t, u)) continue;
         intersections.push_back(static_cast<float>(i - 1) + t);
       }
     }
@@ -147,26 +126,24 @@ std::vector<float> collectIntersectionPositions(
 std::optional<float> nearestLower(const std::vector<float>& values, float pivot) {
   std::optional<float> out;
   for (float value : values) {
-    if (value <= pivot) {
-      out = value;
-    } else {
-      break;
-    }
+    if (value <= pivot) out = value;
+    else break;
   }
   return out;
 }
 
 std::optional<float> nearestUpper(const std::vector<float>& values, float pivot) {
   for (float value : values) {
-    if (value >= pivot) {
-      return value;
-    }
+    if (value >= pivot) return value;
   }
   return std::nullopt;
 }
 
 } // namespace
 
+// ---------------------------------------------------------------
+// ポインターイベント
+// ---------------------------------------------------------------
 ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   Layer* active = context.document.activeLayer();
   if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
@@ -177,23 +154,25 @@ ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEve
   }
 
   m_erasing = true;
-  m_lastPoint = event.point;
+  m_lastPoint = event.fpoint;
+  m_lastPressure = event.pressure;
+  m_distanceAccum = 0.0f;
+
   if (active->kind() == LayerKind::Vector) {
     eraseVectorStroke(*active, m_lastPoint, m_lastPoint);
   } else {
-    eraseStroke(*active, m_lastPoint, m_lastPoint);
+    eraseStroke(*active, m_lastPoint, m_lastPoint, m_lastPressure);
   }
   ToolResult result;
   result.pixelsChanged = true;
-  result.dirtyRect = active->kind() == LayerKind::Vector ? fullLayerRect(*active)
-                                                          : strokeDirtyRect(m_lastPoint, m_lastPoint, m_size);
+  result.dirtyRect = active->kind() == LayerKind::Vector
+      ? fullLayerRect(*active)
+      : strokeDirtyRect(m_lastPoint, m_lastPoint, static_cast<float>(m_size));
   return result;
 }
 
 ToolResult EraserTool::onPointerMove(ToolContext& context, const ToolPointerEvent& event) {
-  if (!m_erasing) {
-    return {};
-  }
+  if (!m_erasing) return {};
 
   Layer* active = context.document.activeLayer();
   if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
@@ -205,66 +184,65 @@ ToolResult EraserTool::onPointerMove(ToolContext& context, const ToolPointerEven
     return {};
   }
 
-  const Point previous = m_lastPoint;
-  const Point stabilizedPoint = applyStabilization(m_lastPoint, event.point);
+  const FPoint previous = m_lastPoint;
+  const FPoint stabilized = applyStabilization(m_lastPoint, event.fpoint);
+  const float pressure = event.pressure;
   if (active->kind() == LayerKind::Vector) {
-    eraseVectorStroke(*active, previous, stabilizedPoint);
+    eraseVectorStroke(*active, previous, stabilized);
   } else {
-    eraseStroke(*active, previous, stabilizedPoint);
+    eraseStroke(*active, previous, stabilized, pressure);
   }
-  m_lastPoint = stabilizedPoint;
+  m_lastPoint = stabilized;
+  m_lastPressure = pressure;
   ToolResult result;
   result.pixelsChanged = true;
-  result.dirtyRect = active->kind() == LayerKind::Vector ? fullLayerRect(*active)
-                                                          : strokeDirtyRect(previous, stabilizedPoint, m_size);
+  result.dirtyRect = active->kind() == LayerKind::Vector
+      ? fullLayerRect(*active)
+      : strokeDirtyRect(previous, stabilized, static_cast<float>(m_size));
   return result;
 }
 
 ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerEvent& event) {
-  if (!m_erasing) {
-    return {};
-  }
+  if (!m_erasing) return {};
 
   m_erasing = false;
   Layer* active = context.document.activeLayer();
-  if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
-    return {};
-  }
-  if (active->kind() == LayerKind::Raster && active->alphaLocked()) {
-    return {};
-  }
+  if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) return {};
+  if (active->kind() == LayerKind::Raster && active->alphaLocked()) return {};
 
-  const Point stabilizedPoint = applyStabilization(m_lastPoint, event.point);
-  if (m_lastPoint.x == stabilizedPoint.x && m_lastPoint.y == stabilizedPoint.y &&
-      (!m_postCorrection ||
-       (stabilizedPoint.x == event.point.x && stabilizedPoint.y == event.point.y))) {
-    return {};
-  }
+  const FPoint stabilized = applyStabilization(m_lastPoint, event.fpoint);
+  const float dx = stabilized.x - m_lastPoint.x;
+  const float dy = stabilized.y - m_lastPoint.y;
+  const bool moved = (dx * dx + dy * dy) > 0.01f;
 
-  if (active->kind() == LayerKind::Vector) {
-    eraseVectorStroke(*active, m_lastPoint, stabilizedPoint);
-  } else {
-    eraseStroke(*active, m_lastPoint, stabilizedPoint);
-  }
-  Rect dirty = active->kind() == LayerKind::Vector ? fullLayerRect(*active)
-                                                    : strokeDirtyRect(m_lastPoint, stabilizedPoint, m_size);
-  if (m_postCorrection &&
-      (stabilizedPoint.x != event.point.x || stabilizedPoint.y != event.point.y)) {
+  if (moved) {
     if (active->kind() == LayerKind::Vector) {
-      eraseVectorStroke(*active, stabilizedPoint, event.point);
+      eraseVectorStroke(*active, m_lastPoint, stabilized);
+    } else {
+      eraseStroke(*active, m_lastPoint, stabilized, m_lastPressure);
+    }
+  }
+
+  Rect dirty = active->kind() == LayerKind::Vector
+      ? fullLayerRect(*active)
+      : strokeDirtyRect(m_lastPoint, stabilized, static_cast<float>(m_size));
+
+  if (m_postCorrection && stabilized.lengthTo(event.fpoint) > 0.5f) {
+    if (active->kind() == LayerKind::Vector) {
+      eraseVectorStroke(*active, stabilized, event.fpoint);
       dirty = fullLayerRect(*active);
     } else {
-      eraseStroke(*active, stabilizedPoint, event.point);
-      const Rect correctionRect = strokeDirtyRect(stabilizedPoint, event.point, m_size);
-      const int minX = std::min(dirty.x, correctionRect.x);
-      const int minY = std::min(dirty.y, correctionRect.y);
-      const int maxX = std::max(dirty.x + dirty.width, correctionRect.x + correctionRect.width);
-      const int maxY = std::max(dirty.y + dirty.height, correctionRect.y + correctionRect.height);
+      eraseStroke(*active, stabilized, event.fpoint, m_lastPressure);
+      const Rect r2 = strokeDirtyRect(stabilized, event.fpoint, static_cast<float>(m_size));
+      const int minX = std::min(dirty.x, r2.x);
+      const int minY = std::min(dirty.y, r2.y);
+      const int maxX = std::max(dirty.x + dirty.width, r2.x + r2.width);
+      const int maxY = std::max(dirty.y + dirty.height, r2.y + r2.height);
       dirty = Rect {minX, minY, maxX - minX, maxY - minY};
     }
-    m_lastPoint = event.point;
+    m_lastPoint = event.fpoint;
   } else {
-    m_lastPoint = stabilizedPoint;
+    m_lastPoint = stabilized;
   }
   ToolResult result;
   result.pixelsChanged = true;
@@ -275,6 +253,7 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
 ToolResult EraserTool::onCancel(ToolContext& context) {
   static_cast<void>(context);
   m_erasing = false;
+  m_distanceAccum = 0.0f;
   return {};
 }
 
@@ -285,93 +264,111 @@ ToolResult EraserTool::onWheel(ToolContext& context, int deltaSteps, const ToolP
   return {};
 }
 
-Point EraserTool::applyStabilization(const Point& from, const Point& to) const {
+// ---------------------------------------------------------------
+// スタビライザー（FPoint版）
+// ---------------------------------------------------------------
+FPoint EraserTool::applyStabilization(const FPoint& from, const FPoint& to) const {
   const float stabilization = std::clamp(m_stabilization, 0.0F, 1.0F);
-  if (stabilization <= 0.001F) {
-    return to;
-  }
+  if (stabilization <= 0.001F) return to;
 
   float response = 1.0F - stabilization * 0.85F;
   if (m_velocityBasedCorrection) {
-    const float distance = std::hypot(static_cast<float>(to.x - from.x), static_cast<float>(to.y - from.y));
+    const float distance = from.lengthTo(to);
     const float velocityFactor = std::clamp(1.0F - distance / 80.0F, 0.25F, 1.0F);
     response *= velocityFactor;
   }
   response = std::clamp(response, 0.05F, 1.0F);
-  return Point {
-      static_cast<int>(std::lround(static_cast<float>(from.x) + static_cast<float>(to.x - from.x) * response)),
-      static_cast<int>(std::lround(static_cast<float>(from.y) + static_cast<float>(to.y - from.y) * response))};
+  return FPoint {
+      from.x + (to.x - from.x) * response,
+      from.y + (to.y - from.y) * response};
 }
 
-void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) const {
+// ---------------------------------------------------------------
+// ラスターストローク（subpixel + spacing accumulation）
+// ---------------------------------------------------------------
+void EraserTool::eraseStroke(Layer& layer, const FPoint& from, const FPoint& to, float pressure) {
   PixelBuffer& buffer = layer.buffer();
-  const int radius = std::max(1, m_size) / 2;
-  const float fRadius = static_cast<float>(m_size) * 0.5f;
-  const int dx = to.x - from.x;
-  const int dy = to.y - from.y;
-  const float distance = std::hypot(static_cast<float>(dx), static_cast<float>(dy));
-  const float spacingPixels = std::max(1.0F, m_spacing * fRadius * 2.0F);
-  const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacingPixels)));
 
-  if (distance <= 0.001F) {
+  // 筆圧によるサイズ・不透明度スケーリング（BrushTool と同じロジック）
+  const float p = std::clamp(pressure, 0.0f, 1.0f);
+  float sizeScale = 1.0f;
+  if (m_pressureSizeEnabled) {
+    sizeScale = m_pressureSizeMin + (1.0f - m_pressureSizeMin) * p;
+  }
+  float opacityScale = 1.0f;
+  if (m_pressureOpacityEnabled) {
+    opacityScale = m_pressureOpacityMin + (1.0f - m_pressureOpacityMin) * p;
+  }
+  const float effectiveOpacity = std::clamp(m_opacity * opacityScale, 0.0f, 1.0f);
+
+  const float fRadius = static_cast<float>(std::max(1, m_size)) * 0.5f * sizeScale;
+  const float spacingPx = std::max(0.5f, m_spacing * fRadius * 2.0f);
+  const float dx = to.x - from.x;
+  const float dy = to.y - from.y;
+  const float segLen = std::sqrt(dx * dx + dy * dy);
+
+  if (segLen < 0.001F) {
     if (m_shapeType == BrushShapeType::Square) {
-      eraseSquare(buffer, from, radius);
+      eraseSquare(buffer, from, fRadius, effectiveOpacity);
     } else {
-      eraseCircleAA(buffer, FPoint {static_cast<float>(from.x), static_cast<float>(from.y)}, fRadius);
+      eraseCircleAA(buffer, from, fRadius, effectiveOpacity);
     }
     return;
   }
 
-  for (int i = 0; i <= steps; ++i) {
-    const float t = static_cast<float>(i) / static_cast<float>(steps);
-    const FPoint fp {
-        static_cast<float>(from.x) + static_cast<float>(dx) * t,
-        static_cast<float>(from.y) + static_cast<float>(dy) * t};
-    if (m_shapeType == BrushShapeType::Square) {
-      const Point p {static_cast<int>(std::lround(fp.x)), static_cast<int>(std::lround(fp.y))};
-      eraseSquare(buffer, p, radius);
-    } else {
-      eraseCircleAA(buffer, fp, fRadius);
-    }
+  float traveled = spacingPx - m_distanceAccum;
+  if (traveled < 0.0f) traveled = 0.0f;
+  if (traveled > segLen) {
+    m_distanceAccum += segLen;
+    return;
   }
+
+  while (traveled <= segLen + 0.001f) {
+    const float t = std::clamp(traveled / segLen, 0.0f, 1.0f);
+    const FPoint pos {from.x + dx * t, from.y + dy * t};
+    if (m_shapeType == BrushShapeType::Square) {
+      eraseSquare(buffer, pos, fRadius, effectiveOpacity);
+    } else {
+      eraseCircleAA(buffer, pos, fRadius, effectiveOpacity);
+    }
+    traveled += spacingPx;
+  }
+
+  const float consumed = traveled - spacingPx;
+  m_distanceAccum = segLen - (consumed - spacingPx);
+  if (m_distanceAccum < 0.0f) m_distanceAccum = 0.0f;
 }
 
-void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point& to) const {
+// ---------------------------------------------------------------
+// ベクターストローク消去（FPoint版）
+// ---------------------------------------------------------------
+void EraserTool::eraseVectorStroke(Layer& layer, const FPoint& from, const FPoint& to) const {
   std::vector<VectorPath>& editablePaths = layer.vectorPaths();
-  if (editablePaths.empty()) {
-    return;
-  }
+  if (editablePaths.empty()) return;
   const std::vector<VectorPath> originalPaths = editablePaths;
 
-  const int radius = std::max(1, m_size) / 2;
-  const float fRadius2 = static_cast<float>(m_size) * 0.5f;
-  const int dx = to.x - from.x;
-  const int dy = to.y - from.y;
-  const float distance = std::hypot(static_cast<float>(dx), static_cast<float>(dy));
-  const float spacingPixels = std::max(1.0F, m_spacing * fRadius2 * 2.0F);
+  const float radiusF = static_cast<float>(std::max(1, m_size)) * 0.5f;
+  const float dx = to.x - from.x;
+  const float dy = to.y - from.y;
+  const float distance = std::sqrt(dx * dx + dy * dy);
+  const float spacingPixels = std::max(1.0F, m_spacing * radiusF * 2.0F);
   const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacingPixels)));
 
-  std::vector<Point> stamps;
+  std::vector<FPoint> stamps;
   stamps.reserve(static_cast<std::size_t>(steps) + 1);
   for (int i = 0; i <= steps; ++i) {
     const float t = steps == 0 ? 0.0F : static_cast<float>(i) / static_cast<float>(steps);
-    stamps.push_back(Point {
-        static_cast<int>(std::lround(static_cast<float>(from.x) + static_cast<float>(dx) * t)),
-        static_cast<int>(std::lround(static_cast<float>(from.y) + static_cast<float>(dy) * t))});
+    stamps.push_back(FPoint {from.x + dx * t, from.y + dy * t});
   }
 
-  const float radiusF = static_cast<float>(radius);
   const auto collectHitPositions = [&](const VectorPath& path) {
     std::vector<float> hits;
-    if (path.points.empty()) {
-      return hits;
-    }
+    if (path.points.empty()) return hits;
     const float widthRadius = static_cast<float>(std::max(1, path.width)) * 0.5F;
-    for (const Point& stamp : stamps) {
-      const FPoint stampF {static_cast<float>(stamp.x), static_cast<float>(stamp.y)};
+    for (const FPoint& stamp : stamps) {
       for (const FPoint& pt : path.points) {
-        const float px = pt.x - stampF.x;
-        const float py = pt.y - stampF.y;
+        const float px = pt.x - stamp.x;
+        const float py = pt.y - stamp.y;
         const float allowance = radiusF + widthRadius;
         if ((px * px + py * py) <= (allowance * allowance)) {
           hits.push_back(0.0F);
@@ -379,21 +376,14 @@ void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point&
       }
       for (std::size_t i = 1; i < path.points.size(); ++i) {
         const float allowance = radiusF + widthRadius;
-        if (distancePointToSegment(stampF, path.points[i - 1], path.points[i]) > allowance) {
-          continue;
-        }
-        const float ax = path.points[i - 1].x;
-        const float ay = path.points[i - 1].y;
-        const float bx = path.points[i].x;
-        const float by = path.points[i].y;
-        const float px = stampF.x;
-        const float py = stampF.y;
-        const float vx = bx - ax;
-        const float vy = by - ay;
+        if (distancePointToSegment(stamp, path.points[i - 1], path.points[i]) > allowance) continue;
+        const float ax = path.points[i - 1].x, ay = path.points[i - 1].y;
+        const float bx = path.points[i].x, by = path.points[i].y;
+        const float vx = bx - ax, vy = by - ay;
         const float lenSq = vx * vx + vy * vy;
         float t = 0.0F;
         if (lenSq > 0.0001F) {
-          t = std::clamp(((px - ax) * vx + (py - ay) * vy) / lenSq, 0.0F, 1.0F);
+          t = std::clamp(((stamp.x - ax) * vx + (stamp.y - ay) * vy) / lenSq, 0.0F, 1.0F);
         }
         hits.push_back(static_cast<float>(i - 1) + t);
       }
@@ -412,9 +402,7 @@ void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point&
       result.push_back(path);
       continue;
     }
-    if (path.points.size() < 2) {
-      continue;
-    }
+    if (path.points.size() < 2) continue;
 
     const float lastPos = static_cast<float>(path.points.size() - 1);
     const float hitPos = hitPositions[hitPositions.size() / 2];
@@ -422,17 +410,13 @@ void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point&
 
     auto appendSlice = [&](float startPos, float endPos) {
       std::vector<FPoint> points = slicePath(path, startPos, endPos);
-      if (points.size() < 2) {
-        return;
-      }
+      if (points.size() < 2) return;
       VectorPath kept = path;
       kept.points = std::move(points);
       result.push_back(std::move(kept));
     };
 
-    if (m_vectorEraseMode == VectorEraseMode::TouchedOnly) {
-      continue;
-    }
+    if (m_vectorEraseMode == VectorEraseMode::TouchedOnly) continue;
 
     if (m_vectorEraseMode == VectorEraseMode::ToIntersection) {
       const std::optional<float> lower = nearestLower(intersections, hitPos);
@@ -442,35 +426,25 @@ void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point&
         appendSlice(*upper, lastPos);
         continue;
       }
-      if (lower.has_value()) {
-        appendSlice(0.0F, *lower);
-        continue;
-      }
-      if (upper.has_value()) {
-        appendSlice(*upper, lastPos);
-        continue;
-      }
+      if (lower.has_value()) { appendSlice(0.0F, *lower); continue; }
+      if (upper.has_value()) { appendSlice(*upper, lastPos); continue; }
       const float removeStart = std::clamp(hitPos - 0.55F, 0.0F, lastPos);
-      const float removeEnd = std::clamp(hitPos + 0.55F, 0.0F, lastPos);
+      const float removeEnd   = std::clamp(hitPos + 0.55F, 0.0F, lastPos);
       appendSlice(0.0F, removeStart);
       appendSlice(removeEnd, lastPos);
       continue;
     }
 
     if (m_vectorEraseMode == VectorEraseMode::TrimOutside) {
-      if (!m_vectorTrimOutside) {
-        continue;
-      }
-      const float distanceToStart = std::abs(hitPos - 0.0F);
-      const float distanceToEnd = std::abs(lastPos - hitPos);
+      if (!m_vectorTrimOutside) continue;
+      const float distanceToStart = std::abs(hitPos);
+      const float distanceToEnd   = std::abs(lastPos - hitPos);
       if (distanceToStart <= distanceToEnd) {
         const std::optional<float> lower = nearestLower(intersections, hitPos);
-        const float cut = lower.value_or(hitPos);
-        appendSlice(cut, lastPos);
+        appendSlice(lower.value_or(hitPos), lastPos);
       } else {
         const std::optional<float> upper = nearestUpper(intersections, hitPos);
-        const float cut = upper.value_or(hitPos);
-        appendSlice(0.0F, cut);
+        appendSlice(0.0F, upper.value_or(hitPos));
       }
       continue;
     }
@@ -480,127 +454,68 @@ void EraserTool::eraseVectorStroke(Layer& layer, const Point& from, const Point&
 }
 
 float EraserTool::distancePointToSegment(FPoint p, FPoint a, FPoint b) noexcept {
-  const float ax = a.x;
-  const float ay = a.y;
-  const float bx = b.x;
-  const float by = b.y;
-  const float px = p.x;
-  const float py = p.y;
-
-  const float vx = bx - ax;
-  const float vy = by - ay;
-  const float wx = px - ax;
-  const float wy = py - ay;
+  const float vx = b.x - a.x, vy = b.y - a.y;
+  const float wx = p.x - a.x, wy = p.y - a.y;
   const float lenSq = vx * vx + vy * vy;
   if (lenSq <= 0.0001F) {
-    const float dx = px - ax;
-    const float dy = py - ay;
-    return std::sqrt(dx * dx + dy * dy);
+    return std::sqrt(wx * wx + wy * wy);
   }
-
   const float t = std::clamp((wx * vx + wy * vy) / lenSq, 0.0F, 1.0F);
-  const float cx = ax + vx * t;
-  const float cy = ay + vy * t;
-  const float dx = px - cx;
-  const float dy = py - cy;
+  const float cx = a.x + vx * t, cy = a.y + vy * t;
+  const float dx = p.x - cx, dy = p.y - cy;
   return std::sqrt(dx * dx + dy * dy);
 }
 
-void EraserTool::eraseCircle(PixelBuffer& buffer, const Point& center, int radius) const {
-  const int r2 = radius * radius;
-  const float radiusF = static_cast<float>(std::max(1, radius));
-  const float hardEdge = std::clamp(m_hardness, 0.0F, 1.0F);
-  for (int y = center.y - radius; y <= center.y + radius; ++y) {
-    for (int x = center.x - radius; x <= center.x + radius; ++x) {
-      const int dx = x - center.x;
-      const int dy = y - center.y;
-      if ((dx * dx + dy * dy) <= r2) {
-        const float distance = std::sqrt(static_cast<float>(dx * dx + dy * dy)) / radiusF;
-        if (distance > 1.0F) {
-          continue;
-        }
-        float strength = 1.0F;
-        if (m_antiAlias) {
-          if (hardEdge < 0.999F && distance > hardEdge) {
-            strength = 1.0F - (distance - hardEdge) / (1.0F - hardEdge);
-          }
-        } else {
-          strength = distance <= hardEdge ? 1.0F : 0.0F;
-        }
-        strength *= std::clamp(m_opacity * m_flow, 0.0F, 1.0F);
-        if (strength > 0.001F) {
-          erasePixel(buffer, x, y, strength);
-        }
-      }
-    }
-  }
-}
-
-void EraserTool::eraseCircleAA(PixelBuffer& buffer, FPoint center, float radius) const {
-  const float hardness    = std::clamp(m_hardness, 0.0F, 1.0F);
-  const float baseStrength = std::clamp(m_opacity * m_flow, 0.0F, 1.0F);
-  const int x0 = static_cast<int>(std::floor(center.x - radius - 1.0F));
-  const int x1 = static_cast<int>(std::ceil (center.x + radius + 1.0F));
-  const int y0 = static_cast<int>(std::floor(center.y - radius - 1.0F));
-  const int y1 = static_cast<int>(std::ceil (center.y + radius + 1.0F));
-  for (int y = y0; y <= y1; ++y) {
-    for (int x = x0; x <= x1; ++x) {
-      const float fdx  = static_cast<float>(x) - center.x;
-      const float fdy  = static_cast<float>(y) - center.y;
-      const float d    = std::sqrt(fdx * fdx + fdy * fdy);
+// ---------------------------------------------------------------
+// ピクセル消去プリミティブ（float座標）
+// ---------------------------------------------------------------
+void EraserTool::eraseCircleAA(PixelBuffer& buffer, FPoint center, float radius, float opacity) const {
+  const float baseStrength = std::clamp(opacity * m_flow, 0.0F, 1.0F);
+  const int x0 = static_cast<int>(std::floor(center.x - radius - 1.5f));
+  const int x1 = static_cast<int>(std::ceil (center.x + radius + 1.5f));
+  const int y0 = static_cast<int>(std::floor(center.y - radius - 1.5f));
+  const int y1 = static_cast<int>(std::ceil (center.y + radius + 1.5f));
+  for (int py = y0; py <= y1; ++py) {
+    for (int px = x0; px <= x1; ++px) {
+      const float fdx = (static_cast<float>(px) + 0.5f) - center.x;
+      const float fdy = (static_cast<float>(py) + 0.5f) - center.y;
+      const float d   = std::sqrt(fdx * fdx + fdy * fdy);
       const float dist = (radius > 0.0F) ? (d / radius) : (d < 0.5F ? 0.0F : 2.0F);
-      const float coverage = brushCoverage(dist, hardness, radius, m_antiAlias);
+      const float coverage = brushCoverage(dist, m_hardness, radius, m_antiAlias);
       const float strength = coverage * baseStrength;
-      if (strength > 0.001F) {
-        erasePixel(buffer, x, y, strength);
-      }
+      if (strength > 0.001F) erasePixel(buffer, px, py, strength);
     }
   }
 }
 
-void EraserTool::eraseSquare(PixelBuffer& buffer, const Point& center, int radius) const {
-  const float radiusF = static_cast<float>(std::max(1, radius));
-  const float hardEdge = std::clamp(m_hardness, 0.0F, 1.0F);
-  for (int y = center.y - radius; y <= center.y + radius; ++y) {
-    for (int x = center.x - radius; x <= center.x + radius; ++x) {
-      const int dx = std::abs(x - center.x);
-      const int dy = std::abs(y - center.y);
-      const float distance = static_cast<float>(std::max(dx, dy)) / radiusF;
-      if (distance > 1.0F) {
-        continue;
-      }
-      float strength = 1.0F;
-      if (m_antiAlias) {
-        if (hardEdge < 0.999F && distance > hardEdge) {
-          strength = 1.0F - (distance - hardEdge) / (1.0F - hardEdge);
-        }
-      } else {
-        strength = distance <= hardEdge ? 1.0F : 0.0F;
-      }
-      strength *= std::clamp(m_opacity * m_flow, 0.0F, 1.0F);
-      if (strength > 0.001F) {
-        erasePixel(buffer, x, y, strength);
-      }
+void EraserTool::eraseSquare(PixelBuffer& buffer, FPoint center, float radius, float opacity) const {
+  const float baseStrength = std::clamp(opacity * m_flow, 0.0F, 1.0F);
+  const int x0 = static_cast<int>(std::floor(center.x - radius - 1.5f));
+  const int x1 = static_cast<int>(std::ceil (center.x + radius + 1.5f));
+  const int y0 = static_cast<int>(std::floor(center.y - radius - 1.5f));
+  const int y1 = static_cast<int>(std::ceil (center.y + radius + 1.5f));
+  for (int py = y0; py <= y1; ++py) {
+    for (int px = x0; px <= x1; ++px) {
+      const float fdx = std::abs((static_cast<float>(px) + 0.5f) - center.x);
+      const float fdy = std::abs((static_cast<float>(py) + 0.5f) - center.y);
+      const float dist = std::max(fdx, fdy) / radius;
+      const float coverage = brushCoverage(dist, m_hardness, radius, m_antiAlias);
+      const float strength = coverage * baseStrength;
+      if (strength > 0.001F) erasePixel(buffer, px, py, strength);
     }
   }
 }
 
 void EraserTool::erasePixel(PixelBuffer& buffer, int x, int y, float strength) const {
-  if (!buffer.inBounds(x, y)) {
-    return;
-  }
-
+  if (!buffer.inBounds(x, y)) return;
   const float s = std::clamp(strength, 0.0F, 1.0F);
   const Color dst = buffer.pixel(x, y);
   const float keep = 1.0F - s;
-  buffer.setPixel(
-      x,
-      y,
-      Color {
-          static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.r) * keep)),
-          static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.g) * keep)),
-          static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.b) * keep)),
-          static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))});
+  buffer.setPixel(x, y, Color {
+      static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.r) * keep)),
+      static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.g) * keep)),
+      static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.b) * keep)),
+      static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))});
 }
 
 } // namespace core

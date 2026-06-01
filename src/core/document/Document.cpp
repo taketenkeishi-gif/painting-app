@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include "core/buffer/PixelBuffer.h"
+
 namespace core {
 
 Document::Document(int width, int height)
@@ -157,6 +159,73 @@ bool Document::moveLayerDown(std::size_t index) noexcept {
     return false;
   }
   return moveLayer(index, index - 1);
+}
+
+bool Document::resizeCanvas(int newWidth, int newHeight, int offsetX, int offsetY) {
+  if (newWidth <= 0 || newHeight <= 0) {
+    return false;
+  }
+  if (newWidth == m_canvasSize.width && newHeight == m_canvasSize.height && offsetX == 0 && offsetY == 0) {
+    return false; // no-op
+  }
+
+  // 各ラスターレイヤーのバッファをリサイズ
+  for (Layer& layer : m_layers) {
+    if (layer.kind() != LayerKind::Raster) {
+      continue;
+    }
+    const PixelBuffer old = layer.buffer();
+    PixelBuffer newBuf(newWidth, newHeight, Color::Transparent());
+    // old のコンテンツを (offsetX, offsetY) に転写
+    const int srcW = old.width();
+    const int srcH = old.height();
+    for (int sy = 0; sy < srcH; ++sy) {
+      const int dy = sy + offsetY;
+      if (dy < 0 || dy >= newHeight) continue;
+      for (int sx = 0; sx < srcW; ++sx) {
+        const int dx = sx + offsetX;
+        if (dx < 0 || dx >= newWidth) continue;
+        newBuf.setPixel(dx, dy, old.pixel(sx, sy));
+      }
+    }
+    layer.buffer() = std::move(newBuf);
+
+    // マスクも同様にリサイズ
+    if (layer.hasMask()) {
+      const PixelBuffer oldMask = layer.maskBuffer();
+      PixelBuffer newMask(newWidth, newHeight, Color::Transparent());
+      for (int sy = 0; sy < oldMask.height(); ++sy) {
+        const int dy = sy + offsetY;
+        if (dy < 0 || dy >= newHeight) continue;
+        for (int sx = 0; sx < oldMask.width(); ++sx) {
+          const int dx = sx + offsetX;
+          if (dx < 0 || dx >= newWidth) continue;
+          newMask.setPixel(dx, dy, oldMask.pixel(sx, sy));
+        }
+      }
+      layer.maskBuffer() = std::move(newMask);
+    }
+  }
+
+  // ベクターレイヤーのパスはオフセットをかける
+  for (Layer& layer : m_layers) {
+    if (layer.kind() != LayerKind::Vector) {
+      continue;
+    }
+    if (offsetX == 0 && offsetY == 0) {
+      continue;
+    }
+    for (VectorPath& path : layer.vectorPaths()) {
+      for (FPoint& pt : path.points) {
+        pt.x += static_cast<float>(offsetX);
+        pt.y += static_cast<float>(offsetY);
+      }
+    }
+  }
+
+  m_canvasSize = {newWidth, newHeight};
+  m_selection = SelectionMask(newWidth, newHeight);
+  return true;
 }
 
 std::string Document::makeDefaultLayerName(std::size_t currentLayerCount) {
