@@ -17,11 +17,16 @@
 #include "core/common/Rect.h"
 #include "core/document/Document.h"
 #include "core/render/Renderer.h"
+#include "platform/skia/SkiaIntegration.h"
+#ifdef PAINT_USE_SKIA
+#  include "platform/skia/SkiaRenderer.h"
+#endif
 #include "core/tools/AiSelectTool.h"
 #include "core/tools/BrushTool.h"
 #include "core/tools/EraserTool.h"
 #include "core/tools/EyedropperTool.h"
 #include "core/tools/FillTool.h"
+#include "core/tools/GradientTool.h"
 #include "core/tools/HandTool.h"
 #include "core/tools/LineTool.h"
 #include "core/tools/MoveLayerTool.h"
@@ -84,6 +89,7 @@ struct ToolStateViewModel {
   bool velocityBasedCorrection {false};
   core::BrushShapeType shapeType {core::BrushShapeType::Circle};
   core::BlendMode blendMode {core::BlendMode::Normal};
+  bool buildupMode {false};
   bool eraseMode {false};
   bool lockAlphaRespect {false};
   app::ui::VectorEraserMode vectorEraseMode {app::ui::VectorEraserMode::TouchedOnly};
@@ -106,6 +112,10 @@ struct ToolStateViewModel {
   int  wetMixRate{50};
   bool smear     {false};
   int  smearRate {90};
+  // グラデーション
+  int  gradientType {0};  ///< 0=Linear, 1=Radial
+  int  gradientFill {0};  ///< 0=FgToBg, 1=FgToTransparent
+  core::Color secondaryColor {255, 255, 255, 255};  ///< 背景色
 };
 
 struct CanvasOverlayViewModel {
@@ -261,6 +271,7 @@ public:
   void setBrushTaperStart(int taperStart);
   void setBrushTaperEnd(int taperEnd);
   void setBrushBlendMode(core::BlendMode blendMode);
+  void setBrushBuildupMode(bool buildup);
   void setBrushEraseMode(bool eraseMode);
   void setBrushLockAlphaRespect(bool enabled);
   void setLineSnapAngle(int snapAngle);
@@ -293,6 +304,18 @@ public:
   void setWetMixRate(int value);
   void setSmear(bool v);
   void setSmearRate(int value);
+
+  // ── グラデーション ──────────────────────────────────────────────────────────
+  void setSecondaryColor(const core::Color& color);
+  core::Color secondaryColor() const noexcept { return m_secondaryColor; }
+
+  // ── 画像調整 ───────────────────────────────────────────────────────────────
+  /// アクティブレイヤーの明るさ・コントラストを調整する。
+  /// brightness: -100 〜 +100, contrast: -100 〜 +100 (Photoshop 互換)
+  bool adjustBrightnessContrast(int brightness, int contrast);
+  /// アクティブレイヤーの色相・彩度・明度を調整する。
+  /// hue: -180 〜 +180 度, saturation: -100 〜 +100, lightness: -100 〜 +100
+  bool adjustHueSaturationLightness(int hue, int saturation, int lightness);
 
   // ── AI / ComfyUI ──────────────────────────────────────────────────────────
   ComfyUiClient* comfyUiClient() noexcept { return m_comfyUiClient; }
@@ -368,7 +391,11 @@ private:
   void rerenderDirty(const core::Rect& dirtyRect);
 
   core::Document m_document;
+#ifdef PAINT_USE_SKIA
+  platform::skia::SkiaRenderer m_renderer;
+#else
   core::Renderer m_renderer;
+#endif
   core::PixelBuffer m_composited;
 
   core::ToolManager m_toolManager;
@@ -377,6 +404,7 @@ private:
   core::LineTool*          m_lineTool           {nullptr};
   core::RectSelectionTool* m_rectSelectionTool  {nullptr};
   core::FillTool*          m_fillTool           {nullptr};
+  core::GradientTool*      m_gradientTool       {nullptr};
   core::AiSelectTool*      m_aiSelectTool       {nullptr};
   ComfyUiClient*           m_comfyUiClient      {nullptr};
 
@@ -389,14 +417,15 @@ private:
   std::optional<PendingStrokeState> m_pendingStroke;
   core::Point m_lastPointer {0, 0};
   core::FPoint m_lastFPointer {0.0f, 0.0f};
-  core::Color m_currentColor {0, 0, 0, 255};
+  core::Color m_currentColor   {0, 0, 0, 255};
+  core::Color m_secondaryColor {255, 255, 255, 255};
   bool m_shiftModifier {false};
   bool m_ctrlModifier {false};
   bool m_altModifier {false};
 
   std::vector<StrokeHistoryEntry> m_undoHistory;
   std::vector<StrokeHistoryEntry> m_redoHistory;
-  std::size_t m_maxStrokeHistory {20};
+  std::size_t m_maxStrokeHistory {50};
   std::optional<core::Rect> m_lastCompositeDirtyRect;
   std::uint64_t m_compositeRevision {0};
 };

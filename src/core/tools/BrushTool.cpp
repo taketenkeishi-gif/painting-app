@@ -10,6 +10,84 @@
 namespace {
   constexpr float kPi = 3.14159265358979f;
 
+  // ── HSL ヘルパー ─────────────────────────────────────────────────────────
+  inline float hslLuminance(float r, float g, float b) noexcept {
+    return 0.299f * r + 0.587f * g + 0.114f * b;
+  }
+
+  inline float hslSaturation(float r, float g, float b) noexcept {
+    const float cmax = std::max({r, g, b});
+    const float cmin = std::min({r, g, b});
+    return cmax - cmin;
+  }
+
+  struct RGB3 { float r, g, b; };
+
+  inline RGB3 clipColor(RGB3 c) noexcept {
+    const float l = hslLuminance(c.r, c.g, c.b);
+    const float n = std::min({c.r, c.g, c.b});
+    const float x = std::max({c.r, c.g, c.b});
+    if (n < 0.0f) {
+      c.r = l + (c.r - l) * l / (l - n);
+      c.g = l + (c.g - l) * l / (l - n);
+      c.b = l + (c.b - l) * l / (l - n);
+    }
+    if (x > 1.0f) {
+      c.r = l + (c.r - l) * (1.0f - l) / (x - l);
+      c.g = l + (c.g - l) * (1.0f - l) / (x - l);
+      c.b = l + (c.b - l) * (1.0f - l) / (x - l);
+    }
+    return c;
+  }
+
+  inline RGB3 setLuminance(RGB3 c, float lum) noexcept {
+    const float d = lum - hslLuminance(c.r, c.g, c.b);
+    return clipColor({c.r + d, c.g + d, c.b + d});
+  }
+
+  inline RGB3 setSaturation(RGB3 c, float sat) noexcept {
+    float& cmin_ref = c.r < c.g ? (c.r < c.b ? c.r : c.b) : (c.g < c.b ? c.g : c.b);
+    float& cmax_ref = c.r > c.g ? (c.r > c.b ? c.r : c.b) : (c.g > c.b ? c.g : c.b);
+    // mid: the one that is neither min nor max
+    // We'll do it manually without reference tricks
+    float vmin = std::min({c.r, c.g, c.b});
+    float vmax = std::max({c.r, c.g, c.b});
+    float vmid;
+    if ((c.r >= vmin && c.r <= vmax) && !(c.r == vmin || c.r == vmax)) vmid = c.r;
+    else if ((c.g >= vmin && c.g <= vmax) && !(c.g == vmin || c.g == vmax)) vmid = c.g;
+    else vmid = c.b;
+    (void)cmin_ref; (void)cmax_ref;
+
+    if (vmax > vmin) {
+      vmid = (vmid - vmin) * sat / (vmax - vmin);
+      vmax = sat;
+    } else {
+      vmid = 0.0f;
+      vmax = 0.0f;
+    }
+    vmin = 0.0f;
+    // assign back by position
+    float newMin = vmin, newMid = vmid, newMax = vmax;
+    // Sort original r,g,b into min/mid/max order and rebuild
+    // Simpler: recompute from scratch
+    const float or_ = c.r, og = c.g, ob = c.b;
+    const float omin = std::min({or_, og, ob});
+    const float omax = std::max({or_, og, ob});
+    const float omid = or_ + og + ob - omin - omax;
+    (void)omid;
+    RGB3 out = c;
+    if (or_ == omin) out.r = newMin;
+    else if (or_ == omax) out.r = newMax;
+    else out.r = newMid;
+    if (og == omin) out.g = newMin;
+    else if (og == omax) out.g = newMax;
+    else out.g = newMid;
+    if (ob == omin) out.b = newMin;
+    else if (ob == omax) out.b = newMax;
+    else out.b = newMid;
+    return out;
+  }
+
   // ── ハッシュベースのグレインノイズ (0.0–1.0) ─────────────────────────────
   // セルノイズ: 入力座標とseedから確定的ランダム値を返す
   float grainNoise(int px, int py, int seed) noexcept {
@@ -298,6 +376,59 @@ void BrushTool::blendPixel(
           (dB+sB) >= 1.0f ? 1.0f : 0.0f);
       break;
 
+    case BlendMode::Dissolve: {
+      // ランダムなピクセルのみ描画（確率 = alphaScale）
+      const std::uint32_t h = static_cast<std::uint32_t>(x * 1619 + y * 31337 + 6271);
+      const float rnd = static_cast<float>(h ^ (h >> 16)) / static_cast<float>(0xFFFFFFFFU);
+      if (rnd >= alphaScale) {
+        return; // このピクセルは描かない
+      }
+      compositeResult(sR, sG, sB);
+      break;
+    }
+
+    case BlendMode::DarkerColor: {
+      const float lumD = hslLuminance(dR, dG, dB);
+      const float lumS = hslLuminance(sR, sG, sB);
+      if (lumS < lumD) compositeResult(sR, sG, sB);
+      else compositeResult(dR, dG, dB);
+      break;
+    }
+
+    case BlendMode::LighterColor: {
+      const float lumD = hslLuminance(dR, dG, dB);
+      const float lumS = hslLuminance(sR, sG, sB);
+      if (lumS > lumD) compositeResult(sR, sG, sB);
+      else compositeResult(dR, dG, dB);
+      break;
+    }
+
+    case BlendMode::Hue: {
+      const RGB3 res = setLuminance(setSaturation({sR, sG, sB}, hslSaturation(dR, dG, dB)),
+                                    hslLuminance(dR, dG, dB));
+      compositeResult(res.r, res.g, res.b);
+      break;
+    }
+
+    case BlendMode::HslSat: {
+      const RGB3 res = setLuminance(setSaturation({dR, dG, dB}, hslSaturation(sR, sG, sB)),
+                                    hslLuminance(dR, dG, dB));
+      compositeResult(res.r, res.g, res.b);
+      break;
+    }
+
+    case BlendMode::HslColor: {
+      const RGB3 res = setLuminance({sR, sG, sB}, hslLuminance(dR, dG, dB));
+      compositeResult(res.r, res.g, res.b);
+      break;
+    }
+
+    case BlendMode::Luminosity: {
+      const RGB3 res = setLuminance({dR, dG, dB}, hslLuminance(sR, sG, sB));
+      compositeResult(res.r, res.g, res.b);
+      break;
+    }
+
     case BlendMode::Normal:
     default:
       compositeResult(sR, sG, sB);
@@ -370,9 +501,8 @@ void BrushTool::stampAt(
         dist = std::max(std::abs(rdx) / radius, std::abs(rdy) / radius);
       }
 
-      if (dist > 1.0f) continue;
-
       float pixelStrength = brushCoverage(dist, m_settings.hardness, radius, m_settings.antiAlias) * strength;
+      if (pixelStrength <= 0.001f) continue;
 
       // ── テクスチャグレイン ──────────────────────────────────────────────
       if (dyn.textureGrain) {
@@ -399,10 +529,26 @@ void BrushTool::stampAt(
           m_strokeAccum.inBounds(px, py)) {
         const float prevAccum = static_cast<float>(m_strokeAccum.pixel(px, py).r) / 255.0f;
         if (pixelStrength <= prevAccum + 0.001f) continue;
-        const float delta = pixelStrength - prevAccum;
+
+        // Porter-Duff 正確計算:
+        //   既存アルファ dstA から目標アルファ pixelStrength に達するために
+        //   必要な srcA を逆算 → srcA = (tgt - dstA) / (1 - dstA)
+        // こうすることで delta 近似ではなく正確に目標カバレッジに到達する
         m_strokeAccum.setPixel(px, py, Color {
             static_cast<std::uint8_t>(std::lround(pixelStrength * 255.0f)), 0, 0, 255});
-        blendPixel(buffer, px, py, drawColor, delta, lockAlpha);
+
+        if (lockAlpha) {
+          // アルファロック時はアルファを増やせないので単純に差分強度でブレンド
+          const float delta = pixelStrength - prevAccum;
+          blendPixel(buffer, px, py, drawColor, delta, lockAlpha);
+        } else {
+          const float dstA = static_cast<float>(buffer.pixel(px, py).a) / 255.0f;
+          if (dstA >= 0.999f) continue; // already fully opaque
+          const float srcANeeded = std::clamp(
+              (pixelStrength - dstA) / (1.0f - dstA), 0.0f, 1.0f);
+          if (srcANeeded <= 0.001f) continue;
+          blendPixel(buffer, px, py, drawColor, srcANeeded, lockAlpha);
+        }
       } else {
         blendPixel(buffer, px, py, drawColor, pixelStrength, lockAlpha);
       }

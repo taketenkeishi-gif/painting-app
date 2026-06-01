@@ -213,7 +213,13 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
 
   const QRect target = canvasRect();
   drawCheckerboard(painter, target, static_cast<int>(std::lround(std::clamp(state.zoom * 10.0, 8.0, 24.0))));
+
+  // ズーム倍率 1x〜8x 未満はバイリニア補間でスムーズに拡大表示する。
+  // 8x 以上はピクセルをそのまま見せるためニアレストネイバーに切り替え。
+  const bool smooth = (state.zoom > 1.0 && state.zoom < 8.0);
+  painter.setRenderHint(QPainter::SmoothPixmapTransform, smooth);
   painter.drawImage(target, m_image);
+  painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
   painter.setPen(QPen(QColor(88, 96, 108), 1.0));
   painter.drawRect(target.adjusted(0, 0, -1, -1));
 
@@ -471,17 +477,20 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
 
   if (!m_mouseDrawing || !(event->buttons() & Qt::LeftButton)) {
     if (!m_spacePressed) {
-      constexpr int kHoverRadiusPx = 48;
+      const int brushRadius = (m_controller != nullptr)
+          ? static_cast<int>(std::ceil(m_controller->toolState().size * stateFor(this).zoom * 0.5 + 4.0))
+          : 48;
+      const int hoverR = std::max(48, brushRadius);
       const QRect prevRect(
-          previousMousePos.x() - kHoverRadiusPx,
-          previousMousePos.y() - kHoverRadiusPx,
-          kHoverRadiusPx * 2 + 1,
-          kHoverRadiusPx * 2 + 1);
+          previousMousePos.x() - hoverR,
+          previousMousePos.y() - hoverR,
+          hoverR * 2 + 1,
+          hoverR * 2 + 1);
       const QRect nextRect(
-          event->position().toPoint().x() - kHoverRadiusPx,
-          event->position().toPoint().y() - kHoverRadiusPx,
-          kHoverRadiusPx * 2 + 1,
-          kHoverRadiusPx * 2 + 1);
+          event->position().toPoint().x() - hoverR,
+          event->position().toPoint().y() - hoverR,
+          hoverR * 2 + 1,
+          hoverR * 2 + 1);
       update(prevRect.united(nextRect).adjusted(-2, -2, 2, 2));
     }
     return;
