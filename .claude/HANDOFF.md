@@ -57,16 +57,18 @@ pressureSize / pressureOpacity の ON/OFF チェックボックスと最小値�
 
 ---
 
+## 完了（追加3）
+
+### EraserTool AA 向上（commit）
+- `eraseCircleAA(FPoint center, float radius)` 新設 — `brushCoverage()` で 1px AA fringe
+- `eraseStroke` の stamp 位置を float 化（`FPoint fp` でサブピクセル精度）
+- `RenderUtils.h` を include して brushCoverage を共有
+
+---
+
 ## 次のタスク（優先順）
 
-### 1. EraserTool AA 向上（UX 直結）
-`eraseCircle` が整数半径ループで旧 `stampCircle` と同じ問題。
-`brushCoverage` を使った float 精度 + 1px AA fringe に置換。
-
-**変更ファイル:**
-- `src/core/tools/EraserTool.cpp` — `eraseCircle` を `eraseCircleAA(FPoint center, float radius)` に
-
-### 2. Skia バックエンド移行（中期）
+### 1. Skia バックエンド移行（中期）
 `src/platform/skia/` を新設し、`PixelBuffer` 裏側を `SkSurface` に置換。
 vcpkg で Skia を導入: `vcpkg install skia`
 

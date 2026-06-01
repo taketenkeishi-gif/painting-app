@@ -4,6 +4,8 @@
 #include <cmath>
 #include <optional>
 
+#include "core/render/RenderUtils.h"
+
 namespace core {
 
 namespace {
@@ -315,20 +317,21 @@ void EraserTool::eraseStroke(Layer& layer, const Point& from, const Point& to) c
     if (m_shapeType == BrushShapeType::Square) {
       eraseSquare(buffer, from, radius);
     } else {
-      eraseCircle(buffer, from, radius);
+      eraseCircleAA(buffer, FPoint {static_cast<float>(from.x), static_cast<float>(from.y)}, fRadius);
     }
     return;
   }
 
   for (int i = 0; i <= steps; ++i) {
     const float t = static_cast<float>(i) / static_cast<float>(steps);
-    const Point p {
-        static_cast<int>(std::lround(static_cast<float>(from.x) + static_cast<float>(dx) * t)),
-        static_cast<int>(std::lround(static_cast<float>(from.y) + static_cast<float>(dy) * t))};
+    const FPoint fp {
+        static_cast<float>(from.x) + static_cast<float>(dx) * t,
+        static_cast<float>(from.y) + static_cast<float>(dy) * t};
     if (m_shapeType == BrushShapeType::Square) {
+      const Point p {static_cast<int>(std::lround(fp.x)), static_cast<int>(std::lround(fp.y))};
       eraseSquare(buffer, p, radius);
     } else {
-      eraseCircle(buffer, p, radius);
+      eraseCircleAA(buffer, fp, fRadius);
     }
   }
 }
@@ -528,6 +531,28 @@ void EraserTool::eraseCircle(PixelBuffer& buffer, const Point& center, int radiu
         if (strength > 0.001F) {
           erasePixel(buffer, x, y, strength);
         }
+      }
+    }
+  }
+}
+
+void EraserTool::eraseCircleAA(PixelBuffer& buffer, FPoint center, float radius) const {
+  const float hardness    = std::clamp(m_hardness, 0.0F, 1.0F);
+  const float baseStrength = std::clamp(m_opacity * m_flow, 0.0F, 1.0F);
+  const int x0 = static_cast<int>(std::floor(center.x - radius - 1.0F));
+  const int x1 = static_cast<int>(std::ceil (center.x + radius + 1.0F));
+  const int y0 = static_cast<int>(std::floor(center.y - radius - 1.0F));
+  const int y1 = static_cast<int>(std::ceil (center.y + radius + 1.0F));
+  for (int y = y0; y <= y1; ++y) {
+    for (int x = x0; x <= x1; ++x) {
+      const float fdx  = static_cast<float>(x) - center.x;
+      const float fdy  = static_cast<float>(y) - center.y;
+      const float d    = std::sqrt(fdx * fdx + fdy * fdy);
+      const float dist = (radius > 0.0F) ? (d / radius) : (d < 0.5F ? 0.0F : 2.0F);
+      const float coverage = brushCoverage(dist, hardness, radius, m_antiAlias);
+      const float strength = coverage * baseStrength;
+      if (strength > 0.001F) {
+        erasePixel(buffer, x, y, strength);
       }
     }
   }

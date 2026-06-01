@@ -42,6 +42,7 @@ private:
   void eraseVectorStroke(Layer& layer, const Point& from, const Point& to) const;
   static float distancePointToSegment(FPoint p, FPoint a, FPoint b) noexcept;
   void eraseCircle(PixelBuffer& buffer, const Point& center, int radius) const;
+  void eraseCircleAA(PixelBuffer& buffer, FPoint center, float radius) const;
   void eraseSquare(PixelBuffer& buffer, const Point& center, int radius) const;
   void erasePixel(PixelBuffer& buffer, int x, int y, float strength) const;
 
