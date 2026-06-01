@@ -66,6 +66,17 @@ pressureSize / pressureOpacity の ON/OFF チェックボックスと最小値�
 
 ---
 
+## 完了（追加4）
+
+### 範囲選択ツール強化（commit b714fb9）
+- `ToolOverlayState` にポリゴンフィールド追加（hasPolygon / polygonClosed / polygonPoints）
+- 投げ縄ドラッグ中: 全パスをリアルタイムポリゴンで表示（開放パス＋閉じるヒント破線）
+- 投げ縄コミット後: 輪郭ポリゴンを保持表示（サブツール切替でクリア）
+- CanvasWidget にマーチングアンツアニメーション（80ms Tick、矩形選択・投げ縄両対応）
+- サブツール名日本語化: 矩形選択 / 投げ縄 / 自動選択
+
+---
+
 ## 次のタスク（優先順）
 
 ### 1. Skia バックエンド移行（中期）
