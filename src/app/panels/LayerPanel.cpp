@@ -954,6 +954,8 @@ void LayerPanel::onDeleteLayerClicked() {
   }
   const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
   if (layerIndex < 0) {
+    // 用紙レイヤー: 非表示にすることで「削除」と同等の効果を持たせる
+    m_controller->setPaperVisible(false);
     return;
   }
   m_controller->removeLayer(static_cast<std::size_t>(layerIndex));
@@ -1336,7 +1338,9 @@ void LayerPanel::refreshButtonState() {
   const bool canMoveUp = current > 0;
   const bool canMoveDown = current >= 0 && current < lastRow;
 
-  m_deleteButton->setEnabled(hasSelection && canDelete && !paperSelected);
+  // 用紙レイヤー: 削除(→非表示化)は許可。移動は常に背面固定なので不可。
+  // opacity/blendMode は用紙には非適用。
+  m_deleteButton->setEnabled(hasSelection && (paperSelected || canDelete));
   m_duplicateButton->setEnabled(hasSelection && !paperSelected);
   m_upButton->setEnabled(canMoveUp && !paperSelected);
   m_downButton->setEnabled(canMoveDown && !paperSelected);
