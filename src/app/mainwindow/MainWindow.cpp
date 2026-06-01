@@ -133,6 +133,7 @@ public:
   void setBackgroundColor(const QColor& color) { m_bgColor = color; update(); }
 
   QSize sizeHint() const override { return QSize(80, 80); }
+  bool hasHeightForWidth() const override { return true; }
   int heightForWidth(int w) const override { return w; }
 
   // Simple callback mechanism for clicks (no Qt signals needed)
@@ -382,7 +383,9 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::setupShellLayout() {
   setCentralWidget(m_canvasWidget);
   setDockNestingEnabled(true);
+  setDockOptions(QMainWindow::AllowNestedDocks | QMainWindow::AllowTabbedDocks | QMainWindow::AnimatedDocks);
   setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::North);
+  setTabPosition(Qt::RightDockWidgetArea, QTabWidget::North);
 
   auto* colorPanel = new QWidget(this);
   m_colorPanelWidget = colorPanel;
@@ -410,9 +413,9 @@ void MainWindow::setupShellLayout() {
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
   m_colorWheelWidget->setMinimumSize(104, 104);
-  // Swatch widget: Preferred (doesn't stretch)
-  m_colorSwatchWidget->setMinimumHeight(50);
-  m_colorSwatchWidget->setMaximumWidth(100);
+  // Swatch widget: square with fixed aspect ratio, minimum 60px
+  m_colorSwatchWidget->setMinimumSize(60, 60);
+  m_colorSwatchWidget->setMaximumSize(120, 120);
   swapColorButton->setFixedSize(20, 20);
   resetColorButton->setFixedSize(20, 20);
   swapColorButton->setIcon(app::ui::icon("swap"));

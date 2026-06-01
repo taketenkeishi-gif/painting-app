@@ -157,7 +157,7 @@ inline QString globalPanelQss() {
 
     // ── QDockWidget ───────────────────────────────────────────────────────
     "QDockWidget { background: #181b22; }"
-    "QDockWidget::title { background: transparent; height: 0px; }"
+    "QDockWidget::title { background: transparent; height: 0px; padding: 0px; margin: 0px; border: none; }"
 
     // ── QTabBar ───────────────────────────────────────────────────────────
     "QTabBar::tab {"
