@@ -1,16 +1,24 @@
 #include "app/bridge/AppController.h"
+#include "app/bridge/ComfyUiClient.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <utility>
+#include <vector>
 
+#include <QBuffer>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QCoreApplication>
 #include <QSettings>
 #include <QString>
+#include <QUrl>
+
+#include "platform/qt/QtImageConverter.h"
 
 namespace app::bridge {
 
@@ -120,6 +128,8 @@ QString toolKindSettingsKey(core::ToolKind kind) {
       return QStringLiteral("hand");
     case core::ToolKind::Zoom:
       return QStringLiteral("zoom");
+    case core::ToolKind::AiSelect:
+      return QStringLiteral("ai_select");
     default:
       return QStringLiteral("tool");
   }
@@ -230,6 +240,10 @@ AppController::AppController(QObject* parent)
   m_fillTool = fill.get();
   m_toolManager.registerTool(std::move(fill));
   m_toolManager.registerTool(std::make_unique<core::MoveLayerTool>());
+
+  auto aiSel = std::make_unique<core::AiSelectTool>();
+  m_aiSelectTool = aiSel.get();
+  m_toolManager.registerTool(std::move(aiSel));
 
   for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
     if (!tool.subTools.empty()) {
@@ -2216,7 +2230,8 @@ bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
 }
 
 bool AppController::toolWritesSelection(core::ToolKind kind) noexcept {
-  return kind == core::ToolKind::RectSelection;
+  return kind == core::ToolKind::RectSelection
+      || kind == core::ToolKind::AiSelect;
 }
 
 std::string AppController::actionNameForTool(core::ToolKind kind) {
@@ -2239,9 +2254,101 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
       return u8"\u624B\u306E\u3072\u3089";
     case core::ToolKind::Zoom:
       return u8"\u30BA\u30FC\u30E0";
+    case core::ToolKind::AiSelect:
+      return u8"AI\u9078\u629E";   // "AI\u9078\u629E"
     default:
       return u8"\u64CD\u4F5C";
   }
+}
+
+// \u2500\u2500 AI / ComfyUI API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+void AppController::connectComfyUi(const QString& urlStr) {
+  if (m_comfyUiClient == nullptr) {
+    m_comfyUiClient = new ComfyUiClient(this);
+
+    connect(m_comfyUiClient, &ComfyUiClient::stateChanged, this,
+            [this](ComfyUiClient::State s) {
+      const bool ok = (s == ComfyUiClient::State::Connected);
+      emit comfyUiStateChanged(ok);
+
+      // \u63A5\u7D9A\u6642\u306B AiSelectTool \u306B ComfyUI \u63A8\u8AD6\u30B3\u30FC\u30EB\u30D0\u30C3\u30AF\u3092\u6CE8\u5165
+      if (m_aiSelectTool != nullptr) {
+        if (ok) {
+          m_aiSelectTool->setInferenceCallback(
+              [this](const core::PixelBuffer& composited,
+                     const std::vector<core::Point>& posPoints,
+                     const std::vector<core::Point>& /*negPoints*/) {
+                if (posPoints.empty() || m_comfyUiClient == nullptr) return;
+
+                // \u753B\u50CF\u3092 PNG base64 \u306B\u5909\u63DB\u3057\u3066\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9
+                const QImage img = platform::qt::QtImageConverter::toQImage(composited);
+                QByteArray pngBytes;
+                QBuffer buf(&pngBytes);
+                buf.open(QIODevice::WriteOnly);
+                img.save(&buf, "PNG");
+                const QString b64 = QString::fromLatin1(pngBytes.toBase64());
+
+                // SAM \u30EF\u30FC\u30AF\u30D5\u30ED\u30FC\u3092\u69CB\u7BC9\u3057\u3066\u30AD\u30E5\u30FC\u306B\u8FFD\u52A0
+                ComfyUiClient::SamRequest req;
+                req.imageBase64   = b64;
+                req.pointX        = posPoints.front().x;
+                req.pointY        = posPoints.front().y;
+                req.positivePoint = true;
+
+                const QJsonObject wf = ComfyUiClient::buildSamWorkflow(req);
+                m_comfyUiClient->queuePrompt(wf);
+              });
+        } else {
+          m_aiSelectTool->setInferenceCallback(nullptr);
+        }
+      }
+    });
+
+    // SAM \u5B9F\u884C\u5B8C\u4E86 \u2192 \u30DE\u30B9\u30AF\u753B\u50CF\u3092\u53D6\u5F97\u3057\u3066 SelectionMask \u306B\u5909\u63DB
+    connect(m_comfyUiClient, &ComfyUiClient::executionComplete, this,
+            [this](const QString& /*promptId*/, const QStringList& outputImages) {
+      if (outputImages.isEmpty() || m_comfyUiClient == nullptr) return;
+      const QString fname = outputImages.first();
+      m_comfyUiClient->fetchImage(fname, QString(), "output",
+          [this](const QByteArray& pngData) {
+            if (pngData.isEmpty()) return;
+            const QImage img = QImage::fromData(pngData, "PNG");
+            if (img.isNull()) return;
+
+            const int W = img.width();
+            const int H = img.height();
+            std::vector<std::uint8_t> pixels(
+                static_cast<std::size_t>(W) * static_cast<std::size_t>(H), 0);
+            for (int y = 0; y < H; ++y) {
+              for (int x = 0; x < W; ++x) {
+                // SAM \u30DE\u30B9\u30AF\u306F\u767D=\u9078\u629E\u3001\u9ED2=\u975E\u9078\u629E
+                if (img.pixelColor(x, y).lightness() > 127) {
+                  pixels[static_cast<std::size_t>(y)*W+x] = 255;
+                }
+              }
+            }
+            core::SelectionMask mask(W, H);
+            mask.setPixels(pixels);
+            applyAiSelectResult(std::move(mask));
+          });
+    });
+  }
+
+  m_comfyUiClient->connectToServer(QUrl(urlStr));
+}
+
+bool AppController::isComfyUiConnected() const noexcept {
+  return m_comfyUiClient != nullptr && m_comfyUiClient->isConnected();
+}
+
+void AppController::applyAiSelectResult(core::SelectionMask mask) {
+  // Undo \u7528\u306B\u5909\u66F4\u524D\u306E\u9078\u629E\u3092\u8A18\u9332\u3057\u3066\u304B\u3089\u9069\u7528
+  const core::SelectionMask before = m_document.selection();
+  m_document.selection() = std::move(mask);
+  pushSelectionHistoryIfChanged(before, u8"AI\u9078\u629E\u7CBE\u8907");  // "AI\u9078\u629E\u7CBE\u8907"
+  emit documentChanged();
+  emit layersChanged();
+  emit aiSelectionRefined();
 }
 
 bool AppController::isSubToolCompatibleWithLayerKind(
@@ -2400,6 +2507,14 @@ void AppController::applyUiStateToTools() {
     m_rectSelectionTool->setAutoSelectThreshold(m_uiState.autoSelectThreshold);
     m_rectSelectionTool->setAutoSelectContiguous(m_uiState.autoSelectContiguous);
     m_rectSelectionTool->setAutoSelectReferAllLayers(m_uiState.autoSelectReferAllLayers);
+  }
+  if (m_aiSelectTool != nullptr) {
+    m_aiSelectTool->setThreshold(m_uiState.autoSelectThreshold);
+    m_aiSelectTool->setReferAllLayers(m_uiState.autoSelectReferAllLayers);
+    m_aiSelectTool->setAntiAlias(m_uiState.antiAlias);
+    const std::string& sid = m_uiState.subToolId;
+    m_aiSelectTool->setAddMode     (sid == "ai_select_add");
+    m_aiSelectTool->setSubtractMode(sid == "ai_select_subtract");
   }
 
   syncCurrentSubToolFromUiState();

@@ -15,6 +15,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/RectSelectionTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FillTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/MoveLayerTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/AiSelectTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/GenerativeFillEngine.cpp
 )
 
@@ -55,6 +56,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPropertyPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ColorWheelWidget.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/GenerativeFillDialog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/ComfyUiClient.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
 )
 
@@ -78,5 +80,6 @@ if(PAINT_BUILD_APP)
       Qt6::Core
       Qt6::Gui
       Qt6::Widgets
+      Qt6::Network
   )
 endif()

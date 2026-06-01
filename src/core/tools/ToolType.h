@@ -11,7 +11,8 @@ enum class ToolKind {
   Line,
   RectSelection,
   MoveLayer,
-  Fill
+  Fill,
+  AiSelect,   ///< AI オブジェクト選択（SAM2 / スマートフラッドフィル）
 };
 
 const char* toolKindDisplayName(ToolKind kind) noexcept;

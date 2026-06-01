@@ -322,7 +322,67 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
           "Zoom",
           {makeSubTool("zoom_default", "Wheel Zoom", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Zoom}, {}, "Use Ctrl+Wheel to zoom.")},
           {},
-          "Zoom viewport."}};
+          "Zoom viewport."},
+      ToolDescriptor {
+          core::ToolKind::AiSelect,
+          "ai_select",
+          "AI 選択",
+          {
+              // ── オブジェクト選択（クリックで単体オブジェクトを選択）──────────────
+              makeSubTool(
+                  "ai_select_object",
+                  "オブジェクト選択",
+                  []{
+                    BrushPreset p {};
+                    p.size = 8;
+                    p.selectionMode          = SelectionMode::AutoSelect;
+                    p.autoSelectThreshold    = 24;
+                    p.autoSelectContiguous   = false;
+                    p.autoSelectReferAllLayers = true;
+                    p.targetLayerKind        = TargetLayerKind::Both;
+                    p.cursorStyle            = CursorStyle::Cross;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
+                  "クリックでオブジェクトを自動認識して選択。Shift=除外点追加。ComfyUI 接続時は SAM2 で高精度化。"),
+              // ── 追加選択（Shift クリックで選択に追加）──────────────────────────
+              makeSubTool(
+                  "ai_select_add",
+                  "選択に追加",
+                  []{
+                    BrushPreset p {};
+                    p.size = 8;
+                    p.selectionMode          = SelectionMode::AutoSelect;
+                    p.autoSelectThreshold    = 24;
+                    p.autoSelectContiguous   = false;
+                    p.autoSelectReferAllLayers = true;
+                    p.targetLayerKind        = TargetLayerKind::Both;
+                    p.cursorStyle            = CursorStyle::Cross;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
+                  "クリックで現在の選択範囲に追加。ComfyUI 接続時は SAM2 を使用。"),
+              // ── 選択から除外（クリックで選択範囲を削除）─────────────────────────
+              makeSubTool(
+                  "ai_select_subtract",
+                  "選択から除外",
+                  []{
+                    BrushPreset p {};
+                    p.size = 8;
+                    p.selectionMode          = SelectionMode::AutoSelect;
+                    p.autoSelectThreshold    = 24;
+                    p.autoSelectContiguous   = false;
+                    p.autoSelectReferAllLayers = true;
+                    p.targetLayerKind        = TargetLayerKind::Both;
+                    p.cursorStyle            = CursorStyle::Cross;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
+                  "クリックした部分を選択範囲から除外します。"),
+          },
+          {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
+          "AI で画像内オブジェクトを自動検出して選択します。"}};
+
 }
 
 std::string normalizeName(std::string name) {

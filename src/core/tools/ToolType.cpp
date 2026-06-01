@@ -22,6 +22,8 @@ const char* toolKindDisplayName(ToolKind kind) noexcept {
       return "Move Layer";
     case ToolKind::Fill:
       return "Fill";
+    case ToolKind::AiSelect:
+      return "AI Select";
     default:
       return "Unknown";
   }

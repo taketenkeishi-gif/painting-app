@@ -157,6 +157,8 @@ QString toolNameJa(core::ToolKind kind) {
       return "手のひら";
     case core::ToolKind::Zoom:
       return "ズーム";
+    case core::ToolKind::AiSelect:
+      return "AI 選択";
     default:
       return "ツール";
   }
@@ -859,7 +861,8 @@ void MainWindow::createMenus() {
   m_swapColorsAction = new QAction("描画色と背景色を切り替え(&C)", this);
   m_resetColorsAction = new QAction("描画色/背景色を白黒に戻す(&D)", this);
   m_transparentColorAction = new QAction("描画色と透明色を切り替え(&X)", this);
-  m_generativeFillAction = new QAction("AI 生成塗りつぶし(&A)...", this);
+  m_generativeFillAction   = new QAction("AI 生成塗りつぶし(&A)...", this);
+  m_connectComfyUiAction   = new QAction("ComfyUI に接続(&Y)...", this);
   m_clearRecentFilesAction = new QAction("最近使ったファイルをクリア", this);
 
   m_recentFilesMenu = fileMenu->addMenu("最近使ったファイル");
@@ -919,6 +922,7 @@ void MainWindow::createMenus() {
   m_resetColorsAction->setShortcut(QKeySequence(Qt::Key_D));
   m_transparentColorAction->setShortcut(QKeySequence(Qt::Key_X));
   m_generativeFillAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
+  m_connectComfyUiAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Y));
   m_toggleGridAction->setCheckable(true);
   m_toggleGridAction->setChecked(m_canvasWidget->isGridVisible());
   m_toggleOverlayAction->setCheckable(true);
@@ -954,6 +958,7 @@ void MainWindow::createMenus() {
   editMenu->addAction(m_brushSizeUpAction);
   editMenu->addSeparator();
   editMenu->addAction(m_generativeFillAction);
+  editMenu->addAction(m_connectComfyUiAction);
 
   auto* toolGroup = new QActionGroup(this);
   toolGroup->setExclusive(true);
@@ -970,6 +975,7 @@ void MainWindow::createMenus() {
   bindTool(core::ToolKind::MoveLayer, "移動(&M)", QKeySequence(Qt::Key_M));
   bindTool(core::ToolKind::Hand, "手のひら(&H)", QKeySequence(Qt::Key_H));
   bindTool(core::ToolKind::Zoom, "ズーム(&Z)", QKeySequence(Qt::Key_Z));
+  bindTool(core::ToolKind::AiSelect, "AI 選択(&W)", QKeySequence(Qt::Key_W));
 
   selectMenu->addAction(m_clearSelectionAction);
   selectMenu->addAction(m_selectAllAction);
@@ -1096,6 +1102,7 @@ void MainWindow::createMenus() {
   scEdit->addAction(m_brushSizeUpAction);
   scEdit->addSeparator();
   scEdit->addAction(m_generativeFillAction);
+  scEdit->addAction(m_connectComfyUiAction);
 
   // ── ツール ────────────────────────────────────────────────────────────
   auto* scTool = shortcutMenu->addMenu("ツール");
@@ -1212,7 +1219,10 @@ void MainWindow::createMenus() {
   connect(m_swapColorsAction, &QAction::triggered, this, &MainWindow::onSwapColors);
   connect(m_resetColorsAction, &QAction::triggered, this, &MainWindow::onResetBlackWhiteColors);
   connect(m_transparentColorAction, &QAction::triggered, this, &MainWindow::onUseTransparentColor);
-  connect(m_generativeFillAction, &QAction::triggered, this, &MainWindow::onGenerativeFillTriggered);
+  connect(m_generativeFillAction,  &QAction::triggered, this, &MainWindow::onGenerativeFillTriggered);
+  connect(m_connectComfyUiAction,  &QAction::triggered, this, &MainWindow::onConnectComfyUiTriggered);
+  connect(m_controller, &app::bridge::AppController::comfyUiStateChanged,
+          this, &MainWindow::onComfyUiStateChanged);
   connect(m_clearRecentFilesAction, &QAction::triggered, this, [this]() {
     m_recentFiles.clear();
     rebuildRecentFilesMenu();
@@ -1247,6 +1257,9 @@ void MainWindow::createMenus() {
   m_zoomStatusLabel->setObjectName("ZoomStatusLabel");
   m_selectionStatusLabel = new QLabel("選択: OFF", this);
   m_selectionStatusLabel->setObjectName("SelectionStatusLabel");
+  m_comfyUiStatusLabel = new QLabel("ComfyUI: 未接続", this);
+  m_comfyUiStatusLabel->setObjectName("ComfyUiStatusLabel");
+  m_comfyUiStatusLabel->setStyleSheet("color: #6a7484; font-size: 10px;");
 
   statusBar()->addWidget(m_toolStatusLabel);
   statusBar()->addWidget(m_subToolStatusLabel);
@@ -1256,6 +1269,7 @@ void MainWindow::createMenus() {
   statusBar()->addPermanentWidget(m_zoomStatusLabel);
   statusBar()->addPermanentWidget(m_selectionStatusLabel);
   statusBar()->addPermanentWidget(m_activeLayerStatusLabel);
+  statusBar()->addPermanentWidget(m_comfyUiStatusLabel);
 
   const auto markCommand = [](QAction* action, const QString& id) {
     if (action == nullptr) {
@@ -1319,7 +1333,8 @@ void MainWindow::createMenus() {
   markCommand(m_swapColorsAction, "color.swap");
   markCommand(m_resetColorsAction, "color.reset_bw");
   markCommand(m_transparentColorAction, "color.transparent");
-  markCommand(m_generativeFillAction, "edit.generative_fill");
+  markCommand(m_generativeFillAction,  "edit.generative_fill");
+  markCommand(m_connectComfyUiAction,  "edit.connect_comfyui");
   for (const auto& [kind, action] : m_toolActions) {
     if (action != nullptr) {
       markCommand(action, QString("tool.%1").arg(static_cast<int>(kind)));
@@ -2656,6 +2671,36 @@ void MainWindow::onResetBlackWhiteColors() {
   m_backgroundColor = core::Color {255, 255, 255, 255};
   m_controller->setPaperColor(m_backgroundColor);
   updateColorPanel();
+}
+
+void MainWindow::onConnectComfyUiTriggered() {
+  bool ok = false;
+  const QString url = QInputDialog::getText(
+      this,
+      "ComfyUI 接続",
+      "ComfyUI サーバー URL:",
+      QLineEdit::Normal,
+      "http://localhost:8188",
+      &ok);
+  if (!ok || url.trimmed().isEmpty()) {
+    return;
+  }
+  statusBar()->showMessage(QString("ComfyUI に接続中: %1").arg(url.trimmed()), 2000);
+  m_controller->connectComfyUi(url.trimmed());
+}
+
+void MainWindow::onComfyUiStateChanged(bool connected) {
+  if (m_comfyUiStatusLabel == nullptr) {
+    return;
+  }
+  if (connected) {
+    m_comfyUiStatusLabel->setText("ComfyUI: 接続済み ●");
+    m_comfyUiStatusLabel->setStyleSheet("color: #4caf50; font-size: 10px; font-weight: 600;");
+    statusBar()->showMessage("ComfyUI に接続しました。AI 選択ツールで高精度選択が利用可能です。", 3000);
+  } else {
+    m_comfyUiStatusLabel->setText("ComfyUI: 未接続");
+    m_comfyUiStatusLabel->setStyleSheet("color: #6a7484; font-size: 10px;");
+  }
 }
 
 void MainWindow::onGenerativeFillTriggered() {

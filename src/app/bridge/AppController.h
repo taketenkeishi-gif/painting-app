@@ -17,6 +17,7 @@
 #include "core/common/Rect.h"
 #include "core/document/Document.h"
 #include "core/render/Renderer.h"
+#include "core/tools/AiSelectTool.h"
 #include "core/tools/BrushTool.h"
 #include "core/tools/EraserTool.h"
 #include "core/tools/EyedropperTool.h"
@@ -29,6 +30,7 @@
 #include "core/tools/ZoomTool.h"
 
 namespace app::bridge {
+class ComfyUiClient;
 
 struct LayerViewModel {
   std::string name;
@@ -264,6 +266,12 @@ public:
   void setPressureOpacityEnabled(bool enabled);
   void setPressureOpacityMin(int value);
 
+  // ── AI / ComfyUI ──────────────────────────────────────────────────────────
+  ComfyUiClient* comfyUiClient() noexcept { return m_comfyUiClient; }
+  void connectComfyUi(const QString& url = "http://localhost:8188");
+  bool isComfyUiConnected() const noexcept;
+  void applyAiSelectResult(core::SelectionMask mask);
+
 signals:
   void canvasChanged();
   void documentChanged();
@@ -271,6 +279,8 @@ signals:
   void toolStateChanged();
   void foregroundColorUsed();
   void overlayChanged();
+  void comfyUiStateChanged(bool connected);
+  void aiSelectionRefined();   ///< ComfyUI 推論で選択が更新されたとき
 
 private:
   enum class HistoryKind {
@@ -334,11 +344,13 @@ private:
   core::PixelBuffer m_composited;
 
   core::ToolManager m_toolManager;
-  core::BrushTool* m_brushTool {nullptr};
-  core::EraserTool* m_eraserTool {nullptr};
-  core::LineTool* m_lineTool {nullptr};
-  core::RectSelectionTool* m_rectSelectionTool {nullptr};
-  core::FillTool* m_fillTool {nullptr};
+  core::BrushTool*         m_brushTool         {nullptr};
+  core::EraserTool*        m_eraserTool         {nullptr};
+  core::LineTool*          m_lineTool           {nullptr};
+  core::RectSelectionTool* m_rectSelectionTool  {nullptr};
+  core::FillTool*          m_fillTool           {nullptr};
+  core::AiSelectTool*      m_aiSelectTool       {nullptr};
+  ComfyUiClient*           m_comfyUiClient      {nullptr};
 
   app::ui::ToolCatalog m_toolCatalog;
   app::ui::UiState m_uiState;
