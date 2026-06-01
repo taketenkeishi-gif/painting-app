@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
 #include <functional>
 #include <vector>
 
@@ -10,6 +11,7 @@
 #include <QActionGroup>
 #include <QClipboard>
 #include <QColorDialog>
+#include <QDebug>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDockWidget>
@@ -73,6 +75,8 @@ namespace app::mainwindow {
 
 namespace {
 
+// Verification flags to track constructor execution
+static bool g_colorSwatchWidgetCreated = false;
 
 
 class TitleBarDragArea : public QWidget {
@@ -126,15 +130,15 @@ class ColorSwatchWidget : public QWidget {
 public:
   explicit ColorSwatchWidget(QWidget* parent = nullptr)
       : QWidget(parent), m_fgColor(255, 0, 0, 255), m_bgColor(255, 255, 255, 255) {
-    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    g_colorSwatchWidgetCreated = true;
   }
 
   void setForegroundColor(const QColor& color) { m_fgColor = color; update(); }
   void setBackgroundColor(const QColor& color) { m_bgColor = color; update(); }
 
-  QSize sizeHint() const override { return QSize(80, 80); }
-  bool hasHeightForWidth() const override { return true; }
-  int heightForWidth(int w) const override { return w; }
+  QSize sizeHint() const override { return QSize(44, 44); }
+  QSize minimumSizeHint() const override { return QSize(44, 44); }
 
   // Simple callback mechanism for clicks (no Qt signals needed)
   std::function<void()> onForegroundClicked;
@@ -142,12 +146,9 @@ public:
 
 protected:
   void mousePressEvent(QMouseEvent* e) override {
-    const int sz = std::min(width(), height());
-    const int fgSize = (sz * 70) / 100;
-    const int fgX = (sz - fgSize) / 2;
-    const int fgY = (sz - fgSize) / 2;
-
-    QRect fgRect(fgX, fgY, fgSize, fgSize);
+    const int fgSize = 28;
+    const int padding = 4;
+    QRect fgRect(padding, padding, fgSize, fgSize);
     if (fgRect.contains(e->pos())) {
       if (onForegroundClicked) onForegroundClicked();
     } else {
@@ -159,103 +160,28 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    const int sz = std::min(width(), height());
-    const int fgSize = (sz * 70) / 100;
-    const int bgSize = (sz * 50) / 100;
-    const int fgX = (sz - fgSize) / 2;
-    const int fgY = (sz - fgSize) / 2;
-    const int bgX = fgX + (fgSize * 30) / 100;
-    const int bgY = fgY + (fgSize * 30) / 100;
+    const int padding = 4;
+    const int fgSize = 28;
+    const int bgSize = 18;
+    const int fgX = padding;
+    const int fgY = padding;
+    const int bgX = fgX + 14;
+    const int bgY = fgY + 14;
 
-    // BG square (behind)
+    // BG square (behind, bottom-right offset)
     painter.fillRect(bgX, bgY, bgSize, bgSize, m_bgColor);
-    painter.setPen(QPen(QColor(160, 160, 160), 1));
+    painter.setPen(QPen(QColor(80, 80, 80), 1));
     painter.drawRect(bgX, bgY, bgSize - 1, bgSize - 1);
 
-    // FG square (front)
+    // FG square (front, top-left)
     painter.fillRect(fgX, fgY, fgSize, fgSize, m_fgColor);
-    painter.setPen(QPen(QColor(200, 200, 200), 2));
+    painter.setPen(QPen(QColor(120, 120, 120), 1));
     painter.drawRect(fgX, fgY, fgSize - 1, fgSize - 1);
   }
 
 private:
   QColor m_fgColor;
   QColor m_bgColor;
-};
-
-class DockTabBarEventFilter : public QObject {
-public:
-  explicit DockTabBarEventFilter(QMainWindow* mainWindow)
-      : QObject(nullptr), m_mainWindow(mainWindow), m_draggedTabIndex(-1) {}
-
-protected:
-  bool eventFilter(QObject* obj, QEvent* event) override {
-    auto* tabBar = qobject_cast<QTabBar*>(obj);
-    if (!tabBar) return QObject::eventFilter(obj, event);
-
-    if (event->type() == QEvent::MouseButtonPress) {
-      auto* me = static_cast<QMouseEvent*>(event);
-      if (me->button() == Qt::LeftButton) {
-        m_draggedTabIndex = tabBar->tabAt(me->pos());
-        m_dragStartPos = me->globalPosition().toPoint();
-      }
-    } else if (event->type() == QEvent::MouseMove && m_draggedTabIndex >= 0) {
-      auto* me = static_cast<QMouseEvent*>(event);
-      if (me->buttons() & Qt::LeftButton) {
-        QPoint delta = me->globalPosition().toPoint() - m_dragStartPos;
-        // Drag threshold: 8 pixels
-        if (std::abs(delta.x()) + std::abs(delta.y()) > 8) {
-          floatDockForTab(tabBar, m_draggedTabIndex);
-          m_draggedTabIndex = -1;
-        }
-      }
-    } else if (event->type() == QEvent::MouseButtonRelease) {
-      m_draggedTabIndex = -1;
-    }
-
-    return QObject::eventFilter(obj, event);
-  }
-
-private:
-  void floatDockForTab(QTabBar* tabBar, int tabIndex) {
-    QDockWidget* dockToFloat = nullptr;
-
-    // Find the QDockWidget corresponding to this tab by matching the parent dock area
-    const auto allDocks = m_mainWindow->findChildren<QDockWidget*>();
-    for (auto* dock : allDocks) {
-      // Check if this dock's tab is at the given index in the tabBar
-      if (isDockInTabBar(dock, tabBar) && getTabIndexForDock(dock, tabBar) == tabIndex) {
-        dockToFloat = dock;
-        break;
-      }
-    }
-
-    if (dockToFloat && !dockToFloat->isFloating()) {
-      dockToFloat->setFloating(true);
-    }
-  }
-
-  bool isDockInTabBar(QDockWidget* dock, QTabBar* tabBar) const {
-    QWidget* parent = tabBar->parentWidget();
-    while (parent) {
-      if (parent == dock->parentWidget()) return true;
-      parent = parent->parentWidget();
-    }
-    return false;
-  }
-
-  int getTabIndexForDock(QDockWidget* dock, QTabBar* tabBar) const {
-    for (int i = 0; i < tabBar->count(); ++i) {
-      if (tabBar->tabText(i) == dock->windowTitle()) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  QMainWindow* m_mainWindow;
-  int m_draggedTabIndex {-1};
-  QPoint m_dragStartPos;
 };
 
 QColor toQColor(const core::Color& color) {
@@ -330,7 +256,6 @@ MainWindow::MainWindow(QWidget* parent)
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
       m_subToolPanel(new app::panels::SubToolPanel(this)),
       m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
-  setWindowTitle("自作イラストアプリ");
   setWindowFlag(Qt::FramelessWindowHint);
   {
     const QRect ag = QGuiApplication::primaryScreen()
@@ -354,6 +279,12 @@ MainWindow::MainWindow(QWidget* parent)
   m_quickSliderPanel->setSections(app::panels::ToolPanel::QuickSlidersOnly);
 
   setupShellLayout();
+
+  // Verify which code paths executed
+  QString titleVerification = "自作イラストアプリ - UI BUILD TEST 2026";
+  if (g_colorSwatchWidgetCreated) titleVerification += " [SWATCH]";
+  setWindowTitle(titleVerification);
+
   createMenus();
   loadWorkspaceLayoutState();
   loadShortcutOverrides();
@@ -413,9 +344,8 @@ void MainWindow::setupShellLayout() {
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
   m_colorWheelWidget->setMinimumSize(104, 104);
-  // Swatch widget: square with fixed aspect ratio, minimum 60px
-  m_colorSwatchWidget->setMinimumSize(60, 60);
-  m_colorSwatchWidget->setMaximumSize(120, 120);
+  // Swatch widget: compact 44x44 fixed size
+  m_colorSwatchWidget->setFixedSize(44, 44);
   swapColorButton->setFixedSize(20, 20);
   resetColorButton->setFixedSize(20, 20);
   swapColorButton->setIcon(app::ui::icon("swap"));
@@ -492,8 +422,8 @@ void MainWindow::setupShellLayout() {
   colorButtons->addLayout(opsCol, 0);
   auto addHsvRow = [this, colorPanel](const QString& label, QSlider* slider, QSpinBox* spin) {
     auto* row = new QHBoxLayout();
-    row->setContentsMargins(2, 1, 2, 1);
-    row->setSpacing(4);
+    row->setContentsMargins(1, 0, 1, 0);
+    row->setSpacing(2);
 
     const QString accent =
         label == QStringLiteral("H") ? QStringLiteral("#ff5a8a") :
@@ -630,7 +560,7 @@ void MainWindow::setupShellLayout() {
   auto* colorMainLayout = new QVBoxLayout(colorMainWidget);
   colorMainLayout->setContentsMargins(0, 0, 0, 0);
   colorMainLayout->setSpacing(0);
-  colorMainLayout->addWidget(colorTitle);
+  // colorTitle removed from layout - tab label is sufficient
   colorMainLayout->addLayout(colorButtons);
   colorMainLayout->addWidget(m_colorWheelWidget, 1);
 
@@ -639,7 +569,7 @@ void MainWindow::setupShellLayout() {
   hsvWidget->setMinimumWidth(176);
   auto* hsvLayout = new QVBoxLayout(hsvWidget);
   hsvLayout->setContentsMargins(0, 0, 0, 0);
-  hsvLayout->setSpacing(2);
+  hsvLayout->setSpacing(0);
   hsvLayout->addLayout(addHsvRow("H", m_hueSlider, m_hueSpin));
   hsvLayout->addLayout(addHsvRow("S", m_satSlider, m_satSpin));
   hsvLayout->addLayout(addHsvRow("V", m_valSlider, m_valSpin));
@@ -651,7 +581,7 @@ void MainWindow::setupShellLayout() {
   auto* historyWrap = new QVBoxLayout(historyWidget);
   historyWrap->setContentsMargins(0, 0, 0, 0);
   historyWrap->setSpacing(2);
-  historyWrap->addWidget(historyTitle);
+  // historyTitle removed from layout - tab label is sufficient
   historyWrap->addWidget(m_colorHistoryGridWidget, 0, Qt::AlignLeft | Qt::AlignTop);
   QTimer::singleShot(0, this, [this]() { relayoutColorHistoryGrid(); });
   m_hueSpin->setMinimumWidth(52);
@@ -845,12 +775,15 @@ void MainWindow::setupShellLayout() {
   addDockWidget(Qt::LeftDockWidgetArea, colorHistoryDock);
   splitDockWidget(m_toolDock, m_toolSliderDock, Qt::Horizontal);
   splitDockWidget(m_toolSliderDock, m_subToolDock, Qt::Horizontal);
+  // ColorDock is split vertically below SubTool so it's visible by default
+  splitDockWidget(m_subToolDock, m_colorDock, Qt::Vertical);
   tabifyDockWidget(m_subToolDock, m_toolPropertyDock);
-  tabifyDockWidget(m_subToolDock, m_colorDock);
-  tabifyDockWidget(m_subToolDock, colorSliderDock);
-  tabifyDockWidget(m_subToolDock, colorHistoryDock);
+  tabifyDockWidget(m_colorDock, colorSliderDock);
+  tabifyDockWidget(m_colorDock, colorHistoryDock);
   resizeDocks({m_toolDock, m_toolSliderDock, m_subToolDock}, {68, 72, 220}, Qt::Horizontal);
+  resizeDocks({m_subToolDock, m_colorDock}, {220, 140}, Qt::Vertical);
   m_subToolDock->raise();
+  m_colorDock->raise();
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
@@ -863,20 +796,21 @@ void MainWindow::setupShellLayout() {
   m_defaultDockState = saveState();
   adjustRightDockLayout();
 
-  // After layout pass, find dock-area QTabBars (not QTabWidget children) and
-  // strip close buttons / apply custom styling. Install drag-to-float event filter.
+  // After layout pass, configure dock-area QTabBars (not QTabWidget children) for compact display.
+  // Connect dock title bar visibility to floating state.
   QTimer::singleShot(0, this, [this] {
-    auto* dragFilter = new DockTabBarEventFilter(this);
     const auto allTabBars = findChildren<QTabBar*>();
+    int dockTabBarCount = 0;
     for (auto* tb : allTabBars) {
       if (qobject_cast<QTabWidget*>(tb->parentWidget())) continue;
+      dockTabBarCount++;
       tb->setTabsClosable(false);
       tb->setMovable(true);
       tb->setExpanding(false);
       tb->setDocumentMode(true);
       tb->setProperty("dockTabBar", true);
-      tb->installEventFilter(dragFilter);
     }
+
   });
 }
 
@@ -1762,12 +1696,13 @@ void MainWindow::applyUiChrome() {
       // Native title bar kept for drag/float/rearrange; styled compact+dark.
       "QDockWidget { color: #c5cde0; font-size: 11px; }"
       "QDockWidget::title {"
-      "  background: #181b22;"
-      "  border-bottom: 1px solid #23283a;"
-      "  padding: 2px 6px;"
-      "  font-size: 10px;"
-      "  color: #4a5268;"
-      "  text-align: left;"
+      "  min-height: 0;"
+      "  max-height: 0;"
+      "  padding: 0;"
+      "  margin: 0;"
+      "  border: none;"
+      "  background: transparent;"
+      "  color: transparent;"
       "}"
       "QDockWidget > QWidget { background: #1a1d27; }"
       "QDockWidget::float-button {"
