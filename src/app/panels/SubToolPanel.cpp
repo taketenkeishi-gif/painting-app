@@ -1,5 +1,7 @@
 ﻿#include "app/panels/SubToolPanel.h"
 
+#include <cmath>
+
 #include <QAbstractItemView>
 #include <QAction>
 #include <QColor>
@@ -30,6 +32,106 @@ namespace {
 constexpr int kSubToolIdRole = Qt::UserRole;
 constexpr int kSubToolEnabledRole = Qt::UserRole + 1;
 
+static bool isSelectionSubTool(const QString& id) {
+  return id == "rect_default" || id == "lasso_default" || id == "poly_lasso"
+      || id == "auto_select" || id == "object_select";
+}
+
+static void drawSelectionIcon(QPainter* painter, const QString& id, const QRectF& r, bool selected, bool enabled) {
+  const qreal alpha = enabled ? 1.0 : 0.35;
+  QColor dashColor = selected ? QColor(255, 255, 255, int(200 * alpha))
+                              : QColor(190, 215, 255, int(170 * alpha));
+  QColor dotColor  = selected ? QColor(255, 255, 255, int(240 * alpha))
+                              : QColor(140, 180, 255, int(200 * alpha));
+
+  QPen dashPen(dashColor, 1.5, Qt::DashLine, Qt::RoundCap, Qt::RoundJoin);
+  dashPen.setDashPattern({4, 3});
+
+  if (id == "rect_default") {
+    // Dashed rectangle centred in preview area
+    const qreal m = 6.0;
+    const QRectF box(r.left() + m, r.top() + m, r.width() - m * 2, r.height() - m * 2);
+    painter->setPen(dashPen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawRect(box);
+    // Corner dots
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(dotColor);
+    for (QPointF c : {box.topLeft(), box.topRight(), box.bottomLeft(), box.bottomRight()})
+      painter->drawEllipse(c, 2.5, 2.5);
+
+  } else if (id == "lasso_default") {
+    // Freehand wavy closed dashed curve
+    const qreal cx = r.center().x(), cy = r.center().y();
+    const qreal rx = r.width() * 0.36, ry = r.height() * 0.32;
+    QPainterPath path;
+    path.moveTo(cx,         cy - ry);
+    path.cubicTo(cx + rx * 1.3, cy - ry * 0.4, cx + rx * 1.1, cy + ry * 0.6, cx + rx * 0.1, cy + ry);
+    path.cubicTo(cx - rx * 0.9, cy + ry * 1.2, cx - rx * 1.4, cy + ry * 0.2, cx - rx * 1.0, cy - ry * 0.4);
+    path.cubicTo(cx - rx * 0.7, cy - ry * 1.0, cx - rx * 0.1, cy - ry * 1.1, cx, cy - ry);
+    painter->setPen(dashPen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawPath(path);
+
+  } else if (id == "poly_lasso") {
+    // Polygon outline with vertex dots
+    const qreal cx = r.center().x(), cy = r.center().y();
+    const qreal s  = qMin(r.width(), r.height()) * 0.38;
+    QVector<QPointF> pts = {
+        {cx,          cy - s},
+        {cx + s,      cy - s * 0.2},
+        {cx + s * 0.6, cy + s},
+        {cx - s * 0.5, cy + s},
+        {cx - s,      cy - s * 0.3},
+    };
+    QPainterPath poly;
+    poly.moveTo(pts[0]);
+    for (int i = 1; i < pts.size(); ++i) poly.lineTo(pts[i]);
+    poly.closeSubpath();
+    painter->setPen(dashPen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawPath(poly);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(dotColor);
+    for (const QPointF& p : pts) painter->drawEllipse(p, 2.5, 2.5);
+
+  } else if (id == "auto_select") {
+    // Magic-wand: wand stick + sparkle rays
+    const qreal cx = r.center().x() - r.width() * 0.06;
+    const qreal cy = r.center().y() + r.height() * 0.06;
+    // Wand stick
+    QPen stickPen(dashColor, 2.0, Qt::SolidLine, Qt::RoundCap);
+    painter->setPen(stickPen);
+    painter->drawLine(QPointF(cx, cy), QPointF(r.right() - 4, r.bottom() - 4));
+    // Sparkle star at top
+    painter->setPen(QPen(dotColor, 1.5, Qt::SolidLine, Qt::RoundCap));
+    const double sx = r.left() + r.width() * 0.30;
+    const double sy = r.top()  + r.height() * 0.28;
+    const double sr = r.width() * 0.20;
+    const double sr2 = sr * 0.45;
+    for (int i = 0; i < 8; ++i) {
+      const double angle = i * M_PI / 4.0;
+      const double rr = (i % 2 == 0) ? sr : sr2;
+      painter->drawLine(
+          QPointF(sx, sy),
+          QPointF(sx + std::cos(angle) * rr, sy + std::sin(angle) * rr));
+    }
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(dotColor);
+    painter->drawEllipse(QPointF(sx, sy), 2.2, 2.2);
+
+  } else if (id == "object_select") {
+    // Rectangle with light selection fill
+    const qreal m = 7.0;
+    const QRectF box(r.left() + m, r.top() + m, r.width() - m * 2, r.height() - m * 2);
+    QColor fill = selected ? QColor(80, 140, 255, 50) : QColor(60, 110, 220, 35);
+    painter->setBrush(fill);
+    painter->setPen(dashPen);
+    painter->drawRect(box);
+    painter->setBrush(Qt::NoBrush);
+  }
+}
+
 QPixmap makeStrokePreview(
     const QString& subToolId,
     const QColor& color,
@@ -41,11 +143,17 @@ QPixmap makeStrokePreview(
   QPainter painter(&pixmap);
   painter.setRenderHint(QPainter::Antialiasing, true);
 
+  const QString id = subToolId.toLower();
+  if (isSelectionSubTool(id)) {
+    const QRectF r(0, 0, size.width(), size.height());
+    drawSelectionIcon(&painter, id, r, false, enabled);
+    return pixmap;
+  }
+
   QColor penColor = color;
   if (!enabled) {
     penColor = QColor(120, 126, 137);
   }
-  const QString id = subToolId.toLower();
   qreal width = 2.6;
   if (id.contains("hard")) {
     width = 3.6;
@@ -132,7 +240,7 @@ public:
     painter->setPen(QPen(border, selected ? 1.5 : 1.0));
     painter->drawPath(cardPath);
 
-    // ── Stroke preview area (top portion of tile) ────────────────────────
+    // ── Preview area (top portion of tile) ───────────────────────────────
     const int labelH = 18;
     const QRectF previewRect(
         rect.left() + 4.0,
@@ -140,42 +248,48 @@ public:
         rect.width() - 8.0,
         rect.height() - labelH - 8.0);
 
-    QColor stroke = selected ? QColor(255, 255, 255, 180) : QColor(210, 225, 248, 140);
-    qreal penW = 2.8;
-    if (id.contains("hard")) {
-      penW = 4.5;
-      stroke.setAlpha(selected ? 210 : 170);
-    } else if (id.contains("soft")) {
-      penW = 6.5;
-      stroke.setAlpha(selected ? 100 : 65);
-    } else if (id.contains("airbrush")) {
-      penW = 9.0;
-      stroke.setAlpha(selected ? 70 : 45);
-    } else if (id.contains("fill")) {
-      penW = 10.0;
-      stroke.setAlpha(selected ? 100 : 60);
-    } else if (id.contains("vector")) {
-      penW = 1.8;
-      stroke.setAlpha(selected ? 220 : 160);
-    } else if (id.contains("eraser")) {
-      stroke = QColor(230, 235, 245, selected ? 150 : 95);
-      penW = 4.0;
-    }
-    if (!enabled) {
-      stroke.setAlpha(stroke.alpha() / 4);
-    }
-
     painter->save();
     painter->setClipRect(QRectF(rect.left() + 1, rect.top() + 1, rect.width() - 2, rect.height() - labelH - 1));
-    QPen strokePen(stroke, penW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    painter->setPen(strokePen);
-    QPainterPath path;
-    path.moveTo(previewRect.left(), previewRect.center().y() + previewRect.height() * 0.15);
-    path.cubicTo(
-        previewRect.left() + previewRect.width() * 0.25, previewRect.top() + 2,
-        previewRect.left() + previewRect.width() * 0.60, previewRect.bottom() - 2,
-        previewRect.right(), previewRect.center().y() - previewRect.height() * 0.12);
-    painter->drawPath(path);
+    painter->setRenderHint(QPainter::Antialiasing, true);
+
+    if (isSelectionSubTool(id)) {
+      drawSelectionIcon(painter, id, previewRect, selected, enabled);
+    } else {
+      QColor stroke = selected ? QColor(255, 255, 255, 180) : QColor(210, 225, 248, 140);
+      qreal penW = 2.8;
+      if (id.contains("hard")) {
+        penW = 4.5;
+        stroke.setAlpha(selected ? 210 : 170);
+      } else if (id.contains("soft")) {
+        penW = 6.5;
+        stroke.setAlpha(selected ? 100 : 65);
+      } else if (id.contains("airbrush")) {
+        penW = 9.0;
+        stroke.setAlpha(selected ? 70 : 45);
+      } else if (id.contains("fill")) {
+        penW = 10.0;
+        stroke.setAlpha(selected ? 100 : 60);
+      } else if (id.contains("vector")) {
+        penW = 1.8;
+        stroke.setAlpha(selected ? 220 : 160);
+      } else if (id.contains("eraser")) {
+        stroke = QColor(230, 235, 245, selected ? 150 : 95);
+        penW = 4.0;
+      }
+      if (!enabled) {
+        stroke.setAlpha(stroke.alpha() / 4);
+      }
+      QPen strokePen(stroke, penW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+      painter->setPen(strokePen);
+      QPainterPath path;
+      path.moveTo(previewRect.left(), previewRect.center().y() + previewRect.height() * 0.15);
+      path.cubicTo(
+          previewRect.left() + previewRect.width() * 0.25, previewRect.top() + 2,
+          previewRect.left() + previewRect.width() * 0.60, previewRect.bottom() - 2,
+          previewRect.right(), previewRect.center().y() - previewRect.height() * 0.12);
+      painter->drawPath(path);
+    }
+
     painter->restore();
 
     // ── Label (bottom of tile) ────────────────────────────────────────────
@@ -246,7 +360,9 @@ QString subToolNameJa(QString id, const QString& displayName) {
   if (id == "fill_gapclose") return QString::fromUtf8(u8"塗りつぶし（隙間閉じ）");
   if (id == "rect_default") return QString::fromUtf8(u8"矩形選択");
   if (id == "lasso_default") return QString::fromUtf8(u8"なげなわ選択");
+  if (id == "poly_lasso") return QString::fromUtf8(u8"多角形選択");
   if (id == "auto_select") return QString::fromUtf8(u8"自動選択");
+  if (id == "object_select") return QString::fromUtf8(u8"オブジェクト選択");
   if (id == "move_layer_default") return QString::fromUtf8(u8"レイヤー移動");
   if (id == "hand_default") return QString::fromUtf8(u8"手のひら移動");
   if (id == "zoom_default") return QString::fromUtf8(u8"ズーム");
