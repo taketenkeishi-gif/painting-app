@@ -42,6 +42,20 @@ if(PAINT_BUILD_QT_PLATFORM)
   target_link_libraries(paint_qt_platform PUBLIC paint_core Qt6::Gui)
 endif()
 
+# ── Skia backend adapter (Phase 0-1) ─────────────────────────────────────
+if(PAINT_USE_SKIA)
+  add_library(paint_skia_platform STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/skia/SkiaPixelBuffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/skia/SkiaRenderer.cpp
+  )
+  target_compile_definitions(paint_skia_platform PUBLIC PAINT_USE_SKIA)
+  target_include_directories(paint_skia_platform PUBLIC ${PROJECT_SOURCE_DIR}/src)
+  target_link_libraries(paint_skia_platform PUBLIC paint_core unofficial::skia::skia)
+  if(MSVC)
+    target_compile_options(paint_skia_platform PRIVATE /utf-8)
+  endif()
+endif()
+
 set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AppController.cpp
@@ -82,4 +96,8 @@ if(PAINT_BUILD_APP)
       Qt6::Widgets
       Qt6::Network
   )
+  if(PAINT_USE_SKIA)
+    target_link_libraries(paint_app PRIVATE paint_skia_platform)
+    target_compile_definitions(paint_app PRIVATE PAINT_USE_SKIA)
+  endif()
 endif()

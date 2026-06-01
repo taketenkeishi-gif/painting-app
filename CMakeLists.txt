@@ -10,6 +10,12 @@ option(PAINT_BUILD_QT_PLATFORM "Build Qt platform conversion layer" ON)
 option(PAINT_BUILD_APP "Build Qt desktop application" ON)
 option(PAINT_BUILD_TESTS "Build core tests" OFF)
 
+# ── Skia backend (Phase 0-1) ──────────────────────────────────────────────
+# Set PAINT_USE_SKIA=ON to build the Skia rendering adapter.
+# Requires vcpkg toolchain:
+#   cmake -DPAINT_USE_SKIA=ON -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ...
+option(PAINT_USE_SKIA "Enable Skia rendering backend (requires vcpkg)" OFF)
+
 if(DEFINED CMAKE_PREFIX_PATH AND NOT CMAKE_PREFIX_PATH STREQUAL "")
   message(STATUS "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}")
 endif()
@@ -35,6 +41,11 @@ endif()
 if(_qt_components)
   list(REMOVE_DUPLICATES _qt_components)
   find_package(Qt6 REQUIRED COMPONENTS ${_qt_components})
+endif()
+
+if(PAINT_USE_SKIA)
+  find_package(unofficial-skia CONFIG REQUIRED)
+  message(STATUS "Skia backend enabled")
 endif()
 
 add_subdirectory(src)
