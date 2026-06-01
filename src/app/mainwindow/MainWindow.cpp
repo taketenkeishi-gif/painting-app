@@ -855,9 +855,9 @@ void MainWindow::createMenus() {
   m_openDocsAction = new QAction("READMEを開く(&D)", this);
   m_shortcutSettingsAction = new QAction("ショートカット設定(&K)...", this);
   m_commandPaletteAction = new QAction("コマンドパレット(&P)...", this);
-  m_swapColorsAction = new QAction("描画色/背景色を入れ替え(&X)", this);
+  m_swapColorsAction = new QAction("描画色と背景色を切り替え(&C)", this);
   m_resetColorsAction = new QAction("描画色/背景色を白黒に戻す(&D)", this);
-  m_transparentColorAction = new QAction("透明色を使用(&T)", this);
+  m_transparentColorAction = new QAction("描画色と透明色を切り替え(&X)", this);
   m_clearRecentFilesAction = new QAction("最近使ったファイルをクリア", this);
 
   m_recentFilesMenu = fileMenu->addMenu("最近使ったファイル");
@@ -913,9 +913,9 @@ void MainWindow::createMenus() {
   m_restoreLastWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_W));
   m_shortcutSettingsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_K));
   m_commandPaletteAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_P));
-  m_swapColorsAction->setShortcut(QKeySequence(Qt::Key_X));
+  m_swapColorsAction->setShortcut(QKeySequence(Qt::Key_C));
   m_resetColorsAction->setShortcut(QKeySequence(Qt::Key_D));
-  m_transparentColorAction->setShortcut(QKeySequence(Qt::Key_C));
+  m_transparentColorAction->setShortcut(QKeySequence(Qt::Key_X));
   m_toggleGridAction->setCheckable(true);
   m_toggleGridAction->setChecked(m_canvasWidget->isGridVisible());
   m_toggleOverlayAction->setCheckable(true);
@@ -1050,9 +1050,16 @@ void MainWindow::createMenus() {
   rebuildWorkspaceLayoutsMenu();
 
   helpMenu->addAction(aboutAction);
-  helpMenu->addAction(m_shortcutSummaryAction);
-  helpMenu->addAction(m_shortcutSettingsAction);
   helpMenu->addAction(m_openDocsAction);
+
+  // ── ショートカットメニュー（メニューバー）────────────────────────────────
+  auto* shortcutMenu = menuBar()->addMenu("ショートカット(&K)");
+  shortcutMenu->addAction(m_shortcutSettingsAction);
+  shortcutMenu->addAction(m_shortcutSummaryAction);
+  shortcutMenu->addSeparator();
+  shortcutMenu->addAction(m_swapColorsAction);
+  shortcutMenu->addAction(m_transparentColorAction);
+  shortcutMenu->addAction(m_resetColorsAction);
 
   connect(m_newCanvasAction, &QAction::triggered, this, &MainWindow::onNewCanvas);
   connect(m_openAction, &QAction::triggered, this, &MainWindow::onOpenTriggered);
@@ -1781,8 +1788,8 @@ void MainWindow::onNewCanvas() {
 
 void MainWindow::onToolStateChanged() {
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
-  if (m_lastForegroundColor.r != state.color.r || m_lastForegroundColor.g != state.color.g ||
-      m_lastForegroundColor.b != state.color.b || m_lastForegroundColor.a != state.color.a) {
+  // 透明色以外のときだけ「最後の有色描画色」を更新（X キーで復帰するために保持）
+  if (state.color.a > 0) {
     m_lastForegroundColor = state.color;
   }
 
@@ -2348,6 +2355,21 @@ void MainWindow::onShortcutSettingsTriggered() {
   struct ShortcutRow {
     QAction* action {nullptr};
     QKeySequenceEdit* edit {nullptr};
+    QLabel* label {nullptr};
+    QString category;
+  };
+
+  // カテゴリ表示名マップ (commandId prefix → 日本語)
+  static const QMap<QString, QString> kCategoryNames {
+      {"file",   "ファイル"},
+      {"edit",   "編集"},
+      {"layer",  "レイヤー"},
+      {"select", "選択"},
+      {"view",   "表示"},
+      {"tool",   "ツール"},
+      {"window", "ウィンドウ"},
+      {"color",  "カラー"},
+      {"help",   "ヘルプ"},
   };
 
   QList<QAction*> configurable;
@@ -2357,51 +2379,111 @@ void MainWindow::onShortcutSettingsTriggered() {
       configurable.push_back(action);
     }
   }
+  // カテゴリ→テキスト順でソート
   std::sort(configurable.begin(), configurable.end(), [](const QAction* lhs, const QAction* rhs) {
+    const QString lCat = lhs->property("commandId").toString().section('.', 0, 0);
+    const QString rCat = rhs->property("commandId").toString().section('.', 0, 0);
+    if (lCat != rCat) return lCat < rCat;
     return lhs->text() < rhs->text();
   });
 
   QDialog dialog(this);
   dialog.setWindowTitle("ショートカット設定");
-  dialog.resize(640, 620);
+  dialog.resize(680, 680);
   auto* root = new QVBoxLayout(&dialog);
   root->setContentsMargins(10, 10, 10, 10);
-  root->setSpacing(8);
+  root->setSpacing(6);
+
+  // ── 検索バー ─────────────────────────────────────────────────────────────
+  auto* searchRow = new QHBoxLayout();
+  auto* searchLabel = new QLabel("検索:", &dialog);
+  auto* searchEdit = new QLineEdit(&dialog);
+  searchEdit->setPlaceholderText("コマンド名またはショートカットキーで絞り込み...");
+  searchEdit->setClearButtonEnabled(true);
+  searchRow->addWidget(searchLabel);
+  searchRow->addWidget(searchEdit, 1);
+  root->addLayout(searchRow);
 
   auto* help = new QLabel(
-      "ショートカットを設定します。空欄は割り当て解除です。重複は保存時に警告されます。",
+      "空欄 = 割り当て解除。変更後「OK」で適用・保存されます。重複は警告されます。",
       &dialog);
   help->setWordWrap(true);
+  help->setStyleSheet("color: #8a9ab5; font-size: 11px;");
   root->addWidget(help);
 
+  // ── スクロールエリア + フォームレイアウト ─────────────────────────────────
   auto* scroll = new QScrollArea(&dialog);
   scroll->setWidgetResizable(true);
   auto* host = new QWidget(scroll);
-  auto* form = new QFormLayout(host);
-  form->setContentsMargins(6, 6, 6, 6);
-  form->setSpacing(8);
+  auto* form = new QVBoxLayout(host);
+  form->setContentsMargins(4, 4, 4, 4);
+  form->setSpacing(2);
 
   std::vector<ShortcutRow> rows;
   rows.reserve(static_cast<std::size_t>(configurable.size()));
+  QString lastCat;
+
   for (QAction* action : configurable) {
-    auto* edit = new QKeySequenceEdit(action->shortcut(), host);
+    const QString commandId = action->property("commandId").toString();
+    const QString cat = commandId.section('.', 0, 0);
+    const QString catName = kCategoryNames.value(cat, cat);
+
+    // カテゴリヘッダー
+    if (cat != lastCat) {
+      lastCat = cat;
+      auto* catHeader = new QLabel(catName, host);
+      catHeader->setStyleSheet(
+          "font-weight: bold; font-size: 12px; color: #4e8ef7;"
+          "padding: 6px 2px 2px 2px; border-bottom: 1px solid #2a2e3e;");
+      form->addWidget(catHeader);
+    }
+
+    // 行ウィジェット
+    auto* rowWidget = new QWidget(host);
+    auto* rowLayout = new QHBoxLayout(rowWidget);
+    rowLayout->setContentsMargins(4, 1, 4, 1);
+    rowLayout->setSpacing(8);
+
+    auto* lbl = new QLabel(action->text().remove('&'), rowWidget);
+    lbl->setMinimumWidth(220);
+    lbl->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    auto* edit = new QKeySequenceEdit(action->shortcut(), rowWidget);
     edit->setClearButtonEnabled(true);
-    form->addRow(action->text().remove('&'), edit);
-    rows.push_back(ShortcutRow {action, edit});
+    edit->setFixedWidth(200);
+
+    rowLayout->addWidget(lbl, 1);
+    rowLayout->addWidget(edit);
+    form->addWidget(rowWidget);
+    rows.push_back(ShortcutRow {action, edit, lbl, cat});
   }
+  form->addStretch();
   host->setLayout(form);
   scroll->setWidget(host);
   root->addWidget(scroll, 1);
 
+  // ── 検索フィルタ接続 ───────────────────────────────────────────────────
+  connect(searchEdit, &QLineEdit::textChanged, &dialog, [&rows](const QString& text) {
+    const QString lower = text.toLower();
+    for (const ShortcutRow& row : rows) {
+      if (row.label == nullptr || row.edit == nullptr) continue;
+      const bool match = lower.isEmpty()
+          || row.label->text().toLower().contains(lower)
+          || row.edit->keySequence().toString().toLower().contains(lower);
+      // 行ウィジェット(parentWidget)の表示を切り替え
+      if (row.edit->parentWidget() != nullptr) {
+        row.edit->parentWidget()->setVisible(match);
+      }
+    }
+  });
+
+  // ── ボタン ────────────────────────────────────────────────────────────
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
   auto* resetButton = buttons->addButton("初期値に戻す", QDialogButtonBox::ResetRole);
   root->addWidget(buttons);
 
   connect(resetButton, &QPushButton::clicked, &dialog, [&rows]() {
     for (const ShortcutRow& row : rows) {
-      if (row.action == nullptr || row.edit == nullptr) {
-        continue;
-      }
+      if (row.action == nullptr || row.edit == nullptr) continue;
       const QString defaultText = row.action->property("defaultShortcut").toString();
       row.edit->setKeySequence(QKeySequence::fromString(defaultText, QKeySequence::PortableText));
     }
@@ -2413,20 +2495,19 @@ void MainWindow::onShortcutSettingsTriggered() {
     return;
   }
 
+  // ── 重複チェック ────────────────────────────────────────────────────────
   QMap<QString, QStringList> duplicates;
   for (const ShortcutRow& row : rows) {
-    if (row.action == nullptr || row.edit == nullptr) {
-      continue;
-    }
+    if (row.action == nullptr || row.edit == nullptr) continue;
     const QString key = row.edit->keySequence().toString(QKeySequence::PortableText);
     if (!key.isEmpty()) {
-      duplicates[key].push_back(row.action->text().remove('&'));
+      duplicates[key].push_back(row.label != nullptr ? row.label->text() : row.action->text().remove('&'));
     }
   }
   QStringList conflictLines;
   for (auto it = duplicates.cbegin(); it != duplicates.cend(); ++it) {
     if (it.value().size() > 1) {
-      conflictLines.push_back(QString("%1 -> %2").arg(it.key(), it.value().join(", ")));
+      conflictLines.push_back(QString("  %1  →  %2").arg(it.key(), it.value().join(" / ")));
     }
   }
   if (!conflictLines.isEmpty()) {
@@ -2439,10 +2520,9 @@ void MainWindow::onShortcutSettingsTriggered() {
     }
   }
 
+  // ── 適用・保存 ─────────────────────────────────────────────────────────
   for (const ShortcutRow& row : rows) {
-    if (row.action == nullptr || row.edit == nullptr) {
-      continue;
-    }
+    if (row.action == nullptr || row.edit == nullptr) continue;
     row.action->setShortcut(row.edit->keySequence());
     saveShortcutOverride(row.action->property("commandId").toString(), row.edit->keySequence());
   }
@@ -2484,9 +2564,16 @@ void MainWindow::onResetBlackWhiteColors() {
 }
 
 void MainWindow::onUseTransparentColor() {
-  core::Color color = m_controller->toolState().color;
-  color.a = 0;
-  m_controller->setBrushColor(color);
+  const core::Color current = m_controller->toolState().color;
+  if (current.a == 0) {
+    // すでに透明 → 最後の有色描画色に戻す
+    m_controller->setBrushColor(m_lastForegroundColor);
+  } else {
+    // 有色 → 透明色に切り替え（RGBはそのまま、alpha=0）
+    core::Color transparent = current;
+    transparent.a = 0;
+    m_controller->setBrushColor(transparent);
+  }
   updateColorPanel();
 }
 
