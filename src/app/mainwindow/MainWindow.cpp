@@ -72,6 +72,86 @@ namespace app::mainwindow {
 
 namespace {
 
+// Adaptive dock title bar: 22 px when floating (draggable), 2 px when tabified/docked.
+class DockTitleBar : public QWidget {
+  Q_OBJECT
+public:
+  explicit DockTitleBar(QDockWidget* dock)
+      : QWidget(dock), m_dock(dock) {
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    setCursor(Qt::SizeAllCursor);
+
+    m_label = new QLabel(dock->windowTitle(), this);
+    m_label->setStyleSheet("color: #5a6480; font-size: 10px; background: transparent;");
+
+    m_floatBtn = new QPushButton(this);
+    m_floatBtn->setFixedSize(16, 16);
+    m_floatBtn->setFlat(true);
+    m_floatBtn->setFocusPolicy(Qt::NoFocus);
+    m_floatBtn->setStyleSheet(
+        "QPushButton { background: transparent; border: none; color: #5a6480; font-size: 11px; padding: 0; }"
+        "QPushButton:hover { color: #c5cde0; }");
+
+    auto* layout = new QHBoxLayout(this);
+    layout->setContentsMargins(6, 0, 4, 0);
+    layout->setSpacing(2);
+    layout->addWidget(m_label, 1);
+    layout->addWidget(m_floatBtn);
+
+    connect(dock, &QDockWidget::topLevelChanged, this, &DockTitleBar::onTopLevelChanged);
+    connect(m_floatBtn, &QPushButton::clicked, this, [this] {
+      m_dock->setFloating(!m_dock->isFloating());
+    });
+
+    onTopLevelChanged(dock->isFloating());
+  }
+
+private slots:
+  void onTopLevelChanged(bool floating) {
+    if (floating) {
+      setFixedHeight(22);
+      setStyleSheet("background: #1e2230; border-bottom: 1px solid #2a2e3e;");
+      m_label->setVisible(true);
+      m_floatBtn->setVisible(true);
+      m_floatBtn->setText(QStringLiteral("⊟"));
+      m_floatBtn->setToolTip("ドックに戻す");
+    } else {
+      setFixedHeight(2);
+      setStyleSheet("background: #0d0f14;");
+      m_label->setVisible(false);
+      m_floatBtn->setVisible(false);
+    }
+  }
+
+protected:
+  void mousePressEvent(QMouseEvent* e) override {
+    if (e->button() == Qt::LeftButton && m_dock->isFloating()) {
+      m_dragging = true;
+      m_dragOffset = e->globalPosition().toPoint() - m_dock->frameGeometry().topLeft();
+      e->accept();
+    }
+  }
+  void mouseMoveEvent(QMouseEvent* e) override {
+    if (m_dragging && (e->buttons() & Qt::LeftButton)) {
+      m_dock->move(e->globalPosition().toPoint() - m_dragOffset);
+      e->accept();
+    }
+  }
+  void mouseReleaseEvent(QMouseEvent* e) override {
+    if (e->button() == Qt::LeftButton) m_dragging = false;
+  }
+  void mouseDoubleClickEvent(QMouseEvent* e) override {
+    if (e->button() == Qt::LeftButton) m_dock->setFloating(!m_dock->isFloating());
+  }
+
+private:
+  QDockWidget* m_dock;
+  QLabel* m_label {nullptr};
+  QPushButton* m_floatBtn {nullptr};
+  QPoint m_dragOffset;
+  bool m_dragging {false};
+};
+
 class TitleBarDragArea : public QWidget {
 public:
   explicit TitleBarDragArea(QMainWindow* win, QWidget* parent = nullptr)
@@ -397,28 +477,33 @@ void MainWindow::setupShellLayout() {
         "}").arg(accent, accentSoft));
 
     slider->setMinimumWidth(76);
-    slider->setFixedHeight(18);
+    slider->setMinimumHeight(20);
     slider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     slider->setStyleSheet(QStringLiteral(
+        // Reserve handle overhang via groove margin (no negative widget margins)
+        "QSlider { padding: 0; }"
         "QSlider::groove:horizontal {"
         "  height: 7px;"
         "  border-radius: 3px;"
         "  background: #202630;"
+        "  margin: 0 6px;"
         "}"
         "QSlider::sub-page:horizontal {"
         "  height: 7px;"
         "  border-radius: 3px;"
         "  background: %1;"
+        "  margin: 0 6px;"
         "}"
         "QSlider::add-page:horizontal {"
         "  height: 7px;"
         "  border-radius: 3px;"
         "  background: #141a22;"
+        "  margin: 0 6px;"
         "}"
         "QSlider::handle:horizontal {"
         "  width: 12px;"
         "  height: 12px;"
-        "  margin: -4px 0px;"
+        "  margin: -3px -6px;"
         "  border-radius: 6px;"
         "  border: 1px solid #dce6f2;"
         "  background: %1;"
@@ -671,7 +756,7 @@ void MainWindow::setupShellLayout() {
     auto* dock = new QDockWidget(title, this);
     dock->setObjectName(name);
     dock->setWidget(widget);
-    dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
     return dock;
   };
 
@@ -696,28 +781,22 @@ void MainWindow::setupShellLayout() {
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
-  // 完全非表示タイトルバー: 2px の不可視ドラッグストリップのみ残す
-  // (ユーザーは右クリックコンテキストメニューまたはTabBarからフロート/クローズ可能)
-  auto applyInvisibleTitleBar = [](QDockWidget* dock) {
+  // Adaptive dock title bar: 22 px when floating (draggable header), 2 px when tabified.
+  auto applyDockTitleBar = [](QDockWidget* dock) {
     if (dock == nullptr) return;
-    auto* bar = new QWidget(dock);
-    bar->setFixedHeight(2);
-    bar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    bar->setStyleSheet("background: #0d0f14;");
-    bar->setCursor(Qt::SizeAllCursor);
-    dock->setTitleBarWidget(bar);
+    dock->setTitleBarWidget(new DockTitleBar(dock));
   };
 
-  applyInvisibleTitleBar(m_toolDock);
-  applyInvisibleTitleBar(m_toolSliderDock);
-  applyInvisibleTitleBar(m_subToolDock);
-  applyInvisibleTitleBar(m_toolPropertyDock);
-  applyInvisibleTitleBar(m_colorDock);
-  applyInvisibleTitleBar(colorSliderDock);
-  applyInvisibleTitleBar(colorHistoryDock);
-  applyInvisibleTitleBar(m_layerDock);
-  applyInvisibleTitleBar(m_aiDock);
-  applyInvisibleTitleBar(m_infoDock);
+  applyDockTitleBar(m_toolDock);
+  applyDockTitleBar(m_toolSliderDock);
+  applyDockTitleBar(m_subToolDock);
+  applyDockTitleBar(m_toolPropertyDock);
+  applyDockTitleBar(m_colorDock);
+  applyDockTitleBar(colorSliderDock);
+  applyDockTitleBar(colorHistoryDock);
+  applyDockTitleBar(m_layerDock);
+  applyDockTitleBar(m_aiDock);
+  applyDockTitleBar(m_infoDock);
 
   addDockWidget(Qt::LeftDockWidgetArea, m_toolDock);
   addDockWidget(Qt::LeftDockWidgetArea, m_toolSliderDock);
@@ -745,6 +824,20 @@ void MainWindow::setupShellLayout() {
   m_layerDock->raise();
   m_defaultDockState = saveState();
   adjustRightDockLayout();
+
+  // After layout pass, find dock-area QTabBars (not QTabWidget children) and
+  // strip close buttons / apply custom styling.
+  QTimer::singleShot(0, this, [this] {
+    const auto allTabBars = findChildren<QTabBar*>();
+    for (auto* tb : allTabBars) {
+      if (qobject_cast<QTabWidget*>(tb->parentWidget())) continue;
+      tb->setTabsClosable(false);
+      tb->setMovable(true);
+      tb->setExpanding(false);
+      tb->setDocumentMode(true);
+      tb->setProperty("dockTabBar", true);
+    }
+  });
 }
 
 void MainWindow::createMenus() {
@@ -1539,43 +1632,38 @@ void MainWindow::createToolBar() {
   m_quickToolBar->addAction(m_resetZoomAction);
   m_quickToolBar->addAction(m_fitToScreenAction);
 
-  // Title bar integration — drag area + title label + window controls
-  m_quickToolBar->addSeparator();
-  auto* dragAreaLeft = new TitleBarDragArea(this, m_quickToolBar);
-  dragAreaLeft->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-  dragAreaLeft->setMinimumWidth(8);
-  m_quickToolBar->addWidget(dragAreaLeft);
-
-  auto* titleLabel = new QLabel(windowTitle(), m_quickToolBar);
-  titleLabel->setAlignment(Qt::AlignCenter);
-  titleLabel->setStyleSheet("color: #b8b8b8; font-size: 11px; font-weight: 600; padding: 0 8px;");
-  titleLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-  m_quickToolBar->addWidget(titleLabel);
-  connect(this, &QMainWindow::windowTitleChanged, titleLabel, &QLabel::setText);
-
-  auto* dragAreaRight = new TitleBarDragArea(this, m_quickToolBar);
-  dragAreaRight->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-  dragAreaRight->setMinimumWidth(8);
-  m_quickToolBar->addWidget(dragAreaRight);
-
+  // Window controls live in menubar corner — same visual row as the menu items.
   auto makeWinBtn = [&](const QString& text, const QString& tip, const QString& hoverBg) {
-    auto* btn = new QPushButton(text, m_quickToolBar);
-    btn->setFixedSize(36, 28);
+    auto* btn = new QPushButton(text);
+    btn->setFixedSize(36, 22);
     btn->setFlat(true);
     btn->setFocusPolicy(Qt::NoFocus);
     btn->setToolTip(tip);
     btn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: transparent; border: none; color: #a0a0a0; font-size: 13px; padding: 0; }"
+        "QPushButton { background: transparent; border: none; color: #a0a0a0; font-size: 12px; padding: 0; }"
         "QPushButton:hover { background: %1; color: #ffffff; }").arg(hoverBg));
     return btn;
   };
 
-  auto* minimizeBtn = makeWinBtn(QStringLiteral("─"), "最小化", "#4a4a4a");
+  auto* cornerWidget = new QWidget;
+  cornerWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  auto* cornerLayout = new QHBoxLayout(cornerWidget);
+  cornerLayout->setContentsMargins(0, 0, 0, 0);
+  cornerLayout->setSpacing(0);
+
+  auto* dragArea = new TitleBarDragArea(this, cornerWidget);
+  dragArea->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+  dragArea->setFixedWidth(32);
+  cornerLayout->addWidget(dragArea);
+
+  auto* minimizeBtn = makeWinBtn(QStringLiteral("─"), "最小化",          "#4a4a4a");
   auto* maximizeBtn = makeWinBtn(QStringLiteral("□"), "最大化/元に戻す", "#4a4a4a");
-  auto* closeBtn    = makeWinBtn(QStringLiteral("✕"), "閉じる",          "#c42b1c");
-  m_quickToolBar->addWidget(minimizeBtn);
-  m_quickToolBar->addWidget(maximizeBtn);
-  m_quickToolBar->addWidget(closeBtn);
+  auto* closeBtn    = makeWinBtn(QStringLiteral("✕"), "閉じる",           "#c42b1c");
+  cornerLayout->addWidget(minimizeBtn);
+  cornerLayout->addWidget(maximizeBtn);
+  cornerLayout->addWidget(closeBtn);
+
+  menuBar()->setCornerWidget(cornerWidget, Qt::TopRightCorner);
 
   connect(minimizeBtn, &QPushButton::clicked, this, &QMainWindow::showMinimized);
   connect(maximizeBtn, &QPushButton::clicked, this, [this]() {
@@ -1825,24 +1913,26 @@ void MainWindow::applyUiChrome() {
       "QCheckBox:disabled { color: #4a5268; }"
 
       // ── Sliders ───────────────────────────────────────────────────
-      // groove に水平マージンを設けてハンドルが切れないようにする
-      "QSlider { padding: 0 7px; }"
+      // groove margin reserves handle overhang — avoids fragile negative widget margins
+      "QSlider { min-height: 20px; padding: 0; }"
       "QSlider::groove:horizontal {"
       "  background: #13151c;"
       "  height: 4px;"
       "  border-radius: 2px;"
       "  border: 1px solid #2a2e3e;"
+      "  margin: 0 7px;"
       "}"
       "QSlider::sub-page:horizontal {"
       "  background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #2a5cbf, stop:1 #4e8ef7);"
       "  border-radius: 2px;"
+      "  margin: 0 7px;"
       "}"
       "QSlider::handle:horizontal {"
       "  background: #edf0f9;"
       "  border: 1px solid #3a4252;"
       "  width: 14px; height: 14px;"
       "  border-radius: 7px;"
-      "  margin: -6px -7px;"
+      "  margin: -5px -7px;"
       "}"
       "QSlider::handle:horizontal:hover { background: #ffffff; border-color: #6da6ff; }"
       "QSlider::handle:horizontal:pressed { background: #4e8ef7; border-color: #4e8ef7; }"
@@ -3405,6 +3495,9 @@ QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, cons
 }
 
 } // namespace app::mainwindow
+
+// DockTitleBar uses Q_OBJECT inside this .cpp — moc include required
+#include "MainWindow.moc"
 
 
 

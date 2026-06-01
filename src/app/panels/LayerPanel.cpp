@@ -370,9 +370,11 @@ QRect layerMaskThumbnailRect(const QRect& rect) {
   return QRect(img.right() + kThumbGap, rect.top() + (rect.height() - kMaskThumbHeight) / 2, kMaskThumbWidth, kMaskThumbHeight);
 }
 
-QRect layerNameRect(const QRect& rect) {
-  const QRect mask = layerMaskThumbnailRect(rect);
-  return QRect(mask.right() + 5, rect.top(), rect.right() - mask.right() - 7, rect.height());
+QRect layerNameRect(const QRect& rect, bool hasMask) {
+  const int nameLeft = hasMask
+      ? layerMaskThumbnailRect(rect).right() + 5
+      : layerThumbnailRect(rect).right() + 5;
+  return QRect(nameLeft, rect.top(), rect.right() - nameLeft - 3, rect.height());
 }
 
 QString layerPaintName(const QModelIndex& index) {
@@ -470,18 +472,13 @@ QString layerPaintName(const QModelIndex& index) {
         painter->drawLine(maskThumbRect.topLeft(), maskThumbRect.bottomRight());
         painter->drawLine(maskThumbRect.topRight(), maskThumbRect.bottomLeft());
       }
-    } else {
-      // Slot placeholder for mask (dashed outline)
-      painter->setPen(QPen(QColor(0x3c, 0x3c, 0x3c), 1, Qt::DashLine));
-      painter->setBrush(Qt::NoBrush);
-      painter->drawRect(maskThumbRect.adjusted(1, 1, -2, -2));
     }
 
     QFont nameFont = option.font;
     nameFont.setBold(active);
     painter->setFont(nameFont);
     painter->setPen(visible ? QColor(0xd4, 0xd4, 0xd4) : QColor(0x78, 0x78, 0x78));
-    painter->drawText(layerNameRect(rect), Qt::AlignVCenter | Qt::AlignLeft, layerPaintName(index));
+    painter->drawText(layerNameRect(rect, hasMask), Qt::AlignVCenter | Qt::AlignLeft, layerPaintName(index));
 
     painter->restore();
   }

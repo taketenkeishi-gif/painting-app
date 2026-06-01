@@ -185,6 +185,31 @@ inline QString globalPanelQss() {
     "  background: #1a1d26; border: 1px solid #3a4252;"
     "  color: #d4d4d4; padding: 4px 8px; border-radius: 3px;"
     "}"
+
+    // ── Dock-area QTabBar (tabified docks, not QTabWidget) ─────────────────
+    "QTabBar[dockTabBar=\"true\"] {"
+    "  background: #181b22;"
+    "  border: none;"
+    "}"
+    "QTabBar[dockTabBar=\"true\"]::tab {"
+    "  background: #181b22;"
+    "  color: #8890a0;"
+    "  border: none;"
+    "  border-right: 1px solid #0d0f14;"
+    "  padding: 3px 10px;"
+    "  min-width: 56px;"
+    "  font-size: 10px;"
+    "}"
+    "QTabBar[dockTabBar=\"true\"]::tab:selected {"
+    "  background: #1f232e;"
+    "  color: #d4d4d4;"
+    "  border-bottom: 2px solid #4e8ef7;"
+    "}"
+    "QTabBar[dockTabBar=\"true\"]::tab:hover:!selected {"
+    "  background: #222636;"
+    "  color: #b8bcc8;"
+    "}"
+    "QTabBar[dockTabBar=\"true\"]::close-button { image: none; width: 0; }"
   );
 }
 
