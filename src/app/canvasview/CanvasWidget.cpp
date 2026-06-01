@@ -185,6 +185,17 @@ int CanvasWidget::zoomPercent() const {
   return static_cast<int>(std::lround(stateFor(this).zoom * 100.0));
 }
 
+void CanvasWidget::resetRotation() {
+  m_canvasRotationDeg = 0.0;
+  update();
+}
+
+void CanvasWidget::setMirrorView(bool mirror) {
+  if (m_mirrorView == mirror) return;
+  m_mirrorView = mirror;
+  update();
+}
+
 void CanvasWidget::setGridVisible(bool visible) {
   if (m_showGrid == visible) {
     return;
@@ -205,23 +216,62 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
   auto& state = stateFor(this);
   QPainter painter(this);
-  painter.fillRect(rect(), QColor(24, 27, 32));
+  // Pasteboard background — subtle grid pattern gives professional look
+  painter.fillRect(rect(), QColor(30, 33, 40));
+  {
+    const int cell = 48;
+    for (int y = 0; y < height(); y += cell) {
+      for (int x = 0; x < width(); x += cell) {
+        if (((x / cell) + (y / cell)) % 2 == 0) {
+          painter.fillRect(x, y, cell, cell, QColor(33, 36, 44));
+        }
+      }
+    }
+  }
 
   if (m_image.isNull()) {
     return;
   }
 
   const QRect target = canvasRect();
+
+  // Apply canvas rotation and/or mirror around canvas centre
+  const bool rotated = std::abs(m_canvasRotationDeg) > 0.001;
+  const bool transformed = rotated || m_mirrorView;
+  if (transformed) {
+    painter.save();
+    const QPointF centre(target.x() + target.width() / 2.0, target.y() + target.height() / 2.0);
+    painter.translate(centre);
+    if (m_mirrorView) {
+      painter.scale(-1.0, 1.0);
+    }
+    if (rotated) {
+      painter.rotate(m_canvasRotationDeg);
+    }
+    painter.translate(-centre);
+  }
+
+  // Drop shadow (4-pass blur approximation using translucent rects)
+  painter.setRenderHint(QPainter::Antialiasing, false);
+  for (int s = 8; s >= 1; --s) {
+    const int alpha = static_cast<int>(14.0 * (9 - s) / 8.0);
+    painter.fillRect(target.adjusted(s, s, s, s), QColor(0, 0, 0, alpha));
+  }
+
   drawCheckerboard(painter, target, static_cast<int>(std::lround(std::clamp(state.zoom * 10.0, 8.0, 24.0))));
 
-  // ズーム倍率 1x〜8x 未満はバイリニア補間でスムーズに拡大表示する。
-  // 8x 以上はピクセルをそのまま見せるためニアレストネイバーに切り替え。
-  const bool smooth = (state.zoom > 1.0 && state.zoom < 8.0);
+  // ズーム倍率 1x未満 or 8x未満はバイリニア補間; 8x以上はニアレストネイバー
+  const bool smooth = (state.zoom < 8.0);
   painter.setRenderHint(QPainter::SmoothPixmapTransform, smooth);
   painter.drawImage(target, m_image);
   painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-  painter.setPen(QPen(QColor(88, 96, 108), 1.0));
+  // Canvas border — slightly brighter when transformed for clarity
+  painter.setPen(QPen(transformed ? QColor(120, 130, 150) : QColor(72, 80, 96), 1.0));
   painter.drawRect(target.adjusted(0, 0, -1, -1));
+
+  if (transformed) {
+    painter.restore();
+  }
 
   if (m_controller != nullptr && m_showOverlay) {
     const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
@@ -459,6 +509,18 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     return;
   }
 
+  if (m_ctrlSpaceZoom) {
+    m_ctrlSpaceStartPos = event->position().toPoint();
+    m_ctrlSpaceStartZoom = state.zoom;
+    event->accept();
+    return;
+  }
+
+  if (m_rotateKeyHeld) {
+    event->accept();
+    return;
+  }
+
   const bool handPan = m_spacePressed || m_controller->currentTool() == core::ToolKind::Hand;
   if (handPan) {
     state.panning = true;
@@ -503,6 +565,37 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   state.hasMousePos = true;
   const auto canvasPoint = mapToCanvas(state.lastMousePos);
   updateCursorForState(canvasPoint);
+
+  // Ctrl+Space drag → zoom
+  if (m_ctrlSpaceZoom && (event->buttons() & Qt::LeftButton)) {
+    const QPoint current = event->position().toPoint();
+    const int dy = current.y() - m_ctrlSpaceStartPos.y();
+    const double factor = std::pow(1.008, -dy);
+    state.zoom = std::clamp(m_ctrlSpaceStartZoom * factor, 0.1, 16.0);
+    updateZoomStatusLabel(this);
+    update();
+    return;
+  }
+
+  // R-drag → rotate canvas
+  if (m_rotateKeyHeld && (event->buttons() & Qt::LeftButton)) {
+    const QPoint current = event->position().toPoint();
+    const QRect cr = canvasRect();
+    const QPointF centre(cr.x() + cr.width() / 2.0, cr.y() + cr.height() / 2.0);
+    const QPointF prev = QPointF(state.lastMousePos) - centre;
+    const QPointF now  = QPointF(current) - centre;
+    if (prev.manhattanLength() > 4 && now.manhattanLength() > 4) {
+      const double angle = std::atan2(now.y(), now.x()) - std::atan2(prev.y(), prev.x());
+      m_canvasRotationDeg = std::fmod(m_canvasRotationDeg + angle * 180.0 / M_PI, 360.0);
+      // Snap to 0° within ±3° when near horizontal (double-tap behaviour via R key)
+      if (std::abs(m_canvasRotationDeg) < 3.0 || std::abs(std::abs(m_canvasRotationDeg) - 360.0) < 3.0) {
+        m_canvasRotationDeg = 0.0;
+      }
+    }
+    state.lastMousePos = current;
+    update();
+    return;
+  }
 
   if (state.panning && (event->buttons() & Qt::LeftButton)) {
     const QPoint current = event->position().toPoint();
@@ -697,9 +790,30 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
     return;
   }
   if (event->key() == Qt::Key_Space) {
-    m_spacePressed = true;
-    updateCursorForState(stateFor(this).hasMousePos ? mapToCanvas(stateFor(this).lastMousePos) : std::optional<core::Point> {});
+    // Ctrl+Space → zoom drag mode; plain Space → pan
+    const bool ctrl = event->modifiers().testFlag(Qt::ControlModifier);
+    if (ctrl) {
+      m_ctrlSpaceZoom = true;
+      const auto& st = stateFor(this);
+      m_ctrlSpaceStartPos = st.lastMousePos;
+      m_ctrlSpaceStartZoom = st.zoom;
+      setCursor(Qt::SizeVerCursor);
+    } else {
+      m_spacePressed = true;
+      updateCursorForState(stateFor(this).hasMousePos ? mapToCanvas(stateFor(this).lastMousePos) : std::optional<core::Point> {});
+    }
     update();
+    event->accept();
+    return;
+  }
+  // R key — reset canvas rotation; holding Shift snaps to 15° increments during drag (future)
+  if (event->key() == Qt::Key_R && !event->modifiers()) {
+    if (m_rotateKeyHeld) {
+      event->accept();
+      return;
+    }
+    m_rotateKeyHeld = true;
+    setCursor(Qt::SizeAllCursor);
     event->accept();
     return;
   }
@@ -720,6 +834,14 @@ void CanvasWidget::keyReleaseEvent(QKeyEvent* event) {
   }
   if (event->key() == Qt::Key_Space) {
     m_spacePressed = false;
+    m_ctrlSpaceZoom = false;
+    updateCursorForState(stateFor(this).hasMousePos ? mapToCanvas(stateFor(this).lastMousePos) : std::optional<core::Point> {});
+    update();
+    event->accept();
+    return;
+  }
+  if (event->key() == Qt::Key_R) {
+    m_rotateKeyHeld = false;
     updateCursorForState(stateFor(this).hasMousePos ? mapToCanvas(stateFor(this).lastMousePos) : std::optional<core::Point> {});
     update();
     event->accept();

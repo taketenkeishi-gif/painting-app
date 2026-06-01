@@ -32,6 +32,9 @@ public:
   int zoomPercent() const;
   void setGridVisible(bool visible);
   void setOverlayVisible(bool visible);
+  void resetRotation();
+  double canvasRotationDeg() const noexcept { return m_canvasRotationDeg; }
+  void setMirrorView(bool mirror);
   bool isGridVisible() const noexcept { return m_showGrid; }
   bool isOverlayVisible() const noexcept { return m_showOverlay; }
 
@@ -63,7 +66,13 @@ private:
   bool m_showGrid {false};
   bool m_showOverlay {true};
   bool m_spacePressed {false};
-  bool m_tabletActive {false};  // タブレット入力中はマウスイベントを無視
+  bool m_tabletActive {false};
+  double m_canvasRotationDeg {0.0};
+  bool m_rotateKeyHeld {false};
+  bool m_ctrlSpaceZoom {false};
+  bool m_mirrorView {false};
+  QPoint m_ctrlSpaceStartPos;
+  double m_ctrlSpaceStartZoom {1.0};
 };
 
 } // namespace app::canvasview

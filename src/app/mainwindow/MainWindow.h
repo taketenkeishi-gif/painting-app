@@ -266,6 +266,18 @@ private:
   QAction* m_hueSatLightAction        {nullptr};
   QLabel*  m_comfyUiStatusLabel    {nullptr};
   QAction* m_clearRecentFilesAction {nullptr};
+  // キャンバス表示
+  QAction* m_resetRotationAction       {nullptr};
+  QAction* m_mirrorViewAction          {nullptr};
+  // 選択範囲
+  QAction* m_expandSelectionAction     {nullptr};
+  QAction* m_contractSelectionAction   {nullptr};
+  // フィルター
+  QAction* m_gaussianBlurAction        {nullptr};
+  QAction* m_motionBlurAction          {nullptr};
+  // 変形
+  QAction* m_transformAction           {nullptr};
+  QAction* m_freeTransformAction       {nullptr};
   QMenu* m_recentFilesMenu {nullptr};
   QMenu* m_workspaceLayoutsMenu {nullptr};
   std::map<core::ToolKind, QAction*> m_toolActions;

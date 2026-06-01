@@ -798,15 +798,15 @@ void MainWindow::setupShellLayout() {
 }
 
 void MainWindow::createMenus() {
-  auto* fileMenu = menuBar()->addMenu("ファイル(&F)");
-  auto* editMenu = menuBar()->addMenu("編集(&E)");
-  auto* imageMenu = menuBar()->addMenu("画像(&I)");
-  auto* toolMenu = menuBar()->addMenu("ツール(&T)");
-  auto* selectMenu = menuBar()->addMenu("選択(&S)");
-  auto* layerMenu = menuBar()->addMenu("レイヤー(&L)");
-  auto* viewMenu = menuBar()->addMenu("表示(&V)");
-  auto* windowMenu = menuBar()->addMenu("ウィンドウ(&W)");
-  auto* helpMenu = menuBar()->addMenu("ヘルプ(&H)");
+  auto* fileMenu   = menuBar()->addMenu(QString::fromUtf8(u8"ファイル(&F)"));
+  auto* editMenu   = menuBar()->addMenu(QString::fromUtf8(u8"編集(&E)"));
+  auto* layerMenu  = menuBar()->addMenu(QString::fromUtf8(u8"レイヤー(&L)"));
+  auto* selectMenu = menuBar()->addMenu(QString::fromUtf8(u8"選択範囲(&S)"));
+  auto* filterMenu = menuBar()->addMenu(QString::fromUtf8(u8"フィルター(&I)"));
+  auto* toolMenu   = menuBar()->addMenu(QString::fromUtf8(u8"ツール(&T)"));
+  auto* viewMenu   = menuBar()->addMenu(QString::fromUtf8(u8"表示(&V)"));
+  auto* windowMenu = menuBar()->addMenu(QString::fromUtf8(u8"ウィンドウ(&W)"));
+  auto* helpMenu   = menuBar()->addMenu(QString::fromUtf8(u8"ヘルプ(&H)"));
 
   m_newCanvasAction = new QAction("新規キャンバス(&N)", this);
   m_openAction = new QAction("開く(&O)...", this);
@@ -868,11 +868,19 @@ void MainWindow::createMenus() {
   m_swapColorsAction = new QAction("描画色と背景色を切り替え(&C)", this);
   m_resetColorsAction = new QAction("描画色/背景色を白黒に戻す(&D)", this);
   m_transparentColorAction = new QAction("描画色と透明色を切り替え(&X)", this);
-  m_generativeFillAction      = new QAction("AI 生成塗りつぶし(&A)...", this);
-  m_connectComfyUiAction      = new QAction("ComfyUI に接続(&Y)...", this);
-  m_clearRecentFilesAction    = new QAction("最近使ったファイルをクリア", this);
-  m_brightnessContrastAction  = new QAction("明るさ・コントラスト(&B)...", this);
-  m_hueSatLightAction         = new QAction("色相・彩度・明度(&H)...", this);
+  m_generativeFillAction      = new QAction(QString::fromUtf8(u8"AI 生成塗りつぶし(&A)..."), this);
+  m_connectComfyUiAction      = new QAction(QString::fromUtf8(u8"ComfyUI に接続(&Y)..."), this);
+  m_clearRecentFilesAction    = new QAction(QString::fromUtf8(u8"最近使ったファイルをクリア"), this);
+  m_brightnessContrastAction  = new QAction(QString::fromUtf8(u8"明るさ・コントラスト(&B)..."), this);
+  m_hueSatLightAction         = new QAction(QString::fromUtf8(u8"色相・彩度・明度(&H)..."), this);
+  m_resetRotationAction       = new QAction(QString::fromUtf8(u8"キャンバス回転をリセット(&R)"), this);
+  m_mirrorViewAction          = new QAction(QString::fromUtf8(u8"左右反転表示(&F)"), this);
+  m_expandSelectionAction     = new QAction(QString::fromUtf8(u8"選択範囲を拡張(&E)..."), this);
+  m_contractSelectionAction   = new QAction(QString::fromUtf8(u8"選択範囲を縮小(&C)..."), this);
+  m_gaussianBlurAction        = new QAction(QString::fromUtf8(u8"ガウスぼかし(&G)..."), this);
+  m_motionBlurAction          = new QAction(QString::fromUtf8(u8"モーションぼかし(&M)..."), this);
+  m_transformAction           = new QAction(QString::fromUtf8(u8"変形(&T)"), this);
+  m_freeTransformAction       = new QAction(QString::fromUtf8(u8"自由変形(&F)"), this);
 
   m_recentFilesMenu = fileMenu->addMenu("最近使ったファイル");
 
@@ -934,6 +942,10 @@ void MainWindow::createMenus() {
   m_connectComfyUiAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Y));
   m_brightnessContrastAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
   m_hueSatLightAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_U));
+  m_resetRotationAction->setShortcut(QKeySequence(Qt::Key_R));
+  m_transformAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
+  m_freeTransformAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T));
+  m_mirrorViewAction->setCheckable(true);
   m_toggleGridAction->setCheckable(true);
   m_toggleGridAction->setChecked(m_canvasWidget->isGridVisible());
   m_toggleOverlayAction->setCheckable(true);
@@ -961,18 +973,36 @@ void MainWindow::createMenus() {
   editMenu->addAction(m_cutAction);
   editMenu->addAction(m_copyAction);
   editMenu->addAction(m_pasteAction);
+  editMenu->addSeparator();
   editMenu->addAction(m_deletePixelsAction);
   editMenu->addAction(m_fillAction);
   editMenu->addAction(m_clearAction);
   editMenu->addSeparator();
+  {
+    auto* transformSubMenu = editMenu->addMenu(QString::fromUtf8(u8"変形(&T)"));
+    transformSubMenu->addAction(m_transformAction);
+    transformSubMenu->addAction(m_freeTransformAction);
+  }
+  editMenu->addSeparator();
   editMenu->addAction(m_brushSizeDownAction);
   editMenu->addAction(m_brushSizeUpAction);
   editMenu->addSeparator();
-  editMenu->addAction(m_generativeFillAction);
-  editMenu->addAction(m_connectComfyUiAction);
+  editMenu->addAction(m_swapColorsAction);
+  editMenu->addAction(m_resetColorsAction);
+  editMenu->addAction(m_transparentColorAction);
 
-  imageMenu->addAction(m_brightnessContrastAction);
-  imageMenu->addAction(m_hueSatLightAction);
+  // フィルターメニュー
+  {
+    auto* blurSubMenu = filterMenu->addMenu(QString::fromUtf8(u8"ぼかし(&B)"));
+    blurSubMenu->addAction(m_gaussianBlurAction);
+    blurSubMenu->addAction(m_motionBlurAction);
+    auto* adjustSubMenu = filterMenu->addMenu(QString::fromUtf8(u8"色調補正(&A)"));
+    adjustSubMenu->addAction(m_brightnessContrastAction);
+    adjustSubMenu->addAction(m_hueSatLightAction);
+    filterMenu->addSeparator();
+    filterMenu->addAction(m_generativeFillAction);
+    filterMenu->addAction(m_connectComfyUiAction);
+  }
 
   auto* toolGroup = new QActionGroup(this);
   toolGroup->setExclusive(true);
@@ -986,21 +1016,24 @@ void MainWindow::createMenus() {
   bindTool(core::ToolKind::Fill, "塗りつぶし(&G)", QKeySequence(Qt::Key_G));
   bindTool(core::ToolKind::Gradient, "グラデーション(&N)", QKeySequence(Qt::Key_N));
   bindTool(core::ToolKind::Line, "直線(&U)", QKeySequence(Qt::Key_U));
-  bindTool(core::ToolKind::RectSelection, "選択(&R)", QKeySequence(Qt::Key_R));
+  bindTool(core::ToolKind::RectSelection, QString::fromUtf8(u8"選択(&S)"), QKeySequence(Qt::Key_S));
   bindTool(core::ToolKind::MoveLayer, "移動(&M)", QKeySequence(Qt::Key_M));
   bindTool(core::ToolKind::Hand, "手のひら(&H)", QKeySequence(Qt::Key_H));
   bindTool(core::ToolKind::Zoom, "ズーム(&Z)", QKeySequence(Qt::Key_Z));
   bindTool(core::ToolKind::AiSelect, "AI 選択(&W)", QKeySequence(Qt::Key_W));
 
-  selectMenu->addAction(m_clearSelectionAction);
   selectMenu->addAction(m_selectAllAction);
   selectMenu->addAction(m_deselectAction);
+  selectMenu->addSeparator();
   selectMenu->addAction(m_invertSelectionAction);
+  selectMenu->addAction(m_expandSelectionAction);
+  selectMenu->addAction(m_contractSelectionAction);
+  selectMenu->addSeparator();
+  selectMenu->addAction(m_clearSelectionAction);
 
   toolMenu->addSeparator();
-  toolMenu->addAction(m_swapColorsAction);
-  toolMenu->addAction(m_resetColorsAction);
-  toolMenu->addAction(m_transparentColorAction);
+  toolMenu->addAction(m_brushSizeDownAction);
+  toolMenu->addAction(m_brushSizeUpAction);
 
   layerMenu->addAction(m_addRasterLayerAction);
   layerMenu->addAction(m_addVectorLayerAction);
@@ -1025,6 +1058,9 @@ void MainWindow::createMenus() {
   viewMenu->addAction(m_zoomOutAction);
   viewMenu->addAction(m_resetZoomAction);
   viewMenu->addAction(m_fitToScreenAction);
+  viewMenu->addSeparator();
+  viewMenu->addAction(m_resetRotationAction);
+  viewMenu->addAction(m_mirrorViewAction);
   viewMenu->addSeparator();
   viewMenu->addAction(m_toggleGridAction);
   viewMenu->addAction(m_toggleOverlayAction);
@@ -1241,6 +1277,35 @@ void MainWindow::createMenus() {
   connect(m_connectComfyUiAction,  &QAction::triggered, this, &MainWindow::onConnectComfyUiTriggered);
   connect(m_brightnessContrastAction, &QAction::triggered, this, &MainWindow::onBrightnessContrastTriggered);
   connect(m_hueSatLightAction,        &QAction::triggered, this, &MainWindow::onHueSatLightTriggered);
+  connect(m_resetRotationAction, &QAction::triggered, this, [this]() {
+    if (m_canvasWidget != nullptr) {
+      m_canvasWidget->resetRotation();
+    }
+  });
+  connect(m_mirrorViewAction, &QAction::toggled, this, [this](bool checked) {
+    if (m_canvasWidget != nullptr) {
+      m_canvasWidget->setMirrorView(checked);
+    }
+  });
+  // スタブ: 変形/フィルターは将来実装
+  connect(m_transformAction,     &QAction::triggered, this, [this]() {
+    statusBar()->showMessage(QString::fromUtf8(u8"変形: 未実装"), 3000);
+  });
+  connect(m_freeTransformAction, &QAction::triggered, this, [this]() {
+    statusBar()->showMessage(QString::fromUtf8(u8"自由変形: 未実装"), 3000);
+  });
+  connect(m_gaussianBlurAction,  &QAction::triggered, this, [this]() {
+    statusBar()->showMessage(QString::fromUtf8(u8"ガウスぼかし: 未実装"), 3000);
+  });
+  connect(m_motionBlurAction,    &QAction::triggered, this, [this]() {
+    statusBar()->showMessage(QString::fromUtf8(u8"モーションぼかし: 未実装"), 3000);
+  });
+  connect(m_expandSelectionAction,   &QAction::triggered, this, [this]() {
+    statusBar()->showMessage(QString::fromUtf8(u8"選択範囲を拡張: 未実装"), 3000);
+  });
+  connect(m_contractSelectionAction, &QAction::triggered, this, [this]() {
+    statusBar()->showMessage(QString::fromUtf8(u8"選択範囲を縮小: 未実装"), 3000);
+  });
   connect(m_controller, &app::bridge::AppController::comfyUiStateChanged,
           this, &MainWindow::onComfyUiStateChanged);
   connect(m_clearRecentFilesAction, &QAction::triggered, this, [this]() {
@@ -1804,8 +1869,27 @@ void MainWindow::applyUiChrome() {
       "QScrollArea { border: none; background: transparent; }"
       "QScrollArea > QWidget > QWidget { background: transparent; }"
 
+      // ── Splitter handles — thin, barely-visible dividers ──────────
+      "QSplitter::handle { background: #2a2e3e; }"
+      "QSplitter::handle:horizontal { width: 2px; }"
+      "QSplitter::handle:vertical   { height: 2px; }"
+      "QSplitter::handle:hover { background: #4e8ef7; }"
+
+      // ── Header view (layer panel table headers etc.) ──────────────
+      "QHeaderView::section {"
+      "  background: #1a1d27; color: #5a6480; font-size: 10px;"
+      "  border: none; border-bottom: 1px solid #2a2e3e; padding: 3px 6px;"
+      "}"
+
       // ── Labels ────────────────────────────────────────────────────
       "QLabel { color: #c5cde0; background: transparent; }"
+
+      // ── Progress bar ──────────────────────────────────────────────
+      "QProgressBar {"
+      "  background: #13151c; border: 1px solid #2a2e3e; border-radius: 3px;"
+      "  color: #c5cde0; text-align: center; height: 8px;"
+      "}"
+      "QProgressBar::chunk { background: #4e8ef7; border-radius: 2px; }"
   );
 }
 
