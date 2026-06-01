@@ -381,7 +381,21 @@ ToolStateViewModel AppController::toolState() const noexcept {
       m_uiState.pressureSize,
       static_cast<int>(m_uiState.pressureSizeMin * 100.0f + 0.5f),
       m_uiState.pressureOpacity,
-      static_cast<int>(m_uiState.pressureOpacityMin * 100.0f + 0.5f)};
+      static_cast<int>(m_uiState.pressureOpacityMin * 100.0f + 0.5f),
+      // 速度感応
+      m_uiState.velocitySize,
+      static_cast<int>(m_uiState.velocitySizeMin    * 100.0f + 0.5f),
+      m_uiState.velocityOpacity,
+      static_cast<int>(m_uiState.velocityOpacityMin * 100.0f + 0.5f),
+      // テクスチャグレイン
+      m_uiState.textureGrain,
+      static_cast<int>(m_uiState.textureStrength * 100.0f + 0.5f),
+      static_cast<int>(m_uiState.textureScale    * 100.0f + 0.5f),
+      // ウェットミックス / スメア
+      m_uiState.wetMix,
+      static_cast<int>(m_uiState.wetMixRate * 100.0f + 0.5f),
+      m_uiState.smear,
+      static_cast<int>(m_uiState.smearRate  * 100.0f + 0.5f)};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -2216,6 +2230,74 @@ void AppController::setPressureOpacityMin(int value) {
   emit toolStateChanged();
 }
 
+// ── 速度感応セッタ ─────────────────────────────────────────────────────────
+void AppController::setVelocitySize(bool v) {
+  if (m_uiState.velocitySize == v) return;
+  m_uiState.velocitySize = v;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setVelocitySizeMin(int value) {
+  const float f = std::clamp(value, 0, 100) / 100.0f;
+  if (std::abs(m_uiState.velocitySizeMin - f) < 0.001f) return;
+  m_uiState.velocitySizeMin = f;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setVelocityOpacity(bool v) {
+  if (m_uiState.velocityOpacity == v) return;
+  m_uiState.velocityOpacity = v;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setVelocityOpacityMin(int value) {
+  const float f = std::clamp(value, 0, 100) / 100.0f;
+  if (std::abs(m_uiState.velocityOpacityMin - f) < 0.001f) return;
+  m_uiState.velocityOpacityMin = f;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+
+// ── テクスチャグレインセッタ ───────────────────────────────────────────────
+void AppController::setTextureGrain(bool v) {
+  if (m_uiState.textureGrain == v) return;
+  m_uiState.textureGrain = v;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setTextureStrength(int value) {
+  const float f = std::clamp(value, 0, 100) / 100.0f;
+  if (std::abs(m_uiState.textureStrength - f) < 0.001f) return;
+  m_uiState.textureStrength = f;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setTextureScale(int value) {
+  // value は 10-400 (= 0.10-4.00 の 100 倍)
+  const float f = std::clamp(value, 10, 400) / 100.0f;
+  if (std::abs(m_uiState.textureScale - f) < 0.001f) return;
+  m_uiState.textureScale = f;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+
+// ── ウェットミックス / スメアセッタ ───────────────────────────────────────
+void AppController::setWetMix(bool v) {
+  if (m_uiState.wetMix == v) return;
+  m_uiState.wetMix = v;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setWetMixRate(int value) {
+  const float f = std::clamp(value, 0, 100) / 100.0f;
+  if (std::abs(m_uiState.wetMixRate - f) < 0.001f) return;
+  m_uiState.wetMixRate = f;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setSmear(bool v) {
+  if (m_uiState.smear == v) return;
+  m_uiState.smear = v;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setSmearRate(int value) {
+  const float f = std::clamp(value, 0, 100) / 100.0f;
+  if (std::abs(m_uiState.smearRate - f) < 0.001f) return;
+  m_uiState.smearRate = f;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+
 bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
   switch (kind) {
     case core::ToolKind::Brush:
@@ -2457,6 +2539,20 @@ void AppController::applyUiStateToTools() {
     m_brushTool->setPressureSizeMin(m_uiState.pressureSizeMin);
     m_brushTool->setPressureOpacityEnabled(m_uiState.pressureOpacity);
     m_brushTool->setPressureOpacityMin(m_uiState.pressureOpacityMin);
+    // 速度感応
+    m_brushTool->setVelocitySizeEnabled   (m_uiState.velocitySize);
+    m_brushTool->setVelocitySizeMin       (m_uiState.velocitySizeMin);
+    m_brushTool->setVelocityOpacityEnabled(m_uiState.velocityOpacity);
+    m_brushTool->setVelocityOpacityMin    (m_uiState.velocityOpacityMin);
+    // テクスチャグレイン
+    m_brushTool->setTextureGrainEnabled(m_uiState.textureGrain);
+    m_brushTool->setTextureStrength    (m_uiState.textureStrength);
+    m_brushTool->setTextureScale       (m_uiState.textureScale);
+    // ウェットミックス / スメア
+    m_brushTool->setWetMixEnabled(m_uiState.wetMix);
+    m_brushTool->setWetMixRate   (m_uiState.wetMixRate);
+    m_brushTool->setSmearEnabled (m_uiState.smear);
+    m_brushTool->setSmearRate    (m_uiState.smearRate);
   }
 
   if (m_eraserTool != nullptr) {

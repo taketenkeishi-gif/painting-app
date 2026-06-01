@@ -153,7 +153,21 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_pressureSizeMinSpin(new QSpinBox(this)),
       m_pressureOpacityCheck(new QCheckBox("筆圧→不透明度", this)),
       m_pressureOpacityMinSlider(new QSlider(Qt::Horizontal, this)),
-      m_pressureOpacityMinSpin(new QSpinBox(this)) {
+      m_pressureOpacityMinSpin(new QSpinBox(this)),
+      m_velocitySection(nullptr),
+      m_velocitySizeCheck(new QCheckBox("速度→サイズ", this)),
+      m_velocitySizeMinSlider(new QSlider(Qt::Horizontal, this)),
+      m_velocityOpacityCheck(new QCheckBox("速度→不透明度", this)),
+      m_velocityOpacityMinSlider(new QSlider(Qt::Horizontal, this)),
+      m_textureSection(nullptr),
+      m_textureGrainCheck(new QCheckBox("テクスチャグレイン", this)),
+      m_textureStrengthSlider(new QSlider(Qt::Horizontal, this)),
+      m_textureScaleSlider(new QSlider(Qt::Horizontal, this)),
+      m_wetSection(nullptr),
+      m_wetMixCheck(new QCheckBox("ウェットミックス", this)),
+      m_wetMixRateSlider(new QSlider(Qt::Horizontal, this)),
+      m_smearCheck(new QCheckBox("スメア（にじみ）", this)),
+      m_smearRateSlider(new QSlider(Qt::Horizontal, this)) {
   auto* hostLayout = new QVBoxLayout(this);
   hostLayout->setContentsMargins(0, 0, 0, 0);
   hostLayout->setSpacing(0);
@@ -196,6 +210,16 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_pressureSizeMinSpin->setRange(0, 100);
   m_pressureOpacityMinSlider->setRange(0, 100);
   m_pressureOpacityMinSpin->setRange(0, 100);
+
+  // 速度感応スライダー (0-100 → 比率 0.0-1.0)
+  m_velocitySizeMinSlider->setRange(0, 100);
+  m_velocityOpacityMinSlider->setRange(0, 100);
+  // テクスチャグレイン (0-100)
+  m_textureStrengthSlider->setRange(0, 100);
+  m_textureScaleSlider->setRange(10, 400);  // 0.1 - 4.0 (×0.01)
+  // ウェットミックス / スメア (0-100)
+  m_wetMixRateSlider->setRange(0, 100);
+  m_smearRateSlider->setRange(0, 100);
 
   m_shapeTypeCombo->addItem("円",   static_cast<int>(core::BrushShapeType::Circle));
   m_shapeTypeCombo->addItem("四角", static_cast<int>(core::BrushShapeType::Square));
@@ -336,6 +360,67 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   pressureLayout->addLayout(pressureOpacityMinRow);
   contentLayout->addWidget(pressureGroup);
   m_pressureSection = pressureGroup;
+
+  // ── 速度感応セクション ──────────────────────────────────────────────────
+  {
+    auto* grp = new QGroupBox("速度感応", m_contentWidget);
+    auto* lay = new QVBoxLayout(grp);
+    lay->setContentsMargins(4, 4, 4, 4); lay->setSpacing(4);
+
+    auto addVelRow = [&](QCheckBox* check, QSlider* slider, const QString& minLabel) {
+      lay->addWidget(check);
+      auto* row = new QHBoxLayout();
+      row->addWidget(new QLabel(minLabel, grp));
+      row->addWidget(slider, 1);
+      lay->addLayout(row);
+    };
+    addVelRow(m_velocitySizeCheck,    m_velocitySizeMinSlider,    "最小サイズ%");
+    addVelRow(m_velocityOpacityCheck, m_velocityOpacityMinSlider, "最小不透明%");
+
+    contentLayout->addWidget(grp);
+    m_velocitySection = grp;
+  }
+
+  // ── テクスチャグレインセクション ───────────────────────────────────────
+  {
+    auto* grp = new QGroupBox("テクスチャグレイン", m_contentWidget);
+    auto* lay = new QVBoxLayout(grp);
+    lay->setContentsMargins(4, 4, 4, 4); lay->setSpacing(4);
+
+    lay->addWidget(m_textureGrainCheck);
+    auto* strRow = new QHBoxLayout();
+    strRow->addWidget(new QLabel("強度", grp));
+    strRow->addWidget(m_textureStrengthSlider, 1);
+    lay->addLayout(strRow);
+    auto* scaleRow = new QHBoxLayout();
+    scaleRow->addWidget(new QLabel("粗さ", grp));
+    scaleRow->addWidget(m_textureScaleSlider, 1);
+    lay->addLayout(scaleRow);
+
+    contentLayout->addWidget(grp);
+    m_textureSection = grp;
+  }
+
+  // ── ウェットミックス / スメアセクション ────────────────────────────────
+  {
+    auto* grp = new QGroupBox("ウェット / スメア", m_contentWidget);
+    auto* lay = new QVBoxLayout(grp);
+    lay->setContentsMargins(4, 4, 4, 4); lay->setSpacing(4);
+
+    lay->addWidget(m_wetMixCheck);
+    auto* wetRow = new QHBoxLayout();
+    wetRow->addWidget(new QLabel("混合率", grp));
+    wetRow->addWidget(m_wetMixRateSlider, 1);
+    lay->addLayout(wetRow);
+    lay->addWidget(m_smearCheck);
+    auto* smearRow = new QHBoxLayout();
+    smearRow->addWidget(new QLabel("強度", grp));
+    smearRow->addWidget(m_smearRateSlider, 1);
+    lay->addLayout(smearRow);
+
+    contentLayout->addWidget(grp);
+    m_wetSection = grp;
+  }
 
   auto* shapeGroup = new QGroupBox("形状", m_contentWidget);
   auto* shapeLayout = new QVBoxLayout(shapeGroup);
@@ -510,6 +595,22 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_pressureOpacityCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onPressureOpacityToggled);
   connect(m_pressureOpacityMinSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onPressureOpacityMinSliderChanged);
   connect(m_pressureOpacityMinSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onPressureOpacityMinSpinChanged);
+
+  // 速度感応
+  connect(m_velocitySizeCheck,       &QCheckBox::toggled,         this, &ToolPropertyPanel::onVelocitySizeToggled);
+  connect(m_velocitySizeMinSlider,   &QSlider::valueChanged,      this, &ToolPropertyPanel::onVelocitySizeMinSliderChanged);
+  connect(m_velocityOpacityCheck,    &QCheckBox::toggled,         this, &ToolPropertyPanel::onVelocityOpacityToggled);
+  connect(m_velocityOpacityMinSlider,&QSlider::valueChanged,      this, &ToolPropertyPanel::onVelocityOpacityMinSliderChanged);
+  // テクスチャグレイン
+  connect(m_textureGrainCheck,       &QCheckBox::toggled,         this, &ToolPropertyPanel::onTextureGrainToggled);
+  connect(m_textureStrengthSlider,   &QSlider::valueChanged,      this, &ToolPropertyPanel::onTextureStrengthSliderChanged);
+  connect(m_textureScaleSlider,      &QSlider::valueChanged,      this, &ToolPropertyPanel::onTextureScaleSliderChanged);
+  // ウェットミックス / スメア
+  connect(m_wetMixCheck,             &QCheckBox::toggled,         this, &ToolPropertyPanel::onWetMixToggled);
+  connect(m_wetMixRateSlider,        &QSlider::valueChanged,      this, &ToolPropertyPanel::onWetMixRateSliderChanged);
+  connect(m_smearCheck,              &QCheckBox::toggled,         this, &ToolPropertyPanel::onSmearToggled);
+  connect(m_smearRateSlider,         &QSlider::valueChanged,      this, &ToolPropertyPanel::onSmearRateSliderChanged);
+
   applyResponsiveLayout();
 }
 
@@ -797,6 +898,11 @@ void ToolPropertyPanel::refreshFromController() {
   m_pressureOpacityCheck->setVisible(showPressure);
   m_pressureOpacityMinSlider->setVisible(showPressure);
   m_pressureOpacityMinSpin->setVisible(showPressure);
+  // 速度感応・テクスチャ・ウェット — ブラシ詳細モードのみ表示
+  const bool showBrushAdv = showPressure && m_showDetails;
+  m_velocitySection->setVisible(showBrushAdv);
+  m_textureSection->setVisible(showBrushAdv);
+  m_wetSection->setVisible(showBrushAdv);
   m_shapeTypeCombo->setVisible(supportsShape);
   m_angleLabel->setVisible(supportsAngle);
   m_angleSlider->setVisible(supportsAngle);
@@ -948,6 +1054,20 @@ void ToolPropertyPanel::refreshFromController() {
   m_pressureOpacityCheck->setChecked(state.pressureOpacityEnabled);
   m_pressureOpacityMinSlider->setValue(state.pressureOpacityMin);
   m_pressureOpacityMinSpin->setValue(state.pressureOpacityMin);
+  // 速度感応
+  m_velocitySizeCheck->setChecked(state.velocitySize);
+  m_velocitySizeMinSlider->setValue(state.velocitySizeMin);
+  m_velocityOpacityCheck->setChecked(state.velocityOpacity);
+  m_velocityOpacityMinSlider->setValue(state.velocityOpacityMin);
+  // テクスチャグレイン
+  m_textureGrainCheck->setChecked(state.textureGrain);
+  m_textureStrengthSlider->setValue(state.textureStrength);
+  m_textureScaleSlider->setValue(state.textureScale);
+  // ウェットミックス / スメア
+  m_wetMixCheck->setChecked(state.wetMix);
+  m_wetMixRateSlider->setValue(state.wetMixRate);
+  m_smearCheck->setChecked(state.smear);
+  m_smearRateSlider->setValue(state.smearRate);
   updateColorButton();
 }
 
@@ -1384,6 +1504,43 @@ void ToolPropertyPanel::onPressureOpacityMinSpinChanged(int value) {
   const QSignalBlocker blocker(m_pressureOpacityMinSlider);
   m_pressureOpacityMinSlider->setValue(value);
   m_controller->setPressureOpacityMin(value);
+}
+
+// ── 速度感応スロット ─────────────────────────────────────────────────────────
+void ToolPropertyPanel::onVelocitySizeToggled(bool checked) {
+  if (m_controller) m_controller->setVelocitySize(checked);
+}
+void ToolPropertyPanel::onVelocitySizeMinSliderChanged(int value) {
+  if (m_controller) m_controller->setVelocitySizeMin(value);
+}
+void ToolPropertyPanel::onVelocityOpacityToggled(bool checked) {
+  if (m_controller) m_controller->setVelocityOpacity(checked);
+}
+void ToolPropertyPanel::onVelocityOpacityMinSliderChanged(int value) {
+  if (m_controller) m_controller->setVelocityOpacityMin(value);
+}
+// ── テクスチャグレインスロット ───────────────────────────────────────────────
+void ToolPropertyPanel::onTextureGrainToggled(bool checked) {
+  if (m_controller) m_controller->setTextureGrain(checked);
+}
+void ToolPropertyPanel::onTextureStrengthSliderChanged(int value) {
+  if (m_controller) m_controller->setTextureStrength(value);
+}
+void ToolPropertyPanel::onTextureScaleSliderChanged(int value) {
+  if (m_controller) m_controller->setTextureScale(value);
+}
+// ── ウェットミックス / スメアスロット ─────────────────────────────────────
+void ToolPropertyPanel::onWetMixToggled(bool checked) {
+  if (m_controller) m_controller->setWetMix(checked);
+}
+void ToolPropertyPanel::onWetMixRateSliderChanged(int value) {
+  if (m_controller) m_controller->setWetMixRate(value);
+}
+void ToolPropertyPanel::onSmearToggled(bool checked) {
+  if (m_controller) m_controller->setSmear(checked);
+}
+void ToolPropertyPanel::onSmearRateSliderChanged(int value) {
+  if (m_controller) m_controller->setSmearRate(value);
 }
 
 void ToolPropertyPanel::updateColorButton() {

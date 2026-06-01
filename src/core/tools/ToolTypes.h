@@ -59,13 +59,35 @@ enum class VectorEraseMode {
 };
 
 struct BrushDynamics {
-  // 筆圧マッピング (0=なし, 1=リニア, 2=カーブ)
+  // 筆圧マッピング
   bool pressureSize     {true};
   bool pressureOpacity  {false};
   bool pressureHardness {false};
   bool pressureFlow     {false};
-  float pressureSizeMin {0.1f};     // 筆圧0のときのサイズ比率
-  float pressureOpacityMin {0.1f};  // 筆圧0のときのopacity比率
+  float pressureSizeMin    {0.1f};   ///< 筆圧0のときのサイズ比率
+  float pressureOpacityMin {0.1f};   ///< 筆圧0のときのopacity比率
+
+  // ── 速度感応 ─────────────────────────────────────────────────────────────
+  /// 速く動かすほどブラシが小さくなる（散布ブラシ・エアブラシ向き）
+  bool  velocitySize       {false};
+  float velocitySizeMin    {0.3f};   ///< 最高速時のサイズ比率 (1.0=変化なし)
+  /// 速く動かすほど薄くなる（水彩ブラシ向き）
+  bool  velocityOpacity    {false};
+  float velocityOpacityMin {0.3f};   ///< 最高速時のopacity比率
+
+  // ── テクスチャグレイン ───────────────────────────────────────────────────
+  /// stamp にランダムグレインを重ねる（鉛筆・パステル質感）
+  bool  textureGrain    {false};
+  float textureStrength {0.6f};   ///< グレイン強度 0.0–1.0
+  float textureScale    {1.0f};   ///< グレイン粗さ 0.5=細, 2.0=粗
+
+  // ── ウェットミックス / スメア ───────────────────────────────────────────
+  /// キャンバス色をブラシ色に混ぜる（水彩・油彩風）
+  bool  wetMix    {false};
+  float wetMixRate{0.5f};   ///< 0=ブラシ色のみ, 1=キャンバス色のみ
+  /// キャンバス色をそのまま押し広げる（スマッジ）
+  bool  smear     {false};
+  float smearRate {0.9f};   ///< スメア強度 0.0–1.0
 };
 
 struct BrushSettings {

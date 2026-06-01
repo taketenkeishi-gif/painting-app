@@ -83,6 +83,20 @@ private slots:
   void onPressureOpacityToggled(bool checked);
   void onPressureOpacityMinSliderChanged(int value);
   void onPressureOpacityMinSpinChanged(int value);
+  // 速度感応
+  void onVelocitySizeToggled(bool checked);
+  void onVelocitySizeMinSliderChanged(int value);
+  void onVelocityOpacityToggled(bool checked);
+  void onVelocityOpacityMinSliderChanged(int value);
+  // テクスチャグレイン
+  void onTextureGrainToggled(bool checked);
+  void onTextureStrengthSliderChanged(int value);
+  void onTextureScaleSliderChanged(int value);
+  // ウェットミックス / スメア
+  void onWetMixToggled(bool checked);
+  void onWetMixRateSliderChanged(int value);
+  void onSmearToggled(bool checked);
+  void onSmearRateSliderChanged(int value);
 
 private:
   void applyResponsiveLayout();
@@ -177,6 +191,23 @@ private:
   QCheckBox* m_pressureOpacityCheck {nullptr};
   QSlider* m_pressureOpacityMinSlider {nullptr};
   QSpinBox* m_pressureOpacityMinSpin {nullptr};
+  // 速度感応
+  QWidget*   m_velocitySection {nullptr};
+  QCheckBox* m_velocitySizeCheck {nullptr};
+  QSlider*   m_velocitySizeMinSlider {nullptr};
+  QCheckBox* m_velocityOpacityCheck {nullptr};
+  QSlider*   m_velocityOpacityMinSlider {nullptr};
+  // テクスチャグレイン
+  QWidget*   m_textureSection {nullptr};
+  QCheckBox* m_textureGrainCheck {nullptr};
+  QSlider*   m_textureStrengthSlider {nullptr};
+  QSlider*   m_textureScaleSlider {nullptr};
+  // ウェットミックス / スメア
+  QWidget*   m_wetSection {nullptr};
+  QCheckBox* m_wetMixCheck {nullptr};
+  QSlider*   m_wetMixRateSlider {nullptr};
+  QCheckBox* m_smearCheck {nullptr};
+  QSlider*   m_smearRateSlider {nullptr};
   bool m_compactLayout {false};
   bool m_showDetails {false};
   QSet<QString> m_pinnedKeys;

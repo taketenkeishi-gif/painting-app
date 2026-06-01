@@ -45,6 +45,23 @@ struct UiState {
   float pressureSizeMin {0.0f};
   bool pressureOpacity {false};
   float pressureOpacityMin {0.0f};
+
+  // ── 速度感応 ──────────────────────────────────────────────────────────────
+  bool  velocitySize       {false};
+  float velocitySizeMin    {0.3f};
+  bool  velocityOpacity    {false};
+  float velocityOpacityMin {0.3f};
+
+  // ── テクスチャグレイン ──────────────────────────────────────────────────
+  bool  textureGrain    {false};
+  float textureStrength {0.6f};
+  float textureScale    {1.0f};
+
+  // ── ウェットミックス / スメア ────────────────────────────────────────────
+  bool  wetMix    {false};
+  float wetMixRate{0.5f};
+  bool  smear     {false};
+  float smearRate {0.9f};
 };
 
 } // namespace app::ui

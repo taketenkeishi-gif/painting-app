@@ -92,6 +92,20 @@ struct ToolStateViewModel {
   int pressureSizeMin {0};
   bool pressureOpacityEnabled {false};
   int pressureOpacityMin {0};
+  // 速度感応
+  bool velocitySize       {false};
+  int  velocitySizeMin    {30};   ///< 0-100
+  bool velocityOpacity    {false};
+  int  velocityOpacityMin {30};
+  // テクスチャグレイン
+  bool textureGrain    {false};
+  int  textureStrength {60};   ///< 0-100
+  int  textureScale    {100}; ///< 10-400 (÷100 = 0.1-4.0)
+  // ウェットミックス / スメア
+  bool wetMix    {false};
+  int  wetMixRate{50};
+  bool smear     {false};
+  int  smearRate {90};
 };
 
 struct CanvasOverlayViewModel {
@@ -265,6 +279,20 @@ public:
   void setPressureSizeMin(int value);
   void setPressureOpacityEnabled(bool enabled);
   void setPressureOpacityMin(int value);
+  // 速度感応
+  void setVelocitySize(bool v);
+  void setVelocitySizeMin(int value);
+  void setVelocityOpacity(bool v);
+  void setVelocityOpacityMin(int value);
+  // テクスチャグレイン
+  void setTextureGrain(bool v);
+  void setTextureStrength(int value);
+  void setTextureScale(int value);
+  // ウェットミックス / スメア
+  void setWetMix(bool v);
+  void setWetMixRate(int value);
+  void setSmear(bool v);
+  void setSmearRate(int value);
 
   // ── AI / ComfyUI ──────────────────────────────────────────────────────────
   ComfyUiClient* comfyUiClient() noexcept { return m_comfyUiClient; }

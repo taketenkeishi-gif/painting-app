@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <string_view>
 #include <vector>
 
@@ -39,6 +40,23 @@ public:
   void setPressureOpacityEnabled(bool enabled) noexcept { m_settings.dynamics.pressureOpacity = enabled; }
   void setPressureOpacityMin(float min) noexcept { m_settings.dynamics.pressureOpacityMin = std::clamp(min, 0.0F, 1.0F); }
 
+  // 速度感応
+  void setVelocitySizeEnabled(bool v)    noexcept { m_settings.dynamics.velocitySize    = v; }
+  void setVelocitySizeMin(float v)       noexcept { m_settings.dynamics.velocitySizeMin = std::clamp(v, 0.0F, 1.0F); }
+  void setVelocityOpacityEnabled(bool v) noexcept { m_settings.dynamics.velocityOpacity    = v; }
+  void setVelocityOpacityMin(float v)    noexcept { m_settings.dynamics.velocityOpacityMin = std::clamp(v, 0.0F, 1.0F); }
+
+  // テクスチャグレイン
+  void setTextureGrainEnabled(bool v)  noexcept { m_settings.dynamics.textureGrain    = v; }
+  void setTextureStrength(float v)     noexcept { m_settings.dynamics.textureStrength = std::clamp(v, 0.0F, 1.0F); }
+  void setTextureScale(float v)        noexcept { m_settings.dynamics.textureScale    = std::clamp(v, 0.1F, 4.0F); }
+
+  // ウェットミックス / スメア
+  void setWetMixEnabled(bool v)  noexcept { m_settings.dynamics.wetMix    = v; }
+  void setWetMixRate(float v)    noexcept { m_settings.dynamics.wetMixRate = std::clamp(v, 0.0F, 1.0F); }
+  void setSmearEnabled(bool v)   noexcept { m_settings.dynamics.smear     = v; }
+  void setSmearRate(float v)     noexcept { m_settings.dynamics.smearRate  = std::clamp(v, 0.0F, 1.0F); }
+
   const BrushSettings& settings() const noexcept { return m_settings; }
 
   ToolKind kind() const noexcept override { return ToolKind::Brush; }
@@ -55,12 +73,15 @@ protected:
   float computeTaperStrength(float t, float taperStart, float taperEnd) const;
   float computePressureSize(float pressure) const;
   float computePressureOpacity(float pressure) const;
+  float computeVelocityFactor(float segLenPx) const noexcept;
 
-  void strokeSegment(Layer& layer, const FPoint& from, const FPoint& to,
+  void strokeSegment(Layer& layer, const PixelBuffer& composited,
+                     const FPoint& from, const FPoint& to,
                      float pressureFrom, float pressureTo,
-                     float strokeT, float strokeLen) const;
+                     float strokeT, float strokeLen);
 
-  void stampAt(PixelBuffer& buffer, const FPoint& center, float radius,
+  void stampAt(PixelBuffer& buffer, const PixelBuffer& composited,
+               const FPoint& center, float radius,
                float strength, bool lockAlpha) const;
 
   void blendPixel(PixelBuffer& buffer, int x, int y,
@@ -77,6 +98,14 @@ protected:
   mutable float m_distanceAccum {0.0f};
   float m_strokeLength {0.0f};
   std::vector<FPoint> m_vectorPoints;
+
+  // 速度計算用
+  using Clock = std::chrono::steady_clock;
+  Clock::time_point m_lastMoveTime {};
+  float m_currentVelocityPxMs {0.0f}; ///< px/ms (exponential smoothed)
+
+  // スメア用: 前回の stamp 中心で採取した色
+  mutable Color m_smearColor {0, 0, 0, 255};
 };
 
 } // namespace core
