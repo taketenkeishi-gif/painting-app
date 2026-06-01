@@ -2387,6 +2387,7 @@ void AppController::applyUiStateToTools() {
     m_fillTool->setContiguous(m_uiState.fillContiguous);
     m_fillTool->setReferAllLayers(m_uiState.fillReferAllLayers);
     m_fillTool->setGapClose(m_uiState.fillGapClose);
+    m_fillTool->setEraseMode(m_uiState.eraseMode);
   }
   if (m_rectSelectionTool != nullptr) {
     core::RectSelectionTool::Mode mode = core::RectSelectionTool::Mode::Rectangle;

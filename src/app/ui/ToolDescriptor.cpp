@@ -168,36 +168,63 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
       ToolDescriptor {
           core::ToolKind::Fill,
           "fill",
-          "Fill",
+          "塗りつぶし",
           {
               makeSubTool(
                   "fill_contiguous",
-                  "Contiguous Fill",
+                  "塗りつぶし",
                   []() {
                     BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Fill};
-                    p.fillThreshold = 0;
+                    p.fillThreshold = 16;
                     p.fillContiguous = true;
                     p.fillReferAllLayers = false;
                     p.fillGapClose = 0;
                     return p;
                   }(),
-                  {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose},
-                  "Click to fill connected area."),
+                  {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose, ToolPropertyKey::EraseMode},
+                  "クリックで隣接領域を塗りつぶし。許容範囲でしきい値調整。"),
+              makeSubTool(
+                  "fill_all",
+                  "全体塗りつぶし",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Fill};
+                    p.fillThreshold = 16;
+                    p.fillContiguous = false;
+                    p.fillReferAllLayers = false;
+                    p.fillGapClose = 0;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose, ToolPropertyKey::EraseMode},
+                  "クリックでキャンバス内の同色ピクセルをすべて塗りつぶし。"),
               makeSubTool(
                   "fill_gapclose",
-                  "Gap Close Fill",
+                  "隙間閉じ",
                   []() {
                     BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Fill};
                     p.fillThreshold = 24;
                     p.fillContiguous = true;
                     p.fillReferAllLayers = true;
-                    p.fillGapClose = 2;
+                    p.fillGapClose = 3;
                     return p;
                   }(),
-                  {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose},
-                  "Fill with simple gap-close and all-layer reference.")},
-          {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose},
-          "Fill connected pixels."},
+                  {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose, ToolPropertyKey::EraseMode},
+                  "線画の隙間を自動補完して塗りつぶし。全レイヤー参照。"),
+              makeSubTool(
+                  "fill_erase",
+                  "消去塗りつぶし",
+                  []() {
+                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, true, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Fill};
+                    p.fillThreshold = 0;
+                    p.fillContiguous = true;
+                    p.fillReferAllLayers = false;
+                    p.fillGapClose = 0;
+                    p.eraseMode = true;
+                    return p;
+                  }(),
+                  {ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::EraseMode},
+                  "クリックで隣接する有色ピクセルを透明化（消去）。")},
+          {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose, ToolPropertyKey::EraseMode},
+          "クリックでピクセルを塗りつぶし。"},
       ToolDescriptor {
           core::ToolKind::Line,
           "line",

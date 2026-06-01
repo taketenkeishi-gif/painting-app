@@ -68,8 +68,10 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
   }
 
   const Color target = source->pixel(event.point.x, event.point.y);
-  const Color replacement = context.currentColor;
-  if (m_settings.threshold == 0 && isSameColor(target, replacement)) {
+  // eraseMode または描画色が完全透明なら消去塗りつぶし
+  const bool isErase = m_settings.eraseMode || context.currentColor.a == 0;
+  const Color replacement = isErase ? Color::Transparent() : context.currentColor;
+  if (!isErase && m_settings.threshold == 0 && isSameColor(target, replacement)) {
     return {};
   }
 
@@ -99,7 +101,12 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
       if (hasSelection && !selection.contains(p.x, p.y)) {
         continue;
       }
-      if (!matchesTarget(*source, target, p.x, p.y) && !hasBridge(*source, target, p.x, p.y)) {
+      // 消去モード: 有色ピクセル（alpha>0）を隣接フラッドフィル
+      if (isErase) {
+        if (source->pixel(p.x, p.y).a == 0) {
+          continue;
+        }
+      } else if (!matchesTarget(*source, target, p.x, p.y) && !hasBridge(*source, target, p.x, p.y)) {
         continue;
       }
 
@@ -115,7 +122,12 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
         if (hasSelection && !selection.contains(x, y)) {
           continue;
         }
-        if (matchesTarget(*source, target, x, y)) {
+        // 消去モード非隣接: 選択範囲内のすべての有色ピクセルを対象
+        if (isErase) {
+          if (source->pixel(x, y).a > 0) {
+            fillMask[idx(x, y)] = 1U;
+          }
+        } else if (matchesTarget(*source, target, x, y)) {
           fillMask[idx(x, y)] = 1U;
         }
       }
@@ -129,12 +141,17 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
         continue;
       }
       const Color before = buffer.pixel(x, y);
-      if (active->alphaLocked() && before.a == 0) {
-        continue;
-      }
       Color output = replacement;
-      if (active->alphaLocked()) {
-        output.a = before.a;
+      if (isErase) {
+        // 消去モード: alphaLock を無視して強制透明化
+        output = Color::Transparent();
+      } else {
+        if (active->alphaLocked() && before.a == 0) {
+          continue;
+        }
+        if (active->alphaLocked()) {
+          output.a = before.a;
+        }
       }
       if (!isSameColor(before, output)) {
         buffer.setPixel(x, y, output);

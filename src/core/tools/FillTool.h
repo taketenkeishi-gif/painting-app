@@ -14,6 +14,7 @@ public:
     bool contiguous {true};
     bool referAllLayers {false};
     int gapClose {0};
+    bool eraseMode {false};   // 透明色で塗りつぶし（消去）
   };
 
   ToolKind kind() const noexcept override { return ToolKind::Fill; }
@@ -29,6 +30,7 @@ public:
   void setContiguous(bool contiguous) noexcept { m_settings.contiguous = contiguous; }
   void setReferAllLayers(bool enabled) noexcept { m_settings.referAllLayers = enabled; }
   void setGapClose(int gapClose) noexcept { m_settings.gapClose = std::clamp(gapClose, 0, 8); }
+  void setEraseMode(bool erase) noexcept { m_settings.eraseMode = erase; }
   const Settings& settings() const noexcept { return m_settings; }
 
 private:
