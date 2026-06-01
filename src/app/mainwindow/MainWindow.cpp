@@ -57,6 +57,7 @@
 
 #include "app/bridge/AppController.h"
 #include "app/canvasview/CanvasWidget.h"
+#include "app/panels/AiPanel.h"
 #include "app/panels/GenerativeFillDialog.h"
 #include "app/panels/LayerPanel.h"
 #include "app/panels/SubToolPanel.h"
@@ -183,6 +184,7 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
       m_controller(new app::bridge::AppController(this)),
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
+      m_aiPanel(new app::panels::AiPanel(this)),
       m_layerPanel(new app::panels::LayerPanel(this)),
       m_toolPanel(new app::panels::ToolPanel(this)),
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
@@ -202,6 +204,7 @@ MainWindow::MainWindow(QWidget* parent)
   }
 
   m_canvasWidget->setController(m_controller);
+  m_aiPanel->setController(m_controller);
   m_layerPanel->setController(m_controller);
   m_toolPanel->setController(m_controller);
   m_quickSliderPanel->setController(m_controller);
@@ -690,6 +693,7 @@ void MainWindow::setupShellLayout() {
   auto* colorHistoryDock = makeDock("カラーヒストリー", makeScrollable(historyWidget), "ColorHistoryDock");
   colorHistoryDock->setMinimumWidth(188);
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
+  m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
   auto applyTabIntegratedTitleBar = [this](QDockWidget* dock) {
     if (dock == nullptr) {
@@ -782,6 +786,8 @@ void MainWindow::setupShellLayout() {
   m_subToolDock->raise();
 
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
+  addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
+  tabifyDockWidget(m_layerDock, m_aiDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
   resizeDocks({m_layerDock, m_infoDock}, {620, 210}, Qt::Vertical);
 
@@ -794,6 +800,7 @@ void MainWindow::setupShellLayout() {
 void MainWindow::createMenus() {
   auto* fileMenu = menuBar()->addMenu("ファイル(&F)");
   auto* editMenu = menuBar()->addMenu("編集(&E)");
+  auto* imageMenu = menuBar()->addMenu("画像(&I)");
   auto* toolMenu = menuBar()->addMenu("ツール(&T)");
   auto* selectMenu = menuBar()->addMenu("選択(&S)");
   auto* layerMenu = menuBar()->addMenu("レイヤー(&L)");
@@ -861,9 +868,11 @@ void MainWindow::createMenus() {
   m_swapColorsAction = new QAction("描画色と背景色を切り替え(&C)", this);
   m_resetColorsAction = new QAction("描画色/背景色を白黒に戻す(&D)", this);
   m_transparentColorAction = new QAction("描画色と透明色を切り替え(&X)", this);
-  m_generativeFillAction   = new QAction("AI 生成塗りつぶし(&A)...", this);
-  m_connectComfyUiAction   = new QAction("ComfyUI に接続(&Y)...", this);
-  m_clearRecentFilesAction = new QAction("最近使ったファイルをクリア", this);
+  m_generativeFillAction      = new QAction("AI 生成塗りつぶし(&A)...", this);
+  m_connectComfyUiAction      = new QAction("ComfyUI に接続(&Y)...", this);
+  m_clearRecentFilesAction    = new QAction("最近使ったファイルをクリア", this);
+  m_brightnessContrastAction  = new QAction("明るさ・コントラスト(&B)...", this);
+  m_hueSatLightAction         = new QAction("色相・彩度・明度(&H)...", this);
 
   m_recentFilesMenu = fileMenu->addMenu("最近使ったファイル");
 
@@ -923,6 +932,8 @@ void MainWindow::createMenus() {
   m_transparentColorAction->setShortcut(QKeySequence(Qt::Key_X));
   m_generativeFillAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
   m_connectComfyUiAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Y));
+  m_brightnessContrastAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
+  m_hueSatLightAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_U));
   m_toggleGridAction->setCheckable(true);
   m_toggleGridAction->setChecked(m_canvasWidget->isGridVisible());
   m_toggleOverlayAction->setCheckable(true);
@@ -960,6 +971,9 @@ void MainWindow::createMenus() {
   editMenu->addAction(m_generativeFillAction);
   editMenu->addAction(m_connectComfyUiAction);
 
+  imageMenu->addAction(m_brightnessContrastAction);
+  imageMenu->addAction(m_hueSatLightAction);
+
   auto* toolGroup = new QActionGroup(this);
   toolGroup->setExclusive(true);
   auto bindTool = [&](core::ToolKind kind, const QString& text, const QKeySequence& shortcut) {
@@ -970,6 +984,7 @@ void MainWindow::createMenus() {
   bindTool(core::ToolKind::Eraser, "消しゴム(&E)", QKeySequence(Qt::Key_E));
   bindTool(core::ToolKind::Eyedropper, "スポイト(&I)", QKeySequence(Qt::Key_I));
   bindTool(core::ToolKind::Fill, "塗りつぶし(&G)", QKeySequence(Qt::Key_G));
+  bindTool(core::ToolKind::Gradient, "グラデーション(&N)", QKeySequence(Qt::Key_N));
   bindTool(core::ToolKind::Line, "直線(&U)", QKeySequence(Qt::Key_U));
   bindTool(core::ToolKind::RectSelection, "選択(&R)", QKeySequence(Qt::Key_R));
   bindTool(core::ToolKind::MoveLayer, "移動(&M)", QKeySequence(Qt::Key_M));
@@ -1046,6 +1061,9 @@ void MainWindow::createMenus() {
   }
   if (m_layerDock != nullptr) {
     windowMenu->addAction(m_layerDock->toggleViewAction());
+  }
+  if (m_aiDock != nullptr) {
+    windowMenu->addAction(m_aiDock->toggleViewAction());
   }
   if (m_infoDock != nullptr) {
     windowMenu->addAction(m_infoDock->toggleViewAction());
@@ -1221,6 +1239,8 @@ void MainWindow::createMenus() {
   connect(m_transparentColorAction, &QAction::triggered, this, &MainWindow::onUseTransparentColor);
   connect(m_generativeFillAction,  &QAction::triggered, this, &MainWindow::onGenerativeFillTriggered);
   connect(m_connectComfyUiAction,  &QAction::triggered, this, &MainWindow::onConnectComfyUiTriggered);
+  connect(m_brightnessContrastAction, &QAction::triggered, this, &MainWindow::onBrightnessContrastTriggered);
+  connect(m_hueSatLightAction,        &QAction::triggered, this, &MainWindow::onHueSatLightTriggered);
   connect(m_controller, &app::bridge::AppController::comfyUiStateChanged,
           this, &MainWindow::onComfyUiStateChanged);
   connect(m_clearRecentFilesAction, &QAction::triggered, this, [this]() {
@@ -2655,6 +2675,7 @@ void MainWindow::onChooseBackgroundColor() {
   }
   m_backgroundColor = toCoreColor(picked);
   m_controller->setPaperColor(m_backgroundColor);
+  m_controller->setSecondaryColor(m_backgroundColor);
   updateColorPanel();
 }
 
@@ -2663,6 +2684,7 @@ void MainWindow::onSwapColors() {
   m_controller->setBrushColor(m_backgroundColor);
   m_backgroundColor = foreground;
   m_controller->setPaperColor(m_backgroundColor);
+  m_controller->setSecondaryColor(m_backgroundColor);
   updateColorPanel();
 }
 
@@ -2670,6 +2692,7 @@ void MainWindow::onResetBlackWhiteColors() {
   m_controller->setBrushColor(core::Color::OpaqueBlack());
   m_backgroundColor = core::Color {255, 255, 255, 255};
   m_controller->setPaperColor(m_backgroundColor);
+  m_controller->setSecondaryColor(m_backgroundColor);
   updateColorPanel();
 }
 
@@ -2720,6 +2743,112 @@ void MainWindow::onGenerativeFillTriggered() {
   if (m_controller->pasteBufferAsNewRasterLayer(dlg.result(), "AI 生成塗りつぶし")) {
     updateUndoRedoState();
     statusBar()->showMessage("AI 生成結果を新規レイヤーとして追加しました", 2500);
+  }
+}
+
+// ── 画像調整ダイアログ ────────────────────────────────────────────────────
+
+void MainWindow::onBrightnessContrastTriggered() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  QDialog dlg(this);
+  dlg.setWindowTitle("明るさ・コントラスト");
+  dlg.setFixedWidth(320);
+
+  auto* layout = new QVBoxLayout(&dlg);
+  auto* form   = new QFormLayout();
+
+  auto* brightnessSlider = new QSlider(Qt::Horizontal, &dlg);
+  brightnessSlider->setRange(-100, 100);
+  brightnessSlider->setValue(0);
+  auto* brightnessSpin   = new QSpinBox(&dlg);
+  brightnessSpin->setRange(-100, 100);
+  brightnessSpin->setValue(0);
+  auto* brightnessRow = new QHBoxLayout();
+  brightnessRow->addWidget(brightnessSlider);
+  brightnessRow->addWidget(brightnessSpin);
+
+  auto* contrastSlider = new QSlider(Qt::Horizontal, &dlg);
+  contrastSlider->setRange(-100, 100);
+  contrastSlider->setValue(0);
+  auto* contrastSpin   = new QSpinBox(&dlg);
+  contrastSpin->setRange(-100, 100);
+  contrastSpin->setValue(0);
+  auto* contrastRow = new QHBoxLayout();
+  contrastRow->addWidget(contrastSlider);
+  contrastRow->addWidget(contrastSpin);
+
+  form->addRow("明るさ:", brightnessRow);
+  form->addRow("コントラスト:", contrastRow);
+
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+  layout->addLayout(form);
+  layout->addWidget(buttons);
+
+  // 双方向バインド
+  QObject::connect(brightnessSlider, &QSlider::valueChanged, brightnessSpin, &QSpinBox::setValue);
+  QObject::connect(brightnessSpin, QOverload<int>::of(&QSpinBox::valueChanged), brightnessSlider, &QSlider::setValue);
+  QObject::connect(contrastSlider, &QSlider::valueChanged, contrastSpin, &QSpinBox::setValue);
+  QObject::connect(contrastSpin, QOverload<int>::of(&QSpinBox::valueChanged), contrastSlider, &QSlider::setValue);
+
+  QObject::connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+  QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+  if (dlg.exec() != QDialog::Accepted) {
+    return;
+  }
+  if (m_controller->adjustBrightnessContrast(brightnessSpin->value(), contrastSpin->value())) {
+    updateUndoRedoState();
+    statusBar()->showMessage("明るさ・コントラストを調整しました", 1800);
+  }
+}
+
+void MainWindow::onHueSatLightTriggered() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  QDialog dlg(this);
+  dlg.setWindowTitle("色相・彩度・明度");
+  dlg.setFixedWidth(340);
+
+  auto* layout = new QVBoxLayout(&dlg);
+  auto* form   = new QFormLayout();
+
+  auto makeRow = [&](QSlider*& slider, QSpinBox*& spin, int lo, int hi) {
+    slider = new QSlider(Qt::Horizontal, &dlg);
+    slider->setRange(lo, hi);
+    slider->setValue(0);
+    spin = new QSpinBox(&dlg);
+    spin->setRange(lo, hi);
+    spin->setValue(0);
+    auto* row = new QHBoxLayout();
+    row->addWidget(slider);
+    row->addWidget(spin);
+    QObject::connect(slider, &QSlider::valueChanged, spin, &QSpinBox::setValue);
+    QObject::connect(spin, QOverload<int>::of(&QSpinBox::valueChanged), slider, &QSlider::setValue);
+    return row;
+  };
+
+  QSlider *hueSlider {}, *satSlider {}, *lightSlider {};
+  QSpinBox *hueSpin  {}, *satSpin  {}, *lightSpin  {};
+  form->addRow("色相:", makeRow(hueSlider, hueSpin, -180, 180));
+  form->addRow("彩度:", makeRow(satSlider, satSpin, -100, 100));
+  form->addRow("明度:", makeRow(lightSlider, lightSpin, -100, 100));
+
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+  layout->addLayout(form);
+  layout->addWidget(buttons);
+
+  QObject::connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+  QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+  if (dlg.exec() != QDialog::Accepted) {
+    return;
+  }
+  if (m_controller->adjustHueSaturationLightness(hueSpin->value(), satSpin->value(), lightSpin->value())) {
+    updateUndoRedoState();
+    statusBar()->showMessage("色相・彩度・明度を調整しました", 1800);
   }
 }
 

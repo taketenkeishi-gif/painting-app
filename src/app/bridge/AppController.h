@@ -322,6 +322,35 @@ public:
   void connectComfyUi(const QString& url = "http://localhost:8188");
   bool isComfyUiConnected() const noexcept;
   void applyAiSelectResult(core::SelectionMask mask);
+  void fetchAiModels();
+
+  struct InpaintParams {
+    QString prompt;
+    QString negativePrompt;
+    QString checkpoint  {"v1-5-pruned-emaonly.ckpt"};
+    int     steps       {20};
+    float   cfg         {7.5f};
+    float   denoise     {0.75f};
+    int     seed        {-1};
+  };
+  /// 選択範囲をマスクとしてインペイントを実行。選択がない場合はキャンバス全体を対象。
+  void runInpaint(const InpaintParams& params);
+
+  struct Txt2ImgParams {
+    QString prompt;
+    QString negativePrompt;
+    QString checkpoint  {"v1-5-pruned-emaonly.ckpt"};
+    int     width       {512};
+    int     height      {512};
+    int     steps       {20};
+    float   cfg         {7.5f};
+    int     seed        {-1};
+  };
+  /// テキストから新規レイヤーに画像を生成
+  void runTextToImage(const Txt2ImgParams& params);
+
+  /// 実行中の AI 生成をキャンセル
+  void cancelAiGeneration();
 
 signals:
   void canvasChanged();
@@ -332,6 +361,10 @@ signals:
   void overlayChanged();
   void comfyUiStateChanged(bool connected);
   void aiSelectionRefined();   ///< ComfyUI 推論で選択が更新されたとき
+  void aiModelsLoaded(QStringList models);
+  void aiProgressUpdate(int step, int totalSteps);
+  void aiGenerationComplete(QString operationType);
+  void aiGenerationError(QString message);
 
 private:
   enum class HistoryKind {
@@ -407,6 +440,8 @@ private:
   core::GradientTool*      m_gradientTool       {nullptr};
   core::AiSelectTool*      m_aiSelectTool       {nullptr};
   ComfyUiClient*           m_comfyUiClient      {nullptr};
+  enum class AiOpType { None, SamSelect, Inpaint, TextToImage };
+  AiOpType                 m_currentAiOp        {AiOpType::None};
 
   app::ui::ToolCatalog m_toolCatalog;
   app::ui::UiState m_uiState;

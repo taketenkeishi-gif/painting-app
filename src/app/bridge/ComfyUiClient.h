@@ -90,8 +90,16 @@ public:
                   const QString& type,
                   std::function<void(QByteArray)> callback);
 
+  /// PNG バイト列を ComfyUI input フォルダへアップロード。
+  /// callback の引数は ComfyUI が付けた保存ファイル名 (空文字=失敗)
+  void uploadImage(const QByteArray& pngData, const QString& name,
+                   std::function<void(QString)> callback);
+
   /// 実行中のプロンプトをキャンセル
   void interruptExecution();
+
+  /// 利用可能なチェックポイント名一覧を取得
+  void fetchCheckpoints(std::function<void(QStringList)> callback);
 
   // ── 組み込みワークフロー ─────────────────────────────────────────────────
   static QJsonObject buildInpaintWorkflow(const InpaintRequest& req);

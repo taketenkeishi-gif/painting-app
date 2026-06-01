@@ -635,8 +635,9 @@ void BrushTool::strokeSegment(
     traveled += spacingPx;
   }
 
-  const float consumed = traveled - spacingPx;
-  m_distanceAccum = segLen - (consumed - spacingPx);
+  // traveled がループを抜けた時点で last stamp は (traveled - spacingPx) の位置にある。
+  // セグメント終端からその位置までの距離が次回の繰り越し量。
+  m_distanceAccum = segLen - (traveled - spacingPx);
   if (m_distanceAccum < 0.0f) m_distanceAccum = 0.0f;
 }
 

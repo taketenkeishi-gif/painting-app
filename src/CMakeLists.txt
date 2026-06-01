@@ -16,6 +16,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FillTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/MoveLayerTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/AiSelectTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/GradientTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/GenerativeFillEngine.cpp
 )
 
@@ -64,6 +65,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/IconLoader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/mainwindow/MainWindow.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/CanvasWidget.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AiPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/LayerPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/SubToolPanel.cpp

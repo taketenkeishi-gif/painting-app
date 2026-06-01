@@ -14,6 +14,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QCoreApplication>
+#include <QRandomGenerator>
 #include <QSettings>
 #include <QString>
 #include <QUrl>
@@ -130,6 +131,8 @@ QString toolKindSettingsKey(core::ToolKind kind) {
       return QStringLiteral("zoom");
     case core::ToolKind::AiSelect:
       return QStringLiteral("ai_select");
+    case core::ToolKind::Gradient:
+      return QStringLiteral("gradient");
     default:
       return QStringLiteral("tool");
   }
@@ -148,6 +151,7 @@ QJsonObject toJson(const app::ui::BrushPreset& preset) {
   json.insert(QStringLiteral("velocityBasedCorrection"), preset.velocityBasedCorrection);
   json.insert(QStringLiteral("shapeType"), static_cast<int>(preset.shapeType));
   json.insert(QStringLiteral("blendMode"), static_cast<int>(preset.blendMode));
+  json.insert(QStringLiteral("buildupMode"), preset.buildupMode);
   json.insert(QStringLiteral("eraseMode"), preset.eraseMode);
   json.insert(QStringLiteral("lockAlphaRespect"), preset.lockAlphaRespect);
   json.insert(QStringLiteral("vectorEraseMode"), static_cast<int>(preset.vectorEraseMode));
@@ -169,6 +173,8 @@ QJsonObject toJson(const app::ui::BrushPreset& preset) {
   json.insert(QStringLiteral("autoSelectThreshold"), preset.autoSelectThreshold);
   json.insert(QStringLiteral("autoSelectContiguous"), preset.autoSelectContiguous);
   json.insert(QStringLiteral("autoSelectReferAllLayers"), preset.autoSelectReferAllLayers);
+  json.insert(QStringLiteral("gradientType"), preset.gradientType);
+  json.insert(QStringLiteral("gradientFill"), preset.gradientFill);
   return json;
 }
 
@@ -186,6 +192,7 @@ app::ui::BrushPreset presetFromJson(const QJsonObject& json, const app::ui::Brus
       json.value(QStringLiteral("velocityBasedCorrection")).toBool(preset.velocityBasedCorrection);
   preset.shapeType = static_cast<core::BrushShapeType>(json.value(QStringLiteral("shapeType")).toInt(static_cast<int>(preset.shapeType)));
   preset.blendMode = static_cast<core::BlendMode>(json.value(QStringLiteral("blendMode")).toInt(static_cast<int>(preset.blendMode)));
+  preset.buildupMode = json.value(QStringLiteral("buildupMode")).toBool(preset.buildupMode);
   preset.eraseMode = json.value(QStringLiteral("eraseMode")).toBool(preset.eraseMode);
   preset.lockAlphaRespect = json.value(QStringLiteral("lockAlphaRespect")).toBool(preset.lockAlphaRespect);
   preset.vectorEraseMode =
@@ -211,6 +218,8 @@ app::ui::BrushPreset presetFromJson(const QJsonObject& json, const app::ui::Brus
   preset.autoSelectContiguous = json.value(QStringLiteral("autoSelectContiguous")).toBool(preset.autoSelectContiguous);
   preset.autoSelectReferAllLayers =
       json.value(QStringLiteral("autoSelectReferAllLayers")).toBool(preset.autoSelectReferAllLayers);
+  preset.gradientType = json.value(QStringLiteral("gradientType")).toInt(preset.gradientType);
+  preset.gradientFill = json.value(QStringLiteral("gradientFill")).toInt(preset.gradientFill);
   return preset;
 }
 
@@ -240,6 +249,10 @@ AppController::AppController(QObject* parent)
   m_fillTool = fill.get();
   m_toolManager.registerTool(std::move(fill));
   m_toolManager.registerTool(std::make_unique<core::MoveLayerTool>());
+
+  auto gradient = std::make_unique<core::GradientTool>();
+  m_gradientTool = gradient.get();
+  m_toolManager.registerTool(std::move(gradient));
 
   auto aiSel = std::make_unique<core::AiSelectTool>();
   m_aiSelectTool = aiSel.get();
@@ -374,6 +387,7 @@ ToolStateViewModel AppController::toolState() const noexcept {
       m_uiState.velocityBasedCorrection,
       m_uiState.shapeType,
       m_uiState.blendMode,
+      m_uiState.buildupMode,
       m_uiState.eraseMode,
       m_uiState.lockAlphaRespect,
       m_uiState.vectorEraseMode,
@@ -395,7 +409,11 @@ ToolStateViewModel AppController::toolState() const noexcept {
       m_uiState.wetMix,
       static_cast<int>(m_uiState.wetMixRate * 100.0f + 0.5f),
       m_uiState.smear,
-      static_cast<int>(m_uiState.smearRate  * 100.0f + 0.5f)};
+      static_cast<int>(m_uiState.smearRate  * 100.0f + 0.5f),
+      // グラデーション
+      m_uiState.gradientType,
+      m_uiState.gradientFill,
+      m_secondaryColor};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -2059,6 +2077,15 @@ void AppController::setBrushBlendMode(core::BlendMode blendMode) {
   emit toolStateChanged();
 }
 
+void AppController::setBrushBuildupMode(bool buildup) {
+  if (m_uiState.buildupMode == buildup) {
+    return;
+  }
+  m_uiState.buildupMode = buildup;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
 void AppController::setBrushEraseMode(bool eraseMode) {
   if (m_uiState.eraseMode == eraseMode) {
     return;
@@ -2298,12 +2325,183 @@ void AppController::setSmearRate(int value) {
   applyUiStateToTools(); emit toolStateChanged();
 }
 
+// ── グラデーション / 背景色 ─────────────────────────────────────────────────
+
+void AppController::setSecondaryColor(const core::Color& color) {
+  if (m_secondaryColor.r == color.r && m_secondaryColor.g == color.g &&
+      m_secondaryColor.b == color.b && m_secondaryColor.a == color.a) {
+    return;
+  }
+  m_secondaryColor = color;
+  emit toolStateChanged();
+}
+
+// ── 画像調整 ───────────────────────────────────────────────────────────────
+
+namespace {
+
+/// RGB (0–255) ↔ HSL (h: 0–360, s/l: 0–1) 変換ヘルパー
+struct HSL { float h, s, l; };
+
+HSL rgbToHsl(uint8_t r, uint8_t g, uint8_t b) noexcept {
+  const float rf = r / 255.0f;
+  const float gf = g / 255.0f;
+  const float bf = b / 255.0f;
+  const float cmax = std::max({rf, gf, bf});
+  const float cmin = std::min({rf, gf, bf});
+  const float delta = cmax - cmin;
+  HSL hsl {};
+  hsl.l = (cmax + cmin) * 0.5f;
+  if (delta < 1e-6f) {
+    hsl.h = 0.0f;
+    hsl.s = 0.0f;
+  } else {
+    hsl.s = delta / (1.0f - std::abs(2.0f * hsl.l - 1.0f));
+    if (cmax == rf) {
+      hsl.h = 60.0f * std::fmod((gf - bf) / delta, 6.0f);
+    } else if (cmax == gf) {
+      hsl.h = 60.0f * ((bf - rf) / delta + 2.0f);
+    } else {
+      hsl.h = 60.0f * ((rf - gf) / delta + 4.0f);
+    }
+    if (hsl.h < 0.0f) hsl.h += 360.0f;
+  }
+  return hsl;
+}
+
+inline uint8_t clamp8f(float v) noexcept {
+  return static_cast<uint8_t>(std::clamp(v, 0.0f, 255.0f));
+}
+
+struct RGB3adj { uint8_t r, g, b; };
+
+RGB3adj hslToRgb(float h, float s, float l) noexcept {
+  const float c  = (1.0f - std::abs(2.0f * l - 1.0f)) * s;
+  const float hp = h / 60.0f;
+  const float x  = c * (1.0f - std::abs(std::fmod(hp, 2.0f) - 1.0f));
+  float rf {}, gf {}, bf {};
+  const int seg = static_cast<int>(hp);
+  switch (seg) {
+    case 0: rf = c; gf = x; bf = 0; break;
+    case 1: rf = x; gf = c; bf = 0; break;
+    case 2: rf = 0; gf = c; bf = x; break;
+    case 3: rf = 0; gf = x; bf = c; break;
+    case 4: rf = x; gf = 0; bf = c; break;
+    default: rf = c; gf = 0; bf = x; break;
+  }
+  const float m = l - c * 0.5f;
+  return {clamp8f((rf + m) * 255.0f), clamp8f((gf + m) * 255.0f), clamp8f((bf + m) * 255.0f)};
+}
+
+} // namespace
+
+bool AppController::adjustBrightnessContrast(int brightness, int contrast) {
+  core::Layer* layer = m_document.activeLayer();
+  if (layer == nullptr || layer->kind() != core::LayerKind::Raster || layer->locked()) {
+    return false;
+  }
+
+  // 履歴のため before スナップショット
+  const core::Layer before = *layer;
+
+  core::PixelBuffer& buf = layer->buffer();
+  const int W = buf.width();
+  const int H = buf.height();
+
+  // Photoshop 互換の明るさ・コントラスト調整
+  // brightness: -100..+100  → 加算 (×255/100)
+  // contrast:   -100..+100  → レベル係数
+  const float bAdd  = static_cast<float>(brightness) * 255.0f / 100.0f;
+  const float cFact = (contrast >= 0)
+      ? (1.0f + static_cast<float>(contrast) / 100.0f * 4.0f)
+      : (1.0f + static_cast<float>(contrast) / 100.0f);
+
+  for (int y = 0; y < H; ++y) {
+    for (int x = 0; x < W; ++x) {
+      core::Color px = buf.pixel(x, y);
+      if (px.a == 0) {
+        continue;
+      }
+      auto adj = [&](uint8_t ch) -> uint8_t {
+        float v = static_cast<float>(ch) / 255.0f;
+        v = (v - 0.5f) * cFact + 0.5f + bAdd / 255.0f;
+        return clamp8f(v * 255.0f);
+      };
+      px.r = adj(px.r);
+      px.g = adj(px.g);
+      px.b = adj(px.b);
+      buf.setPixel(x, y, px);
+    }
+  }
+
+  // 履歴プッシュ
+  StrokeHistoryEntry entry;
+  entry.kind        = HistoryKind::Stroke;
+  entry.actionName  = "明るさ・コントラスト";
+  entry.layerIndex  = m_document.activeLayerIndex();
+  entry.beforeLayer = before;
+  entry.afterLayer  = *layer;
+  pushHistoryEntry(std::move(entry));
+
+  rerender();
+  emit canvasChanged();
+  return true;
+}
+
+bool AppController::adjustHueSaturationLightness(int hue, int saturation, int lightness) {
+  core::Layer* layer = m_document.activeLayer();
+  if (layer == nullptr || layer->kind() != core::LayerKind::Raster || layer->locked()) {
+    return false;
+  }
+
+  const core::Layer before = *layer;
+
+  core::PixelBuffer& buf = layer->buffer();
+  const int W = buf.width();
+  const int H = buf.height();
+
+  // hue: -180..+180 degree shift
+  // saturation: -100..+100 (scale s by (1 + sat/100))
+  // lightness:  -100..+100 (add l × (light/100))
+  const float hShift = static_cast<float>(hue);
+  const float sMul   = 1.0f + static_cast<float>(saturation) / 100.0f;
+  const float lAdd   = static_cast<float>(lightness) / 100.0f;
+
+  for (int y = 0; y < H; ++y) {
+    for (int x = 0; x < W; ++x) {
+      core::Color px = buf.pixel(x, y);
+      if (px.a == 0) {
+        continue;
+      }
+      HSL hsl = rgbToHsl(px.r, px.g, px.b);
+      hsl.h = std::fmod(hsl.h + hShift + 720.0f, 360.0f);
+      hsl.s = std::clamp(hsl.s * sMul, 0.0f, 1.0f);
+      hsl.l = std::clamp(hsl.l + lAdd, 0.0f, 1.0f);
+      const RGB3adj rgb = hslToRgb(hsl.h, hsl.s, hsl.l);
+      buf.setPixel(x, y, core::Color {rgb.r, rgb.g, rgb.b, px.a});
+    }
+  }
+
+  StrokeHistoryEntry entry;
+  entry.kind        = HistoryKind::Stroke;
+  entry.actionName  = "色相・彩度・明度";
+  entry.layerIndex  = m_document.activeLayerIndex();
+  entry.beforeLayer = before;
+  entry.afterLayer  = *layer;
+  pushHistoryEntry(std::move(entry));
+
+  rerender();
+  emit canvasChanged();
+  return true;
+}
+
 bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
   switch (kind) {
     case core::ToolKind::Brush:
     case core::ToolKind::Eraser:
     case core::ToolKind::Line:
     case core::ToolKind::Fill:
+    case core::ToolKind::Gradient:
     case core::ToolKind::MoveLayer:
       return true;
     default:
@@ -2337,7 +2535,9 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
     case core::ToolKind::Zoom:
       return u8"\u30BA\u30FC\u30E0";
     case core::ToolKind::AiSelect:
-      return u8"AI\u9078\u629E";   // "AI\u9078\u629E"
+      return u8"AI\u9078\u629E";
+    case core::ToolKind::Gradient:
+      return u8"\u30B0\u30E9\u30C7\u30FC\u30B7\u30E7\u30F3";  // "\u30B0\u30E9\u30C7\u30FC\u30B7\u30E7\u30F3"
     default:
       return u8"\u64CD\u4F5C";
   }
@@ -2378,6 +2578,7 @@ void AppController::connectComfyUi(const QString& urlStr) {
                 req.positivePoint = true;
 
                 const QJsonObject wf = ComfyUiClient::buildSamWorkflow(req);
+                m_currentAiOp = AiOpType::SamSelect;
                 m_comfyUiClient->queuePrompt(wf);
               });
         } else {
@@ -2386,32 +2587,85 @@ void AppController::connectComfyUi(const QString& urlStr) {
       }
     });
 
-    // SAM \u5B9F\u884C\u5B8C\u4E86 \u2192 \u30DE\u30B9\u30AF\u753B\u50CF\u3092\u53D6\u5F97\u3057\u3066 SelectionMask \u306B\u5909\u63DB
+    // progressUpdate \u3092\u8EE2\u9001
+    connect(m_comfyUiClient, &ComfyUiClient::progressUpdate, this,
+            [this](const QString& /*id*/, int nodeIdx, int totalNodes, float /*value*/) {
+      emit aiProgressUpdate(nodeIdx, totalNodes);
+    });
+
+    // executionError \u3092\u8EE2\u9001
+    connect(m_comfyUiClient, &ComfyUiClient::executionError, this,
+            [this](const QString& /*id*/, const QString& msg) {
+      emit aiGenerationError(msg);
+      m_currentAiOp = AiOpType::None;
+    });
+
+    // \u5B9F\u884C\u5B8C\u4E86 \u2192 \u30AA\u30DA\u30EC\u30FC\u30B7\u30E7\u30F3\u7A2E\u5225\u3067\u5206\u5C90
     connect(m_comfyUiClient, &ComfyUiClient::executionComplete, this,
             [this](const QString& /*promptId*/, const QStringList& outputImages) {
       if (outputImages.isEmpty() || m_comfyUiClient == nullptr) return;
       const QString fname = outputImages.first();
-      m_comfyUiClient->fetchImage(fname, QString(), "output",
-          [this](const QByteArray& pngData) {
-            if (pngData.isEmpty()) return;
-            const QImage img = QImage::fromData(pngData, "PNG");
-            if (img.isNull()) return;
+      const AiOpType op = m_currentAiOp;
+      m_currentAiOp = AiOpType::None;
 
-            const int W = img.width();
-            const int H = img.height();
-            std::vector<std::uint8_t> pixels(
-                static_cast<std::size_t>(W) * static_cast<std::size_t>(H), 0);
-            for (int y = 0; y < H; ++y) {
-              for (int x = 0; x < W; ++x) {
-                // SAM \u30DE\u30B9\u30AF\u306F\u767D=\u9078\u629E\u3001\u9ED2=\u975E\u9078\u629E
-                if (img.pixelColor(x, y).lightness() > 127) {
-                  pixels[static_cast<std::size_t>(y)*W+x] = 255;
+      m_comfyUiClient->fetchImage(fname, QString(), "output",
+          [this, op](const QByteArray& pngData) {
+            if (pngData.isEmpty()) {
+              emit aiGenerationError("\u7D50\u679C\u753B\u50CF\u306E\u53D6\u5F97\u306B\u5931\u6557\u3057\u307E\u3057\u305F");
+              return;
+            }
+            const QImage img = QImage::fromData(pngData, "PNG");
+            if (img.isNull()) {
+              emit aiGenerationError("\u7D50\u679C\u753B\u50CF\u306E\u30C7\u30B3\u30FC\u30C9\u306B\u5931\u6557\u3057\u307E\u3057\u305F");
+              return;
+            }
+
+            if (op == AiOpType::SamSelect) {
+              // SAM: \u767D=\u9078\u629E\u7BC4\u56F2\u30DE\u30B9\u30AF
+              const int W = img.width();
+              const int H = img.height();
+              std::vector<std::uint8_t> pixels(
+                  static_cast<std::size_t>(W) * static_cast<std::size_t>(H), 0);
+              for (int y = 0; y < H; ++y) {
+                for (int x = 0; x < W; ++x) {
+                  if (img.pixelColor(x, y).lightness() > 127) {
+                    pixels[static_cast<std::size_t>(y)*W+x] = 255;
+                  }
                 }
               }
+              core::SelectionMask mask(W, H);
+              mask.setPixels(pixels);
+              applyAiSelectResult(std::move(mask));
+
+            } else if (op == AiOpType::Inpaint || op == AiOpType::TextToImage) {
+              // \u65B0\u898F\u30E9\u30B9\u30BF\u30FC\u30EC\u30A4\u30E4\u30FC\u3092\u8FFD\u52A0\u3057\u3066\u7D50\u679C\u3092\u8CBC\u308A\u4ED8\u3051
+              const QString layerName = (op == AiOpType::Inpaint)
+                  ? "AI \u30A4\u30F3\u30DA\u30A4\u30F3\u30C8" : "AI \u751F\u6210";
+              addRasterLayer();
+              core::Layer* layer = m_document.activeLayer();
+              if (layer == nullptr) {
+                emit aiGenerationError("\u7D50\u679C\u30EC\u30A4\u30E4\u30FC\u306E\u4F5C\u6210\u306B\u5931\u6557\u3057\u307E\u3057\u305F");
+                return;
+              }
+              layer->setName(layerName.toStdString());
+              const QImage converted = img.convertToFormat(QImage::Format_ARGB32);
+              const int W = std::min(converted.width(), layer->buffer().width());
+              const int H = std::min(converted.height(), layer->buffer().height());
+              for (int y = 0; y < H; ++y) {
+                for (int x = 0; x < W; ++x) {
+                  const QColor c = converted.pixelColor(x, y);
+                  layer->buffer().setPixel(x, y, core::Color{
+                      static_cast<std::uint8_t>(c.red()),
+                      static_cast<std::uint8_t>(c.green()),
+                      static_cast<std::uint8_t>(c.blue()),
+                      static_cast<std::uint8_t>(c.alpha())});
+                }
+              }
+              rerender();
+              emit documentChanged();
+              emit layersChanged();
+              emit aiGenerationComplete(op == AiOpType::Inpaint ? "inpaint" : "txt2img");
             }
-            core::SelectionMask mask(W, H);
-            mask.setPixels(pixels);
-            applyAiSelectResult(std::move(mask));
           });
     });
   }
@@ -2531,9 +2785,14 @@ void AppController::applyUiStateToTools() {
     m_brushTool->setPostCorrection(m_uiState.postCorrection);
     m_brushTool->setVelocityBasedCorrection(m_uiState.velocityBasedCorrection);
     m_brushTool->setShapeType(m_uiState.shapeType);
+    m_brushTool->setAngle(static_cast<float>(m_uiState.angle));
+    m_brushTool->setRoundness(static_cast<float>(m_uiState.roundness) / 100.0F);
+    m_brushTool->setTaperStart(static_cast<float>(m_uiState.taperStart) / 100.0F);
+    m_brushTool->setTaperEnd(static_cast<float>(m_uiState.taperEnd) / 100.0F);
     m_brushTool->setBlendMode(m_uiState.blendMode);
     m_brushTool->setEraseMode(m_uiState.eraseMode);
     m_brushTool->setLockAlphaRespect(m_uiState.lockAlphaRespect);
+    m_brushTool->setBuildupMode(m_uiState.buildupMode);
     m_brushTool->setColor(m_currentColor);
     m_brushTool->setPressureSizeEnabled(m_uiState.pressureSize);
     m_brushTool->setPressureSizeMin(m_uiState.pressureSizeMin);
@@ -2566,6 +2825,10 @@ void AppController::applyUiStateToTools() {
     m_eraserTool->setPostCorrection(m_uiState.postCorrection);
     m_eraserTool->setVelocityBasedCorrection(m_uiState.velocityBasedCorrection);
     m_eraserTool->setShapeType(m_uiState.shapeType);
+    m_eraserTool->setPressureSizeEnabled(m_uiState.pressureSize);
+    m_eraserTool->setPressureSizeMin(m_uiState.pressureSizeMin);
+    m_eraserTool->setPressureOpacityEnabled(m_uiState.pressureOpacity);
+    m_eraserTool->setPressureOpacityMin(m_uiState.pressureOpacityMin);
     core::VectorEraseMode mode = core::VectorEraseMode::TouchedOnly;
     switch (m_uiState.vectorEraseMode) {
       case app::ui::VectorEraserMode::TouchedOnly:
@@ -2612,6 +2875,17 @@ void AppController::applyUiStateToTools() {
     m_aiSelectTool->setAddMode     (sid == "ai_select_add");
     m_aiSelectTool->setSubtractMode(sid == "ai_select_subtract");
   }
+  if (m_gradientTool != nullptr) {
+    m_gradientTool->setOpacity(static_cast<float>(m_uiState.opacity) / 100.0f);
+    m_gradientTool->setBlendMode(m_uiState.blendMode);
+    m_gradientTool->setEraseMode(m_uiState.eraseMode);
+    m_gradientTool->setGradientType(m_uiState.gradientType == 1
+        ? core::GradientTool::GradientType::Radial
+        : core::GradientTool::GradientType::Linear);
+    m_gradientTool->setGradientFill(m_uiState.gradientFill == 1
+        ? core::GradientTool::GradientFill::ForegroundToTransparent
+        : core::GradientTool::GradientFill::ForegroundToBackground);
+  }
 
   syncCurrentSubToolFromUiState();
 }
@@ -2644,10 +2918,13 @@ void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescripto
   m_uiState.velocityBasedCorrection = profile.stabilizer.velocityBasedCorrection;
   m_uiState.shapeType = profile.shape.shapeType;
   m_uiState.blendMode = profile.blendMode;
+  m_uiState.buildupMode = subTool.preset.buildupMode;
   m_uiState.eraseMode = profile.eraseMode;
   m_uiState.lockAlphaRespect = profile.lockAlphaRespect;
   m_uiState.vectorEraseMode = profile.vectorEraseMode;
   m_uiState.vectorTrimOutside = profile.vectorTrimOutside;
+  m_uiState.gradientType = subTool.preset.gradientType;
+  m_uiState.gradientFill = subTool.preset.gradientFill;
 }
 
 void AppController::syncCurrentSubToolFromUiState() {
@@ -2669,6 +2946,7 @@ void AppController::syncCurrentSubToolFromUiState() {
   preset.velocityBasedCorrection = m_uiState.velocityBasedCorrection;
   preset.shapeType = m_uiState.shapeType;
   preset.blendMode = m_uiState.blendMode;
+  preset.buildupMode = m_uiState.buildupMode;
   preset.eraseMode = m_uiState.eraseMode;
   preset.lockAlphaRespect = m_uiState.lockAlphaRespect;
   preset.vectorEraseMode = m_uiState.vectorEraseMode;
@@ -2688,6 +2966,8 @@ void AppController::syncCurrentSubToolFromUiState() {
   preset.autoSelectThreshold = m_uiState.autoSelectThreshold;
   preset.autoSelectContiguous = m_uiState.autoSelectContiguous;
   preset.autoSelectReferAllLayers = m_uiState.autoSelectReferAllLayers;
+  preset.gradientType = m_uiState.gradientType;
+  preset.gradientFill = m_uiState.gradientFill;
 
   profile.stroke.size = m_uiState.size;
   profile.stroke.opacity = m_uiState.opacity;
@@ -2887,6 +3167,7 @@ core::ToolContext AppController::makeToolContext() {
       m_document,
       m_composited,
       m_currentColor,
+      m_secondaryColor,
       m_uiState.size};
 }
 
@@ -3021,6 +3302,198 @@ void AppController::rerenderDirty(const core::Rect& dirtyRect) {
   }
   m_renderer.compositeInto(m_document, m_composited, dirtyRect);
   m_lastCompositeDirtyRect = dirtyRect;
+}
+
+// ── AI ヘルパー: PixelBuffer → PNG バイト列 ──────────────────────────────
+static QByteArray pixelBufferToPng(const core::PixelBuffer& buf) {
+  const QImage img = platform::qt::QtImageConverter::toQImage(buf);
+  QByteArray bytes;
+  QBuffer qbuf(&bytes);
+  qbuf.open(QIODevice::WriteOnly);
+  img.save(&qbuf, "PNG");
+  return bytes;
+}
+
+// ── AI: キャンセル ───────────────────────────────────────────────────────
+void AppController::cancelAiGeneration() {
+  if (m_comfyUiClient != nullptr) {
+    m_comfyUiClient->interruptExecution();
+  }
+  m_currentAiOp = AiOpType::None;
+}
+
+// ── AI: モデル一覧取得 ────────────────────────────────────────────────────
+void AppController::fetchAiModels() {
+  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
+    return;
+  }
+  m_comfyUiClient->fetchCheckpoints([this](const QStringList& models) {
+    emit aiModelsLoaded(models);
+  });
+}
+
+// ── AI: インペイント ─────────────────────────────────────────────────────
+void AppController::runInpaint(const InpaintParams& params) {
+  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
+    emit aiGenerationError("ComfyUI に接続されていません");
+    return;
+  }
+
+  // キャンバス合成画像を PNG に
+  rerender();
+  const QByteArray canvasPng = pixelBufferToPng(m_composited);
+
+  // マスク画像を作成: 選択範囲あり→選択部分を白、なし→全白
+  const core::SelectionMask& sel = m_document.selection();
+  const int W = m_document.canvasSize().width;
+  const int H = m_document.canvasSize().height;
+  QImage maskImg(W, H, QImage::Format_Grayscale8);
+  if (sel.hasSelection()) {
+    for (int y = 0; y < H; ++y) {
+      for (int x = 0; x < W; ++x) {
+        maskImg.setPixel(x, y, sel.contains(x, y) ? qRgb(255,255,255) : qRgb(0,0,0));
+      }
+    }
+  } else {
+    maskImg.fill(255);
+  }
+  QByteArray maskPng;
+  QBuffer mbuf(&maskPng);
+  mbuf.open(QIODevice::WriteOnly);
+  maskImg.save(&mbuf, "PNG");
+
+  // 画像をアップロードしてからワークフローを実行
+  const QString inputName = "paintapp_input.png";
+  const QString maskName  = "paintapp_mask.png";
+
+  m_comfyUiClient->uploadImage(canvasPng, inputName, [this, maskPng, maskName, params, inputName](const QString& savedInput) {
+    if (savedInput.isEmpty()) {
+      emit aiGenerationError("入力画像のアップロードに失敗しました");
+      return;
+    }
+    m_comfyUiClient->uploadImage(maskPng, maskName, [this, params, savedInput](const QString& savedMask) {
+      if (savedMask.isEmpty()) {
+        emit aiGenerationError("マスク画像のアップロードに失敗しました");
+        return;
+      }
+
+      ComfyUiClient::InpaintRequest req;
+      req.prompt         = params.prompt;
+      req.negativePrompt = params.negativePrompt;
+      req.checkpointName = params.checkpoint;
+      req.steps          = params.steps;
+      req.cfg            = params.cfg;
+      req.denoise        = params.denoise;
+      req.seed           = params.seed;
+      // ワークフロー内の LoadImage ノードが参照するファイル名を書き換える
+      QJsonObject wf = ComfyUiClient::buildInpaintWorkflow(req);
+      // node 4 の image を実際のアップロード名に差し替え
+      {
+        QJsonObject n4 = wf.value("4").toObject();
+        QJsonObject inp4 = n4.value("inputs").toObject();
+        inp4["image"] = savedInput;
+        n4["inputs"] = inp4;
+        wf["4"] = n4;
+      }
+      {
+        QJsonObject n5 = wf.value("5").toObject();
+        QJsonObject inp5 = n5.value("inputs").toObject();
+        inp5["image"] = m_comfyUiClient->serverUrl().toString() + "/view?filename=" + savedInput;
+        // LoadImageMask は image ファイル名を使う
+        inp5["image"] = savedInput;
+        n5["inputs"] = inp5;
+        wf["5"] = n5;
+      }
+
+      m_currentAiOp = AiOpType::Inpaint;
+      m_comfyUiClient->queuePrompt(wf);
+      // 結果ハンドラは connectComfyUi() で接続済みの executionComplete シグナル経由
+    });
+  });
+}
+
+// ── AI: テキストから画像生成 ─────────────────────────────────────────────
+void AppController::runTextToImage(const Txt2ImgParams& params) {
+  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
+    emit aiGenerationError("ComfyUI に接続されていません");
+    return;
+  }
+
+  QJsonObject wf;
+  // 1: Checkpoint
+  {
+    QJsonObject n; QJsonObject inp;
+    inp["ckpt_name"] = params.checkpoint;
+    n["class_type"] = "CheckpointLoaderSimple";
+    n["inputs"] = inp;
+    wf["1"] = n;
+  }
+  // 2: Positive
+  {
+    QJsonObject n; QJsonObject inp;
+    inp["text"] = params.prompt.isEmpty() ? "high quality, detailed" : params.prompt;
+    inp["clip"] = QJsonArray{QJsonArray{"1"}, 1};
+    n["class_type"] = "CLIPTextEncode";
+    n["inputs"] = inp;
+    wf["2"] = n;
+  }
+  // 3: Negative
+  {
+    QJsonObject n; QJsonObject inp;
+    inp["text"] = params.negativePrompt.isEmpty() ? "blurry, low quality" : params.negativePrompt;
+    inp["clip"] = QJsonArray{QJsonArray{"1"}, 1};
+    n["class_type"] = "CLIPTextEncode";
+    n["inputs"] = inp;
+    wf["3"] = n;
+  }
+  // 4: Empty latent
+  {
+    QJsonObject n; QJsonObject inp;
+    inp["width"]  = params.width;
+    inp["height"] = params.height;
+    inp["batch_size"] = 1;
+    n["class_type"] = "EmptyLatentImage";
+    n["inputs"] = inp;
+    wf["4"] = n;
+  }
+  // 5: KSampler
+  {
+    QJsonObject n; QJsonObject inp;
+    inp["model"]        = QJsonArray{QJsonArray{"1"}, 0};
+    inp["positive"]     = QJsonArray{QJsonArray{"2"}, 0};
+    inp["negative"]     = QJsonArray{QJsonArray{"3"}, 0};
+    inp["latent_image"] = QJsonArray{QJsonArray{"4"}, 0};
+    inp["seed"]         = params.seed < 0 ? static_cast<int>(QRandomGenerator::global()->generate()) : params.seed;
+    inp["steps"]        = params.steps;
+    inp["cfg"]          = static_cast<double>(params.cfg);
+    inp["sampler_name"] = "euler";
+    inp["scheduler"]    = "normal";
+    inp["denoise"]      = 1.0;
+    n["class_type"] = "KSampler";
+    n["inputs"] = inp;
+    wf["5"] = n;
+  }
+  // 6: VAE decode
+  {
+    QJsonObject n; QJsonObject inp;
+    inp["samples"] = QJsonArray{QJsonArray{"5"}, 0};
+    inp["vae"]     = QJsonArray{QJsonArray{"1"}, 2};
+    n["class_type"] = "VAEDecode";
+    n["inputs"] = inp;
+    wf["6"] = n;
+  }
+  // 7: Save
+  {
+    QJsonObject n; QJsonObject inp;
+    inp["images"]          = QJsonArray{QJsonArray{"6"}, 0};
+    inp["filename_prefix"] = "paintapp_txt2img";
+    n["class_type"] = "SaveImage";
+    n["inputs"] = inp;
+    wf["7"] = n;
+  }
+
+  m_currentAiOp = AiOpType::TextToImage;
+  m_comfyUiClient->queuePrompt(wf);
 }
 
 } // namespace app::bridge

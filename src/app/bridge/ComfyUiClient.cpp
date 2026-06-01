@@ -1,5 +1,7 @@
 #include "app/bridge/ComfyUiClient.h"
 
+#include <QHttpMultiPart>
+#include <QHttpPart>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -214,6 +216,68 @@ void ComfyUiClient::fetchImage(const QString& filename,
 void ComfyUiClient::interruptExecution() {
   QNetworkReply* reply = post("/interrupt", {});
   connect(reply, &QNetworkReply::finished, reply, &QNetworkReply::deleteLater);
+}
+
+void ComfyUiClient::uploadImage(const QByteArray& pngData,
+                                 const QString& name,
+                                 std::function<void(QString)> callback) {
+  QUrl url = m_baseUrl;
+  url.setPath("/upload/image");
+
+  auto* multipart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+
+  QHttpPart imagePart;
+  imagePart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("image/png"));
+  imagePart.setHeader(QNetworkRequest::ContentDispositionHeader,
+      QVariant(QString("form-data; name=\"image\"; filename=\"%1\"").arg(name)));
+  imagePart.setBody(pngData);
+  multipart->append(imagePart);
+
+  QHttpPart typePart;
+  typePart.setHeader(QNetworkRequest::ContentDispositionHeader,
+      QVariant("form-data; name=\"type\""));
+  typePart.setBody("input");
+  multipart->append(typePart);
+
+  QHttpPart overwritePart;
+  overwritePart.setHeader(QNetworkRequest::ContentDispositionHeader,
+      QVariant("form-data; name=\"overwrite\""));
+  overwritePart.setBody("true");
+  multipart->append(overwritePart);
+
+  QNetworkRequest req(url);
+  QNetworkReply* reply = m_nam.post(req, multipart);
+  multipart->setParent(reply);
+
+  connect(reply, &QNetworkReply::finished, this, [reply, callback]() {
+    reply->deleteLater();
+    if (reply->error() != QNetworkReply::NoError) {
+      callback({});
+      return;
+    }
+    const QJsonObject resp = QJsonDocument::fromJson(reply->readAll()).object();
+    callback(resp.value("name").toString());
+  });
+}
+
+void ComfyUiClient::fetchCheckpoints(std::function<void(QStringList)> callback) {
+  QNetworkReply* reply = get("/object_info/CheckpointLoaderSimple");
+  connect(reply, &QNetworkReply::finished, this, [reply, callback]() {
+    reply->deleteLater();
+    QStringList names;
+    if (reply->error() == QNetworkReply::NoError) {
+      const QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+      const QJsonObject info = obj.value("CheckpointLoaderSimple").toObject();
+      const QJsonObject input = info.value("input").toObject();
+      const QJsonObject required = input.value("required").toObject();
+      const QJsonArray ckptArr = required.value("ckpt_name").toArray()
+                                     .first().toArray();
+      for (const QJsonValue& v : ckptArr) {
+        names << v.toString();
+      }
+    }
+    callback(names);
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

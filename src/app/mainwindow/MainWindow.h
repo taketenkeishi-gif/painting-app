@@ -34,6 +34,7 @@ namespace app::canvasview {
 class CanvasWidget;
 }
 namespace app::panels {
+class AiPanel;
 class LayerPanel;
 class SubToolPanel;
 class ToolPanel;
@@ -111,6 +112,8 @@ private slots:
   void onGenerativeFillTriggered();
   void onConnectComfyUiTriggered();
   void onComfyUiStateChanged(bool connected);
+  void onBrightnessContrastTriggered();
+  void onHueSatLightTriggered();
 
 private:
   void setupShellLayout();
@@ -146,6 +149,7 @@ private:
 
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
+  app::panels::AiPanel*    m_aiPanel    {nullptr};
   app::panels::LayerPanel* m_layerPanel {nullptr};
   app::panels::ToolPanel* m_toolPanel {nullptr};
   app::panels::ToolPanel* m_quickSliderPanel {nullptr};
@@ -163,6 +167,7 @@ private:
   QDockWidget* m_subToolDock {nullptr};
   QDockWidget* m_toolPropertyDock {nullptr};
   QDockWidget* m_colorDock {nullptr};
+  QDockWidget* m_aiDock    {nullptr};
   QDockWidget* m_layerDock {nullptr};
   QDockWidget* m_infoDock {nullptr};
   QToolBar* m_quickToolBar {nullptr};
@@ -254,8 +259,11 @@ private:
   QAction* m_swapColorsAction {nullptr};
   QAction* m_resetColorsAction {nullptr};
   QAction* m_transparentColorAction {nullptr};
-  QAction* m_generativeFillAction  {nullptr};
-  QAction* m_connectComfyUiAction  {nullptr};
+  QAction* m_generativeFillAction   {nullptr};
+  QAction* m_connectComfyUiAction   {nullptr};
+  // 画像調整
+  QAction* m_brightnessContrastAction {nullptr};
+  QAction* m_hueSatLightAction        {nullptr};
   QLabel*  m_comfyUiStatusLabel    {nullptr};
   QAction* m_clearRecentFilesAction {nullptr};
   QMenu* m_recentFilesMenu {nullptr};

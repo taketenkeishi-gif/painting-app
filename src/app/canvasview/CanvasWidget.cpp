@@ -506,8 +506,8 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   bool shouldDispatch = true;
   if (state.hasLastStrokeDispatchPos) {
     const QPoint delta = nowPos - state.lastStrokeDispatchWidgetPos;
-    const bool movedEnough = delta.manhattanLength() >= 2;
-    const bool elapsedEnough = (nowNs - state.lastStrokeDispatchNs) >= 3'000'000; // ~333fps cap
+    const bool movedEnough = delta.manhattanLength() >= 1;
+    const bool elapsedEnough = (nowNs - state.lastStrokeDispatchNs) >= 2'000'000; // ~500fps cap
     shouldDispatch = movedEnough || elapsedEnough;
   }
   if (!shouldDispatch) {
