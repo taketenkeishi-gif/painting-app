@@ -313,6 +313,7 @@ MainWindow::MainWindow(QWidget* parent)
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateUndoRedoState);
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateNavigatorPreview);
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateNavigatorPreview);
+  connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, &MainWindow::updateNavigatorPreview);
 
   onToolStateChanged();
   updateUndoRedoState();
@@ -737,6 +738,12 @@ void MainWindow::setupShellLayout() {
     dock->setObjectName(name);
     dock->setWidget(widget);
     dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    // Replace native title bar with an empty widget (zero height).
+    // The dock tab label still shows windowTitle(). QSS max-height:0 is
+    // unreliable on Windows; setTitleBarWidget is the only reliable way.
+    auto* emptyBar = new QWidget(dock);
+    emptyBar->setFixedHeight(0);
+    dock->setTitleBarWidget(emptyBar);
     return dock;
   };
 

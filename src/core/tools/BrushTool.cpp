@@ -559,13 +559,20 @@ void BrushTool::stampAt(
           blendPixel(buffer, px, py, drawColor, delta, lockAlpha);
         } else {
           const float dstA = static_cast<float>(buffer.pixel(px, py).a) / 255.0f;
-          // Skip already-opaque pixels UNLESS in transparent-erase mode
           const bool isTransparentMode = (drawColor.a == 0);
-          if (dstA >= 0.999f && !isTransparentMode) continue;
-          const float srcANeeded = std::clamp(
-              (pixelStrength - dstA) / (1.0f - dstA), 0.0f, 1.0f);
-          if (srcANeeded <= 0.001f) continue;
-          blendPixel(buffer, px, py, drawColor, srcANeeded, lockAlpha);
+          if (dstA >= 0.999f && !isTransparentMode) {
+            // Destination is fully opaque: use delta-based application so new
+            // strokes always paint over existing pixels (color replacement).
+            const float delta = pixelStrength - prevAccum;
+            if (delta > 0.001f) {
+              blendPixel(buffer, px, py, drawColor, delta, lockAlpha);
+            }
+          } else {
+            const float srcANeeded = std::clamp(
+                (pixelStrength - dstA) / (1.0f - dstA), 0.0f, 1.0f);
+            if (srcANeeded <= 0.001f) continue;
+            blendPixel(buffer, px, py, drawColor, srcANeeded, lockAlpha);
+          }
         }
       } else {
         blendPixel(buffer, px, py, drawColor, pixelStrength, lockAlpha);

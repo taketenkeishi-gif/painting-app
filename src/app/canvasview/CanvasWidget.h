@@ -22,6 +22,9 @@ namespace app::canvasview {
 class CanvasWidget : public QWidget {
   Q_OBJECT
 
+signals:
+  void viewTransformChanged();
+
 public:
   explicit CanvasWidget(QWidget* parent = nullptr);
   void setController(app::bridge::AppController* controller);

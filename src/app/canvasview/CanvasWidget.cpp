@@ -151,6 +151,7 @@ void CanvasWidget::zoomIn() {
   state.zoom = std::clamp(state.zoom * 1.1, 0.1, 16.0);
   updateZoomStatusLabel(this);
   update();
+  emit viewTransformChanged();
 }
 
 void CanvasWidget::zoomOut() {
@@ -158,6 +159,7 @@ void CanvasWidget::zoomOut() {
   state.zoom = std::clamp(state.zoom / 1.1, 0.1, 16.0);
   updateZoomStatusLabel(this);
   update();
+  emit viewTransformChanged();
 }
 
 void CanvasWidget::resetZoom() {
@@ -166,6 +168,7 @@ void CanvasWidget::resetZoom() {
   state.panOffset = QPointF(0.0, 0.0);
   updateZoomStatusLabel(this);
   update();
+  emit viewTransformChanged();
 }
 
 void CanvasWidget::fitToScreen() {
@@ -179,6 +182,7 @@ void CanvasWidget::fitToScreen() {
   state.panOffset = QPointF(0.0, 0.0);
   updateZoomStatusLabel(this);
   update();
+  emit viewTransformChanged();
 }
 
 int CanvasWidget::zoomPercent() const {
@@ -574,6 +578,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
     state.zoom = std::clamp(m_ctrlSpaceStartZoom * factor, 0.1, 16.0);
     updateZoomStatusLabel(this);
     update();
+    emit viewTransformChanged();
     return;
   }
 
@@ -605,6 +610,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
     state.lastPanPos = current;
     updateCursorForState(std::nullopt);
     update();
+    if (!delta.isNull()) emit viewTransformChanged();
     return;
   }
 
@@ -616,6 +622,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
     state.lastPanPos = current;
     updateCursorForState(std::nullopt);
     update();
+    if (!delta.isNull()) emit viewTransformChanged();
     return;
   }
 
@@ -774,6 +781,7 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
   updateZoomStatusLabel(this);
   updateCursorForState(mapToCanvas(event->position().toPoint()));
   update();
+  emit viewTransformChanged();
   event->accept();
 }
 
