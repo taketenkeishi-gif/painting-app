@@ -56,7 +56,7 @@ constexpr int kPaperRole = Qt::UserRole + 12;
 constexpr int kActiveRole = Qt::UserRole + 13;
 constexpr int kEditTargetRole = Qt::UserRole + 14;  ///< 0=Image, 1=Mask
 
-constexpr int kLayerRowHeight = 42;
+constexpr int kLayerRowHeight = 36;
 constexpr int kLayerThumbWidth = 34;
 constexpr int kLayerThumbHeight = 26;
 constexpr int kMaskThumbWidth = 26;
@@ -533,7 +533,7 @@ QString layerPaintName(const QModelIndex& index) {
 
 LayerPanel::LayerPanel(QWidget* parent)
     : QWidget(parent),
-      m_headerLabel(new QLabel(QStringLiteral("レイヤー"), this)),
+      m_headerLabel(nullptr), // removed: must not exist with text matching dock windowTitle "レイヤー"
       m_filterEdit(new QLineEdit(this)),
       m_layerList(new QListWidget(this)),
       m_opacityLabel(new QLabel(QStringLiteral("不透明度: 100%"), this)),
@@ -557,7 +557,7 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_stateGroup(new QGroupBox(QString(), this)),
       m_primaryGrid(new QGridLayout()),
       m_stateGrid(new QGridLayout()) {
-  m_headerLabel->setStyleSheet("font-weight:700;");
+  // m_headerLabel is nullptr — not created
   m_primaryGroup->setTitle(QString());
   m_stateGroup->setTitle(QString());
 
@@ -764,7 +764,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   opacityRow->setSpacing(4);
   opacityRow->addWidget(m_opacitySlider, 1);
   opacityRow->addWidget(m_opacitySpin, 0);
-  layout->addWidget(m_headerLabel);
+  // m_headerLabel deleted — never add to layout
   layout->addWidget(m_filterEdit);
   layout->addWidget(m_layerList, 1);
   layout->addWidget(m_opacityLabel);

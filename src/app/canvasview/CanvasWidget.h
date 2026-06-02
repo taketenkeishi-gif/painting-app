@@ -30,6 +30,7 @@ public:
   void resetZoom();
   void fitToScreen();
   int zoomPercent() const;
+  QRectF visibleCanvasFractionF() const; // normalized 0..1 rect of visible canvas area
   void setGridVisible(bool visible);
   void setOverlayVisible(bool visible);
   void resetRotation();

@@ -920,6 +920,19 @@ QRect CanvasWidget::canvasRect() const {
   return QRect(x, y, scaledW, scaledH);
 }
 
+QRectF CanvasWidget::visibleCanvasFractionF() const {
+  if (m_image.isNull()) return QRectF(0, 0, 1, 1);
+  const QRect cr = canvasRect();
+  if (cr.width() <= 0 || cr.height() <= 0) return QRectF(0, 0, 1, 1);
+  const QRect visible = cr.intersected(rect());
+  if (visible.isEmpty()) return QRectF(0, 0, 1, 1);
+  const double fx = (visible.x() - cr.x()) / double(cr.width());
+  const double fy = (visible.y() - cr.y()) / double(cr.height());
+  const double fw = visible.width() / double(cr.width());
+  const double fh = visible.height() / double(cr.height());
+  return QRectF(qMax(0.0, fx), qMax(0.0, fy), qMin(1.0, fw), qMin(1.0, fh));
+}
+
 std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) const {
   if (m_image.isNull()) {
     return std::nullopt;

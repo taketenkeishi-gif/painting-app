@@ -240,70 +240,47 @@ public:
     painter->setPen(QPen(border, selected ? 1.5 : 1.0));
     painter->drawPath(cardPath);
 
-    // ── Preview area (top portion of tile) ───────────────────────────────
-    const int labelH = 18;
-    const QRectF previewRect(
-        rect.left() + 4.0,
-        rect.top() + 4.0,
-        rect.width() - 8.0,
-        rect.height() - labelH - 8.0);
+    // ── Compact row layout: mini-stroke icon left, text right ────────────
+    const int iconW = 28;
+    const QRectF iconRect(rect.left() + 2.0, rect.top() + 2.0, iconW - 4.0, rect.height() - 4.0);
+    const QRect  textRect(rect.left() + iconW + 2, rect.top(), rect.width() - iconW - 4, rect.height());
 
+    // Mini stroke preview in icon area
     painter->save();
-    painter->setClipRect(QRectF(rect.left() + 1, rect.top() + 1, rect.width() - 2, rect.height() - labelH - 1));
+    painter->setClipRect(iconRect);
     painter->setRenderHint(QPainter::Antialiasing, true);
-
     if (isSelectionSubTool(id)) {
-      drawSelectionIcon(painter, id, previewRect, selected, enabled);
+      drawSelectionIcon(painter, id, iconRect, selected, enabled);
     } else {
-      QColor stroke = selected ? QColor(255, 255, 255, 180) : QColor(210, 225, 248, 140);
-      qreal penW = 2.8;
-      if (id.contains("hard")) {
-        penW = 4.5;
-        stroke.setAlpha(selected ? 210 : 170);
-      } else if (id.contains("soft")) {
-        penW = 6.5;
-        stroke.setAlpha(selected ? 100 : 65);
-      } else if (id.contains("airbrush")) {
-        penW = 9.0;
-        stroke.setAlpha(selected ? 70 : 45);
-      } else if (id.contains("fill")) {
-        penW = 10.0;
-        stroke.setAlpha(selected ? 100 : 60);
-      } else if (id.contains("vector")) {
-        penW = 1.8;
-        stroke.setAlpha(selected ? 220 : 160);
-      } else if (id.contains("eraser")) {
-        stroke = QColor(230, 235, 245, selected ? 150 : 95);
-        penW = 4.0;
-      }
-      if (!enabled) {
-        stroke.setAlpha(stroke.alpha() / 4);
-      }
-      QPen strokePen(stroke, penW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-      painter->setPen(strokePen);
+      QColor stroke = selected ? QColor(255, 255, 255, 200) : QColor(210, 225, 248, 160);
+      qreal penW = 2.0;
+      if (id.contains("hard")) { penW = 3.5; stroke.setAlpha(selected ? 220 : 180); }
+      else if (id.contains("soft")) { penW = 5.0; stroke.setAlpha(selected ? 110 : 75); }
+      else if (id.contains("airbrush")) { penW = 7.0; stroke.setAlpha(selected ? 80 : 55); }
+      else if (id.contains("fill")) { penW = 8.0; stroke.setAlpha(selected ? 110 : 70); }
+      else if (id.contains("vector")) { penW = 1.5; stroke.setAlpha(selected ? 230 : 170); }
+      else if (id.contains("eraser")) { stroke = QColor(230, 235, 245, selected ? 160 : 105); penW = 3.0; }
+      if (!enabled) stroke.setAlpha(stroke.alpha() / 4);
+      painter->setPen(QPen(stroke, penW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
       QPainterPath path;
-      path.moveTo(previewRect.left(), previewRect.center().y() + previewRect.height() * 0.15);
+      path.moveTo(iconRect.left(), iconRect.center().y() + iconRect.height() * 0.15);
       path.cubicTo(
-          previewRect.left() + previewRect.width() * 0.25, previewRect.top() + 2,
-          previewRect.left() + previewRect.width() * 0.60, previewRect.bottom() - 2,
-          previewRect.right(), previewRect.center().y() - previewRect.height() * 0.12);
+          iconRect.left() + iconRect.width() * 0.25, iconRect.top() + 1,
+          iconRect.left() + iconRect.width() * 0.65, iconRect.bottom() - 1,
+          iconRect.right(), iconRect.center().y() - iconRect.height() * 0.12);
       painter->drawPath(path);
     }
-
     painter->restore();
 
-    // ── Label (bottom of tile) ────────────────────────────────────────────
-    const QRect labelRect(rect.left(), rect.bottom() - labelH, rect.width(), labelH);
-    painter->fillRect(labelRect, selected ? QColor(0x18, 0x32, 0x68, 180) : QColor(0x13, 0x15, 0x1c, 160));
-
+    // Tool name text
     const QString text = index.data(Qt::DisplayRole).toString();
     painter->setPen(enabled ? (selected ? QColor("#edf0f9") : QColor("#c5cde0"))
                             : QColor("#4a5268"));
     QFont f = painter->font();
-    f.setPointSizeF(7.5);
+    f.setPointSizeF(8.5);
     f.setBold(selected);
     painter->setFont(f);
-    painter->drawText(labelRect.adjusted(3, 0, -3, 0), Qt::AlignVCenter | Qt::AlignHCenter, text);
+    painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, text);
 
     painter->restore();
   }
@@ -311,7 +288,7 @@ public:
   QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
     Q_UNUSED(option);
     Q_UNUSED(index);
-    return QSize(86, 70);
+    return QSize(86, 32);
   }
 };
 
@@ -387,22 +364,28 @@ SubToolPanel::SubToolPanel(QWidget* parent)
       "QToolButton { min-height: 20px; min-width: 20px; padding: 1px; background: #3a3a3a; border: 1px solid #1e1e1e; border-radius: 2px; }"
       "QToolButton:hover { background: #484848; }");
   auto* layout = new QVBoxLayout(this);
-  layout->setContentsMargins(4, 4, 4, 4);
-  layout->setSpacing(3);
+  layout->setContentsMargins(1, 1, 1, 1);
+  layout->setSpacing(1);
 
+  // Tool/subtool name labels: compact, single-line
   m_toolNameLabel->setStyleSheet(
-      "font-weight: 700; font-size: 12px; color: #e0e0e0;"
-      "padding: 4px 4px 2px 4px; border-bottom: 1px solid #1a1a1a;");
+      "font-weight: 700; font-size: 11px; color: #e0e0e0;"
+      "padding: 1px 4px; border-bottom: 1px solid #1a1a1a;");
+  m_toolNameLabel->setFixedHeight(18);
   m_summaryLabel->setStyleSheet("color: #909090; font-size: 10px; padding: 0 4px;");
-  m_summaryLabel->setWordWrap(true);
+  m_summaryLabel->setWordWrap(false);
+  m_summaryLabel->setFixedHeight(16);
   m_searchEdit->setPlaceholderText(QString::fromUtf8(u8"サブツールを検索..."));
+  m_searchEdit->setFixedHeight(20);
   m_createButton->setAutoRaise(true);
   m_createButton->setIcon(app::ui::icon("layer_add", 16));
   m_createButton->setIconSize(QSize(14, 14));
+  m_createButton->setFixedSize(20, 20);
   m_createButton->setToolTip(QString::fromUtf8(u8"新しいサブツールを作成"));
   m_settingsButton->setAutoRaise(true);
   m_settingsButton->setIcon(app::ui::icon("settings", 16));
   m_settingsButton->setIconSize(QSize(14, 14));
+  m_settingsButton->setFixedSize(20, 20);
   m_settingsButton->setToolTip(QString::fromUtf8(u8"サブツール設定"));
   m_settingsButton->setPopupMode(QToolButton::InstantPopup);
   m_settingsButton->setMenu(m_settingsMenu);
@@ -414,49 +397,47 @@ SubToolPanel::SubToolPanel(QWidget* parent)
   auto* deleteAction = m_settingsMenu->addAction(app::ui::icon("delete", 16), QString::fromUtf8(u8"削除"));
   auto* resetAction = m_settingsMenu->addAction(QString::fromUtf8(u8"初期化"));
 
-  m_subToolList->setViewMode(QListWidget::IconMode);
-  m_subToolList->setResizeMode(QListWidget::Adjust);
+  // ListMode: single column, compact rows, spacing=0
+  m_subToolList->setViewMode(QListWidget::ListMode);
+  m_subToolList->setResizeMode(QListWidget::Fixed);
   m_subToolList->setMovement(QListWidget::Static);
   m_subToolList->setSelectionMode(QAbstractItemView::SingleSelection);
   m_subToolList->setEditTriggers(QAbstractItemView::NoEditTriggers);
   m_subToolList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   m_subToolList->setUniformItemSizes(true);
   m_subToolList->setItemDelegate(new SubToolDelegate(m_subToolList));
-  m_subToolList->setSpacing(2);
-  m_subToolList->setGridSize(QSize(90, 74));
+  m_subToolList->setSpacing(0);
   m_subToolList->setMouseTracking(true);
-  m_subToolList->setWordWrap(true);
+  m_subToolList->setWordWrap(false);
   m_subToolList->setStyleSheet(
-      "QListWidget { background: #13151c; border: none; outline: none; padding: 2px; }"
-      "QListWidget::item { border: none; padding: 0; background: transparent; }"
+      "QListWidget { background: #13151c; border: none; outline: none; padding: 0px; }"
+      "QListWidget::item { border: none; padding: 0px; margin: 0px; background: transparent; }"
       "QListWidget::item:hover { background: transparent; }"
       "QListWidget::item:selected { background: transparent; }");
 
+  // Search row: search field + action buttons, max 2px margins
   m_searchRowLayout = new QHBoxLayout();
   m_searchRowLayout->setContentsMargins(0, 0, 0, 0);
-  m_searchRowLayout->setSpacing(3);
+  m_searchRowLayout->setSpacing(2);
   m_searchRowLayout->addWidget(m_searchEdit, 1);
-  auto* searchLabel = new QLabel(QString::fromUtf8(u8"一覧"), this);
-  searchLabel->setStyleSheet("font-size:10px; color:#9fb1c8;");
-  m_searchRowLayout->addWidget(searchLabel);
 
-  layout->addWidget(m_toolNameLabel);
+  // Compact header row: tool name + action buttons
+  auto* headerRow = new QHBoxLayout();
+  headerRow->setContentsMargins(0, 0, 0, 0);
+  headerRow->setSpacing(2);
+  headerRow->addWidget(m_toolNameLabel, 1);
+  headerRow->addWidget(m_createButton);
+  headerRow->addWidget(m_settingsButton);
+
+  layout->addLayout(headerRow);
   layout->addWidget(m_summaryLabel);
-  auto* listTitle = new QLabel(QString::fromUtf8(u8"プリセット一覧"), this);
-  listTitle->setStyleSheet(
-      "font-weight: 600; font-size: 10px; color: #888888;"
-      "padding: 2px 4px; background: #2a2a2a; border-bottom: 1px solid #1a1a1a;");
-  layout->addWidget(listTitle);
   layout->addLayout(m_searchRowLayout);
-  layout->addWidget(m_subToolList);
+  layout->addWidget(m_subToolList, 1);
 
   m_compactActionsLayout = new QHBoxLayout();
   m_compactActionsLayout->setContentsMargins(0, 0, 0, 0);
   m_compactActionsLayout->setSpacing(1);
-  m_compactActionsLayout->addStretch(1);
-  m_compactActionsLayout->addWidget(m_createButton);
-  m_compactActionsLayout->addWidget(m_settingsButton);
-  layout->addLayout(m_compactActionsLayout);
+  // buttons are now in headerRow, not here
 
   connect(m_subToolList, &QListWidget::currentRowChanged, this, &SubToolPanel::onCurrentSubToolChanged);
   connect(m_searchEdit, &QLineEdit::textChanged, this, &SubToolPanel::onFilterTextChanged);
@@ -534,7 +515,7 @@ void SubToolPanel::refreshFromController() {
         item.enabled
             ? (item.hint.empty() ? localizedName : QString::fromStdString(item.hint))
             : QString::fromUtf8(u8"現在のレイヤー種別では使用できません"));
-    row->setSizeHint(QSize(86, 70));
+    row->setSizeHint(QSize(86, 32));
     hasEnabledRow = hasEnabledRow || item.enabled;
     if (item.active) {
       m_subToolList->setCurrentItem(row);

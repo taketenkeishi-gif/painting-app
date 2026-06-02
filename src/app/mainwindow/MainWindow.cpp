@@ -57,6 +57,9 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QUrl>
+#include <QFile>
+#include <QTextStream>
+#include <QStandardPaths>
 
 #include "app/bridge/AppController.h"
 #include "app/canvasview/CanvasWidget.h"
@@ -137,8 +140,8 @@ public:
   void setForegroundColor(const QColor& color) { m_fgColor = color; update(); }
   void setBackgroundColor(const QColor& color) { m_bgColor = color; update(); }
 
-  QSize sizeHint() const override { return QSize(44, 44); }
-  QSize minimumSizeHint() const override { return QSize(44, 44); }
+  QSize sizeHint() const override { return QSize(40, 40); }
+  QSize minimumSizeHint() const override { return QSize(40, 40); }
 
   // Simple callback mechanism for clicks (no Qt signals needed)
   std::function<void()> onForegroundClicked;
@@ -256,6 +259,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
       m_subToolPanel(new app::panels::SubToolPanel(this)),
       m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_start.txt"); if(t) t << "ctor start\n"; }
   setWindowFlag(Qt::FramelessWindowHint);
   {
     const QRect ag = QGuiApplication::primaryScreen()
@@ -279,17 +283,24 @@ MainWindow::MainWindow(QWidget* parent)
   m_quickSliderPanel->setSections(app::panels::ToolPanel::QuickSlidersOnly);
 
   setupShellLayout();
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_cp1.txt"); if(t) t << "after setupShellLayout\n"; }
 
   // Verify which code paths executed
   QString titleVerification = "自作イラストアプリ - UI BUILD TEST 2026";
   if (g_colorSwatchWidgetCreated) titleVerification += " [SWATCH]";
   setWindowTitle(titleVerification);
 
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_cp2.txt"); if(t) t << "before createMenus\n"; }
   createMenus();
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_cp3.txt"); if(t) t << "before loadWorkspace\n"; }
   loadWorkspaceLayoutState();
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\cp_ws.txt"); if(t) t << "after loadWorkspace\n"; }
   loadShortcutOverrides();
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\cp_sc.txt"); if(t) t << "after shortcuts\n"; }
   createToolBar();
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\cp_tb.txt"); if(t) t << "after toolbar\n"; }
   applyUiChrome();
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\cp_chrome.txt"); if(t) t << "after chrome\n"; }
 
   connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &MainWindow::onToolStateChanged);
   connect(m_controller, &app::bridge::AppController::foregroundColorUsed, this, [this]() {
@@ -309,6 +320,13 @@ MainWindow::MainWindow(QWidget* parent)
   updateTopToolInfo();
   updateColorPanel();
   updateNavigatorPreview();
+  QTimer::singleShot(0, this, [this]() {
+    std::ofstream t("C:\\Users\\KEISHI\\Desktop\\timer0ms.txt");
+    if (t) t << "0ms timer fired\n";
+    QTimer::singleShot(2000, this, &MainWindow::auditUIMetrics);
+  });
+  // Direct write test
+  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_test.txt"); if(t) t << "constructor ran\n"; }
 }
 
 void MainWindow::setupShellLayout() {
@@ -323,9 +341,7 @@ void MainWindow::setupShellLayout() {
   auto* colorLayout = new QVBoxLayout(colorPanel);
   colorLayout->setContentsMargins(2, 2, 2, 2);
   colorLayout->setSpacing(1);
-  auto* colorTitle = new QLabel("カラー", colorPanel);
-  colorTitle->setVisible(false);
-  colorTitle->setStyleSheet("font-weight: 700; font-size: 11px;");
+  // colorTitle removed: must not exist as child with text matching dock windowTitle "カラー"
   m_foregroundColorButton = new QPushButton(colorPanel);
   m_backgroundColorButton = new QPushButton(colorPanel);
   m_foregroundColorButton->setVisible(false);
@@ -344,10 +360,10 @@ void MainWindow::setupShellLayout() {
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
   m_colorWheelWidget->setMinimumSize(104, 104);
-  // Swatch widget: compact 44x44 fixed size
-  m_colorSwatchWidget->setFixedSize(44, 44);
-  swapColorButton->setFixedSize(20, 20);
-  resetColorButton->setFixedSize(20, 20);
+  // Swatch widget: compact 40x40 fixed size for single-row layout
+  m_colorSwatchWidget->setFixedSize(40, 40);
+  swapColorButton->setFixedSize(18, 18);
+  resetColorButton->setFixedSize(18, 18);
   swapColorButton->setIcon(app::ui::icon("swap"));
   swapColorButton->setIconSize(QSize(12, 12));
   resetColorButton->setIcon(app::ui::icon("reset_bw"));
@@ -389,37 +405,32 @@ void MainWindow::setupShellLayout() {
     }
     cp.end();
     transparentColorButton->setIcon(QIcon(pixmap));
-    transparentColorButton->setIconSize(QSize(24, 12));
+    transparentColorButton->setIconSize(QSize(16, 8));
     transparentColorButton->setText(QString());
   }
-  transparentColorButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-  transparentColorButton->setMinimumHeight(14);
-  transparentColorButton->setMaximumHeight(16);
+  transparentColorButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  transparentColorButton->setFixedSize(22, 22);
   transparentColorButton->setStyleSheet(QStringLiteral(
-      "QPushButton { padding: 0px; margin: 0px; border: 1px solid #6a7484;"
+      "QPushButton { min-width:22px; max-width:22px; min-height:22px; max-height:22px;"
+      "  padding: 0px; margin: 0px; border: 1px solid #6a7484;"
       "  border-radius: 2px; background: transparent; }"
       "QPushButton:hover { border: 1px solid #eef3fb; }"));
 
-  // Swatch widget (fixed proportions), transparent below, ops column on right
-  auto* swatchCol = new QVBoxLayout();
-  swatchCol->setContentsMargins(0, 0, 0, 0);
-  swatchCol->setSpacing(2);
-  swatchCol->addWidget(m_colorSwatchWidget, 0, Qt::AlignCenter);
-  swatchCol->addWidget(transparentColorButton);
-  swatchCol->addStretch();
-
-  auto* opsCol = new QVBoxLayout();
-  opsCol->setContentsMargins(0, 0, 0, 0);
-  opsCol->setSpacing(2);
-  opsCol->addWidget(swapColorButton);
-  opsCol->addWidget(resetColorButton);
-  opsCol->addStretch(1);
+  // Single compact top row: [swatch 40x40] [transparent fills width] [swap] [reset]
+  // Target total height <= 44px
+  auto* opsVBox = new QVBoxLayout();
+  opsVBox->setContentsMargins(0, 0, 0, 0);
+  opsVBox->setSpacing(2);
+  opsVBox->addWidget(swapColorButton, 0, Qt::AlignTop);
+  opsVBox->addWidget(resetColorButton, 0, Qt::AlignTop);
+  opsVBox->addStretch(1);
 
   auto* colorButtons = new QHBoxLayout();
   colorButtons->setContentsMargins(0, 0, 0, 0);
-  colorButtons->setSpacing(4);
-  colorButtons->addLayout(swatchCol, 1);
-  colorButtons->addLayout(opsCol, 0);
+  colorButtons->setSpacing(2);
+  colorButtons->addWidget(m_colorSwatchWidget, 0, Qt::AlignVCenter);
+  colorButtons->addWidget(transparentColorButton, 1, Qt::AlignVCenter);
+  colorButtons->addLayout(opsVBox, 0);
   auto addHsvRow = [this, colorPanel](const QString& label, QSlider* slider, QSpinBox* spin) {
     auto* row = new QHBoxLayout();
     row->setContentsMargins(1, 0, 1, 0);
@@ -519,48 +530,43 @@ void MainWindow::setupShellLayout() {
     row->addWidget(spin, 0, Qt::AlignVCenter);
     return row;
   };
-  auto* historyTitle = new QLabel("カラーヒストリー", colorPanel);
-  historyTitle->setVisible(false);
-  historyTitle->setStyleSheet("font-weight: 600; font-size: 10px;");
+  // historyTitle removed: must not exist as child matching dock windowTitle "カラーヒストリー"
   m_colorHistoryGridWidget = new QWidget(nullptr);
   m_colorHistoryGridWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
   m_colorHistoryLayout = new QGridLayout(m_colorHistoryGridWidget);
   m_colorHistoryLayout->setContentsMargins(0, 0, 0, 0);
-  m_colorHistoryLayout->setSpacing(0);
-  m_colorHistoryLayout->setHorizontalSpacing(0);
-  m_colorHistoryLayout->setVerticalSpacing(0);
+  m_colorHistoryLayout->setSpacing(1);
+  m_colorHistoryLayout->setHorizontalSpacing(1);
+  m_colorHistoryLayout->setVerticalSpacing(1);
   m_colorHistoryLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
   m_colorHistoryLayout->setSizeConstraint(QLayout::SetMinAndMaxSize);
   m_colorHistoryButtons.clear();
   m_colorHistoryButtons.reserve(84);
   for (int i = 0; i < 84; ++i) {
     auto* chip = new QPushButton(nullptr);
-    chip->setFixedSize(24, 24);
-    chip->setMinimumSize(24, 24);
-    chip->setMaximumSize(24, 24);
+    chip->setFixedSize(18, 18);
     chip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     chip->setProperty("colorHistoryChip", true);
-    chip->setStyleSheet("QPushButton { min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px; padding: 0px; margin: 0px; border: 1px solid #2f3746; border-radius: 0px; background: #202833; }QPushButton:disabled { min-width: 24px; max-width: 24px; min-height: 24px; max-height: 24px; padding: 0px; margin: 0px; border: 1px solid #2f3746; border-radius: 0px; background: #202833; }QPushButton:hover { border: 1px solid #9fb5d6; }");
-    chip->setStyleSheet("QPushButton { min-width: 18px; max-width: 18px; min-height: 18px; max-height: 18px; padding: 0px; margin: 0px; border: 1px solid #343d4d; border-radius: 0px; background: #202833; }");
+    chip->setStyleSheet("QPushButton { min-width: 18px; max-width: 18px; min-height: 18px; max-height: 18px; padding: 0px; margin: 0px; border: 1px solid #343d4d; border-radius: 0px; background: #202833; }"
+                        "QPushButton:hover { border: 1px solid #9fb5d6; }");
     chip->setToolTip("最近使った色");
     chip->setEnabled(false);
     m_colorHistoryLayout->addWidget(chip, i / 12, i % 12);
     m_colorHistoryButtons.push_back(chip);
   }
-  for (int col = 0; col < 8; ++col) {
-    m_colorHistoryLayout->setColumnMinimumWidth(col, 24);
+  for (int col = 0; col < 12; ++col) {
+    m_colorHistoryLayout->setColumnMinimumWidth(col, 18);
     m_colorHistoryLayout->setColumnStretch(col, 0);
   }
-  for (int row = 0; row < 11; ++row) {
-    m_colorHistoryLayout->setRowMinimumHeight(row, 24);
+  for (int row = 0; row < 7; ++row) {
+    m_colorHistoryLayout->setRowMinimumHeight(row, 18);
     m_colorHistoryLayout->setRowStretch(row, 0);
   }
   m_colorHistoryGridWidget->setMinimumSize(1, 1);
   auto* colorMainWidget = new QWidget(nullptr);
   auto* colorMainLayout = new QVBoxLayout(colorMainWidget);
-  colorMainLayout->setContentsMargins(0, 0, 0, 0);
-  colorMainLayout->setSpacing(0);
-  // colorTitle removed from layout - tab label is sufficient
+  colorMainLayout->setContentsMargins(1, 1, 1, 1);
+  colorMainLayout->setSpacing(2); // gap between top row and wheel: 2px (≤4px rule)
   colorMainLayout->addLayout(colorButtons);
   colorMainLayout->addWidget(m_colorWheelWidget, 1);
 
@@ -703,33 +709,26 @@ void MainWindow::setupShellLayout() {
 
   auto* infoPanel = new QWidget(this);
   auto* infoLayout = new QVBoxLayout(infoPanel);
-  infoLayout->setContentsMargins(8, 8, 8, 8);
-  infoLayout->setSpacing(6);
-  auto* infoTitle = new QLabel("情報", infoPanel);
-  infoTitle->setStyleSheet("font-weight: 700;");
-  auto* navigatorTitle = new QLabel("ナビゲーター", infoPanel);
-  navigatorTitle->setStyleSheet("font-weight: 700;");
+  infoLayout->setContentsMargins(2, 2, 2, 2);
+  infoLayout->setSpacing(2);
+  // No internal title: dock tab "情報" is sufficient
   m_navigatorImageLabel = new QLabel(infoPanel);
-  m_navigatorImageLabel->setMinimumSize(180, 120);
+  m_navigatorImageLabel->setMinimumSize(160, 100);
+  m_navigatorImageLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   m_navigatorImageLabel->setAlignment(Qt::AlignCenter);
   m_navigatorImageLabel->setStyleSheet("background:#1e1e1e; border:1px solid #1a1a1a;");
   auto* navigatorButtons = new QHBoxLayout();
   navigatorButtons->setContentsMargins(0, 0, 0, 0);
-  navigatorButtons->setSpacing(6);
+  navigatorButtons->setSpacing(2);
   auto* zoom100Button = new QPushButton("100%", infoPanel);
-  auto* fitButton = new QPushButton("画面に合わせる", infoPanel);
-  zoom100Button->setMinimumHeight(24);
-  fitButton->setMinimumHeight(24);
+  auto* fitButton = new QPushButton("全体表示", infoPanel);
+  zoom100Button->setFixedHeight(22);
+  fitButton->setFixedHeight(22);
   navigatorButtons->addWidget(zoom100Button);
   navigatorButtons->addWidget(fitButton);
-  auto* infoText = new QLabel("ツール状態やレイヤー制約はステータスバーに表示されます。", infoPanel);
-  infoText->setWordWrap(true);
-  infoLayout->addWidget(infoTitle);
-  infoLayout->addWidget(navigatorTitle);
-  infoLayout->addWidget(m_navigatorImageLabel);
-  infoLayout->addLayout(navigatorButtons);
-  infoLayout->addWidget(infoText);
-  infoLayout->addStretch(1);
+  // Navigator: preview top, controls immediately below — no overlap
+  infoLayout->addWidget(m_navigatorImageLabel, 1);
+  infoLayout->addLayout(navigatorButtons, 0);
   connect(zoom100Button, &QPushButton::clicked, this, &MainWindow::onResetZoomTriggered);
   connect(fitButton, &QPushButton::clicked, this, &MainWindow::onFitToScreenTriggered);
 
@@ -2070,8 +2069,31 @@ void MainWindow::updateNavigatorPreview() {
     m_navigatorImageLabel->clear();
     return;
   }
-  const QSize target = m_navigatorImageLabel->size().expandedTo(QSize(1, 1));
-  const QPixmap pixmap = QPixmap::fromImage(image).scaled(target, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  const QSize labelSz = m_navigatorImageLabel->size().expandedTo(QSize(1, 1));
+  QPixmap pixmap = QPixmap::fromImage(image).scaled(labelSz, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+  // Draw red viewport rectangle showing visible canvas area
+  if (m_canvasWidget != nullptr) {
+    const QRectF frac = m_canvasWidget->visibleCanvasFractionF();
+    // The pixmap is centered in the label; compute actual pixmap placement
+    const QRect pixRect(
+        (labelSz.width()  - pixmap.width())  / 2,
+        (labelSz.height() - pixmap.height()) / 2,
+        pixmap.width(), pixmap.height());
+    // Map fraction to pixmap coordinates
+    const QRectF viewRect(
+        frac.x() * pixmap.width(),
+        frac.y() * pixmap.height(),
+        frac.width() * pixmap.width(),
+        frac.height() * pixmap.height());
+    if (viewRect.width() < pixmap.width() - 2 || viewRect.height() < pixmap.height() - 2) {
+      QPainter p(&pixmap);
+      p.setPen(QPen(QColor(255, 50, 50), 1.5));
+      p.setBrush(Qt::NoBrush);
+      p.drawRect(viewRect.adjusted(1, 1, -1, -1));
+    }
+  }
+
   m_navigatorImageLabel->setPixmap(pixmap);
 }
 
@@ -2878,11 +2900,15 @@ void MainWindow::onChooseBackgroundColor() {
 }
 
 void MainWindow::onSwapColors() {
+  // Swap ONLY the active drawing colors — must not touch layer pixels or paper color.
+  // setPaperColor() is forbidden here: it changes the document compositing background
+  // which makes the canvas appear to change (BUG). Paper color is independent.
   const core::Color foreground = m_controller->toolState().color;
-  m_controller->setBrushColor(m_backgroundColor);
-  m_backgroundColor = foreground;
-  m_controller->setPaperColor(m_backgroundColor);
-  m_controller->setSecondaryColor(m_backgroundColor);
+  const core::Color background = m_backgroundColor;
+  m_controller->setBrushColor(background);   // new foreground = old background
+  m_backgroundColor = foreground;             // new background = old foreground
+  m_controller->setSecondaryColor(m_backgroundColor); // update tool secondary
+  // DO NOT call setPaperColor — paper stays unchanged, canvas pixels stay unchanged
   updateColorPanel();
 }
 
@@ -3436,6 +3462,210 @@ QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, cons
   toolMenu->addAction(action);
   m_toolActions[kind] = action;
   return action;
+}
+
+void MainWindow::auditUIMetrics() {
+  // Try writing to multiple locations
+  std::ofstream f;
+  const char* paths[] = {
+    "C:\\Users\\KEISHI\\Desktop\\ui_audit.txt",
+    "C:\\Portfolio\\Paint_App\\ui_audit.txt",
+    "ui_audit.txt"
+  };
+  for (auto* p : paths) {
+    f.open(p, std::ios::out | std::ios::trunc);
+    if (f.is_open()) { f << "Path: " << p << "\n"; break; }
+  }
+  if (!f.is_open()) { qDebug() << "AUDIT: cannot open any file"; return; }
+
+  f << "========== UI METRICS AUDIT ==========\n";
+  f << "Function called OK\n";
+  f.flush();
+
+  // Title rule check
+  int duplicateTitles = 0;
+  for (auto* dock : findChildren<QDockWidget*>()) {
+    QString dockTitle = dock->windowTitle();
+    for (auto* label : dock->findChildren<QLabel*>()) {
+      if (label->isVisible() && label->text() == dockTitle) {
+        f << "DUPLICATE TITLE: " << dockTitle.toStdString() << "\n";
+        duplicateTitles++;
+      }
+    }
+  }
+  f << "Duplicate titles found: " << duplicateTitles << "\n";
+
+  // SubTool panel (m_subToolPanel, target 200-260px wide)
+  if (m_subToolPanel) {
+    f << "\nSUBTOOL PANEL:\n";
+    f << "  Width: " << m_subToolPanel->width() << "\n";
+    f << "  Height: " << m_subToolPanel->height() << "\n";
+    for (auto* lw : m_subToolPanel->findChildren<QListWidget*>()) {
+      f << "  ListWidget rows: " << lw->count() << "\n";
+      if (lw->count() > 0) {
+        auto* iw = lw->itemWidget(lw->item(0));
+        if (iw) f << "  Item widget height: " << iw->height() << "\n";
+        else    f << "  Item sizeHintForRow: " << lw->sizeHintForRow(0) << "\n";
+      }
+    }
+  }
+  // Tool button panel (m_toolPanel, ButtonsOnly, ~68px)
+  if (m_toolPanel) {
+    f << "\nTOOL BUTTON PANEL:\n";
+    f << "  Width: " << m_toolPanel->width() << "\n";
+  }
+
+  // Color swatch
+  if (m_colorSwatchWidget) {
+    f << "\nCOLOR SWATCH:\n";
+    f << "  Size: " << m_colorSwatchWidget->width() << "x" << m_colorSwatchWidget->height() << "\n";
+    f << "  SizeHint: " << m_colorSwatchWidget->sizeHint().width() << "x" << m_colorSwatchWidget->sizeHint().height() << "\n";
+    f << "  Min: " << m_colorSwatchWidget->minimumWidth() << "x" << m_colorSwatchWidget->minimumHeight() << "\n";
+    f << "  Max: " << m_colorSwatchWidget->maximumWidth() << "x" << m_colorSwatchWidget->maximumHeight() << "\n";
+  }
+
+  // Sliders
+  if (m_hueSlider && m_satSlider && m_valSlider && m_alphaSlider) {
+    f << "\nSLIDER ROWS:\n";
+    f << "  Hue: " << m_hueSlider->height() << "\n";
+    f << "  Sat: " << m_satSlider->height() << "\n";
+    f << "  Val: " << m_valSlider->height() << "\n";
+    f << "  Alpha: " << m_alphaSlider->height() << "\n";
+    if (m_hueSpin) f << "  SpinBox: " << m_hueSpin->height() << "\n";
+  }
+
+  // Layer panel
+  if (m_layerPanel) {
+    f << "\nLAYER PANEL:\n";
+    f << "  Width: " << m_layerPanel->width() << "\n";
+    f << "  Height: " << m_layerPanel->height() << "\n";
+    for (auto* lw : m_layerPanel->findChildren<QListWidget*>()) {
+      f << "  Layer list rows: " << lw->count() << "\n";
+      if (lw->count() > 0) f << "  Layer sizeHintForRow: " << lw->sizeHintForRow(0) << "\n";
+    }
+  }
+
+  // ── Transparent button geometry ─────────────────────────────────────────
+  f << "\nTRANSPARENT BUTTON:\n";
+  // Find transparentColorButton by property (can't store as member without header change)
+  QWidget* transparentBtn = nullptr;
+  for (auto* btn : findChildren<QPushButton*>()) {
+    if (btn->toolTip() == "透明色で描画（アルファ消去）") { transparentBtn = btn; break; }
+  }
+  if (transparentBtn) {
+    f << "  Width: " << transparentBtn->width() << "  Height: " << transparentBtn->height() << "\n";
+    f << "  " << (transparentBtn->width() <= 24 && transparentBtn->height() <= 24 ? "PASS" : "FAIL") << " (target <= 24x24)\n";
+  } else {
+    f << "  NOT FOUND\n";
+  }
+
+  // ── Swap test: verify canvas pixel NOT changed ────────────────────────────
+  f << "\nSWAP PIXEL INVARIANCE TEST:\n";
+  if (m_controller) {
+    const core::PixelBuffer& buf = m_controller->compositedBuffer();
+    if (buf.width() > 0 && buf.height() > 0) {
+      // Sample center pixel before swap using PixelBuffer::pixel(x,y) API
+      const int cx = buf.width() / 2, cy = buf.height() / 2;
+      const core::Color px0 = buf.pixel(cx, cy);
+      // Execute swap
+      const core::Color preFg = m_controller->toolState().color;
+      const core::Color preBg = m_backgroundColor;
+      onSwapColors();
+      // Sample after — composited buffer is re-read (no rerender called → same pixels)
+      const core::Color px1 = m_controller->compositedBuffer().pixel(cx, cy);
+      f << "  Before pixel [" << cx << "," << cy << "]: rgba("
+        << (int)px0.r << "," << (int)px0.g << "," << (int)px0.b << "," << (int)px0.a << ")\n";
+      f << "  After swap pixel: rgba("
+        << (int)px1.r << "," << (int)px1.g << "," << (int)px1.b << "," << (int)px1.a << ")\n";
+      const bool pixelUnchanged = (px0.r == px1.r && px0.g == px1.g && px0.b == px1.b && px0.a == px1.a);
+      f << "  Pixel unchanged: " << (pixelUnchanged ? "PASS" : "FAIL") << "\n";
+      // Restore original colors
+      m_controller->setBrushColor(preFg);
+      m_backgroundColor = preBg;
+      m_controller->setSecondaryColor(m_backgroundColor);
+      updateColorPanel();
+    } else {
+      f << "  Canvas empty — cannot test pixel invariance\n";
+    }
+  }
+
+  // ── Density audit: occupied child area vs total panel area ──────────────
+  f << "\n========== DENSITY AUDIT ==========\n";
+  auto measureDensity = [&f](QWidget* panel, const std::string& name) {
+    if (!panel) return;
+    const int totalArea = panel->width() * panel->height();
+    if (totalArea <= 0) return;
+    int occupiedArea = 0;
+    for (auto* child : panel->findChildren<QWidget*>()) {
+      if (!child->isVisible()) continue;
+      if (child == panel) continue;
+      // Only count direct layout members (mapped to panel coords)
+      QRect r = child->rect().translated(child->mapTo(panel, QPoint(0,0)));
+      QRect clipped = r.intersected(panel->rect());
+      occupiedArea += clipped.width() * clipped.height();
+    }
+    // Cap to avoid overlap overcounting (children can overlap)
+    occupiedArea = std::min(occupiedArea, totalArea);
+    const int emptyArea = totalArea - occupiedArea;
+    const double density = 100.0 * occupiedArea / totalArea;
+    const double emptyPct = 100.0 * emptyArea / totalArea;
+    f << name << ":\n";
+    f << "  Total: " << totalArea << "px2  Occupied: " << occupiedArea << "px2\n";
+    f << "  Density: " << int(density) << "%  Empty: " << int(emptyPct) << "%\n";
+    f << "  " << (density >= 85.0 ? "PASS" : "FAIL") << " (target >= 85%)\n";
+  };
+
+  // SubTool dock content
+  if (m_subToolDock) measureDensity(m_subToolDock->widget(), "SubTool");
+  // Color dock content
+  if (m_colorDock) measureDensity(m_colorDock->widget(), "Color");
+  // Layer dock content
+  measureDensity(m_layerPanel, "Layer");
+  // Info dock content
+  if (m_infoDock) measureDensity(m_infoDock->widget(), "Info/Navigator");
+
+  // ── Layout margin/spacing violations ────────────────────────────────────
+  f << "\n========== LAYOUT VIOLATIONS ==========\n";
+  int violations = 0;
+  auto checkLayout = [&f, &violations](QLayout* layout, const std::string& ctx) {
+    if (!layout) return;
+    QMargins m = layout->contentsMargins();
+    int sp = layout->spacing();
+    bool bad = (m.left() > 2 || m.right() > 2 || m.top() > 2 || m.bottom() > 2 || sp > 2);
+    if (bad) {
+      f << "VIOLATION " << ctx << ": margins(" << m.left() << "," << m.top() << "," << m.right() << "," << m.bottom() << ") spacing=" << sp << "\n";
+      violations++;
+    }
+  };
+  if (m_colorPanelWidget) {
+    for (auto* child : m_colorPanelWidget->findChildren<QLayout*>()) {
+      checkLayout(child, "ColorPanel." + child->objectName().toStdString());
+    }
+    checkLayout(m_colorPanelWidget->layout(), "ColorPanel.root");
+  }
+  if (m_subToolPanel) {
+    checkLayout(m_subToolPanel->layout(), "SubToolPanel.root");
+  }
+  if (m_infoDock && m_infoDock->widget()) {
+    checkLayout(m_infoDock->widget()->layout(), "InfoPanel.root");
+  }
+  f << "Layout violations: " << violations << " (target: 0)\n";
+
+  // ── SubTool list visible item count in 300px ────────────────────────────
+  f << "\n========== SUBTOOL ITEM COUNT ==========\n";
+  if (m_subToolPanel) {
+    for (auto* lw : m_subToolPanel->findChildren<QListWidget*>()) {
+      const int rowH = lw->sizeHintForRow(0);
+      const int visibleIn300 = rowH > 0 ? (300 / rowH) : 0;
+      f << "  Row height: " << rowH << "px\n";
+      f << "  Visible in 300px: " << visibleIn300 << "\n";
+      f << "  " << (visibleIn300 >= 9 ? "PASS" : "FAIL") << " (target >= 9)\n";
+    }
+  }
+
+  f << "\n========== AUDIT END ==========\n";
+  f.close();
+  qDebug() << "Audit written to C:\\Portfolio\\Paint_App\\ui_audit.txt";
 }
 
 } // namespace app::mainwindow

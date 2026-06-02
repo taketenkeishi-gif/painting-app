@@ -146,6 +146,7 @@ private:
   void loadShortcutOverrides();
   void saveShortcutOverride(const QString& commandId, const QKeySequence& sequence);
   QAction* createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut);
+  void auditUIMetrics();
 
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
