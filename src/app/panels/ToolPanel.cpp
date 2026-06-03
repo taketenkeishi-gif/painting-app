@@ -5,6 +5,7 @@
 
 #include <QGridLayout>
 #include <QFrame>
+#include <QScrollArea>
 #include <QColor>
 #include <QLinearGradient>
 #include <QPainter>
@@ -377,15 +378,34 @@ ToolPanel::ToolPanel(QWidget* parent)
   m_buttonGrid->setHorizontalSpacing(2);
   m_buttonGrid->setVerticalSpacing(2);
   m_buttonGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-  m_buttonGridHost->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
-  // Allow the host and panel to shrink to zero width so the scroll area
-  // can make the panel as narrow as the dock.  Column count is recalculated
-  // from the actual viewport width on every resize.
-  m_buttonGridHost->setMinimumSize(0, 0);
-  setMinimumSize(0, 0);
-  m_buttonGridHost->setStyleSheet(QStringLiteral("background: #1a1d27; border-right: 1px solid #2a2e3e;"));
+
+  // Host widget carries the grid layout.
+  // minimumWidth = 0 so the host can be as narrow as the viewport.
+  // Height is NOT forced to 0 — it stays at natural grid height so the
+  // scroll area can show a scrollbar when buttons overflow vertically.
+  m_buttonGridHost->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+  m_buttonGridHost->setMinimumWidth(0);
+  m_buttonGridHost->setStyleSheet(QStringLiteral("background: #1a1d27;"));
   m_buttonGridHost->setLayout(m_buttonGrid);
-  m_rootLayout->addWidget(m_buttonGridHost, 0);
+
+  // ── Internal button scroll area ───────────────────────────────────────────
+  // Vertical scroll ON (buttons overflow downward when dock is narrow).
+  // Horizontal scroll OFF (never clip-scroll sideways — columns shrink instead).
+  // setWidgetResizable(true) makes m_buttonGridHost width track the viewport
+  // width, which is exactly what columnCountForWidth() reads via viewport().
+  m_buttonScrollArea = new QScrollArea(this);
+  m_buttonScrollArea->setFrameShape(QFrame::NoFrame);
+  m_buttonScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_buttonScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  m_buttonScrollArea->setWidgetResizable(true);
+  m_buttonScrollArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  m_buttonScrollArea->setWidget(m_buttonGridHost);
+
+  // ToolPanel itself can be as narrow as needed; height fills whatever the
+  // dock gives it (the internal scroll area handles button overflow).
+  setMinimumWidth(0);
+
+  m_rootLayout->addWidget(m_buttonScrollArea, 1);
 
   auto* quickWrap = new QHBoxLayout(m_quickHost);
   quickWrap->setContentsMargins(0, 3, 0, 4);
@@ -446,7 +466,7 @@ void ToolPanel::setSections(Sections sections) noexcept {
   m_sections = sections;
   const bool showButtons = (m_sections & ButtonsOnly) != 0U;
   const bool showQuick = (m_sections & QuickSlidersOnly) != 0U;
-  m_buttonGridHost->setVisible(showButtons);
+  m_buttonScrollArea->setVisible(showButtons);
   m_quickHost->setVisible(showQuick);
   if (showButtons) {
     relayoutButtons();
@@ -647,18 +667,26 @@ void ToolPanel::relayoutButtons() {
     delete item;
   }
 
-  // Use the panel's own width — it equals the scroll-area viewport width
-  // (setWidgetResizable(true) keeps them in sync), so no stale host value.
-  const int availableWidth = width();
+  // Read the actual viewport width — setWidgetResizable(true) on the internal
+  // scroll area keeps m_buttonGridHost width = viewport width, so this is the
+  // authoritative "how wide are the buttons allowed to be" value.
+  const int availableWidth = (m_buttonScrollArea && m_buttonScrollArea->viewport())
+                             ? m_buttonScrollArea->viewport()->width()
+                             : width();
   const int columns = std::max(1, columnCountForWidth(availableWidth));
 
+  // Place buttons: top-left packed, no centering, no stretch.
   for (int i = 0; i < static_cast<int>(m_buttonOrder.size()); ++i) {
     const int logicalRow = i / columns;
-    const int row = logicalRow * 2;
+    const int row = logicalRow * 2;   // even rows = buttons; odd rows = separators
     const int col = i % columns;
-    m_buttonGrid->addWidget(m_buttonOrder[static_cast<std::size_t>(i)], row, col, Qt::AlignHCenter | Qt::AlignVCenter);
+    m_buttonGrid->addWidget(
+        m_buttonOrder[static_cast<std::size_t>(i)],
+        row, col,
+        Qt::AlignLeft | Qt::AlignTop);
   }
 
+  // Separator lines between button rows (thin 1px dividers).
   const int rowCount = (static_cast<int>(m_buttonOrder.size()) + columns - 1) / columns;
   for (int r = 0; r < rowCount - 1; ++r) {
     auto* separator = new QFrame(m_buttonGridHost);
@@ -671,6 +699,7 @@ void ToolPanel::relayoutButtons() {
     m_buttonGrid->addWidget(separator, r * 2 + 1, 0, 1, columns);
   }
 
+  // No column or row stretch — buttons stay left-top, not distributed.
   for (int c = 0; c < columns; ++c) {
     m_buttonGrid->setColumnStretch(c, 0);
   }
@@ -681,10 +710,11 @@ void ToolPanel::relayoutButtons() {
       m_buttonGrid->setRowMinimumHeight(r * 2 + 1, 1);
     }
   }
+  // Bottom spacer row pushes buttons to the top.
+  m_buttonGrid->setRowStretch(rowCount * 2, 1);
 
   m_buttonGridHost->setMinimumWidth(0);
   m_buttonGridHost->setMaximumWidth(QWIDGETSIZE_MAX);
-  m_buttonGridHost->adjustSize();
 }
 
 } // namespace app::panels

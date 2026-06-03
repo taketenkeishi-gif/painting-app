@@ -8,6 +8,7 @@
 #include "core/tools/ToolType.h"
 
 class QGridLayout;
+class QScrollArea;
 class QToolButton;
 class QSlider;
 class QLabel;
@@ -56,6 +57,7 @@ private:
   app::bridge::AppController* m_controller {nullptr};
   std::map<core::ToolKind, QToolButton*> m_buttons;
   std::vector<QToolButton*> m_buttonOrder;
+  QScrollArea* m_buttonScrollArea {nullptr};
   QWidget* m_buttonGridHost {nullptr};
   QGridLayout* m_buttonGrid {nullptr};
   QWidget* m_quickHost {nullptr};
