@@ -130,97 +130,184 @@ private:
 };
 
 // ── DockTitleBar ──────────────────────────────────────────────────────────────
-// Tab-styled title bar for QDockWidget panels.
-// Using setTitleBarWidget() causes Qt to automatically apply FramelessWindowHint
-// on floating docks (nativeWindowDeco() returns false when a custom title bar
-// is set).  Qt's own event filter on this widget then handles title-bar drag →
-// dock-drag mode → drop indicators → re-dock.  The OS never intercepts the drag
-// as SC_MOVE, so floating→dock transitions work correctly on Windows.
+// Photoshop / CLIP STUDIO–style title bar for QDockWidget panels.
 //
-// Child widgets (QLabel, grip spacer) have WA_TransparentForMouseEvents so that
-// clicks anywhere except the buttons fall through to this widget, where the
-// QDockWidget event filter picks them up.
+// Renders a horizontal row of tab buttons — one per dock in the same tabified
+// group — directly inside the QDockWidget title bar widget.  The native Qt
+// QTabBar for dock areas is hidden via QSS; this bar replaces it visually while
+// the underlying tabifyDockWidget() structure (and Qt's dock-drag/float/redock
+// machinery) is left completely intact.
+//
+// Why setTitleBarWidget() enables re-docking:
+//   When a custom title bar is set, Qt's nativeWindowDeco() returns false →
+//   Qt automatically applies FramelessWindowHint to the floating window →
+//   OS never intercepts title-bar drag as SC_MOVE → Qt's own event filter on
+//   this widget drives dock-drag mode → drop indicators appear → re-dock works.
+//
+// Drag safety: the grip widget and the right-hand stretch area have
+//   WA_TransparentForMouseEvents so mouse-press/move events on those areas fall
+//   through to this widget, where the QDockWidget event filter picks them up as
+//   a dock-drag gesture.  Tab QPushButtons are NOT transparent (they handle
+//   clicks independently).
 class DockTitleBar : public QWidget {
 public:
   explicit DockTitleBar(const QString& title, QDockWidget* dock)
-      : QWidget(dock), m_dock(dock)
+      : QWidget(dock), m_dock(dock), m_ownTitle(title)
   {
     setFixedHeight(22);
     setMouseTracking(true);
-    // Scoped QSS: affects only children of this widget.
-    setStyleSheet(
-        "QLabel { background: transparent; color: #8a9ab8;"
-        "  font-family: 'Segoe UI', sans-serif; font-size: 10px; font-weight: 600;"
-        "  letter-spacing: 0.5px; text-transform: uppercase; }"
-        "QPushButton { background: transparent; border: none; color: #4a5570;"
-        "  font-family: 'Segoe UI', sans-serif; font-size: 12px; padding: 0; }"
-        "QPushButton:hover { color: #c5cde0; background: #2f3650; border-radius: 3px; }"
-        "QPushButton#dockCloseBtn:hover { color: #e05070; background: #3a2035; }"
-    );
 
-    auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(4, 0, 2, 0);
-    layout->setSpacing(0);
+    m_layout = new QHBoxLayout(this);
+    m_layout->setContentsMargins(0, 0, 2, 0);
+    m_layout->setSpacing(0);
 
-    // Grip spacer — transparent to mouse so drags reach this widget
-    m_gripSpacer = new QWidget(this);
-    m_gripSpacer->setFixedSize(14, 22);
-    m_gripSpacer->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-    layout->addWidget(m_gripSpacer);
+    // ── Grip ─────────────────────────────────────────────────────────
+    // Painted by paintEvent.  Transparent to mouse → drag falls through
+    // to this widget → QDockWidget event filter → dock-drag mode.
+    m_grip = new QWidget(this);
+    m_grip->setFixedSize(14, 22);
+    m_grip->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    m_layout->addWidget(m_grip);
 
-    // Title label — transparent to mouse so drags reach this widget
-    m_titleLabel = new QLabel(title, this);
-    m_titleLabel->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-    layout->addWidget(m_titleLabel, 1);
+    // Tab buttons will be inserted here by rebuildTabs().
 
-    // Float / undock toggle button
-    m_floatBtn = new QPushButton(this);
-    m_floatBtn->setFixedSize(18, 18);
+    // ── Stretch ───────────────────────────────────────────────────────
+    // Fills remaining horizontal space; transparent to mouse → drag area.
+    m_stretch = new QWidget(this);
+    m_stretch->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_stretch->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+
+    // ── Float button ──────────────────────────────────────────────────
+    m_floatBtn = new QPushButton("⧉", this);
+    m_floatBtn->setFixedSize(20, 22);
     m_floatBtn->setFlat(true);
     m_floatBtn->setFocusPolicy(Qt::NoFocus);
-    m_floatBtn->setText("⧉");
     m_floatBtn->setToolTip("フロート / ドック切替");
+    m_floatBtn->setStyleSheet(
+        "QPushButton{background:transparent;border:none;color:#4a5570;font-size:12px;}"
+        "QPushButton:hover{color:#c5cde0;background:#2f3650;border-radius:3px;}");
     connect(m_floatBtn, &QPushButton::clicked, this, [this] {
       m_dock->setFloating(!m_dock->isFloating());
     });
-    layout->addWidget(m_floatBtn);
 
-    // Close button
-    m_closeBtn = new QPushButton(this);
-    m_closeBtn->setObjectName("dockCloseBtn");
-    m_closeBtn->setFixedSize(18, 18);
+    // ── Close button ──────────────────────────────────────────────────
+    m_closeBtn = new QPushButton("×", this);
+    m_closeBtn->setFixedSize(20, 22);
     m_closeBtn->setFlat(true);
     m_closeBtn->setFocusPolicy(Qt::NoFocus);
-    m_closeBtn->setText("×");
     m_closeBtn->setToolTip("閉じる");
+    m_closeBtn->setStyleSheet(
+        "QPushButton{background:transparent;border:none;color:#4a5570;font-size:13px;}"
+        "QPushButton:hover{color:#e05070;background:#3a2035;border-radius:3px;}");
     connect(m_closeBtn, &QPushButton::clicked, this, [this] {
       m_dock->close();
+      // After hiding this dock Qt will show another dock in the group;
+      // schedule a rebuild on siblings so they drop the stale tab.
+      QTimer::singleShot(0, this, [this] {
+        if (auto* mw = qobject_cast<QMainWindow*>(m_dock->parentWidget())) {
+          for (auto* sib : mw->tabifiedDockWidgets(m_dock)) {
+            if (auto* tb = dynamic_cast<DockTitleBar*>(sib->titleBarWidget()))
+              tb->rebuildTabs();
+          }
+        }
+      });
     });
-    layout->addWidget(m_closeBtn);
+
+    // Deferred first build: tabification has finished by the time the
+    // event-loop processes this timer.
+    QTimer::singleShot(0, this, &DockTitleBar::rebuildTabs);
+  }
+
+  // Rebuild the tab button row.
+  // Called from MainWindow::updateDockTitleBars() whenever dock layout changes.
+  void rebuildTabs() {
+    // ── Remove old tab buttons ────────────────────────────────────────
+    for (auto* btn : m_tabBtns) {
+      m_layout->removeWidget(btn);
+      delete btn;
+    }
+    m_tabBtns.clear();
+    m_layout->removeWidget(m_stretch);
+    m_layout->removeWidget(m_floatBtn);
+    m_layout->removeWidget(m_closeBtn);
+
+    // ── Collect group ─────────────────────────────────────────────────
+    // m_dock is always first (active); siblings follow in Qt's tab order.
+    QList<QDockWidget*> group;
+    if (auto* mw = qobject_cast<QMainWindow*>(m_dock->parentWidget()))
+      group = mw->tabifiedDockWidgets(m_dock);
+    group.prepend(m_dock);
+
+    // ── Create tab buttons ────────────────────────────────────────────
+    for (auto* sib : group) {
+      auto* btn = new QPushButton(sib->windowTitle(), this);
+      btn->setFlat(true);
+      btn->setFocusPolicy(Qt::NoFocus);
+      btn->setFixedHeight(22);
+      btn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+      applyTabStyle(btn, sib == m_dock);
+
+      connect(btn, &QPushButton::clicked, this, [sib] {
+        sib->show();
+        sib->raise();
+      });
+
+      m_layout->addWidget(btn);
+      m_tabBtns.append(btn);
+    }
+
+    // ── Re-add stretch + action buttons ───────────────────────────────
+    m_layout->addWidget(m_stretch, 1);
+    m_layout->addWidget(m_floatBtn);
+    m_layout->addWidget(m_closeBtn);
   }
 
 protected:
   void paintEvent(QPaintEvent*) override {
     QPainter p(this);
+    // Background
     p.fillRect(rect(), QColor(0x1c, 0x20, 0x30));
     // Bottom border
     p.setPen(QColor(0x2a, 0x2e, 0x3e));
     p.drawLine(0, height() - 1, width() - 1, height() - 1);
-    // Grip dots — 2 columns × 3 rows
+    // Grip dots — 2 cols × 3 rows
     p.setPen(QColor(0x4a, 0x55, 0x70));
-    for (int row = 0; row < 3; ++row) {
-      for (int col = 0; col < 2; ++col) {
-        p.drawPoint(5 + col * 4, 5 + row * 4);
-      }
-    }
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 2; ++c)
+        p.drawPoint(5 + c * 4, 5 + r * 4);
   }
 
 private:
-  QDockWidget* m_dock;
-  QLabel*      m_titleLabel  {nullptr};
-  QWidget*     m_gripSpacer  {nullptr};
-  QPushButton* m_floatBtn    {nullptr};
-  QPushButton* m_closeBtn    {nullptr};
+  static void applyTabStyle(QPushButton* btn, bool active) {
+    if (active) {
+      btn->setStyleSheet(
+          "QPushButton{"
+          "  background:#212535; color:#c5cde0; border:none;"
+          "  border-right:1px solid #252838;"
+          "  border-bottom:2px solid #4e8ef7;"
+          "  padding:0 10px;"
+          "  font-family:'Segoe UI',sans-serif; font-size:10px; font-weight:600;"
+          "  letter-spacing:0.5px;}");
+    } else {
+      btn->setStyleSheet(
+          "QPushButton{"
+          "  background:#1c2030; color:#5a6d8a; border:none;"
+          "  border-right:1px solid #252838;"
+          "  padding:0 10px;"
+          "  font-family:'Segoe UI',sans-serif; font-size:10px; font-weight:600;"
+          "  letter-spacing:0.5px;}"
+          "QPushButton:hover{background:#242840; color:#a0b0cc;}");
+    }
+  }
+
+  QDockWidget*        m_dock     {nullptr};
+  QString             m_ownTitle;
+  QHBoxLayout*        m_layout   {nullptr};
+  QWidget*            m_grip     {nullptr};
+  QWidget*            m_stretch  {nullptr};
+  QPushButton*        m_floatBtn {nullptr};
+  QPushButton*        m_closeBtn {nullptr};
+  QList<QPushButton*> m_tabBtns;
 };
 
 class ColorSwatchWidget : public QWidget {
@@ -919,15 +1006,17 @@ void MainWindow::setupShellLayout() {
     });
   }
 
-  // After layout pass: tag dock tab bars and apply title bar state
+  // After layout pass: tag native dock tab bars (for QSS hide), rebuild
+  // DockTitleBar tab buttons, and connect visibilityChanged so that
+  // closing/showing a dock refreshes the sibling tab lists.
   QTimer::singleShot(0, this, [this] {
     for (auto* tb : findChildren<QTabBar*>()) {
       if (qobject_cast<QTabWidget*>(tb->parentWidget())) continue;
-      tb->setTabsClosable(false);
-      tb->setMovable(true);
-      tb->setExpanding(false);
-      tb->setDocumentMode(true);
       tb->setProperty("dockTabBar", true);
+      // Force QSS re-evaluation for the property to take effect immediately.
+      tb->style()->unpolish(tb);
+      tb->style()->polish(tb);
+      tb->update();
     }
     updateDockTitleBars();
   });
@@ -1740,10 +1829,19 @@ void MainWindow::resizeEvent(QResizeEvent* event) {
 }
 
 void MainWindow::updateDockTitleBars() {
-  // No-op: FramelessWindowHint for floating docks is handled automatically
-  // by Qt when setTitleBarWidget() is used (nativeWindowDeco() returns false).
-  // QDockWidget's event filter on the DockTitleBar handles dock-drag mode
-  // so the OS never intercepts title-bar drag as a plain window move.
+  // Rebuild the tab-button row inside every DockTitleBar.
+  // Called after topLevelChanged / dockLocationChanged so that floating or
+  // re-docked panels update their tab lists immediately.
+  const QList<QDockWidget*> docks = {
+      m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
+      m_colorDock, m_colorSliderDock, m_colorHistoryDock,
+      m_layerDock, m_aiDock, m_infoDock
+  };
+  for (auto* dock : docks) {
+    if (!dock) continue;
+    if (auto* tb = dynamic_cast<DockTitleBar*>(dock->titleBarWidget()))
+      tb->rebuildTabs();
+  }
 }
 
 void MainWindow::applyUiChrome() {
@@ -1814,38 +1912,15 @@ void MainWindow::applyUiChrome() {
       "  background: #2f3650; border-radius: 3px;"
       "}"
 
-      // ── Dock tab bars (same visual row as title bar) ──────────────
-      // Target only QTabBars that are dock area tab bars (property set in code).
+      // ── Native dock tab bars — hidden ────────────────────────────────
+      // DockTitleBar renders its own tab buttons (Photoshop/CLIP style).
+      // The underlying tabifyDockWidget() structure is kept; only the visual
+      // QTabBar is suppressed so the title bar row is a single 22px strip.
       "QTabBar[dockTabBar=\"true\"] {"
-      "  background: #1c2030;"
-      "  border-bottom: 1px solid #2a2e3e;"
+      "  max-height: 0px; min-height: 0px;"
+      "  border: none; margin: 0; padding: 0;"
       "}"
-      "QTabBar[dockTabBar=\"true\"]::tab {"
-      "  background: #1c2030;"
-      "  color: #5a6d8a;"
-      "  border: none;"
-      "  border-right: 1px solid #252838;"
-      "  padding: 0 12px;"
-      "  min-height: 20px;"
-      "  max-height: 22px;"
-      "  font-size: 10px;"
-      "  font-weight: 600;"
-      "  letter-spacing: 0.5px;"
-      "  text-transform: uppercase;"
-      "}"
-      "QTabBar[dockTabBar=\"true\"]::tab:selected {"
-      "  background: #212535;"
-      "  color: #c5cde0;"
-      "  border-bottom: 2px solid #4e8ef7;"
-      "}"
-      "QTabBar[dockTabBar=\"true\"]::tab:hover:!selected {"
-      "  background: #242840;"
-      "  color: #a0b0cc;"
-      "}"
-      "QTabBar[dockTabBar=\"true\"]::tab:first { border-left: none; }"
-      "QTabBar[dockTabBar=\"true\"]::scroller {"
-      "  width: 16px;"
-      "}"
+      "QTabBar[dockTabBar=\"true\"]::tab { max-height: 0px; }"
 
       // ── Group boxes ───────────────────────────────────────────────
       "QGroupBox {"
