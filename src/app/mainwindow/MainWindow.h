@@ -147,6 +147,7 @@ private:
   void saveShortcutOverride(const QString& commandId, const QKeySequence& sequence);
   QAction* createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut);
   void auditUIMetrics();
+  void updateDockTitleBars();
 
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
@@ -168,6 +169,8 @@ private:
   QDockWidget* m_subToolDock {nullptr};
   QDockWidget* m_toolPropertyDock {nullptr};
   QDockWidget* m_colorDock {nullptr};
+  QDockWidget* m_colorSliderDock {nullptr};
+  QDockWidget* m_colorHistoryDock {nullptr};
   QDockWidget* m_aiDock    {nullptr};
   QDockWidget* m_layerDock {nullptr};
   QDockWidget* m_infoDock {nullptr};
