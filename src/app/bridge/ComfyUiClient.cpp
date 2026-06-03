@@ -8,6 +8,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrlQuery>
+#include "app/bridge/MinimalWebSocket.h"
 
 namespace app::bridge {
 
@@ -16,7 +17,7 @@ namespace app::bridge {
 // ─────────────────────────────────────────────────────────────────────────────
 ComfyUiClient::ComfyUiClient(QObject* parent)
     : QObject(parent) {
-  // 再接続タイマー
+  // 再接続タイマー (接続失敗時のバックオフ)
   m_reconnectTimer.setInterval(8000);
   m_reconnectTimer.setSingleShot(true);
   connect(&m_reconnectTimer, &QTimer::timeout, this, [this]() {
@@ -24,10 +25,6 @@ ComfyUiClient::ComfyUiClient(QObject* parent)
       connectToServer(m_baseUrl);
     }
   });
-
-  // ポーリングタイマー (1 秒ごとに未完了プロンプトを確認)
-  m_pollTimer.setInterval(1000);
-  connect(&m_pollTimer, &QTimer::timeout, this, &ComfyUiClient::onPollTimer);
 }
 
 ComfyUiClient::~ComfyUiClient() = default;
@@ -39,7 +36,7 @@ void ComfyUiClient::connectToServer(const QUrl& url) {
   m_baseUrl = url;
   setState(State::Connecting);
 
-  // /system_stats で HTTP 到達性を確認
+  // HTTP で /system_stats を確認してから WebSocket を開く
   QNetworkReply* reply = get("/system_stats");
   connect(reply, &QNetworkReply::finished, this, [this, reply]() {
     reply->deleteLater();
@@ -50,16 +47,54 @@ void ComfyUiClient::connectToServer(const QUrl& url) {
       m_reconnectTimer.start();
       return;
     }
-    setState(State::Connected);
     emit systemStatsReceived(
         QJsonDocument::fromJson(reply->readAll()).object());
+    // HTTP 到達確認後に WebSocket を接続
+    connectWebSocket();
   });
+}
+
+void ComfyUiClient::connectWebSocket() {
+  // 既存 WS があれば閉じて削除
+  if (m_ws != nullptr) {
+    m_ws->close();
+    m_ws->deleteLater();
+    m_ws = nullptr;
+  }
+  // (m_ws will be set below)
+
+  m_ws = new MinimalWebSocket(this);
+
+  connect(m_ws, &MinimalWebSocket::connected, this, [this]() {
+    setState(State::Connected);
+  });
+  connect(m_ws, &MinimalWebSocket::disconnected,
+          this, &ComfyUiClient::onWsDisconnected);
+  connect(m_ws, &MinimalWebSocket::textMessageReceived,
+          this, &ComfyUiClient::onWsTextMessage);
+  connect(m_ws, &MinimalWebSocket::binaryMessageReceived,
+          this, &ComfyUiClient::onWsBinaryMessage);
+
+  // ws://host:port/ws?clientId=<uuid>
+  QUrl wsUrl = m_baseUrl;
+  wsUrl.setScheme(wsUrl.scheme() == "https" ? "wss" : "ws");
+  wsUrl.setPath("/ws");
+  QUrlQuery q;
+  q.addQueryItem("clientId", m_clientId);
+  wsUrl.setQuery(q);
+  // MinimalWebSocket uses ws:// scheme — convert
+  wsUrl.setScheme(wsUrl.scheme() == "wss" ? "wss" : "ws");
+  m_ws->open(wsUrl);
 }
 
 void ComfyUiClient::disconnect() {
   m_reconnectTimer.stop();
-  m_pollTimer.stop();
-  m_pendingPrompts.clear();
+  m_pendingOutputs.clear();
+  if (m_ws != nullptr) {
+    m_ws->close();
+    // m_ws is parented to this; do not deleteLater here — just nullify the pointer
+    // (it will be replaced next connect or destroyed with this object)
+  }
   setState(State::Disconnected);
 }
 
@@ -71,66 +106,94 @@ void ComfyUiClient::setState(State s) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ポーリング
+// WebSocket メッセージハンドラ
 // ─────────────────────────────────────────────────────────────────────────────
-void ComfyUiClient::startPolling(const QString& promptId) {
-  m_pendingPrompts[promptId] = 0;
-  if (!m_pollTimer.isActive()) {
-    m_pollTimer.start();
+void ComfyUiClient::onWsTextMessage(const QString& text) {
+  const QJsonObject obj = QJsonDocument::fromJson(text.toUtf8()).object();
+  const QString type    = obj.value("type").toString();
+  const QJsonObject data = obj.value("data").toObject();
+  const QString promptId = data.value("prompt_id").toString();
+
+  if (type == "progress") {
+    const int step    = data.value("value").toInt();
+    const int maxStep = data.value("max").toInt();
+    const QString nodeId = data.value("node").toString();
+    if (m_pendingOutputs.count(promptId) || promptId.isEmpty()) {
+      emit progressUpdate(promptId, step, maxStep, nodeId);
+    }
+
+  } else if (type == "executing") {
+    const QString nodeId = data.value("node").toString();
+    if (nodeId.isEmpty()) {
+      // node == null → このプロンプトの実行完了
+      auto it = m_pendingOutputs.find(promptId);
+      if (it != m_pendingOutputs.end()) {
+        const QStringList images = it->second;
+        m_pendingOutputs.erase(it);
+        emit executionComplete(promptId, images);
+      }
+    }
+
+  } else if (type == "executed") {
+    // ノード完了 → 出力画像を収集
+    const QJsonObject output = data.value("output").toObject();
+    const QJsonArray  images = output.value("images").toArray();
+    auto it = m_pendingOutputs.find(promptId);
+    if (it != m_pendingOutputs.end()) {
+      for (const QJsonValue& imgVal : images) {
+        const QString fname = imgVal.toObject().value("filename").toString();
+        if (!fname.isEmpty()) {
+          it->second.append(fname);
+        }
+      }
+    }
+
+  } else if (type == "execution_error") {
+    auto it = m_pendingOutputs.find(promptId);
+    if (it != m_pendingOutputs.end()) {
+      m_pendingOutputs.erase(it);
+      const QString msg = data.value("exception_message").toString();
+      emit executionError(promptId, msg.isEmpty() ? "不明なエラー" : msg);
+    }
+
+  } else if (type == "execution_interrupted") {
+    auto it = m_pendingOutputs.find(promptId);
+    if (it != m_pendingOutputs.end()) {
+      m_pendingOutputs.erase(it);
+      emit executionError(promptId, "実行がキャンセルされました");
+    }
   }
 }
 
-void ComfyUiClient::onPollTimer() {
-  if (m_pendingPrompts.empty()) {
-    m_pollTimer.stop();
-    return;
+void ComfyUiClient::onWsBinaryMessage(const QByteArray& data) {
+  // ComfyUI プレビュー形式:
+  //   [0..3]  event_type (LE uint32): 1 = preview image
+  //   [4..7]  image_type (LE uint32): 1 = JPEG, 2 = PNG
+  //   [8..]   画像データ
+  if (data.size() < 8) return;
+
+  const auto readU32LE = [&](int offset) -> quint32 {
+    return static_cast<quint32>(static_cast<unsigned char>(data[offset]))
+         | (static_cast<quint32>(static_cast<unsigned char>(data[offset+1])) << 8)
+         | (static_cast<quint32>(static_cast<unsigned char>(data[offset+2])) << 16)
+         | (static_cast<quint32>(static_cast<unsigned char>(data[offset+3])) << 24);
+  };
+
+  const quint32 eventType = readU32LE(0);
+  if (eventType != 1) return;  // 1 = preview image
+
+  const QByteArray imgData = data.mid(8);
+  QPixmap px;
+  if (px.loadFromData(imgData)) {
+    emit previewImageReceived(px);
   }
+}
 
-  // ひとつずつ /history/{id} を確認（同時リクエストを抑制するため先頭のみ）
-  auto it = m_pendingPrompts.begin();
-  const QString promptId = it->first;
-  int& count = it->second;
-  ++count;
-
-  // タイムアウト: 300 秒 (300 ポーリング × 1 秒)
-  if (count > 300) {
-    m_pendingPrompts.erase(it);
-    emit executionError(promptId, "タイムアウト: 実行が 300 秒以内に完了しませんでした");
-    return;
+void ComfyUiClient::onWsDisconnected() {
+  if (m_state == State::Connected) {
+    setState(State::Error);
+    m_reconnectTimer.start();
   }
-
-  getHistory(promptId, [this, promptId](const QJsonObject& history) {
-    // history = { "<promptId>": { "outputs": {...}, "status": {...} } }
-    if (!history.contains(promptId)) {
-      return; // まだ完了していない
-    }
-    m_pendingPrompts.erase(promptId);
-    if (m_pendingPrompts.empty()) {
-      m_pollTimer.stop();
-    }
-
-    const QJsonObject entry  = history.value(promptId).toObject();
-    const QJsonObject status = entry.value("status").toObject();
-    if (status.value("status_str").toString() == "error") {
-      const QString msg = status.value("messages").toArray()
-                              .last().toArray().last().toObject()
-                              .value("exception_message").toString();
-      emit executionError(promptId, msg.isEmpty() ? "不明なエラー" : msg);
-      return;
-    }
-
-    // 出力画像を収集
-    QStringList images;
-    const QJsonObject outputs = entry.value("outputs").toObject();
-    for (const QString& nodeId : outputs.keys()) {
-      const QJsonObject nodeOut = outputs.value(nodeId).toObject();
-      for (const QJsonValue& imgVal : nodeOut.value("images").toArray()) {
-        const QString fname = imgVal.toObject().value("filename").toString();
-        if (!fname.isEmpty()) images.push_back(fname);
-      }
-    }
-    emit executionComplete(promptId, images);
-  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,36 +220,26 @@ QNetworkReply* ComfyUiClient::post(const QString& path,
 // ─────────────────────────────────────────────────────────────────────────────
 // API
 // ─────────────────────────────────────────────────────────────────────────────
-QString ComfyUiClient::queuePrompt(const QJsonObject& workflow) {
+void ComfyUiClient::queuePrompt(const QJsonObject& workflow,
+                                 std::function<void(QString)> onQueued) {
   QJsonObject body;
   body.insert("prompt",    workflow);
   body.insert("client_id", m_clientId);
   const QByteArray bodyBytes = QJsonDocument(body).toJson(QJsonDocument::Compact);
   QNetworkReply* reply = post("/prompt", bodyBytes);
 
-  // POST 完了後に返ってくる {"prompt_id": "..."} からIDを取得してポーリング開始
-  connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+  connect(reply, &QNetworkReply::finished, this, [this, reply, onQueued]() {
     reply->deleteLater();
-    if (reply->error() != QNetworkReply::NoError) return;
+    if (reply->error() != QNetworkReply::NoError) {
+      if (onQueued) onQueued({});
+      return;
+    }
     const QJsonObject resp = QJsonDocument::fromJson(reply->readAll()).object();
     const QString id = resp.value("prompt_id").toString();
     if (!id.isEmpty()) {
-      startPolling(id);
+      m_pendingOutputs[id] = {};  // register as pending
     }
-  });
-  return {}; // promptId は POST レスポンスから非同期で取得
-}
-
-void ComfyUiClient::getHistory(const QString& promptId,
-                                std::function<void(QJsonObject)> callback) {
-  QNetworkReply* reply = get(QString("/history/%1").arg(promptId));
-  connect(reply, &QNetworkReply::finished, this, [reply, callback]() {
-    reply->deleteLater();
-    if (reply->error() != QNetworkReply::NoError) {
-      callback({});
-      return;
-    }
-    callback(QJsonDocument::fromJson(reply->readAll()).object());
+    if (onQueued) onQueued(id);
   });
 }
 
@@ -281,71 +334,99 @@ void ComfyUiClient::fetchCheckpoints(std::function<void(QStringList)> callback) 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ワークフローパラメーター注入
+// ─────────────────────────────────────────────────────────────────────────────
+QJsonObject ComfyUiClient::injectWorkflowParams(
+    QJsonObject workflow,
+    const QString& positivePrompt,
+    const QString& negativePrompt,
+    int seed,
+    const QString& checkpoint) {
+  int clipEncodeCount = 0;
+  for (const QString& nodeId : workflow.keys()) {
+    QJsonObject node = workflow.value(nodeId).toObject();
+    const QString classType = node.value("class_type").toString();
+    QJsonObject inputs = node.value("inputs").toObject();
+
+    if (classType == "CLIPTextEncode") {
+      ++clipEncodeCount;
+      if (clipEncodeCount == 1 && !positivePrompt.isEmpty()) {
+        inputs["text"] = positivePrompt;
+      } else if (clipEncodeCount == 2 && !negativePrompt.isEmpty()) {
+        inputs["text"] = negativePrompt;
+      }
+      node["inputs"] = inputs;
+      workflow[nodeId] = node;
+
+    } else if (classType == "KSampler" || classType == "KSamplerAdvanced") {
+      if (seed >= 0) {
+        inputs["seed"] = seed;
+        node["inputs"] = inputs;
+        workflow[nodeId] = node;
+      }
+
+    } else if (classType == "CheckpointLoaderSimple" && !checkpoint.isEmpty()) {
+      inputs["ckpt_name"] = checkpoint;
+      node["inputs"] = inputs;
+      workflow[nodeId] = node;
+    }
+  }
+  return workflow;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 組み込みワークフロー: SD インペイント
 // ─────────────────────────────────────────────────────────────────────────────
 QJsonObject ComfyUiClient::buildInpaintWorkflow(const InpaintRequest& req) {
   QJsonObject wf;
 
   // 1: Checkpoint loader
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n; QJsonObject inp;
     inp.insert("ckpt_name", req.checkpointName);
     n.insert("class_type", "CheckpointLoaderSimple");
     n.insert("inputs", inp);
-    wf.insert("1", n);
-  }
+    wf.insert("1", n); }
   // 2: Positive prompt
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n; QJsonObject inp;
     inp.insert("text", req.prompt.isEmpty() ? "high quality, detailed" : req.prompt);
     inp.insert("clip", QJsonArray{QJsonArray{"1"}, 1});
     n.insert("class_type", "CLIPTextEncode");
     n.insert("inputs", inp);
-    wf.insert("2", n);
-  }
+    wf.insert("2", n); }
   // 3: Negative prompt
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n; QJsonObject inp;
     inp.insert("text", req.negativePrompt.isEmpty()
                            ? "blurry, low quality, artifacts" : req.negativePrompt);
     inp.insert("clip", QJsonArray{QJsonArray{"1"}, 1});
     n.insert("class_type", "CLIPTextEncode");
     n.insert("inputs", inp);
-    wf.insert("3", n);
-  }
+    wf.insert("3", n); }
   // 4: Load image
-  {
-    QJsonObject n; QJsonObject inp;
-    inp.insert("image", "comfyui_input.png");
+  { QJsonObject n; QJsonObject inp;
+    inp.insert("image",  "comfyui_input.png");
     inp.insert("upload", "image");
     n.insert("class_type", "LoadImage");
     n.insert("inputs", inp);
-    wf.insert("4", n);
-  }
+    wf.insert("4", n); }
   // 5: Load mask
-  {
-    QJsonObject n; QJsonObject inp;
-    inp.insert("image", "comfyui_mask.png");
+  { QJsonObject n; QJsonObject inp;
+    inp.insert("image",  "comfyui_mask.png");
     inp.insert("upload", "image");
-    inp.insert("channel", "red");
+    inp.insert("channel","red");
     n.insert("class_type", "LoadImageMask");
     n.insert("inputs", inp);
-    wf.insert("5", n);
-  }
+    wf.insert("5", n); }
   // 6: VAE encode for inpaint
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n; QJsonObject inp;
     inp.insert("pixels",       QJsonArray{QJsonArray{"4"}, 0});
     inp.insert("vae",          QJsonArray{QJsonArray{"1"}, 2});
     inp.insert("mask",         QJsonArray{QJsonArray{"5"}, 0});
     inp.insert("grow_mask_by", 6);
     n.insert("class_type", "VAEEncodeForInpaint");
     n.insert("inputs", inp);
-    wf.insert("6", n);
-  }
+    wf.insert("6", n); }
   // 7: KSampler
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n; QJsonObject inp;
     inp.insert("model",        QJsonArray{QJsonArray{"1"}, 0});
     inp.insert("positive",     QJsonArray{QJsonArray{"2"}, 0});
     inp.insert("negative",     QJsonArray{QJsonArray{"3"}, 0});
@@ -358,26 +439,21 @@ QJsonObject ComfyUiClient::buildInpaintWorkflow(const InpaintRequest& req) {
     inp.insert("denoise",      static_cast<double>(req.denoise));
     n.insert("class_type", "KSampler");
     n.insert("inputs", inp);
-    wf.insert("7", n);
-  }
+    wf.insert("7", n); }
   // 8: VAE decode
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n; QJsonObject inp;
     inp.insert("samples", QJsonArray{QJsonArray{"7"}, 0});
     inp.insert("vae",     QJsonArray{QJsonArray{"1"}, 2});
     n.insert("class_type", "VAEDecode");
     n.insert("inputs", inp);
-    wf.insert("8", n);
-  }
+    wf.insert("8", n); }
   // 9: Save image
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n; QJsonObject inp;
     inp.insert("images",          QJsonArray{QJsonArray{"8"}, 0});
     inp.insert("filename_prefix", "paintapp_inpaint");
     n.insert("class_type", "SaveImage");
     n.insert("inputs", inp);
-    wf.insert("9", n);
-  }
+    wf.insert("9", n); }
   return wf;
 }
 
@@ -387,27 +463,19 @@ QJsonObject ComfyUiClient::buildInpaintWorkflow(const InpaintRequest& req) {
 QJsonObject ComfyUiClient::buildSamWorkflow(const SamRequest& req) {
   QJsonObject wf;
 
-  // 1: Load input image
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n; QJsonObject inp;
     inp.insert("image",  "sam_input.png");
     inp.insert("upload", "image");
     n.insert("class_type", "LoadImage");
     n.insert("inputs", inp);
-    wf.insert("1", n);
-  }
-  // 2: SAM2 model loader
-  {
-    QJsonObject n; QJsonObject inp;
+    wf.insert("1", n); }
+  { QJsonObject n; QJsonObject inp;
     inp.insert("model",  req.samModel);
     inp.insert("device", "cuda");
     n.insert("class_type", "SAM2ModelLoader");
     n.insert("inputs", inp);
-    wf.insert("2", n);
-  }
-  // 3: SAM2 segmentation (point prompt)
-  {
-    QJsonObject n; QJsonObject inp;
+    wf.insert("2", n); }
+  { QJsonObject n; QJsonObject inp;
     inp.insert("sam2_model", QJsonArray{QJsonArray{"2"}, 0});
     inp.insert("image",      QJsonArray{QJsonArray{"1"}, 0});
     inp.insert("coordinates_positive",
@@ -421,25 +489,18 @@ QJsonObject ComfyUiClient::buildSamWorkflow(const SamRequest& req) {
     inp.insert("mask_hint_threshold", 0.5);
     n.insert("class_type", "SAM2Segmentation");
     n.insert("inputs", inp);
-    wf.insert("3", n);
-  }
-  // 4: Mask → Image
-  {
-    QJsonObject n; QJsonObject inp;
+    wf.insert("3", n); }
+  { QJsonObject n; QJsonObject inp;
     inp.insert("mask", QJsonArray{QJsonArray{"3"}, 0});
     n.insert("class_type", "MaskToImage");
     n.insert("inputs", inp);
-    wf.insert("4", n);
-  }
-  // 5: Save mask image
-  {
-    QJsonObject n; QJsonObject inp;
+    wf.insert("4", n); }
+  { QJsonObject n; QJsonObject inp;
     inp.insert("images",          QJsonArray{QJsonArray{"4"}, 0});
     inp.insert("filename_prefix", "paintapp_sam");
     n.insert("class_type", "SaveImage");
     n.insert("inputs", inp);
-    wf.insert("5", n);
-  }
+    wf.insert("5", n); }
   return wf;
 }
 

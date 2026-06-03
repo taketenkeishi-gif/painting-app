@@ -2834,8 +2834,14 @@ void AppController::connectComfyUi(const QString& urlStr) {
 
     // progressUpdate \u3092\u8EE2\u9001
     connect(m_comfyUiClient, &ComfyUiClient::progressUpdate, this,
-            [this](const QString& /*id*/, int nodeIdx, int totalNodes, float /*value*/) {
-      emit aiProgressUpdate(nodeIdx, totalNodes);
+            [this](const QString& /*id*/, int step, int totalSteps, const QString& nodeId) {
+      emit aiProgressUpdate(step, totalSteps, nodeId);
+    });
+
+    // \u30D7\u30EC\u30D3\u30E5\u30FC\u753B\u50CF\u3092\u8EE2\u9001
+    connect(m_comfyUiClient, &ComfyUiClient::previewImageReceived, this,
+            [this](const QPixmap& px) {
+      emit aiPreviewReceived(px);
     });
 
     // executionError \u3092\u8EE2\u9001
@@ -2851,22 +2857,23 @@ void AppController::connectComfyUi(const QString& urlStr) {
       if (outputImages.isEmpty() || m_comfyUiClient == nullptr) return;
       const QString fname = outputImages.first();
       const AiOpType op = m_currentAiOp;
-      m_currentAiOp = AiOpType::None;
 
       m_comfyUiClient->fetchImage(fname, QString(), "output",
           [this, op](const QByteArray& pngData) {
             if (pngData.isEmpty()) {
               emit aiGenerationError("\u7D50\u679C\u753B\u50CF\u306E\u53D6\u5F97\u306B\u5931\u6557\u3057\u307E\u3057\u305F");
+              m_currentAiOp = AiOpType::None;
               return;
             }
-            const QImage img = QImage::fromData(pngData, "PNG");
+            const QImage img = QImage::fromData(pngData);
             if (img.isNull()) {
               emit aiGenerationError("\u7D50\u679C\u753B\u50CF\u306E\u30C7\u30B3\u30FC\u30C9\u306B\u5931\u6557\u3057\u307E\u3057\u305F");
+              m_currentAiOp = AiOpType::None;
               return;
             }
 
             if (op == AiOpType::SamSelect) {
-              // SAM: \u767D=\u9078\u629E\u7BC4\u56F2\u30DE\u30B9\u30AF
+              m_currentAiOp = AiOpType::None;
               const int W = img.width();
               const int H = img.height();
               std::vector<std::uint8_t> pixels(
@@ -2882,34 +2889,43 @@ void AppController::connectComfyUi(const QString& urlStr) {
               mask.setPixels(pixels);
               applyAiSelectResult(std::move(mask));
 
-            } else if (op == AiOpType::Inpaint || op == AiOpType::TextToImage) {
-              // \u65B0\u898F\u30E9\u30B9\u30BF\u30FC\u30EC\u30A4\u30E4\u30FC\u3092\u8FFD\u52A0\u3057\u3066\u7D50\u679C\u3092\u8CBC\u308A\u4ED8\u3051
-              const QString layerName = (op == AiOpType::Inpaint)
-                  ? "AI \u30A4\u30F3\u30DA\u30A4\u30F3\u30C8" : "AI \u751F\u6210";
-              addRasterLayer();
-              core::Layer* layer = m_document.activeLayer();
-              if (layer == nullptr) {
-                emit aiGenerationError("\u7D50\u679C\u30EC\u30A4\u30E4\u30FC\u306E\u4F5C\u6210\u306B\u5931\u6557\u3057\u307E\u3057\u305F");
-                return;
-              }
-              layer->setName(layerName.toStdString());
-              const QImage converted = img.convertToFormat(QImage::Format_ARGB32);
-              const int W = std::min(converted.width(), layer->buffer().width());
-              const int H = std::min(converted.height(), layer->buffer().height());
-              for (int y = 0; y < H; ++y) {
-                for (int x = 0; x < W; ++x) {
-                  const QColor c = converted.pixelColor(x, y);
-                  layer->buffer().setPixel(x, y, core::Color{
-                      static_cast<std::uint8_t>(c.red()),
-                      static_cast<std::uint8_t>(c.green()),
-                      static_cast<std::uint8_t>(c.blue()),
-                      static_cast<std::uint8_t>(c.alpha())});
+            } else if (op == AiOpType::Inpaint
+                    || op == AiOpType::TextToImage
+                    || op == AiOpType::CustomWorkflow) {
+              // \u30D0\u30C3\u30C1\u53CE\u96C6
+              m_batchImages.append(QPixmap::fromImage(img));
+              --m_batchRemaining;
+
+              if (m_batchRemaining > 0) {
+                // \u6B21\u306E\u30D0\u30C3\u30C1\u3092\u30AD\u30E5\u30FC
+                if (m_batchQueueNext) m_batchQueueNext();
+              } else {
+                m_currentAiOp = AiOpType::None;
+                const QString opStr = (op == AiOpType::Inpaint) ? "inpaint" : "txt2img";
+                if (m_batchImages.size() == 1) {
+                  // \u5358\u767A: \u5373\u30EC\u30A4\u30E4\u30FC\u9069\u7528
+                  const QImage converted = img.convertToFormat(QImage::Format_ARGB32);
+                  const int W2 = m_document.canvasSize().width;
+                  const int H2 = m_document.canvasSize().height;
+                  core::PixelBuffer buf(W2, H2);
+                  for (int y2 = 0; y2 < std::min(converted.height(), H2); ++y2)
+                    for (int x2 = 0; x2 < std::min(converted.width(), W2); ++x2) {
+                      const QColor c = converted.pixelColor(x2, y2);
+                      buf.setPixel(x2, y2, core::Color{
+                          static_cast<std::uint8_t>(c.red()),
+                          static_cast<std::uint8_t>(c.green()),
+                          static_cast<std::uint8_t>(c.blue()),
+                          static_cast<std::uint8_t>(c.alpha())});
+                    }
+                  pasteBufferAsNewRasterLayer(std::move(buf),
+                      op == AiOpType::Inpaint ? "AI \u30A4\u30F3\u30DA\u30A4\u30F3\u30C8" : "AI \u751F\u6210");
+                  emit aiGenerationComplete(opStr);
+                } else {
+                  // \u8907\u6570: \u5019\u88DC\u30B0\u30EA\u30C3\u30C9\u3067\u8868\u793A
+                  emit aiBatchCandidatesReady(m_batchImages);
                 }
+                m_batchImages.clear();
               }
-              rerender();
-              emit documentChanged();
-              emit layersChanged();
-              emit aiGenerationComplete(op == AiOpType::Inpaint ? "inpaint" : "txt2img");
             }
           });
     });
@@ -3586,87 +3602,94 @@ void AppController::fetchAiModels() {
 }
 
 // ── AI: インペイント ─────────────────────────────────────────────────────
-void AppController::runInpaint(const InpaintParams& params) {
+void AppController::runInpaint(const InpaintParams& params, int batchCount) {
   if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
     emit aiGenerationError("ComfyUI に接続されていません");
     return;
   }
 
+  // 選択範囲チェック: なければ禁止
+  if (!m_document.selection().hasSelection()) {
+    emit selectionMissing();
+    return;
+  }
+
+  // バッチ初期化
+  m_batchCount     = batchCount;
+  m_batchRemaining = batchCount;
+  m_batchImages.clear();
+
   // キャンバス合成画像を PNG に
   rerender();
   const QByteArray canvasPng = pixelBufferToPng(m_composited);
 
-  // マスク画像を作成: 選択範囲あり→選択部分を白、なし→全白
+  // マスク画像を作成: 選択範囲 = 白
   const core::SelectionMask& sel = m_document.selection();
   const int W = m_document.canvasSize().width;
   const int H = m_document.canvasSize().height;
   QImage maskImg(W, H, QImage::Format_Grayscale8);
-  if (sel.hasSelection()) {
-    for (int y = 0; y < H; ++y) {
-      for (int x = 0; x < W; ++x) {
-        maskImg.setPixel(x, y, sel.contains(x, y) ? qRgb(255,255,255) : qRgb(0,0,0));
-      }
+  for (int y = 0; y < H; ++y) {
+    for (int x = 0; x < W; ++x) {
+      maskImg.setPixel(x, y, sel.contains(x, y) ? qRgb(255,255,255) : qRgb(0,0,0));
     }
-  } else {
-    maskImg.fill(255);
   }
   QByteArray maskPng;
   QBuffer mbuf(&maskPng);
   mbuf.open(QIODevice::WriteOnly);
   maskImg.save(&mbuf, "PNG");
 
-  // 画像をアップロードしてからワークフローを実行
   const QString inputName = "paintapp_input.png";
   const QString maskName  = "paintapp_mask.png";
 
-  m_comfyUiClient->uploadImage(canvasPng, inputName, [this, maskPng, maskName, params, inputName](const QString& savedInput) {
+  m_comfyUiClient->uploadImage(canvasPng, inputName,
+      [this, maskPng, maskName, params, inputName](const QString& savedInput) {
     if (savedInput.isEmpty()) {
       emit aiGenerationError("入力画像のアップロードに失敗しました");
       return;
     }
-    m_comfyUiClient->uploadImage(maskPng, maskName, [this, params, savedInput](const QString& savedMask) {
+    m_comfyUiClient->uploadImage(maskPng, maskName,
+        [this, params, savedInput](const QString& savedMask) {
       if (savedMask.isEmpty()) {
         emit aiGenerationError("マスク画像のアップロードに失敗しました");
         return;
       }
 
-      ComfyUiClient::InpaintRequest req;
-      req.prompt         = params.prompt;
-      req.negativePrompt = params.negativePrompt;
-      req.checkpointName = params.checkpoint;
-      req.steps          = params.steps;
-      req.cfg            = params.cfg;
-      req.denoise        = params.denoise;
-      req.seed           = params.seed;
-      // ワークフロー内の LoadImage ノードが参照するファイル名を書き換える
-      QJsonObject wf = ComfyUiClient::buildInpaintWorkflow(req);
-      // node 4 の image を実際のアップロード名に差し替え
-      {
-        QJsonObject n4 = wf.value("4").toObject();
-        QJsonObject inp4 = n4.value("inputs").toObject();
-        inp4["image"] = savedInput;
-        n4["inputs"] = inp4;
-        wf["4"] = n4;
-      }
-      {
-        QJsonObject n5 = wf.value("5").toObject();
-        QJsonObject inp5 = n5.value("inputs").toObject();
-        inp5["image"] = m_comfyUiClient->serverUrl().toString() + "/view?filename=" + savedInput;
-        // LoadImageMask は image ファイル名を使う
-        inp5["image"] = savedInput;
-        n5["inputs"] = inp5;
-        wf["5"] = n5;
-      }
+      // ワークフロー組み立て (seed はバッチごとに変える)
+      const auto buildAndQueue = [this, params, savedInput, savedMask](int batchIdx) {
+        ComfyUiClient::InpaintRequest req;
+        req.prompt         = params.prompt;
+        req.negativePrompt = params.negativePrompt;
+        req.checkpointName = params.checkpoint;
+        req.steps          = params.steps;
+        req.cfg            = params.cfg;
+        req.denoise        = params.denoise;
+        req.seed           = (params.seed < 0)
+            ? static_cast<int>(QRandomGenerator::global()->generate())
+            : (params.seed + batchIdx);
+        QJsonObject wf = ComfyUiClient::buildInpaintWorkflow(req);
+        // LoadImage ノードのファイル名を差し替え
+        { QJsonObject n = wf.value("4").toObject();
+          QJsonObject inp = n.value("inputs").toObject();
+          inp["image"] = savedInput;  n["inputs"] = inp;  wf["4"] = n; }
+        { QJsonObject n = wf.value("5").toObject();
+          QJsonObject inp = n.value("inputs").toObject();
+          inp["image"] = savedMask;   n["inputs"] = inp;  wf["5"] = n; }
+        m_comfyUiClient->queuePrompt(wf);
+      };
+
+      m_batchFired     = 0;
+      m_batchQueueNext = [this, buildAndQueue]() {
+        buildAndQueue(++m_batchFired);
+      };
 
       m_currentAiOp = AiOpType::Inpaint;
-      m_comfyUiClient->queuePrompt(wf);
-      // 結果ハンドラは connectComfyUi() で接続済みの executionComplete シグナル経由
+      buildAndQueue(0);
     });
   });
 }
 
 // ── AI: テキストから画像生成 ─────────────────────────────────────────────
-void AppController::runTextToImage(const Txt2ImgParams& params) {
+void AppController::runTextToImage(const Txt2ImgParams& params, int batchCount) {
   if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
     emit aiGenerationError("ComfyUI に接続されていません");
     return;
@@ -3745,8 +3768,77 @@ void AppController::runTextToImage(const Txt2ImgParams& params) {
     wf["7"] = n;
   }
 
+  // バッチ初期化
+  m_batchCount     = batchCount;
+  m_batchRemaining = batchCount;
+  m_batchImages.clear();
   m_currentAiOp = AiOpType::TextToImage;
+
+  // バッチ 2 枚目以降: seed を変えて再キュー
+  m_batchFired     = 0;
+  m_batchQueueNext = [this, wf]() mutable {
+    ++m_batchFired;
+    QJsonObject wfNext = wf;
+    QJsonObject n5 = wfNext.value("5").toObject();
+    QJsonObject inp5 = n5.value("inputs").toObject();
+    inp5["seed"] = static_cast<int>(QRandomGenerator::global()->generate());
+    n5["inputs"] = inp5; wfNext["5"] = n5;
+    m_comfyUiClient->queuePrompt(wfNext);
+  };
+
   m_comfyUiClient->queuePrompt(wf);
+}
+
+// ── AI: カスタムワークフロー ─────────────────────────────────────────────
+void AppController::runWorkflow(const QJsonObject& workflow,
+                                const QString& positivePrompt,
+                                const QString& negativePrompt,
+                                int seed, const QString& checkpoint,
+                                int batchCount) {
+  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
+    emit aiGenerationError("ComfyUI に接続されていません");
+    return;
+  }
+  m_batchCount     = batchCount;
+  m_batchRemaining = batchCount;
+  m_batchImages.clear();
+  m_currentAiOp    = AiOpType::CustomWorkflow;
+
+  m_batchFired     = 0;
+  const auto queueOne = [this, workflow, positivePrompt, negativePrompt,
+                          checkpoint, seed]() {
+    const int thisSeed = (seed < 0)
+        ? static_cast<int>(QRandomGenerator::global()->generate())
+        : (seed + m_batchFired);
+    QJsonObject wf = ComfyUiClient::injectWorkflowParams(
+        workflow, positivePrompt, negativePrompt, thisSeed, checkpoint);
+    m_comfyUiClient->queuePrompt(wf);
+  };
+
+  m_batchQueueNext = [this, queueOne]() {
+    ++m_batchFired; queueOne();
+  };
+  queueOne();
+}
+
+// ── AI: バッチ候補を新規レイヤーとして適用 ───────────────────────────────
+void AppController::applyBatchCandidate(const QPixmap& px, const QString& layerName) {
+  const QImage img = px.toImage().convertToFormat(QImage::Format_ARGB32);
+  const int W = m_document.canvasSize().width;
+  const int H = m_document.canvasSize().height;
+  core::PixelBuffer buf(W, H);
+  for (int y = 0; y < std::min(img.height(), H); ++y) {
+    for (int x = 0; x < std::min(img.width(), W); ++x) {
+      const QColor c = img.pixelColor(x, y);
+      buf.setPixel(x, y, core::Color{
+          static_cast<std::uint8_t>(c.red()),
+          static_cast<std::uint8_t>(c.green()),
+          static_cast<std::uint8_t>(c.blue()),
+          static_cast<std::uint8_t>(c.alpha())});
+    }
+  }
+  pasteBufferAsNewRasterLayer(std::move(buf), layerName.toStdString());
+  emit aiGenerationComplete("apply_candidate");
 }
 
 } // namespace app::bridge

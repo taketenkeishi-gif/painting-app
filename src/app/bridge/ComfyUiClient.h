@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QObject>
+#include <QPixmap>
 #include <QString>
 #include <QTimer>
 #include <QUrl>
@@ -13,26 +14,29 @@
 
 QT_FORWARD_DECLARE_CLASS(QNetworkReply)
 
+namespace app::bridge { class MinimalWebSocket; }
+
 namespace app::bridge {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ComfyUiClient
 //
-// ComfyUI の HTTP REST API に接続するクライアント。
+// ComfyUI HTTP REST + WebSocket クライアント。
 // デフォルト URL: http://localhost:8188
 //
 // ── 接続フロー ──────────────────────────────────────────────────────────────
-//   connectToServer()  →  健全性確認 (GET /system_stats)  →  接続完了
+//   connectToServer()  →  GET /system_stats  →  WebSocket /ws  →  接続完了
 //
 // ── ワークフロー実行フロー ──────────────────────────────────────────────────
-//   queuePrompt(workflow)  →  POST /prompt  →  promptId を返す
-//   内部ポーリング (GET /history/{promptId}) で完了を検出
+//   queuePrompt(workflow)  →  POST /prompt  →  promptId を記録
+//   WebSocket イベント (progress / executing / executed) で進捗・完了を検出
 //   executionComplete / executionError シグナルを emit
-//   fetchImage(filename)   →  GET /view?filename=... →  QByteArray (PNG)
+//   fetchImage(filename)  →  GET /view?filename=...  →  QByteArray (PNG)
 //
-// ── 組み込みワークフロー ────────────────────────────────────────────────────
-//   buildInpaintWorkflow()   - SD 標準インペイントワークフロー
-//   buildSamWorkflow()       - Segment Anything 2 選択ワークフロー
+// ── プレビュー ──────────────────────────────────────────────────────────────
+//   ComfyUI が WebSocket バイナリメッセージで KSampler 中間プレビューを送信。
+//   先頭 4 バイト = event_type (1=preview), 次 4 バイト = format, 残り = 画像。
+//   previewImageReceived シグナルで QPixmap を emit。
 // ─────────────────────────────────────────────────────────────────────────────
 class ComfyUiClient : public QObject {
   Q_OBJECT
@@ -77,12 +81,9 @@ public:
   QString clientId() const noexcept { return m_clientId; }
 
   // ── API ──────────────────────────────────────────────────────────────────
-  /// ワークフロー JSON をキューに追加。非同期。戻り値: promptId
-  QString queuePrompt(const QJsonObject& workflow);
-
-  /// 実行履歴を取得（結果画像ファイル名の取り出しに使う）
-  void getHistory(const QString& promptId,
-                  std::function<void(QJsonObject)> callback);
+  /// ワークフロー JSON をキューに追加。非同期。
+  void queuePrompt(const QJsonObject& workflow,
+                   std::function<void(QString)> onQueued = {});
 
   /// ComfyUI view エンドポイントから画像バイト列を取得
   void fetchImage(const QString& filename,
@@ -105,33 +106,50 @@ public:
   static QJsonObject buildInpaintWorkflow(const InpaintRequest& req);
   static QJsonObject buildSamWorkflow    (const SamRequest&     req);
 
+  /// ワークフロー JSON に prompt/seed/checkpoint を注入して返す。
+  /// CLIPTextEncode ノード(1番目=positive, 2番目=negative), KSampler, CheckpointLoader を検索。
+  static QJsonObject injectWorkflowParams(
+      QJsonObject workflow,
+      const QString& positivePrompt,
+      const QString& negativePrompt,
+      int seed,
+      const QString& checkpoint = {});
+
 signals:
   void stateChanged       (State newState);
   void connectionError    (QString message);
-  void progressUpdate     (QString promptId, int nodeIndex, int totalNodes, float value);
+  /// progress: step/totalSteps + 現在ノード ID (class_type があれば)
+  void progressUpdate     (QString promptId, int step, int totalSteps, QString nodeId);
   void executionComplete  (QString promptId, QStringList outputImages);
   void executionError     (QString promptId, QString message);
   void systemStatsReceived(QJsonObject stats);
+  /// KSampler 中間プレビュー（WebSocket バイナリ）
+  void previewImageReceived(QPixmap preview);
 
 private slots:
-  void onPollTimer();
+  void onWsTextMessage  (const QString& text);
+  void onWsBinaryMessage(const QByteArray& data);
+  void onWsDisconnected ();
 
 private:
   void setState(State s);
-  void startPolling(const QString& promptId);
+  void connectWebSocket();
   QNetworkReply* get (const QString& path);
   QNetworkReply* post(const QString& path, const QByteArray& body,
                       const QString& contentType = "application/json");
 
+  // HTTP
   QUrl                  m_baseUrl   {"http://localhost:8188"};
   QString               m_clientId  {QUuid::createUuid().toString(QUuid::WithoutBraces)};
   QNetworkAccessManager m_nam       {this};
   State                 m_state     {State::Disconnected};
   QTimer                m_reconnectTimer {this};
-  QTimer                m_pollTimer      {this};
 
-  // pending prompts being polled: promptId → poll count
-  std::map<QString, int> m_pendingPrompts;
+  // WebSocket
+  MinimalWebSocket* m_ws {nullptr};
+
+  // 追跡中のプロンプト: promptId → 収集済み出力画像ファイル名リスト
+  std::map<QString, QStringList> m_pendingOutputs;
 };
 
 } // namespace app::bridge

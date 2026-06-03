@@ -8,7 +8,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include <functional>
+
+#include <QList>
 #include <QObject>
+#include <QPixmap>
 
 #include "app/ui/ToolDescriptor.h"
 #include "app/ui/UiState.h"
@@ -356,8 +360,9 @@ public:
     float   denoise     {0.75f};
     int     seed        {-1};
   };
-  /// 選択範囲をマスクとしてインペイントを実行。選択がない場合はキャンバス全体を対象。
-  void runInpaint(const InpaintParams& params);
+  /// 選択範囲をマスクとしてインペイントを実行。
+  /// 選択がない場合は selectionMissing() を emit して返す（全体 inpaint は禁止）。
+  void runInpaint(const InpaintParams& params, int batchCount = 1);
 
   struct Txt2ImgParams {
     QString prompt;
@@ -370,10 +375,21 @@ public:
     int     seed        {-1};
   };
   /// テキストから新規レイヤーに画像を生成
-  void runTextToImage(const Txt2ImgParams& params);
+  void runTextToImage(const Txt2ImgParams& params, int batchCount = 1);
+
+  /// ユーザー指定ワークフロー JSON を実行。prompt/seed を注入して batchCount 回キューに追加。
+  void runWorkflow(const QJsonObject& workflow,
+                   const QString& positivePrompt,
+                   const QString& negativePrompt,
+                   int seed,
+                   const QString& checkpoint,
+                   int batchCount = 1);
 
   /// 実行中の AI 生成をキャンセル
   void cancelAiGeneration();
+
+  /// バッチ候補 Pixmap を新規レイヤーとして貼り付け
+  void applyBatchCandidate(const QPixmap& px, const QString& layerName = "AI 生成");
 
 signals:
   void canvasChanged();
@@ -385,9 +401,17 @@ signals:
   void comfyUiStateChanged(bool connected);
   void aiSelectionRefined();   ///< ComfyUI 推論で選択が更新されたとき
   void aiModelsLoaded(QStringList models);
-  void aiProgressUpdate(int step, int totalSteps);
+  /// step/total ステップ数 + 現在ノード ID
+  void aiProgressUpdate(int step, int totalSteps, QString nodeId);
+  /// KSampler 中間プレビュー画像
+  void aiPreviewReceived(QPixmap preview);
+  /// 単一完了 (バッチ 1 or 各バッチ要素)
   void aiGenerationComplete(QString operationType);
+  /// バッチ全候補が揃ったとき
+  void aiBatchCandidatesReady(QList<QPixmap> candidates);
   void aiGenerationError(QString message);
+  /// インペイント時に選択範囲がなかった
+  void selectionMissing();
 
 private:
   enum class HistoryKind {
@@ -463,8 +487,15 @@ private:
   core::GradientTool*      m_gradientTool       {nullptr};
   core::AiSelectTool*      m_aiSelectTool       {nullptr};
   ComfyUiClient*           m_comfyUiClient      {nullptr};
-  enum class AiOpType { None, SamSelect, Inpaint, TextToImage };
+  enum class AiOpType { None, SamSelect, Inpaint, TextToImage, CustomWorkflow };
   AiOpType                 m_currentAiOp        {AiOpType::None};
+  // バッチ追跡
+  int                      m_batchCount         {1};
+  int                      m_batchRemaining     {0};
+  int                      m_batchFired         {0};
+  QList<QPixmap>           m_batchImages;
+  // 次のバッチ用コールバック (upload 済みの場合に再利用)
+  std::function<void()>    m_batchQueueNext;
 
   app::ui::ToolCatalog m_toolCatalog;
   app::ui::UiState m_uiState;
