@@ -376,8 +376,13 @@ ToolPanel::ToolPanel(QWidget* parent)
   m_buttonGrid->setContentsMargins(4, 4, 4, 4);
   m_buttonGrid->setHorizontalSpacing(2);
   m_buttonGrid->setVerticalSpacing(2);
-  m_buttonGrid->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+  m_buttonGrid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
   m_buttonGridHost->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+  // Allow the host and panel to shrink to zero width so the scroll area
+  // can make the panel as narrow as the dock.  Column count is recalculated
+  // from the actual viewport width on every resize.
+  m_buttonGridHost->setMinimumSize(0, 0);
+  setMinimumSize(0, 0);
   m_buttonGridHost->setStyleSheet(QStringLiteral("background: #1a1d27; border-right: 1px solid #2a2e3e;"));
   m_buttonGridHost->setLayout(m_buttonGrid);
   m_rootLayout->addWidget(m_buttonGridHost, 0);
@@ -449,16 +454,15 @@ void ToolPanel::setSections(Sections sections) noexcept {
 }
 
 int ToolPanel::columnCountForWidth(int width) const noexcept {
-  if (width < 72) {
-    return 1;
-  }
-  if (width < 110) {
-    return 2;
-  }
-  if (width < 160) {
-    return 3;
-  }
-  return 4;
+  // Formula-based: how many 28px buttons (+ 2px gap each) fit in the usable
+  // width after subtracting the 4px margin on each side (8px total)?
+  constexpr int kBtn     = 28;
+  constexpr int kGap     = 2;
+  constexpr int kMargins = 8;   // 4px left + 4px right
+  const int usable = width - kMargins;
+  if (usable <= 0) return 1;
+  // cols = floor((usable + gap) / (btn + gap))
+  return std::max(1, (usable + kGap) / (kBtn + kGap));
 }
 
 void ToolPanel::refreshFromController() {
@@ -643,7 +647,9 @@ void ToolPanel::relayoutButtons() {
     delete item;
   }
 
-  const int availableWidth = std::max(width(), m_buttonGridHost != nullptr ? m_buttonGridHost->width() : 0);
+  // Use the panel's own width — it equals the scroll-area viewport width
+  // (setWidgetResizable(true) keeps them in sync), so no stale host value.
+  const int availableWidth = width();
   const int columns = std::max(1, columnCountForWidth(availableWidth));
 
   for (int i = 0; i < static_cast<int>(m_buttonOrder.size()); ++i) {

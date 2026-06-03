@@ -1,5 +1,12 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#B0B0B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<path d="M6 18c1.2 1.8 4.4 1.8 6.2 0l5.2-5.2-4.2-4.2L8 13.8C6.3 15.5 5.6 17.1 6 18z"/>
-<path d="M14 6l4 4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Brush handle end cap -->
+  <path d="M20 2 L22 4 L20 6 L18 4 Z" fill="#d0d4e0"/>
+  <!-- Brush body (diagonal shaft) -->
+  <path d="M18 4 L20 6 L11 15 L9 13 Z" fill="#b0b5c8"/>
+  <!-- Ferrule band -->
+  <path d="M9 13 L11 15 L9.5 16.5 L7.5 14.5 Z" fill="#787a90"/>
+  <!-- Bristles, tapering to tip -->
+  <path d="M7.5 14.5 L9.5 16.5 L5.5 21 Q3.5 21.5 3 19.5 Z" fill="#9095ab"/>
+  <!-- Paint blob at tip -->
+  <ellipse cx="4.5" cy="19.5" rx="1.5" ry="1.5" fill="#60637a"/>
 </svg>
-

@@ -148,7 +148,7 @@ void CanvasWidget::setController(app::bridge::AppController* controller) {
 
 void CanvasWidget::zoomIn() {
   auto& state = stateFor(this);
-  state.zoom = std::clamp(state.zoom * 1.1, 0.1, 16.0);
+  state.zoom = std::clamp(state.zoom * 1.1, 0.05, 16.0);
   updateZoomStatusLabel(this);
   update();
   emit viewTransformChanged();
@@ -156,7 +156,7 @@ void CanvasWidget::zoomIn() {
 
 void CanvasWidget::zoomOut() {
   auto& state = stateFor(this);
-  state.zoom = std::clamp(state.zoom / 1.1, 0.1, 16.0);
+  state.zoom = std::clamp(state.zoom / 1.1, 0.05, 16.0);
   updateZoomStatusLabel(this);
   update();
   emit viewTransformChanged();
@@ -178,7 +178,7 @@ void CanvasWidget::fitToScreen() {
   auto& state = stateFor(this);
   const double zoomX = static_cast<double>(width()) / static_cast<double>(m_image.width());
   const double zoomY = static_cast<double>(height()) / static_cast<double>(m_image.height());
-  state.zoom = std::clamp(std::min(zoomX, zoomY), 0.1, 16.0);
+  state.zoom = std::clamp(std::min(zoomX, zoomY), 0.05, 16.0);
   state.panOffset = QPointF(0.0, 0.0);
   updateZoomStatusLabel(this);
   update();
@@ -575,7 +575,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
     const QPoint current = event->position().toPoint();
     const int dy = current.y() - m_ctrlSpaceStartPos.y();
     const double factor = std::pow(1.008, -dy);
-    state.zoom = std::clamp(m_ctrlSpaceStartZoom * factor, 0.1, 16.0);
+    state.zoom = std::clamp(m_ctrlSpaceStartZoom * factor, 0.05, 16.0);
     updateZoomStatusLabel(this);
     update();
     emit viewTransformChanged();
@@ -760,7 +760,7 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
   }
 
   const double oldZoom = state.zoom;
-  const double newZoom = std::clamp(oldZoom * std::pow(1.1, steps), 0.1, 16.0);
+  const double newZoom = std::clamp(oldZoom * std::pow(1.1, steps), 0.05, 16.0);
   if (std::abs(newZoom - oldZoom) < 0.0001) {
     event->accept();
     return;

@@ -1,9 +1,14 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#B0B0B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<path d="M12 4v16"/>
-<path d="M4 12h16"/>
-<path d="M12 4l-2 2"/><path d="M12 4l2 2"/>
-<path d="M12 20l-2-2"/><path d="M12 20l2-2"/>
-<path d="M4 12l2-2"/><path d="M4 12l2 2"/>
-<path d="M20 12l-2-2"/><path d="M20 12l-2 2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Vertical bar -->
+  <rect x="11" y="6" width="2" height="12" fill="#b0b5c8"/>
+  <!-- Horizontal bar -->
+  <rect x="6" y="11" width="12" height="2" fill="#b0b5c8"/>
+  <!-- Up arrow -->
+  <path d="M9.5 7.5 L12 3 L14.5 7.5 Z" fill="#b0b5c8"/>
+  <!-- Down arrow -->
+  <path d="M9.5 16.5 L12 21 L14.5 16.5 Z" fill="#b0b5c8"/>
+  <!-- Left arrow -->
+  <path d="M7.5 9.5 L3 12 L7.5 14.5 Z" fill="#b0b5c8"/>
+  <!-- Right arrow -->
+  <path d="M16.5 9.5 L21 12 L16.5 14.5 Z" fill="#b0b5c8"/>
 </svg>
-
