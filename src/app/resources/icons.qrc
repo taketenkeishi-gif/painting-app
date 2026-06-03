@@ -25,6 +25,7 @@
     <file>icons/16/export.svg</file>
     <file>icons/16/eyedropper.svg</file>
     <file>icons/16/fill.svg</file>
+    <file>icons/16/gradient.svg</file>
     <file>icons/16/fit.svg</file>
     <file>icons/16/folder.svg</file>
     <file>icons/16/hand.svg</file>
@@ -63,6 +64,7 @@
     <file>icons/20/export.svg</file>
     <file>icons/20/eyedropper.svg</file>
     <file>icons/20/fill.svg</file>
+    <file>icons/20/gradient.svg</file>
     <file>icons/20/fit.svg</file>
     <file>icons/20/folder.svg</file>
     <file>icons/20/hand.svg</file>
@@ -100,6 +102,7 @@
     <file>icons/24/export.svg</file>
     <file>icons/24/eyedropper.svg</file>
     <file>icons/24/fill.svg</file>
+    <file>icons/24/gradient.svg</file>
     <file>icons/24/fit.svg</file>
     <file>icons/24/folder.svg</file>
     <file>icons/24/hand.svg</file>

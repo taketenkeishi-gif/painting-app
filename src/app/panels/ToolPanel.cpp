@@ -103,7 +103,7 @@ QString iconName(core::ToolKind kind) {
     case core::ToolKind::Zoom:
       return "zoom";
     case core::ToolKind::Gradient:
-      return "fill";  // グラデーションアイコンがない場合は fill を流用
+      return "gradient";
     default:
       return "brush";
   }

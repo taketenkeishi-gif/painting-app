@@ -1,14 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <!-- Body (thick diagonal tube) -->
-  <path d="M13 3 L21 11 L17 15 L9 7 Z" fill="#b0b5c8"/>
-  <!-- Highlight stripe on body -->
-  <path d="M15 4 L20 9 L18.5 10.5 L13.5 5.5 Z" fill="#d0d4e0" opacity="0.6"/>
-  <!-- Rubber cap at top -->
-  <path d="M13 3 L15 1 L18.5 4.5 L16.5 6.5 Z" fill="#787a90"/>
-  <!-- Tip / nozzle -->
-  <path d="M9 7 L17 15 L14 18 L6 10 Z" fill="#9095ab"/>
-  <!-- Sample pick tip -->
-  <path d="M6 10 L14 18 L12 20 L4 12 Z" fill="#787a90"/>
-  <!-- Paint drop at tip -->
-  <path d="M8 19 Q7 22 10 22 Q13 22 12 19 Z" fill="#9095ab"/>
+  <!-- Rubber bulb (oval) at top-right -->
+  <ellipse cx="17.5" cy="6" rx="3.5" ry="3" fill="#b0b5c8"/>
+  <ellipse cx="17" cy="5.2" rx="1.2" ry="0.9" fill="#d0d4e0" opacity="0.45"/>
+  <!-- Glass tube (diagonal, connects bulb base to tip) -->
+  <rect x="8" y="8" width="9" height="3.5" rx="1.4"
+        transform="rotate(-45 12.5 9.75)" fill="#b0b5c8"/>
+  <!-- Tube highlight -->
+  <rect x="8.8" y="8.2" width="7" height="1.2" rx="0.6"
+        transform="rotate(-45 12.5 9.75)" fill="#d0d4e0" opacity="0.4"/>
+  <!-- Nib (narrow tip at bottom-left) -->
+  <polygon points="5.5,18.5 3.5,20.5 6.5,20" fill="#888ca0"/>
+  <!-- Sample drop -->
+  <ellipse cx="3.8" cy="21.2" rx="1.4" ry="1.7" fill="#9095ab"/>
+  <ellipse cx="3.4" cy="20.5" rx="0.45" ry="0.55" fill="#c8ccd8" opacity="0.55"/>
 </svg>
