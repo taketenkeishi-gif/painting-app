@@ -244,6 +244,7 @@ public:
       btn->setFlat(true);
       btn->setFocusPolicy(Qt::NoFocus);
       btn->setFixedHeight(22);
+      btn->setMinimumWidth(0);   // allow shrinking below text width
       btn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
       applyTabStyle(btn, sib == m_dock);
 
@@ -261,6 +262,12 @@ public:
     m_layout->addWidget(m_floatBtn);
     m_layout->addWidget(m_closeBtn);
   }
+
+  // Keep DockTitleBar from enforcing a minimum width based on tab label text.
+  // Only grip (14) + float (20) + close (20) = 54 px is the hard minimum;
+  // the tab buttons clip/shrink when the dock is narrower than their content.
+  QSize minimumSizeHint() const override { return QSize(54, 22); }
+  QSize sizeHint()        const override { return QSize(54, 22); }
 
 protected:
   void paintEvent(QPaintEvent*) override {
