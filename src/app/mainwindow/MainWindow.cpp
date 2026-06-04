@@ -1,5 +1,6 @@
 #include "app/mainwindow/MainWindow.h"
 #include <QPainter>
+#include <QPainterPath>
 
 #include <algorithm>
 #include <cstdint>
@@ -334,8 +335,8 @@ public:
   void setForegroundColor(const QColor& color) { m_fgColor = color; update(); }
   void setBackgroundColor(const QColor& color) { m_bgColor = color; update(); }
 
-  QSize sizeHint() const override { return QSize(40, 40); }
-  QSize minimumSizeHint() const override { return QSize(40, 40); }
+  QSize sizeHint() const override { return QSize(48, 48); }
+  QSize minimumSizeHint() const override { return QSize(48, 48); }
 
   // Simple callback mechanism for clicks (no Qt signals needed)
   std::function<void()> onForegroundClicked;
@@ -343,9 +344,10 @@ public:
 
 protected:
   void mousePressEvent(QMouseEvent* e) override {
-    const int fgSize = 28;
-    const int padding = 4;
-    QRect fgRect(padding, padding, fgSize, fgSize);
+    const int fgSize = 32;
+    const int fgX = 0;
+    const int fgY = 0;
+    QRect fgRect(fgX, fgY, fgSize, fgSize);
     if (fgRect.contains(e->pos())) {
       if (onForegroundClicked) onForegroundClicked();
     } else {
@@ -354,26 +356,92 @@ protected:
   }
 
   void paintEvent(QPaintEvent*) override {
+    const qreal dpr = devicePixelRatioF();
+    const int W = width();
+    const int H = height();
+    QImage img(static_cast<int>(W * dpr), static_cast<int>(H * dpr), QImage::Format_ARGB32_Premultiplied);
+    img.setDevicePixelRatio(dpr);
+    img.fill(Qt::transparent);
+
+    QPainter p(&img);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.scale(dpr, dpr);
+
+    // Helper: draw checker pattern into a rounded rect region
+    auto drawChecker = [&](const QRectF& r, int radius) {
+      const int cell = 4;
+      QPainterPath clip;
+      clip.addRoundedRect(r, radius, radius);
+      p.save();
+      p.setClipPath(clip);
+      for (int cy = static_cast<int>(r.top()); cy < static_cast<int>(r.bottom()); cy += cell) {
+        for (int cx = static_cast<int>(r.left()); cx < static_cast<int>(r.right()); cx += cell) {
+          bool light = (((cx - static_cast<int>(r.left())) / cell) + ((cy - static_cast<int>(r.top())) / cell)) % 2 == 0;
+          p.fillRect(QRectF(cx, cy, cell, cell), light ? QColor(220, 220, 220) : QColor(160, 160, 160));
+        }
+      }
+      p.restore();
+    };
+
+    // Helper: draw a color swatch with outline
+    auto drawSwatch = [&](const QRectF& r, const QColor& color, int radius,
+                          const QColor& outlineColor, qreal outlineWidth,
+                          bool hasShadow) {
+      // Shadow (drop shadow effect: offset rect slightly darker)
+      if (hasShadow) {
+        QRectF shadowRect = r.translated(1.5, 1.5);
+        p.save();
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 0, 0, 60));
+        p.drawRoundedRect(shadowRect, radius, radius);
+        p.restore();
+      }
+      // White outline (outer glow)
+      if (outlineWidth > 0 && outlineColor == Qt::white) {
+        p.save();
+        p.setPen(QPen(QColor(255, 255, 255, 230), outlineWidth + 1.0));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(r.adjusted(-1, -1, 1, 1), radius + 1, radius + 1);
+        p.restore();
+      }
+      // Checker pattern for transparent/semi-transparent
+      if (color.alpha() < 128) {
+        drawChecker(r, radius);
+      }
+      // Color fill
+      p.save();
+      p.setPen(Qt::NoPen);
+      p.setBrush(color);
+      p.drawRoundedRect(r, radius, radius);
+      p.restore();
+      // Dark border
+      p.save();
+      p.setPen(QPen(outlineColor, outlineWidth));
+      p.setBrush(Qt::NoBrush);
+      p.drawRoundedRect(r.adjusted(outlineWidth * 0.5, outlineWidth * 0.5,
+                                   -outlineWidth * 0.5, -outlineWidth * 0.5),
+                        radius, radius);
+      p.restore();
+    };
+
+    // BG swatch: 24x24, offset 12px from FG top-left (bottom-right)
+    const QRectF bgRect(12.0, 12.0, 24.0, 24.0);
+    drawSwatch(bgRect, m_bgColor, 2, QColor(50, 50, 50), 1.0, false);
+
+    // FG swatch: 32x32 at top-left
+    const QRectF fgRect(0.0, 0.0, 32.0, 32.0);
+    drawSwatch(fgRect, m_fgColor, 3, QColor(40, 40, 40), 1.0, true);
+    // White inner outline on FG
+    p.save();
+    p.setPen(QPen(QColor(255, 255, 255, 180), 1.5));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(fgRect.adjusted(1.5, 1.5, -1.5, -1.5), 2, 2);
+    p.restore();
+
+    p.end();
+
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-
-    const int padding = 4;
-    const int fgSize = 28;
-    const int bgSize = 18;
-    const int fgX = padding;
-    const int fgY = padding;
-    const int bgX = fgX + 14;
-    const int bgY = fgY + 14;
-
-    // BG square (behind, bottom-right offset)
-    painter.fillRect(bgX, bgY, bgSize, bgSize, m_bgColor);
-    painter.setPen(QPen(QColor(80, 80, 80), 1));
-    painter.drawRect(bgX, bgY, bgSize - 1, bgSize - 1);
-
-    // FG square (front, top-left)
-    painter.fillRect(fgX, fgY, fgSize, fgSize, m_fgColor);
-    painter.setPen(QPen(QColor(120, 120, 120), 1));
-    painter.drawRect(fgX, fgY, fgSize - 1, fgSize - 1);
+    painter.drawImage(0, 0, img);
   }
 
 private:
@@ -541,8 +609,8 @@ void MainWindow::setupShellLayout() {
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
   m_colorWheelWidget->setMinimumSize(104, 104);
-  // Swatch widget: compact 40x40 fixed size for single-row layout
-  m_colorSwatchWidget->setFixedSize(40, 40);
+  // Swatch widget: 48x48 for high-quality CSP-like display
+  m_colorSwatchWidget->setFixedSize(48, 48);
   swapColorButton->setFixedSize(18, 18);
   resetColorButton->setFixedSize(18, 18);
   swapColorButton->setIcon(app::ui::icon("swap"));
@@ -572,46 +640,46 @@ void MainWindow::setupShellLayout() {
   resetColorButton->setToolTip("描画色/背景色を白黒に戻す");
   transparentColorButton->setToolTip("透明色で描画（アルファ消去）");
 
-  // Checker pattern icon for transparent button
+  // Checker pattern icon for transparent button (sharper, 20x20)
   {
-    QPixmap pixmap(24, 12);
+    QPixmap pixmap(20, 20);
     pixmap.fill(QColor(244, 244, 244));
     QPainter cp(&pixmap);
-    constexpr int cell = 3;
+    constexpr int cell = 4;
     for (int y = 0; y < pixmap.height(); y += cell) {
       for (int x = 0; x < pixmap.width(); x += cell) {
         if (((x / cell) + (y / cell)) % 2 == 1)
-          cp.fillRect(QRect(x, y, cell, cell), QColor(142, 151, 164));
+          cp.fillRect(QRect(x, y, cell, cell), QColor(130, 140, 155));
       }
     }
     cp.end();
     transparentColorButton->setIcon(QIcon(pixmap));
-    transparentColorButton->setIconSize(QSize(16, 8));
+    transparentColorButton->setIconSize(QSize(14, 14));
     transparentColorButton->setText(QString());
   }
   transparentColorButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  transparentColorButton->setFixedSize(22, 22);
+  transparentColorButton->setFixedSize(20, 20);
   transparentColorButton->setStyleSheet(QStringLiteral(
-      "QPushButton { min-width:22px; max-width:22px; min-height:22px; max-height:22px;"
+      "QPushButton { min-width:20px; max-width:20px; min-height:20px; max-height:20px;"
       "  padding: 0px; margin: 0px; border: 1px solid #6a7484;"
-      "  border-radius: 2px; background: transparent; }"
+      "  border-radius: 3px; background: transparent; }"
       "QPushButton:hover { border: 1px solid #eef3fb; }"));
 
-  // Single compact top row: [swatch 40x40] [transparent fills width] [swap] [reset]
-  // Target total height <= 44px
-  auto* opsVBox = new QVBoxLayout();
-  opsVBox->setContentsMargins(0, 0, 0, 0);
-  opsVBox->setSpacing(2);
-  opsVBox->addWidget(swapColorButton, 0, Qt::AlignTop);
-  opsVBox->addWidget(resetColorButton, 0, Qt::AlignTop);
-  opsVBox->addStretch(1);
+  // Layout: [swatch 48x48 top-aligned] [transparent 20x20 / swap 18x18 / reset 18x18 vertical, top-aligned]
+  auto* rightVBox = new QVBoxLayout();
+  rightVBox->setContentsMargins(0, 0, 0, 0);
+  rightVBox->setSpacing(2);
+  rightVBox->addWidget(transparentColorButton, 0, Qt::AlignLeft | Qt::AlignTop);
+  rightVBox->addWidget(swapColorButton, 0, Qt::AlignLeft | Qt::AlignTop);
+  rightVBox->addWidget(resetColorButton, 0, Qt::AlignLeft | Qt::AlignTop);
+  rightVBox->addStretch(1);
 
   auto* colorButtons = new QHBoxLayout();
   colorButtons->setContentsMargins(0, 0, 0, 0);
-  colorButtons->setSpacing(2);
-  colorButtons->addWidget(m_colorSwatchWidget, 0, Qt::AlignVCenter);
-  colorButtons->addWidget(transparentColorButton, 1, Qt::AlignVCenter);
-  colorButtons->addLayout(opsVBox, 0);
+  colorButtons->setSpacing(4);
+  colorButtons->addWidget(m_colorSwatchWidget, 0, Qt::AlignTop | Qt::AlignLeft);
+  colorButtons->addLayout(rightVBox, 0);
+  colorButtons->addStretch(1);
   auto addHsvRow = [this, colorPanel](const QString& label, QSlider* slider, QSpinBox* spin) {
     auto* row = new QHBoxLayout();
     row->setContentsMargins(1, 0, 1, 0);

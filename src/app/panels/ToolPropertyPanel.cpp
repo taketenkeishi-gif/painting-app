@@ -306,19 +306,30 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
 
   auto* titleFrame = new QFrame(m_contentWidget);
   auto* titleLayout = new QVBoxLayout(titleFrame);
-  titleLayout->setContentsMargins(3, 3, 3, 3);
-  titleLayout->setSpacing(2);
-  auto* titleActions = new QHBoxLayout();
-  titleActions->setContentsMargins(0, 0, 0, 0);
-  titleActions->setSpacing(4);
-  m_detailToggleButton->setMinimumHeight(20);
-  m_pinConfigButton->setMinimumHeight(20);
-  m_detailToggleButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-  m_pinConfigButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-  titleActions->addWidget(m_detailToggleButton);
-  titleActions->addWidget(m_pinConfigButton);
-  titleLayout->addWidget(m_toolNameLabel);
-  titleLayout->addLayout(titleActions);
+  titleLayout->setContentsMargins(2, 2, 2, 2);
+  titleLayout->setSpacing(1);
+
+  // Compact header row: [tool name (stretch)] [detail btn 20x20] [pin btn 20x20]
+  auto* titleRow = new QHBoxLayout();
+  titleRow->setContentsMargins(0, 0, 0, 0);
+  titleRow->setSpacing(2);
+
+  m_toolNameLabel->setStyleSheet(QStringLiteral(
+      "QLabel { font-weight: bold; font-size: 10px; }"));
+
+  m_detailToggleButton->setFixedSize(20, 20);
+  m_pinConfigButton->setFixedSize(20, 20);
+  m_detailToggleButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  m_pinConfigButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  // Use compact symbols for the icon buttons
+  m_detailToggleButton->setText(QString::fromUtf8("\xe2\x89\xa1"));   // ≡
+  m_pinConfigButton->setText(QString::fromUtf8("\xe2\x8a\x95"));      // ⊕
+
+  titleRow->addWidget(m_toolNameLabel, 1);
+  titleRow->addWidget(m_detailToggleButton, 0);
+  titleRow->addWidget(m_pinConfigButton, 0);
+
+  titleLayout->addLayout(titleRow);
   titleLayout->addWidget(m_compatibilityLabel);
   titleLayout->addWidget(m_guideLabel);
   contentLayout->addWidget(titleFrame);
@@ -825,7 +836,8 @@ void ToolPropertyPanel::refreshDetailToggleText() {
   if (m_detailToggleButton == nullptr) {
     return;
   }
-  m_detailToggleButton->setText(m_showDetails ? QStringLiteral("詳細を隠す") : QStringLiteral("詳細を表示"));
+  // Keep compact symbol; use tooltip to communicate state
+  m_detailToggleButton->setToolTip(m_showDetails ? QStringLiteral("詳細を隠す") : QStringLiteral("詳細を表示"));
 }
 
 void ToolPropertyPanel::onToggleDetailRequested() {
