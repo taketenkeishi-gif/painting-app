@@ -87,7 +87,7 @@ if(PAINT_BUILD_APP)
   if(WIN32)
     list(APPEND APP_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/app.rc)
   endif()
-  add_executable(paint_app ${APP_SOURCES})
+  add_executable(paint_app WIN32 ${APP_SOURCES})
   set_target_properties(paint_app PROPERTIES
     OUTPUT_NAME "LayeredPaintApp"
     AUTOMOC ON
