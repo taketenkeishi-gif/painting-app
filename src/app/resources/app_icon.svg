@@ -1,136 +1,121 @@
 <svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 256 256" width="256" height="256">
   <defs>
-    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#1e2458"/>
-      <stop offset="100%" stop-color="#0b0e2c"/>
+    <!-- Vivid purple-to-deep-blue background (CSP-like) -->
+    <linearGradient id="bg" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%"   stop-color="#7b2fff"/>
+      <stop offset="50%"  stop-color="#4a1fd6"/>
+      <stop offset="100%" stop-color="#1a0a8c"/>
     </linearGradient>
 
-    <radialGradient id="centerBright" cx="50%" cy="44%" r="52%">
-      <stop offset="0%"   stop-color="#2e3c80" stop-opacity="0.7"/>
-      <stop offset="100%" stop-color="#0b0e2c" stop-opacity="0"/>
+    <!-- Subtle inner highlight on bg (top-left lighter) -->
+    <radialGradient id="bgHl" cx="30%" cy="25%" r="55%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Nib: lit from upper-left -->
-    <linearGradient id="nibLeft" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"   stop-color="#edf0fc"/>
-      <stop offset="55%"  stop-color="#c4ccec"/>
-      <stop offset="100%" stop-color="#9aa4cc"/>
+    <!-- Nib: bright white-to-silver -->
+    <linearGradient id="nibL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="50%"  stop-color="#dde4ff"/>
+      <stop offset="100%" stop-color="#b0bcee"/>
+    </linearGradient>
+    <linearGradient id="nibR" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#aab2e0"/>
+      <stop offset="100%" stop-color="#8890cc"/>
     </linearGradient>
 
-    <linearGradient id="nibRight" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"   stop-color="#9aa4cc"/>
-      <stop offset="100%" stop-color="#7880a8"/>
-    </linearGradient>
-
-    <radialGradient id="nibGlowBg" cx="50%" cy="48%" r="44%">
-      <stop offset="0%"   stop-color="#3a50b0" stop-opacity="0.28"/>
-      <stop offset="100%" stop-color="#3a50b0" stop-opacity="0"/>
+    <!-- Ink drop at tip -->
+    <radialGradient id="ink" cx="45%" cy="35%" r="60%">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="40%"  stop-color="#a8d4ff"/>
+      <stop offset="100%" stop-color="#4488ee" stop-opacity="0.2"/>
     </radialGradient>
 
-    <radialGradient id="inkGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#a0ccff"/>
-      <stop offset="45%"  stop-color="#4d8ee8"/>
-      <stop offset="100%" stop-color="#1a55cc" stop-opacity="0"/>
-    </radialGradient>
-
-    <!-- Nib drop shadow using standard feDropShadow equivalent -->
-    <filter id="nibDrop" x="-25%" y="-15%" width="150%" height="135%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="b"/>
-      <feOffset dx="2" dy="5" result="off"/>
-      <feFlood flood-color="#000018" flood-opacity="0.55" result="fc"/>
-      <feComposite in="fc" in2="off" operator="in" result="shadow"/>
-      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    <!-- Nib shadow -->
+    <filter id="shadow" x="-20%" y="-10%" width="140%" height="130%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="b"/>
+      <feOffset dx="0" dy="6" result="o"/>
+      <feFlood flood-color="#00005a" flood-opacity="0.45" result="c"/>
+      <feComposite in="c" in2="o" operator="in" result="s"/>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
 
-    <clipPath id="roundClip">
+    <clipPath id="clip">
       <rect width="256" height="256" rx="52" ry="52"/>
     </clipPath>
   </defs>
 
-  <g clip-path="url(#roundClip)">
-
+  <g clip-path="url(#clip)">
     <!-- Background -->
-    <rect width="256" height="256" fill="url(#bgGrad)"/>
-    <rect width="256" height="256" fill="url(#centerBright)"/>
+    <rect width="256" height="256" fill="url(#bg)"/>
+    <rect width="256" height="256" fill="url(#bgHl)"/>
 
-    <!-- ── Layer strips (bottom) — three colored bands ─────────────────── -->
-    <!-- Each represents a layer; subtle but readable -->
-    <rect x="32" y="202" width="192" height="8" rx="4" fill="#4a80ff" opacity="0.30"/>
-    <rect x="32" y="214" width="192" height="8" rx="4" fill="#e05880" opacity="0.30"/>
-    <rect x="32" y="226" width="192" height="8" rx="4" fill="#38c888" opacity="0.30"/>
-    <!-- strip highlight lines -->
-    <rect x="32" y="202" width="192" height="1" rx="0.5" fill="#ffffff" opacity="0.10"/>
-    <rect x="32" y="214" width="192" height="1" rx="0.5" fill="#ffffff" opacity="0.10"/>
-    <rect x="32" y="226" width="192" height="1" rx="0.5" fill="#ffffff" opacity="0.10"/>
+    <!-- G-pen nib: large, centered, high contrast white -->
+    <!-- Positioned: shoulders at y=44, tip at y=210, centered at x=128 -->
+    <g filter="url(#shadow)">
 
-    <!-- ── Nib glow halo ────────────────────────────────────────────────── -->
-    <ellipse cx="128" cy="116" rx="70" ry="85" fill="url(#nibGlowBg)"/>
+      <!-- Right half (shadow side) -->
+      <path d="
+        M 128 210
+        C 142 188, 176 154, 178 110
+        C 179  82, 162  52, 128  44
+        Z
+      " fill="url(#nibR)"/>
 
-    <!-- ── G-pen nib ──────────────────────────────────────────────────────
-         Shoulder: wide at y=58, tapers to tip at y=192.
-         Left half (bright), right half (mid-tone), then overlays.
-    -->
+      <!-- Left half (bright side) -->
+      <path d="
+        M 128 210
+        C 114 188,  80 154,  78 110
+        C  77  82,  94  52, 128  44
+        Z
+      " fill="url(#nibL)"/>
 
-    <!-- Right half (shadow side) -->
-    <path d="
-      M 128 192
-      C 140 174, 170 146, 172 108
-      C 173  84, 158  62, 128  56
-      Z
-    " fill="url(#nibRight)" filter="url(#nibDrop)"/>
+      <!-- Shoulder arc highlight (top rim) -->
+      <path d="M 94 62 C 104 50, 118 44, 128 44 C 138 44, 152 50, 162 62"
+            fill="none" stroke="#ffffff" stroke-width="3.5"
+            stroke-linecap="round" opacity="0.85"/>
 
-    <!-- Left half (highlight side) -->
-    <path d="
-      M 128 192
-      C 116 174,  86 146,  84 108
-      C  83  84,  98  62, 128  56
-      Z
-    " fill="url(#nibLeft)"/>
+      <!-- Left specular stripe -->
+      <path d="M 85 90 C 80 110, 80 132, 86 154 C 90 168, 100 186, 112 200"
+            fill="none" stroke="#ffffff" stroke-width="3"
+            stroke-linecap="round" opacity="0.30"/>
 
-    <!-- Shoulder top highlight arc -->
-    <path d="M 98 74 C 108 62, 120 57, 128 56 C 136 57, 148 62, 158 74"
-          fill="none" stroke="#f4f6fe" stroke-width="3"
-          stroke-linecap="round" opacity="0.75"/>
+      <!-- Vent hole -->
+      <ellipse cx="128" cy="98" rx="6" ry="12"
+               fill="#2a0a80" opacity="0.70"/>
+      <!-- Vent hole inner -->
+      <ellipse cx="128" cy="98" rx="4" ry="9"
+               fill="#1a0660" opacity="0.50"/>
+      <!-- Vent hole highlight -->
+      <path d="M 123.5 88 C 122 93, 122 103, 123.5 108"
+            fill="none" stroke="#ffffff" stroke-width="1.2"
+            stroke-linecap="round" opacity="0.40"/>
 
-    <!-- Left body specular stripe -->
-    <path d="M 96 86 C 91 104, 90 122, 94 140 C 97 152, 106 168, 116 180"
-          fill="none" stroke="#ffffff" stroke-width="2.5"
-          stroke-linecap="round" opacity="0.28"/>
+      <!-- Center slit -->
+      <line x1="128" y1="54" x2="128" y2="196"
+            stroke="#2a0a80" stroke-width="2.5"
+            stroke-linecap="round" opacity="0.65"/>
+      <!-- Slit edge highlight -->
+      <line x1="130" y1="56" x2="130" y2="192"
+            stroke="#ffffff" stroke-width="1"
+            stroke-linecap="round" opacity="0.30"/>
 
-    <!-- ── Vent hole (classic G-pen elongated hole near shoulder) ───────── -->
-    <ellipse cx="128" cy="100" rx="5.5" ry="10.5"
-             fill="#0c1030" opacity="0.65"/>
-    <ellipse cx="128" cy="100" rx="3.5" ry="8"
-             fill="#141840" opacity="0.45"/>
-    <!-- vent hole highlight edge -->
-    <path d="M 124.5 92 C 123 95, 123 105, 124.5 108"
-          fill="none" stroke="#c8d0f0" stroke-width="1"
-          stroke-linecap="round" opacity="0.35"/>
+      <!-- Split tines -->
+      <path d="M 128 196 C 122 202, 118 207, 117 214"
+            fill="none" stroke="#c0caee" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M 128 196 C 134 202, 138 207, 139 214"
+            fill="none" stroke="#c0caee" stroke-width="2.5" stroke-linecap="round"/>
 
-    <!-- ── Center slit ────────────────────────────────────────────────────  -->
-    <line x1="128" y1="66" x2="128" y2="178"
-          stroke="#0c1030" stroke-width="2.2"
-          stroke-linecap="round" opacity="0.70"/>
-    <!-- slit bright edge -->
-    <line x1="129.8" y1="68" x2="129.8" y2="174"
-          stroke="#dce4f8" stroke-width="0.9"
-          stroke-linecap="round" opacity="0.38"/>
+    </g>
 
-    <!-- ── Split tines at tip ─────────────────────────────────────────────  -->
-    <path d="M 128 178 C 123 182, 120 187, 119 192"
-          fill="none" stroke="#8898c8" stroke-width="2.2" stroke-linecap="round"/>
-    <path d="M 128 178 C 133 182, 136 187, 137 192"
-          fill="none" stroke="#8898c8" stroke-width="2.2" stroke-linecap="round"/>
+    <!-- Ink bead at tip -->
+    <circle cx="128" cy="197" r="8"   fill="url(#ink)" opacity="0.95"/>
+    <circle cx="128" cy="197" r="3.5" fill="#ffffff"   opacity="0.90"/>
+    <circle cx="125.5" cy="194.5" r="1.5" fill="#ffffff" opacity="0.70"/>
 
-    <!-- ── Ink bead at tip (where tines meet) ────────────────────────────  -->
-    <circle cx="128" cy="179" r="7"   fill="url(#inkGlow)" opacity="0.90"/>
-    <circle cx="128" cy="179" r="3.2" fill="#b8d8ff" opacity="0.85"/>
-    <!-- ink specular -->
-    <circle cx="126.5" cy="177" r="1.2" fill="#ffffff" opacity="0.70"/>
-
-    <!-- ── Border ─────────────────────────────────────────────────────────  -->
-    <rect x="1"   y="1"   width="254" height="254" rx="51" ry="51"
-          fill="none" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.13"/>
+    <!-- Border rim -->
+    <rect x="1" y="1" width="254" height="254" rx="51" ry="51"
+          fill="none" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.20"/>
   </g>
 </svg>
