@@ -36,6 +36,7 @@
 #include "core/tools/MoveLayerTool.h"
 #include "core/tools/RectSelectionTool.h"
 #include "core/tools/ToolManager.h"
+#include "core/selection/SelectionEngine.h"
 #include "core/tools/ZoomTool.h"
 
 namespace app::bridge {
@@ -121,13 +122,17 @@ struct ToolStateViewModel {
   int  gradientFill {0};  ///< 0=FgToBg, 1=FgToTransparent
   core::Color secondaryColor {255, 255, 255, 255};  ///< 背景色
   // 選択ツール追加オプション
-  int  selectionFeather   {0};
-  bool selectionAntiAlias {true};
+  int  selectionFeather  {0};
+  bool selectionAntiAlias{true};
+  core::SelectionOp selectionOp   {core::SelectionOp::New};
+  int  selectionExpand   {0};
+  int  selectionGapClose {0};
+  bool selectionEdgeSnap {false};
 };
 
 struct CanvasOverlayViewModel {
-  core::ToolOverlayState toolOverlay;
-  std::optional<core::Rect> selectionRect;
+  core::ToolOverlayState     toolOverlay;
+  const core::SelectionMask* selectionMask {nullptr};
 };
 
 class AppController : public QObject {
@@ -308,11 +313,15 @@ public:
   void setFillReferAllLayers(bool enabled);
   void setFillGapClose(int gapClose);
   void setSelectionMode(app::ui::SelectionMode mode);
+  void setSelectionOp(core::SelectionOp op);
   void setAutoSelectThreshold(int threshold);
   void setAutoSelectContiguous(bool contiguous);
   void setAutoSelectReferAllLayers(bool enabled);
   void setSelectionFeather(int radius);
   void setSelectionAntiAlias(bool enabled);
+  void setSelectionExpand(int pixels);
+  void setSelectionGapClose(int radius);
+  void setSelectionEdgeSnap(bool enabled);
   void setPressureSizeEnabled(bool enabled);
   void setPressureSizeMin(int value);
   void setPressureOpacityEnabled(bool enabled);
@@ -478,6 +487,7 @@ private:
 #endif
   core::PixelBuffer m_composited;
 
+  core::SelectionEngine m_selectionEngine;
   core::ToolManager m_toolManager;
   core::BrushTool*         m_brushTool         {nullptr};
   core::EraserTool*        m_eraserTool         {nullptr};

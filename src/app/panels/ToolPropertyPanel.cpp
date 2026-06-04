@@ -147,6 +147,16 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_selectionFeatherSlider(new QSlider(Qt::Horizontal, this)),
       m_selectionFeatherSpin(new QSpinBox(this)),
       m_selectionAntiAliasCheck(new QCheckBox("アンチエイリアス", this)),
+      m_selOpNewBtn      (new QPushButton("新規",  this)),
+      m_selOpAddBtn      (new QPushButton("+追加", this)),
+      m_selOpSubtractBtn (new QPushButton("−削除", this)),
+      m_selOpIntersectBtn(new QPushButton("∩共通", this)),
+      m_selectionOpLabel (new QLabel("選択モード", this)),
+      m_selectionExpandLabel  (new QLabel("拡張(px)", this)),
+      m_selectionExpandSpin   (new QSpinBox(this)),
+      m_selectionGapCloseLabel(new QLabel("ギャップ(px)", this)),
+      m_selectionGapCloseSpin (new QSpinBox(this)),
+      m_selectionEdgeSnapCheck(new QCheckBox("エッジ吸着", this)),
       m_blendModeCombo(new QComboBox(this)),
       m_buildupModeCheck(new QCheckBox("積み上げモード（Buildup）", this)),
       m_eraseModeCheck(new QCheckBox("消しゴムモード", this)),
@@ -212,6 +222,14 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_autoSelectThresholdSpin->setRange(0, 255);
   m_selectionFeatherSlider->setRange(0, 100);
   m_selectionFeatherSpin->setRange(0, 100);
+  m_selectionExpandSpin->setRange(0, 100);
+  m_selectionGapCloseSpin->setRange(0, 20);
+  // op buttons: checkable, exclusive
+  for (auto* btn : {m_selOpNewBtn, m_selOpAddBtn, m_selOpSubtractBtn, m_selOpIntersectBtn}) {
+    btn->setCheckable(true);
+    btn->setFixedHeight(22);
+  }
+  m_selOpNewBtn->setChecked(true);
   m_pressureSizeMinSlider->setRange(0, 100);
   m_pressureSizeMinSpin->setRange(0, 100);
   m_pressureOpacityMinSlider->setRange(0, 100);
@@ -549,8 +567,25 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   markResponsiveRow(featherRow);
   featherRow->addWidget(m_selectionFeatherSlider, 1);
   featherRow->addWidget(m_selectionFeatherSpin);
+  // op buttons row
+  auto* opRow = new QHBoxLayout();
+  opRow->setSpacing(2);
+  opRow->addWidget(m_selOpNewBtn);
+  opRow->addWidget(m_selOpAddBtn);
+  opRow->addWidget(m_selOpSubtractBtn);
+  opRow->addWidget(m_selOpIntersectBtn);
+  // expand / gap close rows
+  auto* expandRow = new QHBoxLayout();
+  expandRow->addWidget(m_selectionExpandLabel);
+  expandRow->addWidget(m_selectionExpandSpin);
+  auto* gapRow = new QHBoxLayout();
+  gapRow->addWidget(m_selectionGapCloseLabel);
+  gapRow->addWidget(m_selectionGapCloseSpin);
+
   selectionLayout->addWidget(m_selectionModeLabel);
   selectionLayout->addWidget(m_selectionModeCombo);
+  selectionLayout->addWidget(m_selectionOpLabel);
+  selectionLayout->addLayout(opRow);
   selectionLayout->addWidget(m_autoSelectThresholdLabel);
   selectionLayout->addLayout(autoSelectThresholdRow);
   selectionLayout->addWidget(m_autoSelectContiguousCheck);
@@ -558,6 +593,9 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   selectionLayout->addWidget(m_selectionFeatherLabel);
   selectionLayout->addLayout(featherRow);
   selectionLayout->addWidget(m_selectionAntiAliasCheck);
+  selectionLayout->addLayout(expandRow);
+  selectionLayout->addLayout(gapRow);
+  selectionLayout->addWidget(m_selectionEdgeSnapCheck);
   contentLayout->addWidget(selectionGroup);
   m_selectionSection = selectionGroup;
 
@@ -610,6 +648,13 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_selectionFeatherSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onSelectionFeatherSliderChanged);
   connect(m_selectionFeatherSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSelectionFeatherSpinChanged);
   connect(m_selectionAntiAliasCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onSelectionAntiAliasToggled);
+  connect(m_selOpNewBtn,       &QPushButton::clicked, this, [this]{ onSelectionOpClicked(0); });
+  connect(m_selOpAddBtn,       &QPushButton::clicked, this, [this]{ onSelectionOpClicked(1); });
+  connect(m_selOpSubtractBtn,  &QPushButton::clicked, this, [this]{ onSelectionOpClicked(2); });
+  connect(m_selOpIntersectBtn, &QPushButton::clicked, this, [this]{ onSelectionOpClicked(3); });
+  connect(m_selectionExpandSpin,   qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSelectionExpandChanged);
+  connect(m_selectionGapCloseSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSelectionGapCloseChanged);
+  connect(m_selectionEdgeSnapCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onSelectionEdgeSnapToggled);
   connect(
       m_autoSelectThresholdSlider,
       &QSlider::valueChanged,
@@ -993,6 +1038,20 @@ void ToolPropertyPanel::refreshFromController() {
   if (m_selectionFeatherSlider != nullptr) m_selectionFeatherSlider->setVisible(supportsSelectionFeather);
   if (m_selectionFeatherSpin != nullptr) m_selectionFeatherSpin->setVisible(supportsSelectionFeather);
   if (m_selectionAntiAliasCheck != nullptr) m_selectionAntiAliasCheck->setVisible(supportsSelectionAA);
+  const bool supportsSelectionOp      = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionOp);
+  const bool supportsSelectionExpand  = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionExpand);
+  const bool supportsSelectionGap     = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionGapClose);
+  const bool supportsSelectionEdge    = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionEdgeSnap);
+  if (m_selectionOpLabel    != nullptr) m_selectionOpLabel->setVisible(supportsSelectionOp);
+  if (m_selOpNewBtn         != nullptr) m_selOpNewBtn->setVisible(supportsSelectionOp);
+  if (m_selOpAddBtn         != nullptr) m_selOpAddBtn->setVisible(supportsSelectionOp);
+  if (m_selOpSubtractBtn    != nullptr) m_selOpSubtractBtn->setVisible(supportsSelectionOp);
+  if (m_selOpIntersectBtn   != nullptr) m_selOpIntersectBtn->setVisible(supportsSelectionOp);
+  if (m_selectionExpandLabel!= nullptr) m_selectionExpandLabel->setVisible(supportsSelectionExpand);
+  if (m_selectionExpandSpin != nullptr) m_selectionExpandSpin->setVisible(supportsSelectionExpand);
+  if (m_selectionGapCloseLabel != nullptr) m_selectionGapCloseLabel->setVisible(supportsSelectionGap);
+  if (m_selectionGapCloseSpin  != nullptr) m_selectionGapCloseSpin->setVisible(supportsSelectionGap);
+  if (m_selectionEdgeSnapCheck != nullptr) m_selectionEdgeSnapCheck->setVisible(supportsSelectionEdge);
   m_drawingControlSection->setVisible(showBlend || (m_showDetails && (supportsEraseMode || supportsLockAlpha)));
   m_vectorSection->setVisible(
       m_showDetails && (supportsSnapAngle || supportsSimplify || showVectorMode || showVectorTrim));
@@ -1000,8 +1059,9 @@ void ToolPropertyPanel::refreshFromController() {
       m_showDetails && (supportsFillThreshold || supportsFillContiguous || supportsFillReferAllLayers || supportsFillGapClose));
   m_selectionSection->setVisible(
       m_showDetails &&
-      (supportsSelectionMode || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
-       supportsAutoSelectReferAllLayers || supportsSelectionFeather || supportsSelectionAA));
+      (supportsSelectionMode || supportsSelectionOp || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
+       supportsAutoSelectReferAllLayers || supportsSelectionFeather || supportsSelectionAA ||
+       supportsSelectionExpand || supportsSelectionGap || supportsSelectionEdge));
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);
@@ -1099,6 +1159,16 @@ void ToolPropertyPanel::refreshFromController() {
   if (m_selectionFeatherSlider != nullptr) m_selectionFeatherSlider->setValue(state.selectionFeather);
   if (m_selectionFeatherSpin != nullptr) m_selectionFeatherSpin->setValue(state.selectionFeather);
   if (m_selectionAntiAliasCheck != nullptr) m_selectionAntiAliasCheck->setChecked(state.selectionAntiAlias);
+  // op buttons: uncheck all then check active
+  if (m_selOpNewBtn != nullptr) {
+    m_selOpNewBtn->setChecked(state.selectionOp == core::SelectionOp::New);
+    m_selOpAddBtn->setChecked(state.selectionOp == core::SelectionOp::Add);
+    m_selOpSubtractBtn->setChecked(state.selectionOp == core::SelectionOp::Subtract);
+    m_selOpIntersectBtn->setChecked(state.selectionOp == core::SelectionOp::Intersect);
+  }
+  if (m_selectionExpandSpin   != nullptr) m_selectionExpandSpin->setValue(state.selectionExpand);
+  if (m_selectionGapCloseSpin != nullptr) m_selectionGapCloseSpin->setValue(state.selectionGapClose);
+  if (m_selectionEdgeSnapCheck!= nullptr) m_selectionEdgeSnapCheck->setChecked(state.selectionEdgeSnap);
   m_vectorEraseModeCombo->setCurrentIndex(m_vectorEraseModeCombo->findData(static_cast<int>(state.vectorEraseMode)));
   m_vectorTrimOutsideCheck->setChecked(state.vectorTrimOutside);
   m_pressureSizeCheck->setChecked(state.pressureSizeEnabled);
@@ -1505,6 +1575,34 @@ void ToolPropertyPanel::onSelectionFeatherSpinChanged(int value) {
 void ToolPropertyPanel::onSelectionAntiAliasToggled(bool checked) {
   if (m_controller == nullptr) return;
   m_controller->setSelectionAntiAlias(checked);
+}
+
+void ToolPropertyPanel::onSelectionOpClicked(int op) {
+  if (m_controller == nullptr) return;
+  static const core::SelectionOp ops[] = {
+    core::SelectionOp::New,
+    core::SelectionOp::Add,
+    core::SelectionOp::Subtract,
+    core::SelectionOp::Intersect,
+  };
+  if (op >= 0 && op < 4) {
+    m_controller->setSelectionOp(ops[op]);
+  }
+}
+
+void ToolPropertyPanel::onSelectionExpandChanged(int value) {
+  if (m_controller == nullptr) return;
+  m_controller->setSelectionExpand(value);
+}
+
+void ToolPropertyPanel::onSelectionGapCloseChanged(int value) {
+  if (m_controller == nullptr) return;
+  m_controller->setSelectionGapClose(value);
+}
+
+void ToolPropertyPanel::onSelectionEdgeSnapToggled(bool checked) {
+  if (m_controller == nullptr) return;
+  m_controller->setSelectionEdgeSnap(checked);
 }
 
 void ToolPropertyPanel::onBlendModeChanged(int index) {

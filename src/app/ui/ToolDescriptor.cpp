@@ -278,7 +278,7 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                     p.selectionAntiAlias = true;
                     return p;
                   }(),
-                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias},
+                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionOp, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionExpand, ToolPropertyKey::SelectionGapClose},
                   "ドラッグして矩形選択。Shift=正方形制約。選択範囲内ドラッグで移動。"),
               makeSubTool(
                   "lasso_default",
@@ -289,7 +289,7 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                     p.selectionAntiAlias = true;
                     return p;
                   }(),
-                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias},
+                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionOp, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionExpand, ToolPropertyKey::SelectionGapClose},
                   "フリーハンドで任意形状を選択。選択範囲内ドラッグで移動。"),
               makeSubTool(
                   "poly_lasso",
@@ -300,7 +300,7 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                     p.selectionAntiAlias = true;
                     return p;
                   }(),
-                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias},
+                  {ToolPropertyKey::SelectionMode, ToolPropertyKey::SelectionOp, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionExpand, ToolPropertyKey::SelectionGapClose},
                   "クリックで頂点を追加。始点付近クリックまたはダブルクリックで確定。Escでキャンセル。"),
               makeSubTool(
                   "auto_select",
@@ -313,7 +313,7 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                     p.autoSelectReferAllLayers = true;
                     return p;
                   }(),
-                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
+                  {ToolPropertyKey::SelectionOp, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionEdgeSnap, ToolPropertyKey::SelectionGapClose},
                   "クリック点と類似した連続した色域を選択。Shift=追加、Alt=減算。"),
               makeSubTool(
                   "object_select",
@@ -326,7 +326,7 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                     p.autoSelectReferAllLayers = true;
                     return p;
                   }(),
-                  {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers},
+                  {ToolPropertyKey::SelectionOp, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionEdgeSnap, ToolPropertyKey::SelectionGapClose},
                   "クリックで全レイヤーの類似色をまとめて選択。ComfyUI 接続時は SAM2 で高精度化。Shift=追加、Alt=減算。"),
           },
           {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},

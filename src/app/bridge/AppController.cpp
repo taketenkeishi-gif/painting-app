@@ -1,7 +1,9 @@
 #include "app/bridge/AppController.h"
 #include "app/bridge/ComfyUiClient.h"
+#include "core/selection/providers/ClassicProvider.h"
 
 #include <algorithm>
+
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -258,6 +260,10 @@ AppController::AppController(QObject* parent)
   m_aiSelectTool = aiSel.get();
   m_toolManager.registerTool(std::move(aiSel));
 
+  // SelectionEngine を ClassicProvider で初期化
+  m_selectionEngine.setDocument(&m_document);
+  m_selectionEngine.setProvider(std::make_unique<core::ClassicProvider>());
+
   for (const app::ui::ToolDescriptor& tool : m_toolCatalog.tools()) {
     if (!tool.subTools.empty()) {
       m_selectedSubToolByTool[tool.kind] = tool.subTools.front().id;
@@ -293,8 +299,8 @@ AppController::AppController(QObject* parent)
 
 CanvasOverlayViewModel AppController::canvasOverlay() const {
   CanvasOverlayViewModel view;
-  view.toolOverlay = m_toolManager.overlay();
-  view.selectionRect = m_document.selection().boundingRect();
+  view.toolOverlay   = m_toolManager.overlay();
+  view.selectionMask = &m_document.selection();
   return view;
 }
 
@@ -415,7 +421,11 @@ ToolStateViewModel AppController::toolState() const noexcept {
       m_uiState.gradientFill,
       m_secondaryColor,
       m_uiState.selectionFeather,
-      m_uiState.selectionAntiAlias};
+      m_uiState.selectionAntiAlias,
+      m_uiState.selectionOp,
+      m_uiState.selectionExpand,
+      m_uiState.selectionGapClose,
+      m_uiState.selectionEdgeSnap};
 }
 
 void AppController::newDocument(int width, int height) {
@@ -2464,6 +2474,36 @@ void AppController::setSelectionAntiAlias(bool enabled) {
   emit toolStateChanged();
 }
 
+void AppController::setSelectionOp(core::SelectionOp op) {
+  if (m_uiState.selectionOp == op) return;
+  m_uiState.selectionOp = op;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setSelectionExpand(int pixels) {
+  const int v = std::max(0, pixels);
+  if (m_uiState.selectionExpand == v) return;
+  m_uiState.selectionExpand = v;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setSelectionGapClose(int radius) {
+  const int v = std::max(0, radius);
+  if (m_uiState.selectionGapClose == v) return;
+  m_uiState.selectionGapClose = v;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
+void AppController::setSelectionEdgeSnap(bool enabled) {
+  if (m_uiState.selectionEdgeSnap == enabled) return;
+  m_uiState.selectionEdgeSnap = enabled;
+  applyUiStateToTools();
+  emit toolStateChanged();
+}
+
 void AppController::setPressureSizeEnabled(bool enabled) {
   if (m_uiState.pressureSize == enabled) {
     return;
@@ -3018,6 +3058,7 @@ bool AppController::selectSubToolInternal(std::string_view subToolId, bool emitS
     return false;
   }
 
+
   m_selectedSubToolByTool[currentTool()] = sub->id;
   resetToolStateFromDescriptor(*sub);
   applyUiStateToTools();
@@ -3126,11 +3167,15 @@ void AppController::applyUiStateToTools() {
       default: break;
     }
     m_rectSelectionTool->setMode(mode);
+    m_rectSelectionTool->setSelectionOp(m_uiState.selectionOp);
     m_rectSelectionTool->setAutoSelectThreshold(m_uiState.autoSelectThreshold);
     m_rectSelectionTool->setAutoSelectContiguous(m_uiState.autoSelectContiguous);
     m_rectSelectionTool->setAutoSelectReferAllLayers(m_uiState.autoSelectReferAllLayers);
     m_rectSelectionTool->setFeatherRadius(m_uiState.selectionFeather);
     m_rectSelectionTool->setSelectionAntiAlias(m_uiState.selectionAntiAlias);
+    m_rectSelectionTool->setExpandPixels(m_uiState.selectionExpand);
+    m_rectSelectionTool->setGapCloseRadius(m_uiState.selectionGapClose);
+    m_rectSelectionTool->setEdgeAware(m_uiState.selectionEdgeSnap);
   }
   // ObjectSelect subtool → SAM2 がある場合は AiSelectTool のコールバックを注入
   if (m_aiSelectTool != nullptr) {
@@ -3181,6 +3226,10 @@ void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescripto
   m_uiState.autoSelectReferAllLayers = profile.selection.autoSelectReferAllLayers;
   m_uiState.selectionFeather   = std::max(0, profile.selection.featherRadius);
   m_uiState.selectionAntiAlias = profile.selection.antiAlias;
+  m_uiState.selectionOp        = profile.selection.op;
+  m_uiState.selectionExpand    = std::max(0, profile.selection.expandPixels);
+  m_uiState.selectionGapClose  = std::max(0, profile.selection.gapCloseRadius);
+  m_uiState.selectionEdgeSnap  = profile.selection.edgeSnap;
   m_uiState.postCorrection = profile.stabilizer.postCorrection;
   m_uiState.velocityBasedCorrection = profile.stabilizer.velocityBasedCorrection;
   m_uiState.shapeType = profile.shape.shapeType;
@@ -3230,9 +3279,15 @@ void AppController::syncCurrentSubToolFromUiState() {
   preset.fillReferAllLayers = m_uiState.fillReferAllLayers;
   preset.fillGapClose = m_uiState.fillGapClose;
   preset.selectionMode = m_uiState.selectionMode;
+  preset.selectionOp   = m_uiState.selectionOp;
   preset.autoSelectThreshold = m_uiState.autoSelectThreshold;
   preset.autoSelectContiguous = m_uiState.autoSelectContiguous;
   preset.autoSelectReferAllLayers = m_uiState.autoSelectReferAllLayers;
+  preset.selectionFeather   = m_uiState.selectionFeather;
+  preset.selectionAntiAlias = m_uiState.selectionAntiAlias;
+  preset.selectionExpand    = m_uiState.selectionExpand;
+  preset.selectionGapClose  = m_uiState.selectionGapClose;
+  preset.selectionEdgeSnap  = m_uiState.selectionEdgeSnap;
   preset.gradientType = m_uiState.gradientType;
   preset.gradientFill = m_uiState.gradientFill;
 
@@ -3258,9 +3313,15 @@ void AppController::syncCurrentSubToolFromUiState() {
   profile.fill.referAllLayers = m_uiState.fillReferAllLayers;
   profile.fill.gapClose = m_uiState.fillGapClose;
   profile.selection.mode = m_uiState.selectionMode;
+  profile.selection.op   = m_uiState.selectionOp;
   profile.selection.autoSelectThreshold = m_uiState.autoSelectThreshold;
   profile.selection.autoSelectContiguous = m_uiState.autoSelectContiguous;
   profile.selection.autoSelectReferAllLayers = m_uiState.autoSelectReferAllLayers;
+  profile.selection.featherRadius  = m_uiState.selectionFeather;
+  profile.selection.antiAlias      = m_uiState.selectionAntiAlias;
+  profile.selection.expandPixels   = m_uiState.selectionExpand;
+  profile.selection.gapCloseRadius = m_uiState.selectionGapClose;
+  profile.selection.edgeSnap       = m_uiState.selectionEdgeSnap;
   profile.blendMode = m_uiState.blendMode;
   profile.eraseMode = m_uiState.eraseMode;
   profile.lockAlphaRespect = m_uiState.lockAlphaRespect;
@@ -3349,6 +3410,12 @@ void AppController::loadSubToolCatalogFromSettings() {
           loadedSub.profile.selection.autoSelectThreshold = loadedSub.preset.autoSelectThreshold;
           loadedSub.profile.selection.autoSelectContiguous = loadedSub.preset.autoSelectContiguous;
           loadedSub.profile.selection.autoSelectReferAllLayers = loadedSub.preset.autoSelectReferAllLayers;
+          loadedSub.profile.selection.op            = loadedSub.preset.selectionOp;
+          loadedSub.profile.selection.featherRadius = loadedSub.preset.selectionFeather;
+          loadedSub.profile.selection.antiAlias     = loadedSub.preset.selectionAntiAlias;
+          loadedSub.profile.selection.expandPixels  = loadedSub.preset.selectionExpand;
+          loadedSub.profile.selection.gapCloseRadius= loadedSub.preset.selectionGapClose;
+          loadedSub.profile.selection.edgeSnap      = loadedSub.preset.selectionEdgeSnap;
           loadedSub.profile.blendMode = loadedSub.preset.blendMode;
           loadedSub.profile.eraseMode = loadedSub.preset.eraseMode;
           loadedSub.profile.lockAlphaRespect = loadedSub.preset.lockAlphaRespect;
@@ -3437,7 +3504,8 @@ core::ToolContext AppController::makeToolContext() {
       m_currentColor,
       m_secondaryColor,
       m_uiState.size,
-      maskMode};
+      maskMode,
+      &m_selectionEngine};
 }
 
 void AppController::applyToolResult(const core::ToolResult& result) {

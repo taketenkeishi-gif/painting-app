@@ -14,6 +14,7 @@
 #include <QWheelEvent>
 
 #include "app/bridge/AppController.h"
+#include "app/canvasview/SelectionOverlayRenderer.h"
 #include "core/common/FPoint.h"
 #include "core/tools/ToolType.h"
 #include "platform/qt/QtImageConverter.h"
@@ -409,27 +410,13 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     }
 
     // ── Committed selection — marching ants ─────────────────────────────────
-    if (overlay.selectionRect.has_value()) {
-      const core::Rect rect = *overlay.selectionRect;
-      const QRectF selectionRect(
-          target.x() + static_cast<double>(rect.x) * state.zoom,
-          target.y() + static_cast<double>(rect.y) * state.zoom,
-          std::max(1.0, static_cast<double>(rect.width) * state.zoom),
-          std::max(1.0, static_cast<double>(rect.height) * state.zoom));
-      painter.setBrush(Qt::NoBrush);
-      // Outer black stroke
-      painter.setPen(QPen(QColor(0, 0, 0, 200), 2.5, Qt::SolidLine));
-      painter.drawRect(selectionRect);
-      // Marching white dashes
-      QPen marchWhite(QColor(255, 255, 255, 240), 1.2, Qt::DashLine);
-      marchWhite.setDashOffset(m_marchingOffset);
-      painter.setPen(marchWhite);
-      painter.drawRect(selectionRect);
-      // Marching black dashes (offset by half period for two-tone effect)
-      QPen marchBlack(QColor(0, 0, 0, 200), 1.2, Qt::DashLine);
-      marchBlack.setDashOffset(m_marchingOffset + 4);
-      painter.setPen(marchBlack);
-      painter.drawRect(selectionRect);
+    if (overlay.selectionMask != nullptr) {
+      SelectionOverlayRenderer::render(
+          painter,
+          *overlay.selectionMask,
+          state.zoom,
+          QPointF(target.x(), target.y()),
+          m_marchingOffset);
     }
 
   }
@@ -895,7 +882,7 @@ void CanvasWidget::refreshFromController() {
 
   // Start/stop marching ants animation based on whether there's a selection
   if (m_marchingTimer != nullptr) {
-    const bool hasSelection = m_controller->canvasOverlay().selectionRect.has_value();
+    const bool hasSelection = m_controller->documentSelection().hasSelection();
     if (hasSelection && !m_marchingTimer->isActive()) {
       m_marchingTimer->start();
     } else if (!hasSelection && m_marchingTimer->isActive()) {

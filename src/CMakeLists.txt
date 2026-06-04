@@ -5,6 +5,9 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/render/Renderer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/selection/SelectionMask.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/selection/SelectionEngine.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/selection/SelectionRefiner.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/selection/MaskExporter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/selection/providers/ClassicProvider.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolType.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ToolManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/BrushTool.cpp
@@ -66,6 +69,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/IconLoader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/mainwindow/MainWindow.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/CanvasWidget.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/SelectionOverlayRenderer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AiPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/LayerPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPanel.cpp

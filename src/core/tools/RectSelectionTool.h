@@ -33,7 +33,6 @@ public:
 
   void setMode(Mode mode) noexcept {
     if (m_mode != mode) {
-      m_committedLassoPoints.clear();
       cancelPolygon();
     }
     m_mode = mode;
@@ -46,28 +45,26 @@ public:
 
   void setFeatherRadius      (int v)  noexcept { m_featherRadius = std::max(0, v); }
   void setSelectionAntiAlias (bool v) noexcept { m_antiAlias = v; }
+  void setSelectionOp        (SelectionOp op) noexcept { m_selectionOp = op; }
+  void setExpandPixels       (int v)  noexcept { m_expandPixels = std::max(0, v); }
+  void setGapCloseRadius     (int v)  noexcept { m_gapCloseRadius = std::max(0, v); }
+  void setEdgeAware          (bool v) noexcept { m_edgeAware = v; }
   int  featherRadius         () const noexcept { return m_featherRadius; }
   bool selectionAntiAlias    () const noexcept { return m_antiAlias; }
+  SelectionOp selectionOp    () const noexcept { return m_selectionOp; }
 
 private:
-  static SelectionOp opFromEvent(const ToolPointerEvent& e) noexcept;
+  SelectionOp opFromEvent(const ToolPointerEvent& e) const noexcept;
   static Rect normalizeRect(const Point& a, const Point& b);
   static Point constrainToSquare(const Point& start, const Point& current) noexcept;
   bool applyAutoSelect  (ToolContext& context, const Point& seed, SelectionOp op);
+  bool applyObjectSelect(ToolContext& context, SelectionOp op);
   bool applyLasso       (ToolContext& context, SelectionOp op);
   bool applyPolygon     (ToolContext& context, SelectionOp op);
   void applyFeather     (ToolContext& context) const;
   void cancelPolygon    () noexcept;
 
   static bool isInsideSelection(const SelectionMask& sel, const Point& pt) noexcept;
-
-  /// Scan-line polygon fill (高速)
-  static std::vector<std::uint8_t> scanFillPolygon(
-      const std::vector<Point>& poly, int width, int height);
-  static std::vector<std::uint8_t> antiAliasedFillPolygon(
-      const std::vector<Point>& poly, int width, int height);
-
-  static int colorDistance(const Color& a, const Color& b) noexcept;
 
   // ── モード ────────────────────────────────────────────────────────────────
   Mode         m_mode {Mode::Rectangle};
@@ -78,7 +75,6 @@ private:
   Point m_start {0, 0};
   Point m_current {0, 0};
   std::vector<Point> m_lassoPoints;
-  std::vector<Point> m_committedLassoPoints;
 
   // ── 選択マーキー移動 ───────────────────────────────────────────────────────
   bool  m_movingMarquee {false};
@@ -99,9 +95,16 @@ private:
   bool m_autoSelectContiguous      {true};
   bool m_autoSelectReferAllLayers  {true};
 
-  // ── フェザー / アンチエイリアス ─────────────────────────────────────────
-  int  m_featherRadius {0};
-  bool m_antiAlias     {true};
+  // ── Object Select ストロークヒント ────────────────────────────────────────
+  std::vector<Point> m_strokeHint; ///< ブラシストロークの座標列 (ObjectSelect)
+
+  // ── フェザー / アンチエイリアス / 拡張 / エッジ ────────────────────────
+  int         m_featherRadius   {0};
+  bool        m_antiAlias       {true};
+  SelectionOp m_selectionOp     {SelectionOp::New};
+  int         m_expandPixels    {0};
+  int         m_gapCloseRadius  {0};
+  bool        m_edgeAware       {false};
 };
 
 } // namespace core

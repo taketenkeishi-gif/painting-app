@@ -9,6 +9,7 @@
 #include "core/common/Point.h"
 #include "core/common/Rect.h"
 #include "core/document/Document.h"
+#include "core/selection/SelectionEngine.h"
 
 namespace core {
 
@@ -69,6 +70,7 @@ struct ToolContext {
   Color secondaryColor {255, 255, 255, 255};  ///< 背景色（グラデーション用）
   int brushSize {1};
   bool maskEditMode {false};  ///< true = brush/eraser writes to layer maskBuffer (grayscale)
+  SelectionEngine* selectionEngine {nullptr};  ///< 新プロバイダーパイプライン
 };
 
 } // namespace core

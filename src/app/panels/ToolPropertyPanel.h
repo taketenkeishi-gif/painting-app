@@ -75,6 +75,10 @@ private slots:
   void onSelectionFeatherSliderChanged(int value);
   void onSelectionFeatherSpinChanged(int value);
   void onSelectionAntiAliasToggled(bool checked);
+  void onSelectionOpClicked(int op);
+  void onSelectionExpandChanged(int value);
+  void onSelectionGapCloseChanged(int value);
+  void onSelectionEdgeSnapToggled(bool checked);
   void onBlendModeChanged(int index);
   void onBuildupModeToggled(bool checked);
   void onEraseModeToggled(bool checked);
@@ -189,6 +193,18 @@ private:
   QSlider*   m_selectionFeatherSlider {nullptr};
   QSpinBox*  m_selectionFeatherSpin {nullptr};
   QCheckBox* m_selectionAntiAliasCheck {nullptr};
+  // 選択オペレーション
+  QPushButton* m_selOpNewBtn       {nullptr};
+  QPushButton* m_selOpAddBtn       {nullptr};
+  QPushButton* m_selOpSubtractBtn  {nullptr};
+  QPushButton* m_selOpIntersectBtn {nullptr};
+  QLabel*      m_selectionOpLabel  {nullptr};
+  // 拡張 / ギャップ / エッジスナップ
+  QLabel*      m_selectionExpandLabel    {nullptr};
+  QSpinBox*    m_selectionExpandSpin     {nullptr};
+  QLabel*      m_selectionGapCloseLabel  {nullptr};
+  QSpinBox*    m_selectionGapCloseSpin   {nullptr};
+  QCheckBox*   m_selectionEdgeSnapCheck  {nullptr};
   QComboBox* m_blendModeCombo {nullptr};
   QCheckBox* m_buildupModeCheck {nullptr};
   QCheckBox* m_eraseModeCheck {nullptr};

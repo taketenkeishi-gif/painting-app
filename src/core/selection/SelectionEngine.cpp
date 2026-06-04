@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <queue>
 
+
 #include "core/document/Document.h"
+#include "core/selection/MaskExporter.h"
+#include "core/selection/SelectionRefiner.h"
+#include "core/selection/providers/ISelectionProvider.h"
 
 namespace core {
 
@@ -16,6 +20,62 @@ const SelectionMask* SelectionEngine::mask() const noexcept {
 SelectionMask* SelectionEngine::mutableMask() noexcept {
   if (m_doc == nullptr) return nullptr;
   return &m_doc->selection();
+}
+
+// ── プロバイダー設定 ──────────────────────────────────────────────────────
+void SelectionEngine::setProvider(
+    std::unique_ptr<ISelectionProvider> provider) noexcept {
+  m_provider = std::move(provider);
+}
+
+// ── プロバイダーパイプライン実行 ─────────────────────────────────────────
+bool SelectionEngine::execute(const SelectionRequest& request,
+                               const PixelBuffer&      reference) {
+  if (m_provider == nullptr) return false;
+  if (!m_provider->canHandle(request.type)) return false;
+
+
+  const int canvasW = reference.width();
+  const int canvasH = reference.height();
+
+  SelectionResult result =
+      m_provider->execute(request, reference, canvasW, canvasH);
+
+  // SelectionRefiner を必ず通す
+  SelectionRefiner::RefinementOptions refinements;
+  refinements.featherRadius  = request.feather;
+  refinements.gapCloseRadius = request.gapClose;
+  refinements.expandRadius   = request.expandPixels;
+
+  // MagicWand / Object: 自動後処理 (島除去・穴埋め・エッジAA)
+  const bool isPixelFill = (request.type == SelectionRequest::Type::MagicWand ||
+                             request.type == SelectionRequest::Type::Object);
+  if (isPixelFill) {
+    refinements.removeIslandsMinArea = 20;
+    refinements.fillHolesMaxArea     = 40;
+    if (request.antiAlias) {
+      refinements.antiAliasEdge = true;
+    }
+    if (request.edgeAware && result.hasEdgeMap()) {
+      refinements.edgeSnap = true;
+    }
+  }
+
+  SelectionRefiner::apply(result, refinements);
+
+  // SelectionOp を適用して Document に反映
+  auto* m = mutableMask();
+  if (m == nullptr) return false;
+
+  // SelectionMask → flat pixels → Document の SelectionMask に Op 合成
+  const auto pixels = MaskExporter::exportMask(result.mask,
+                                                MaskExporter::Format::Soft);
+  const bool changed = m->applyPixels(request.op, pixels);
+
+  // 結果を保存
+  m_lastResult = std::make_unique<SelectionResult>(std::move(result));
+
+  return changed;
 }
 
 // ── 選択適用 ──────────────────────────────────────────────────────────────

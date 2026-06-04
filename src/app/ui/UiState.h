@@ -3,6 +3,7 @@
 #include <string>
 
 #include "app/ui/ToolDescriptor.h"
+#include "core/selection/SelectionMask.h"
 #include "core/tools/ToolTypes.h"
 #include "core/tools/ToolType.h"
 
@@ -38,11 +39,15 @@ struct UiState {
   bool fillReferAllLayers {false};
   int fillGapClose {0};
   SelectionMode selectionMode {SelectionMode::Rectangle};
+  core::SelectionOp selectionOp {core::SelectionOp::New};
   int autoSelectThreshold {16};
   bool autoSelectContiguous {true};
   bool autoSelectReferAllLayers {true};
   int selectionFeather {0};
   bool selectionAntiAlias {true};
+  int selectionExpand {0};
+  int selectionGapClose {0};
+  bool selectionEdgeSnap {false};
   bool buildupMode {false};   // trueで積み上げ、falseでKritaスタイル非積み上げ
   bool pressureSize {false};
   float pressureSizeMin {0.0f};

@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 
+#include "core/selection/SelectionMask.h"
 #include "core/tools/ToolTypes.h"
 #include "core/tools/ToolType.h"
 
@@ -53,11 +54,15 @@ enum class ToolPropertyKey {
   FillReferAllLayers,
   FillGapClose,
   SelectionMode,
+  SelectionOp,
   AutoSelectThreshold,
   AutoSelectContiguous,
   AutoSelectReferAllLayers,
   SelectionFeather,
-  SelectionAntiAlias
+  SelectionAntiAlias,
+  SelectionExpand,
+  SelectionGapClose,
+  SelectionEdgeSnap
 };
 
 struct StrokeSettings {
@@ -112,11 +117,15 @@ enum class VectorEraserMode {
 
 struct SelectionSettings {
   SelectionMode mode {SelectionMode::Rectangle};
+  core::SelectionOp op {core::SelectionOp::New};
   int autoSelectThreshold {16};
   bool autoSelectContiguous {true};
   bool autoSelectReferAllLayers {true};
   int featherRadius {0};
   bool antiAlias {true};
+  int expandPixels {0};
+  int gapCloseRadius {0};
+  bool edgeSnap {false};
 };
 
 struct ToolBehaviorProfile {
@@ -163,11 +172,15 @@ struct BrushPreset {
   bool fillReferAllLayers {false};
   int fillGapClose {0};
   SelectionMode selectionMode {SelectionMode::Rectangle};
+  core::SelectionOp selectionOp {core::SelectionOp::New};
   int autoSelectThreshold {16};
   bool autoSelectContiguous {true};
   bool autoSelectReferAllLayers {true};
   int selectionFeather {0};
   bool selectionAntiAlias {true};
+  int selectionExpand {0};
+  int selectionGapClose {0};
+  bool selectionEdgeSnap {false};
   VectorEraserMode vectorEraseMode {VectorEraserMode::TouchedOnly};
   bool vectorTrimOutside {false};
   bool buildupMode {false};   // Krita非積み上げ / Photoshop積み上げ切替
