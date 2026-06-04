@@ -447,7 +447,6 @@ MainWindow::MainWindow(QWidget* parent)
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
       m_subToolPanel(new app::panels::SubToolPanel(this)),
       m_toolPropertyPanel(new app::panels::ToolPropertyPanel(this)) {
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_start.txt"); if(t) t << "ctor start\n"; }
   // FramelessWindowHint breaks Qt dock drop-zone detection on Windows:
   // QApplication::topLevelAt() can't find the main window as a drop target.
   // Use native window frame; custom chrome is applied via QSS instead.
@@ -474,24 +473,11 @@ MainWindow::MainWindow(QWidget* parent)
   m_quickSliderPanel->setSections(app::panels::ToolPanel::QuickSlidersOnly);
 
   setupShellLayout();
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_cp1.txt"); if(t) t << "after setupShellLayout\n"; }
-
-  // Verify which code paths executed
-  QString titleVerification = "自作イラストアプリ - UI BUILD TEST 2026";
-  if (g_colorSwatchWidgetCreated) titleVerification += " [SWATCH]";
-  setWindowTitle(titleVerification);
-
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_cp2.txt"); if(t) t << "before createMenus\n"; }
   createMenus();
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_cp3.txt"); if(t) t << "before loadWorkspace\n"; }
   loadWorkspaceLayoutState();
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\cp_ws.txt"); if(t) t << "after loadWorkspace\n"; }
   loadShortcutOverrides();
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\cp_sc.txt"); if(t) t << "after shortcuts\n"; }
   createToolBar();
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\cp_tb.txt"); if(t) t << "after toolbar\n"; }
   applyUiChrome();
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\cp_chrome.txt"); if(t) t << "after chrome\n"; }
 
   connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &MainWindow::onToolStateChanged);
   connect(m_controller, &app::bridge::AppController::foregroundColorUsed, this, [this]() {
@@ -512,13 +498,6 @@ MainWindow::MainWindow(QWidget* parent)
   updateTopToolInfo();
   updateColorPanel();
   updateNavigatorPreview();
-  QTimer::singleShot(0, this, [this]() {
-    std::ofstream t("C:\\Users\\KEISHI\\Desktop\\timer0ms.txt");
-    if (t) t << "0ms timer fired\n";
-    QTimer::singleShot(2000, this, &MainWindow::auditUIMetrics);
-  });
-  // Direct write test
-  { std::ofstream t("C:\\Users\\KEISHI\\Desktop\\ctor_test.txt"); if(t) t << "constructor ran\n"; }
 }
 
 void MainWindow::setupShellLayout() {
@@ -3683,11 +3662,10 @@ QAction* MainWindow::createToolAction(QMenu* toolMenu, core::ToolKind kind, cons
 }
 
 void MainWindow::auditUIMetrics() {
-  // Try writing to multiple locations
+  // audit removed
+  return;
   std::ofstream f;
   const char* paths[] = {
-    "C:\\Users\\KEISHI\\Desktop\\ui_audit.txt",
-    "C:\\Portfolio\\Paint_App\\ui_audit.txt",
     "ui_audit.txt"
   };
   for (auto* p : paths) {
