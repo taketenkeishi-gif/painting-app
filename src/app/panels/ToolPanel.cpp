@@ -21,6 +21,8 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <QGraphicsOpacityEffect>
+
 #include "app/bridge/AppController.h"
 #include "app/ui/IconLoader.h"
 
@@ -502,6 +504,13 @@ void ToolPanel::refreshFromController() {
     button->setChecked(kind == current);
     button->setEnabled(enabled);
     button->setToolTip(tip);
+    // 使用不可ツールを明確にグレーアウト（QSS依存の subtle 変化ではなく opacity で確実に）
+    auto* fx = qobject_cast<QGraphicsOpacityEffect*>(button->graphicsEffect());
+    if (!fx) {
+      fx = new QGraphicsOpacityEffect(button);
+      button->setGraphicsEffect(fx);
+    }
+    fx->setOpacity(enabled ? 1.0 : 0.30);
   }
 
   if (m_sizeSlider != nullptr && m_opacitySlider != nullptr &&
