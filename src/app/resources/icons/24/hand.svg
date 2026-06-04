@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Palm and fingers as one filled shape -->
+  <path d="
+    M10 4 Q10 2.5 11.5 2.5 Q13 2.5 13 4
+    L13 3 Q13 1.5 14.5 1.5 Q16 1.5 16 3
+    L16 4 Q16 2.5 17.5 2.5 Q19 2.5 19 4
+    L19 8.5
+    Q20.5 8.5 20.5 10 L20.5 15
+    Q20.5 20.5 14.5 21.5 Q8.5 20.5 8.5 15
+    L8.5 11
+    Q7 11 7 9.5 Q7 8 8.5 8 Q9.5 8 10 9
+    L10 4 Z
+  " fill="#b0b5c8"/>
+  <!-- Finger separators (subtle lines) -->
+  <line x1="13" y1="3.5" x2="13" y2="11" stroke="#787a90" stroke-width="0.8"/>
+  <line x1="16" y1="3.5" x2="16" y2="11" stroke="#787a90" stroke-width="0.8"/>
+  <line x1="19" y1="4.5" x2="19" y2="11" stroke="#787a90" stroke-width="0.8"/>
+</svg>
