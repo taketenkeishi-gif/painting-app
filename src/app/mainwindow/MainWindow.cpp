@@ -543,9 +543,13 @@ MainWindow::MainWindow(QWidget* parent)
 void MainWindow::setupShellLayout() {
   setCentralWidget(m_canvasWidget);
   setDockNestingEnabled(true);
-  setDockOptions(QMainWindow::AllowNestedDocks | QMainWindow::AllowTabbedDocks | QMainWindow::AnimatedDocks);
-  setTabPosition(Qt::LeftDockWidgetArea, QTabWidget::North);
-  setTabPosition(Qt::RightDockWidgetArea, QTabWidget::North);
+  setDockOptions(QMainWindow::AllowNestedDocks | QMainWindow::AllowTabbedDocks |
+                 QMainWindow::AnimatedDocks | QMainWindow::GroupedDragging);
+  // 全エリアのタブ位置を統一
+  for (auto area : {Qt::LeftDockWidgetArea, Qt::RightDockWidgetArea,
+                    Qt::TopDockWidgetArea,  Qt::BottomDockWidgetArea}) {
+    setTabPosition(area, QTabWidget::North);
+  }
 
   auto* colorPanel = new QWidget(this);
   m_colorPanelWidget = colorPanel;

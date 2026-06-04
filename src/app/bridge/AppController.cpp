@@ -204,8 +204,8 @@ app::ui::BrushPreset presetFromJson(const QJsonObject& json, const app::ui::Brus
   preset.roundness = json.value(QStringLiteral("roundness")).toInt(preset.roundness);
   preset.taperStart = json.value(QStringLiteral("taperStart")).toInt(preset.taperStart);
   preset.taperEnd = json.value(QStringLiteral("taperEnd")).toInt(preset.taperEnd);
-  preset.targetLayerKind =
-      static_cast<app::ui::TargetLayerKind>(json.value(QStringLiteral("targetLayerKind")).toInt(static_cast<int>(preset.targetLayerKind)));
+  // targetLayerKind はカタログ側の定義が正 — ユーザー保存値で上書きしない
+  // preset.targetLayerKind はそのまま（カタログデフォルト値を維持）
   preset.cursorStyle = static_cast<app::ui::CursorStyle>(json.value(QStringLiteral("cursorStyle")).toInt(static_cast<int>(preset.cursorStyle)));
   preset.snapAngle = json.value(QStringLiteral("snapAngle")).toInt(preset.snapAngle);
   preset.simplifyLevel = json.value(QStringLiteral("simplifyLevel")).toInt(preset.simplifyLevel);
@@ -3421,7 +3421,9 @@ void AppController::loadSubToolCatalogFromSettings() {
           loadedSub.profile.lockAlphaRespect = loadedSub.preset.lockAlphaRespect;
           loadedSub.profile.vectorEraseMode = loadedSub.preset.vectorEraseMode;
           loadedSub.profile.vectorTrimOutside = loadedSub.preset.vectorTrimOutside;
-          loadedSub.profile.targetLayerKind = loadedSub.preset.targetLayerKind;
+          // targetLayerKind はカタログ定義が正 — 保存値（旧Raster等）で上書きしない
+          loadedSub.profile.targetLayerKind = fallback->profile.targetLayerKind;
+          loadedSub.preset.targetLayerKind   = fallback->preset.targetLayerKind;
           loadedSub.profile.cursorStyle = loadedSub.preset.cursorStyle;
           const QString guideValue = subObj.value(QStringLiteral("guide")).toString();
           if (!guideValue.isEmpty()) {
