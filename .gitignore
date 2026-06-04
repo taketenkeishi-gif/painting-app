@@ -20,3 +20,6 @@ scripts/*.log
 # Windows thumbnails / metadata
 Thumbs.db
 desktop.ini
+
+# Local archive (experimental/retired code)
+_archive/
