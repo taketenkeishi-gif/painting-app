@@ -854,4 +854,15 @@ ToolResult BrushTool::onWheel(ToolContext& context, int deltaSteps, const ToolPo
   return {};
 }
 
+ToolOverlayState BrushTool::overlay() const {
+  ToolOverlayState state;
+  if (m_drawing && !m_vectorPoints.empty()) {
+    state.hasVectorPreview = true;
+    state.vectorPreviewPoints = m_vectorPoints;
+    state.vectorPreviewColor  = m_settings.color;
+    state.vectorPreviewWidth  = static_cast<float>(std::max(1, m_settings.size));
+  }
+  return state;
+}
+
 } // namespace core

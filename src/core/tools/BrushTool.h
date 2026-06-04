@@ -67,6 +67,7 @@ public:
   ToolResult onPointerRelease(ToolContext& context, const ToolPointerEvent& event) override;
   ToolResult onCancel(ToolContext& context) override;
   ToolResult onWheel(ToolContext& context, int deltaSteps, const ToolPointerEvent& event) override;
+  ToolOverlayState overlay() const override;
 
 protected:
   FPoint applyStabilization(const FPoint& from, const FPoint& to) const;

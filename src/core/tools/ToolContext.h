@@ -52,6 +52,12 @@ struct ToolOverlayState {
   std::vector<Point> polyLassoVertices;  // 確定頂点
   Point polyLassoMouse {0, 0};           // 現在マウス位置
 
+  // ベクターストロークのライブプレビュー（描画中のみ有効）
+  bool hasVectorPreview {false};
+  std::vector<FPoint> vectorPreviewPoints;
+  Color vectorPreviewColor {0, 0, 0, 255};
+  float vectorPreviewWidth {2.0f};
+
   OverlayCursorHint cursorHint {OverlayCursorHint::Default};
 };
 

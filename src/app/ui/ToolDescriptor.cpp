@@ -94,7 +94,26 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   "Airbrush",
                   BrushPreset {24, 28, 10, 35, 12, true, 60, true, true, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Brush},
                   {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
-                  "Low-flow brush for gradual buildup.")},
+                  "Low-flow brush for gradual buildup."),
+              // ── ベクターレイヤー用ブラシ ──────────────────────────────────
+              makeSubTool(
+                  "brush_vector_pen",
+                  "Gペン (Vector)",
+                  BrushPreset {4, 100, 100, 100, 20, true, 30, false, true, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Brush},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection},
+                  "ベクターレイヤーにGペン風のストロークを描きます。"),
+              makeSubTool(
+                  "brush_vector_round",
+                  "丸ペン (Vector)",
+                  BrushPreset {2, 100, 100, 100, 15, true, 20, false, true, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Brush},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection},
+                  "ベクターレイヤーに細い丸ペンのストロークを描きます。"),
+              makeSubTool(
+                  "brush_vector_soft",
+                  "ソフト (Vector)",
+                  BrushPreset {8, 80, 100, 60, 25, true, 50, true, true, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Brush},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection},
+                  "ベクターレイヤーにソフトなストロークを描きます。")},
           {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
           "Draw on active layer."},
       ToolDescriptor {

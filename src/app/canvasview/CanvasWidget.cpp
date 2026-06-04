@@ -409,6 +409,35 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       }
     }
 
+    // ── Vector stroke live preview ───────────────────────────────────────────
+    if (overlay.toolOverlay.hasVectorPreview && overlay.toolOverlay.vectorPreviewPoints.size() >= 2) {
+      const auto& pts = overlay.toolOverlay.vectorPreviewPoints;
+      const core::Color& vc = overlay.toolOverlay.vectorPreviewColor;
+      const float vw = overlay.toolOverlay.vectorPreviewWidth;
+
+      QPolygonF poly;
+      poly.reserve(static_cast<int>(pts.size()));
+      for (const auto& fp : pts) {
+        poly.append(QPointF(
+            target.x() + (static_cast<double>(fp.x) + 0.5) * state.zoom,
+            target.y() + (static_cast<double>(fp.y) + 0.5) * state.zoom));
+      }
+
+      const double penW = std::max(1.0, static_cast<double>(vw) * state.zoom);
+
+      // Shadow (readability on any bg)
+      painter.setBrush(Qt::NoBrush);
+      QPen shadowPen(QColor(0, 0, 0, 100), penW + 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+      painter.setPen(shadowPen);
+      painter.drawPolyline(poly);
+
+      // Stroke preview in actual color
+      QPen strokePen(QColor(vc.r, vc.g, vc.b, static_cast<int>(overlay.toolOverlay.vectorPreviewColor.a * 0.85f)),
+                     penW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+      painter.setPen(strokePen);
+      painter.drawPolyline(poly);
+    }
+
     // ── Committed selection — marching ants ─────────────────────────────────
     if (overlay.selectionMask != nullptr) {
       SelectionOverlayRenderer::render(
