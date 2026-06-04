@@ -151,7 +151,10 @@ public:
   std::vector<SubToolViewModel> subToolViewModels() const;
   ToolStateViewModel toolState() const noexcept;
 
-  void newDocument(int width, int height);
+  void newDocument(int width, int height, int dpi = 72);
+  bool resizeCanvas(int newWidth, int newHeight, int offsetX = 0, int offsetY = 0);
+  int  documentDpi() const noexcept { return m_document.dpi(); }
+  void setDocumentDpi(int dpi) noexcept { m_document.setDpi(dpi); emit documentChanged(); }
   void addLayer();
   void addRasterLayer();
   void addVectorLayer();

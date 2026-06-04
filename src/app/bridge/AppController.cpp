@@ -428,8 +428,8 @@ ToolStateViewModel AppController::toolState() const noexcept {
       m_uiState.selectionEdgeSnap};
 }
 
-void AppController::newDocument(int width, int height) {
-  m_document = core::Document(width, height);
+void AppController::newDocument(int width, int height, int dpi) {
+  m_document = core::Document(width, height, dpi);
   m_layerCounter = 1;
   ensureCurrentSubToolCompatibility();
   m_stroking = false;
@@ -439,6 +439,19 @@ void AppController::newDocument(int width, int height) {
   emit toolStateChanged();
   emit layersChanged();
   emit documentChanged();
+}
+
+bool AppController::resizeCanvas(int newWidth, int newHeight, int offsetX, int offsetY) {
+  if (!m_document.resizeCanvas(newWidth, newHeight, offsetX, offsetY)) {
+    return false;
+  }
+  m_stroking = false;
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
 }
 
 void AppController::addLayer() {

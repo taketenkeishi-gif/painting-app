@@ -55,6 +55,7 @@ protected:
 
 private slots:
   void onNewCanvas();
+  void onResizeCanvas();
   void onToolStateChanged();
   void onOpenTriggered();
   void onNewFromClipboardTriggered();
@@ -296,8 +297,9 @@ private:
   QByteArray m_defaultDockState;
   QString m_currentFilePath;
   QStringList m_recentFiles;
-  int m_lastCanvasWidth {800};
-  int m_lastCanvasHeight {600};
+  int m_lastCanvasWidth  {1920};
+  int m_lastCanvasHeight {1080};
+  int m_lastCanvasDpi    {72};
 };
 
 } // namespace app::mainwindow

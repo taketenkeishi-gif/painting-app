@@ -8,8 +8,9 @@
 
 namespace core {
 
-Document::Document(int width, int height)
+Document::Document(int width, int height, int dpi)
     : m_canvasSize {width, height},
+      m_dpi(dpi > 0 ? dpi : 72),
       m_selection(width, height) {
   addRasterLayer("Layer 1");
 }

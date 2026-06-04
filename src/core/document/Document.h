@@ -12,9 +12,11 @@ namespace core {
 
 class Document {
 public:
-  Document(int width = 800, int height = 600);
+  Document(int width = 800, int height = 600, int dpi = 72);
 
   Size canvasSize() const noexcept { return m_canvasSize; }
+  int  dpi()        const noexcept { return m_dpi; }
+  void setDpi(int dpi) noexcept   { m_dpi = std::max(1, dpi); }
 
   std::size_t layerCount() const noexcept { return m_layers.size(); }
   Layer& layerAt(std::size_t index);
@@ -57,6 +59,7 @@ private:
   static std::string makeDefaultLayerName(std::size_t currentLayerCount);
 
   Size m_canvasSize;
+  int  m_dpi {72};
   std::vector<Layer> m_layers;
   std::size_t m_activeLayerIndex {0};
   SelectionMask m_selection;

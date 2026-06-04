@@ -13,6 +13,7 @@
 #include <QClipboard>
 #include <QColorDialog>
 #include <QDebug>
+#include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDockWidget>
@@ -1252,6 +1253,10 @@ void MainWindow::createMenus() {
   fileMenu->addAction(m_openAction);
   fileMenu->addAction(m_newFromClipboardAction);
   fileMenu->addAction(m_importAsLayerAction);
+  auto* resizeCanvasAction = new QAction("キャンバスサイズを変更(&R)...", this);
+  resizeCanvasAction->setShortcut(QKeySequence("Ctrl+Alt+R"));
+  connect(resizeCanvasAction, &QAction::triggered, this, &MainWindow::onResizeCanvas);
+  fileMenu->addAction(resizeCanvasAction);
   fileMenu->addAction(m_saveAction);
   fileMenu->addAction(m_saveAsAction);
   fileMenu->addSeparator();
@@ -2385,30 +2390,273 @@ void MainWindow::onRedoTriggered() {
 void MainWindow::onNewCanvas() {
   QDialog dialog(this);
   dialog.setWindowTitle("新規キャンバス");
-  auto* form = new QFormLayout(&dialog);
-  auto* widthSpin = new QSpinBox(&dialog);
+  dialog.setMinimumWidth(360);
+
+  auto* root = new QVBoxLayout(&dialog);
+  root->setSpacing(10);
+  root->setContentsMargins(16, 14, 16, 14);
+
+  // ── プリセット ─────────────────────────────────────────────────────────
+  struct Preset { const char* name; int w; int h; int dpi; };
+  static const Preset kPresets[] = {
+    {"カスタム",         0,    0,   72},
+    {"HD  1280×720",  1280,  720,   72},
+    {"FHD 1920×1080", 1920, 1080,   72},
+    {"4K  3840×2160", 3840, 2160,   72},
+    {"A4 (72dpi)",    595,  842,   72},
+    {"A4 (300dpi)",  2480, 3508,  300},
+    {"B5 (72dpi)",   516,  729,   72},
+    {"正方形 1000",   1000, 1000,   72},
+    {"正方形 2000",   2000, 2000,   72},
+  };
+  auto* presetCombo = new QComboBox(&dialog);
+  for (auto& p : kPresets) presetCombo->addItem(p.name);
+
+  // ── サイズ入力 ─────────────────────────────────────────────────────────
+  auto* sizeBox  = new QGroupBox("キャンバスサイズ", &dialog);
+  auto* sizeGrid = new QGridLayout(sizeBox);
+  sizeGrid->setSpacing(6);
+
+  auto* widthSpin  = new QSpinBox(&dialog);
   auto* heightSpin = new QSpinBox(&dialog);
-  widthSpin->setRange(1, 8192);
-  heightSpin->setRange(1, 8192);
+  auto* dpiSpin    = new QSpinBox(&dialog);
+  auto* lockBtn    = new QPushButton("🔒", &dialog);
+  widthSpin->setRange(1, 16384);  widthSpin->setSuffix(" px");
+  heightSpin->setRange(1, 16384); heightSpin->setSuffix(" px");
+  dpiSpin->setRange(1, 1200);     dpiSpin->setSuffix(" dpi");
   widthSpin->setValue(m_lastCanvasWidth);
   heightSpin->setValue(m_lastCanvasHeight);
-  form->addRow("幅", widthSpin);
-  form->addRow("高さ", heightSpin);
+  dpiSpin->setValue(m_lastCanvasDpi);
+  lockBtn->setFixedSize(28, 28);
+  lockBtn->setCheckable(true);
+  lockBtn->setChecked(false);
+  lockBtn->setToolTip("縦横比をロック");
+  lockBtn->setStyleSheet(
+    "QPushButton{border:1px solid #3a4460;border-radius:4px;background:#1e2338;font-size:13px;}"
+    "QPushButton:checked{background:#2a3a5a;border-color:#4e8ef7;}"
+    "QPushButton:hover{background:#262c48;}");
+
+  // プレビューラベル（ピクセル数・印刷サイズ）
+  auto* infoLabel = new QLabel(&dialog);
+  infoLabel->setStyleSheet("color:#7a8aaa;font-size:10px;");
+
+  auto updateInfo = [&]() {
+    int w = widthSpin->value(), h = heightSpin->value(), d = dpiSpin->value();
+    double mmW = w / (d / 25.4);
+    double mmH = h / (d / 25.4);
+    infoLabel->setText(QString("%1 × %2 px  (%3 × %4 mm @ %5dpi)")
+      .arg(w).arg(h)
+      .arg(mmW, 0, 'f', 1).arg(mmH, 0, 'f', 1).arg(d));
+  };
+  updateInfo();
+
+  bool updatingSize = false;
+  auto onWidthChanged = [&](int val) {
+    if (updatingSize) return;
+    if (lockBtn->isChecked() && heightSpin->value() > 0) {
+      updatingSize = true;
+      double ratio = static_cast<double>(heightSpin->value()) / widthSpin->value();
+      if (val > 0) heightSpin->setValue(qRound(val * ratio));
+      updatingSize = false;
+    }
+    updateInfo();
+  };
+  auto onHeightChanged = [&](int val) {
+    if (updatingSize) return;
+    if (lockBtn->isChecked() && widthSpin->value() > 0) {
+      updatingSize = true;
+      double ratio = static_cast<double>(widthSpin->value()) / heightSpin->value();
+      if (val > 0) widthSpin->setValue(qRound(val * ratio));
+      updatingSize = false;
+    }
+    updateInfo();
+  };
+  connect(widthSpin,  QOverload<int>::of(&QSpinBox::valueChanged), &dialog, onWidthChanged);
+  connect(heightSpin, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, onHeightChanged);
+  connect(dpiSpin,    QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int){ updateInfo(); });
+
+  // 向き切り替えボタン
+  auto* orientRow = new QHBoxLayout();
+  auto* portraitBtn  = new QPushButton("縦", &dialog);
+  auto* landscapeBtn = new QPushButton("横", &dialog);
+  portraitBtn->setCheckable(true);  portraitBtn->setChecked(true);
+  landscapeBtn->setCheckable(true);
+  const QString orientStyle =
+    "QPushButton{border:1px solid #3a4460;border-radius:4px;background:#1e2338;padding:3px 14px;}"
+    "QPushButton:checked{background:#2a3a5a;border-color:#4e8ef7;color:#c5d8ff;}"
+    "QPushButton:hover{background:#262c48;}";
+  portraitBtn->setStyleSheet(orientStyle);
+  landscapeBtn->setStyleSheet(orientStyle);
+  auto swapIfNeeded = [&](bool portrait) {
+    int w = widthSpin->value(), h = heightSpin->value();
+    if (portrait && w > h) { widthSpin->setValue(h); heightSpin->setValue(w); }
+    else if (!portrait && w < h) { widthSpin->setValue(h); heightSpin->setValue(w); }
+  };
+  connect(portraitBtn,  &QPushButton::clicked, &dialog, [&](){ portraitBtn->setChecked(true);  landscapeBtn->setChecked(false); swapIfNeeded(true); });
+  connect(landscapeBtn, &QPushButton::clicked, &dialog, [&](){ landscapeBtn->setChecked(true); portraitBtn->setChecked(false);  swapIfNeeded(false); });
+  orientRow->addWidget(portraitBtn);
+  orientRow->addWidget(landscapeBtn);
+  orientRow->addStretch();
+
+  // プリセット選択時
+  connect(presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), &dialog, [&](int idx){
+    if (idx <= 0 || kPresets[idx].w == 0) return;
+    updatingSize = true;
+    widthSpin->setValue(kPresets[idx].w);
+    heightSpin->setValue(kPresets[idx].h);
+    dpiSpin->setValue(kPresets[idx].dpi);
+    updatingSize = false;
+    updateInfo();
+  });
+
+  sizeGrid->addWidget(new QLabel("幅",  &dialog), 0, 0);
+  sizeGrid->addWidget(widthSpin, 0, 1);
+  sizeGrid->addWidget(lockBtn,   0, 2, 2, 1, Qt::AlignVCenter);
+  sizeGrid->addWidget(new QLabel("高さ", &dialog), 1, 0);
+  sizeGrid->addWidget(heightSpin, 1, 1);
+  sizeGrid->addWidget(new QLabel("解像度", &dialog), 2, 0);
+  sizeGrid->addWidget(dpiSpin, 2, 1);
+  sizeGrid->addLayout(orientRow, 3, 0, 1, 3);
+  sizeGrid->addWidget(infoLabel, 4, 0, 1, 3);
 
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-  form->addWidget(buttons);
+  buttons->button(QDialogButtonBox::Ok)->setText("作成");
+
+  root->addWidget(new QLabel("プリセット", &dialog));
+  root->addWidget(presetCombo);
+  root->addWidget(sizeBox);
+  root->addWidget(buttons);
+
   connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
   connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+  if (dialog.exec() != QDialog::Accepted) return;
 
-  if (dialog.exec() != QDialog::Accepted) {
-    return;
+  m_lastCanvasWidth  = widthSpin->value();
+  m_lastCanvasHeight = heightSpin->value();
+  m_lastCanvasDpi    = dpiSpin->value();
+  m_controller->newDocument(m_lastCanvasWidth, m_lastCanvasHeight, m_lastCanvasDpi);
+}
+
+void MainWindow::onResizeCanvas() {
+  if (!m_controller) return;
+  const core::Size cur = m_controller->document().canvasSize();
+  const int curW = cur.width, curH = cur.height;
+
+  QDialog dialog(this);
+  dialog.setWindowTitle("キャンバスサイズを変更");
+  dialog.setMinimumWidth(380);
+
+  auto* root = new QVBoxLayout(&dialog);
+  root->setSpacing(10);
+  root->setContentsMargins(16, 14, 16, 14);
+
+  // 現在サイズ表示
+  auto* curLabel = new QLabel(
+    QString("現在のサイズ: %1 × %2 px").arg(curW).arg(curH), &dialog);
+  curLabel->setStyleSheet("color:#7a8aaa;font-size:10px;");
+
+  // 新サイズ入力
+  auto* sizeBox  = new QGroupBox("新しいサイズ", &dialog);
+  auto* sizeGrid = new QGridLayout(sizeBox);
+  sizeGrid->setSpacing(6);
+  auto* newW    = new QSpinBox(&dialog);
+  auto* newH    = new QSpinBox(&dialog);
+  auto* lockBtn = new QPushButton("🔒", &dialog);
+  newW->setRange(1, 16384);  newW->setSuffix(" px");  newW->setValue(curW);
+  newH->setRange(1, 16384);  newH->setSuffix(" px");  newH->setValue(curH);
+  lockBtn->setFixedSize(28, 28);
+  lockBtn->setCheckable(true);
+  lockBtn->setToolTip("縦横比をロック");
+  lockBtn->setStyleSheet(
+    "QPushButton{border:1px solid #3a4460;border-radius:4px;background:#1e2338;font-size:13px;}"
+    "QPushButton:checked{background:#2a3a5a;border-color:#4e8ef7;}"
+    "QPushButton:hover{background:#262c48;}");
+
+  bool updLock = false;
+  connect(newW, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int v){
+    if (updLock || !lockBtn->isChecked()) return;
+    updLock = true;
+    if (curW > 0) newH->setValue(qRound(static_cast<double>(curH) / curW * v));
+    updLock = false;
+  });
+  connect(newH, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int v){
+    if (updLock || !lockBtn->isChecked()) return;
+    updLock = true;
+    if (curH > 0) newW->setValue(qRound(static_cast<double>(curW) / curH * v));
+    updLock = false;
+  });
+
+  sizeGrid->addWidget(new QLabel("幅",  &dialog), 0, 0);
+  sizeGrid->addWidget(newW, 0, 1);
+  sizeGrid->addWidget(lockBtn, 0, 2, 2, 1, Qt::AlignVCenter);
+  sizeGrid->addWidget(new QLabel("高さ", &dialog), 1, 0);
+  sizeGrid->addWidget(newH, 1, 1);
+
+  // アンカーポイント（3×3グリッド）
+  auto* anchorBox = new QGroupBox("配置（既存コンテンツの位置）", &dialog);
+  auto* anchorGrid = new QGridLayout(anchorBox);
+  anchorGrid->setSpacing(2);
+  anchorGrid->setContentsMargins(8, 8, 8, 8);
+
+  int anchorCol = 1, anchorRow = 1;  // デフォルト: 中央
+  QVector<QPushButton*> anchorBtns;
+  const QString anchorActive =
+    "QPushButton{background:#2a3a5a;border:2px solid #4e8ef7;border-radius:3px;min-width:26px;min-height:26px;}";
+  const QString anchorNormal =
+    "QPushButton{background:#1e2338;border:1px solid #3a4460;border-radius:3px;min-width:26px;min-height:26px;}"
+    "QPushButton:hover{background:#262c48;border-color:#5a7ab0;}";
+
+  for (int r = 0; r < 3; ++r) {
+    for (int c = 0; c < 3; ++c) {
+      auto* btn = new QPushButton("", &dialog);
+      btn->setFixedSize(28, 28);
+      btn->setStyleSheet(r == 1 && c == 1 ? anchorActive : anchorNormal);
+      const int rr = r, cc = c;
+      connect(btn, &QPushButton::clicked, &dialog, [&, rr, cc](){
+        anchorRow = rr; anchorCol = cc;
+        for (int i = 0; i < anchorBtns.size(); ++i)
+          anchorBtns[i]->setStyleSheet(
+            (i / 3 == anchorRow && i % 3 == anchorCol) ? anchorActive : anchorNormal);
+      });
+      anchorBtns.append(btn);
+      anchorGrid->addWidget(btn, r, c);
+    }
   }
+  // オフセット表示ラベル
+  auto* offsetLabel = new QLabel(&dialog);
+  offsetLabel->setStyleSheet("color:#7a8aaa;font-size:10px;");
+  auto updateOffset = [&](){
+    int ow = newW->value() - curW;
+    int oh = newH->value() - curH;
+    int ox = anchorCol == 0 ? 0 : (anchorCol == 1 ? ow/2 : ow);
+    int oy = anchorRow == 0 ? 0 : (anchorRow == 1 ? oh/2 : oh);
+    offsetLabel->setText(QString("オフセット: (%1, %2) px").arg(ox).arg(oy));
+  };
+  connect(newW, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int){ updateOffset(); });
+  connect(newH, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int){ updateOffset(); });
+  updateOffset();
 
-  const int width = widthSpin->value();
-  const int height = heightSpin->value();
-  m_lastCanvasWidth = width;
-  m_lastCanvasHeight = height;
-  m_controller->newDocument(width, height);
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+  buttons->button(QDialogButtonBox::Ok)->setText("変更");
+
+  root->addWidget(curLabel);
+  root->addWidget(sizeBox);
+  root->addWidget(anchorBox);
+  root->addWidget(offsetLabel);
+  root->addWidget(buttons);
+
+  connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+  if (dialog.exec() != QDialog::Accepted) return;
+
+  // アンカーポイントからオフセット計算
+  // anchorCol/Row: 0=左上, 1=中央, 2=右下 → 既存コンテンツの左上が移動先
+  const int dw = newW->value() - curW;
+  const int dh = newH->value() - curH;
+  const int offX = anchorCol == 0 ? 0 : (anchorCol == 1 ? dw / 2 : dw);
+  const int offY = anchorRow == 0 ? 0 : (anchorRow == 1 ? dh / 2 : dh);
+
+  m_controller->resizeCanvas(newW->value(), newH->value(), offX, offY);
 }
 
 void MainWindow::onToolStateChanged() {
