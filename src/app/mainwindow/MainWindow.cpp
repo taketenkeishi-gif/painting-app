@@ -154,27 +154,33 @@ public:
   explicit DockTitleBar(const QString& title, QDockWidget* dock)
       : QWidget(dock), m_dock(dock), m_ownTitle(title)
   {
-    setFixedHeight(22);
+    setFixedHeight(24);
     setMouseTracking(true);
+    // QDockWidget のイベントフィルタがドラッグを検知できるよう
+    // このウィジェット自身はマウスイベントを素通しさせる
+    setAttribute(Qt::WA_TransparentForMouseEvents, false);
 
     m_layout = new QHBoxLayout(this);
     m_layout->setContentsMargins(0, 0, 2, 0);
     m_layout->setSpacing(0);
 
     // ── Grip ─────────────────────────────────────────────────────────
-    // Painted by paintEvent.  Transparent to mouse → drag falls through
-    // to this widget → QDockWidget event filter → dock-drag mode.
+    // Transparent → mouse events fall through to DockTitleBar itself →
+    // QDockWidget event filter picks them up → dock-drag mode (shows drop
+    // indicators, allows re-docking). DO NOT consume events here.
     m_grip = new QWidget(this);
-    m_grip->setFixedSize(14, 22);
+    m_grip->setFixedSize(18, 22);
     m_grip->setAttribute(Qt::WA_TransparentForMouseEvents, true);
     m_layout->addWidget(m_grip);
 
     // Tab buttons will be inserted here by rebuildTabs().
 
     // ── Stretch ───────────────────────────────────────────────────────
-    // Fills remaining horizontal space; transparent to mouse → drag area.
+    // Wide transparent drag zone — the larger this is, the easier it is
+    // to grab and drag the dock (both when docked and floating).
     m_stretch = new QWidget(this);
     m_stretch->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    m_stretch->setMinimumWidth(40);  // 最低40px確保してドラッグしやすく
     m_stretch->setAttribute(Qt::WA_TransparentForMouseEvents, true);
 
     // ── Float button ──────────────────────────────────────────────────
@@ -187,16 +193,7 @@ public:
         "QPushButton{background:transparent;border:none;color:#4a5570;font-size:12px;}"
         "QPushButton:hover{color:#c5cde0;background:#2f3650;border-radius:3px;}");
     connect(m_floatBtn, &QPushButton::clicked, this, [this] {
-      const bool nowFloating = !m_dock->isFloating();
-      m_dock->setFloating(nowFloating);
-      // フローティング時はグリップ/ストレッチをマウス透過 OFF にして自由ドラッグを有効化
-      m_grip->setAttribute(Qt::WA_TransparentForMouseEvents, !nowFloating);
-      m_stretch->setAttribute(Qt::WA_TransparentForMouseEvents, !nowFloating);
-    });
-    // ドック状態変化時にも透過属性を同期
-    connect(m_dock, &QDockWidget::topLevelChanged, this, [this](bool floating) {
-      m_grip->setAttribute(Qt::WA_TransparentForMouseEvents, !floating);
-      m_stretch->setAttribute(Qt::WA_TransparentForMouseEvents, !floating);
+      m_dock->setFloating(!m_dock->isFloating());
     });
 
     // ── Close button ──────────────────────────────────────────────────
@@ -316,45 +313,14 @@ private:
     }
   }
 
-  // フローティング時のタイトルバードラッグ
-  void mousePressEvent(QMouseEvent* e) override {
-    if (m_dock->isFloating() && e->button() == Qt::LeftButton) {
-      m_dragActive = true;
-      m_dragOffset = e->globalPosition().toPoint() - m_dock->frameGeometry().topLeft();
-      e->accept();
-      return;
-    }
-    QWidget::mousePressEvent(e);
-  }
-
-  void mouseMoveEvent(QMouseEvent* e) override {
-    if (m_dragActive && m_dock->isFloating()) {
-      m_dock->move(e->globalPosition().toPoint() - m_dragOffset);
-      e->accept();
-      return;
-    }
-    QWidget::mouseMoveEvent(e);
-  }
-
-  void mouseReleaseEvent(QMouseEvent* e) override {
-    if (m_dragActive) {
-      m_dragActive = false;
-      e->accept();
-      return;
-    }
-    QWidget::mouseReleaseEvent(e);
-  }
-
-  QDockWidget*        m_dock       {nullptr};
+  QDockWidget*        m_dock     {nullptr};
   QString             m_ownTitle;
-  QHBoxLayout*        m_layout     {nullptr};
-  QWidget*            m_grip       {nullptr};
-  QWidget*            m_stretch    {nullptr};
-  QPushButton*        m_floatBtn   {nullptr};
-  QPushButton*        m_closeBtn   {nullptr};
+  QHBoxLayout*        m_layout   {nullptr};
+  QWidget*            m_grip     {nullptr};
+  QWidget*            m_stretch  {nullptr};
+  QPushButton*        m_floatBtn {nullptr};
+  QPushButton*        m_closeBtn {nullptr};
   QList<QPushButton*> m_tabBtns;
-  bool                m_dragActive {false};
-  QPoint              m_dragOffset;
 };
 
 class ColorSwatchWidget : public QWidget {
