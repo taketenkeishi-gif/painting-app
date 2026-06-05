@@ -1,0 +1,37 @@
+{
+	"BUILD_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_app_autogen",
+	"CMAKE_BINARY_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv",
+	"CMAKE_CURRENT_BINARY_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src",
+	"CMAKE_CURRENT_SOURCE_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/src",
+	"CMAKE_SOURCE_DIR" : "C:/Users/Keishi/Portfolio/Painting-app",
+	"CROSS_CONFIG" : false,
+	"GENERATOR" : "Visual Studio 17 2022",
+	"INCLUDE_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_app_autogen/include",
+	"INCLUDE_DIR_Debug" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_app_autogen/include_Debug",
+	"INCLUDE_DIR_MinSizeRel" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_app_autogen/include_MinSizeRel",
+	"INCLUDE_DIR_RelWithDebInfo" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_app_autogen/include_RelWithDebInfo",
+	"INCLUDE_DIR_Release" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_app_autogen/include_Release",
+	"INPUTS" : 
+	[
+		"C:/Users/Keishi/Portfolio/Painting-app/src/app/resources/workflows/paintapp_inpaint.json",
+		"C:/Users/Keishi/Portfolio/Painting-app/src/app/resources/workflows/paintapp_scribble.json",
+		"C:/Users/Keishi/Portfolio/Painting-app/src/app/resources/workflows/paintapp_lineart.json",
+		"C:/Users/Keishi/Portfolio/Painting-app/src/app/resources/workflows/paintapp_canny.json",
+		"C:/Users/Keishi/Portfolio/Painting-app/src/app/resources/workflows/paintapp_img2img.json"
+	],
+	"LOCK_FILE" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Lock.lock",
+	"MULTI_CONFIG" : true,
+	"OPTIONS" : [ "--no-zstd", "-name", "workflows" ],
+	"OUTPUT_CHECKSUM" : "5QDYQ3JZ3K",
+	"OUTPUT_NAME" : "qrc_workflows.cpp",
+	"RCC_EXECUTABLE" : "C:/Qt/6.7.2/msvc2019_64/./bin/rcc.exe",
+	"RCC_LIST_OPTIONS" : [],
+	"SETTINGS_FILE" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Used.txt",
+	"SETTINGS_FILE_Debug" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Used_Debug.txt",
+	"SETTINGS_FILE_MinSizeRel" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Used_MinSizeRel.txt",
+	"SETTINGS_FILE_RelWithDebInfo" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Used_RelWithDebInfo.txt",
+	"SETTINGS_FILE_Release" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Used_Release.txt",
+	"SOURCE" : "C:/Users/Keishi/Portfolio/Painting-app/src/app/resources/workflows.qrc",
+	"USE_BETTER_GRAPH" : false,
+	"VERBOSITY" : 0
+}

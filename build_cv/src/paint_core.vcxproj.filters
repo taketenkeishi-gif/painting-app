@@ -1,0 +1,100 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_core_autogen\mocs_compilation_Debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\buffer\PixelBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\document\Document.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\layer\Layer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\render\Renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\selection\SelectionMask.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\selection\SelectionEngine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\selection\SelectionRefiner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\selection\MaskExporter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\selection\providers\ClassicProvider.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\ToolType.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\ToolManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\BrushTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\EraserTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\EyedropperTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\HandTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\ZoomTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\LineTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\RectSelectionTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\FillTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\MoveLayerTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\AiSelectTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\FreeTransformTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\TextTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\tools\GradientTool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\core\ai\GenerativeFillEngine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_core_autogen\mocs_compilation_Release.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_core_autogen\mocs_compilation_MinSizeRel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_core_autogen\mocs_compilation_RelWithDebInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Keishi\Portfolio\Painting-app\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{DCBBAC99-0809-3F8C-AF79-CAFD262DCF92}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

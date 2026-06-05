@@ -1,0 +1,431 @@
+{
+	"AUTOGEN_COMMAND_LINE_LENGTH_MAX" : 32000,
+	"BUILD_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen",
+	"CMAKE_BINARY_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv",
+	"CMAKE_CURRENT_BINARY_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src",
+	"CMAKE_CURRENT_SOURCE_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/src",
+	"CMAKE_EXECUTABLE" : "C:/Program Files/CMake/bin/cmake.exe",
+	"CMAKE_LIST_FILES" : 
+	[
+		"C:/Users/Keishi/Portfolio/Painting-app/src/CMakeLists.txt",
+		"C:/Users/Keishi/Portfolio/Painting-app/src/app/resources/icons.qrc",
+		"C:/Users/Keishi/Portfolio/Painting-app/src/app/resources/workflows.qrc"
+	],
+	"CMAKE_SOURCE_DIR" : "C:/Users/Keishi/Portfolio/Painting-app",
+	"CROSS_CONFIG" : false,
+	"DEP_FILE" : "",
+	"DEP_FILE_RULE_NAME" : "",
+	"HEADERS" : 
+	[
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/ai/GenerativeFillEngine.h",
+			"Mu",
+			"O6LQ2N4BAV/moc_GenerativeFillEngine.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/buffer/PixelBuffer.h",
+			"Mu",
+			"NSNIGPUAZS/moc_PixelBuffer.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/document/Document.h",
+			"Mu",
+			"7JY7MTQHYP/moc_Document.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/layer/Layer.h",
+			"Mu",
+			"V73SMFNRP2/moc_Layer.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/render/Renderer.h",
+			"Mu",
+			"7OEO6JDWX6/moc_Renderer.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/MaskExporter.h",
+			"Mu",
+			"USQ77E7B54/moc_MaskExporter.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/SelectionEngine.h",
+			"Mu",
+			"USQ77E7B54/moc_SelectionEngine.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/SelectionMask.h",
+			"Mu",
+			"USQ77E7B54/moc_SelectionMask.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/SelectionRefiner.h",
+			"Mu",
+			"USQ77E7B54/moc_SelectionRefiner.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/providers/ClassicProvider.h",
+			"Mu",
+			"CUFRDTA3EB/moc_ClassicProvider.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/AiSelectTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_AiSelectTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/BrushTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_BrushTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/EraserTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_EraserTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/EyedropperTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_EyedropperTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/FillTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_FillTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/FreeTransformTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_FreeTransformTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/GradientTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_GradientTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/HandTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_HandTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/LineTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_LineTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/MoveLayerTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_MoveLayerTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/RectSelectionTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_RectSelectionTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/TextTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_TextTool.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/ToolManager.h",
+			"Mu",
+			"4NE5AASU2C/moc_ToolManager.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/ToolType.h",
+			"Mu",
+			"4NE5AASU2C/moc_ToolType.cpp",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/ZoomTool.h",
+			"Mu",
+			"4NE5AASU2C/moc_ZoomTool.cpp",
+			null
+		]
+	],
+	"HEADER_EXTENSIONS" : [ "h", "hh", "h++", "hm", "hpp", "hxx", "in", "txx" ],
+	"INCLUDE_DIR" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/include",
+	"INCLUDE_DIR_Debug" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/include_Debug",
+	"INCLUDE_DIR_MinSizeRel" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/include_MinSizeRel",
+	"INCLUDE_DIR_RelWithDebInfo" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/include_RelWithDebInfo",
+	"INCLUDE_DIR_Release" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/include_Release",
+	"MOC_COMPILATION_FILE" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/mocs_compilation.cpp",
+	"MOC_COMPILATION_FILE_Debug" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/mocs_compilation_Debug.cpp",
+	"MOC_COMPILATION_FILE_MinSizeRel" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/mocs_compilation_MinSizeRel.cpp",
+	"MOC_COMPILATION_FILE_RelWithDebInfo" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/mocs_compilation_RelWithDebInfo.cpp",
+	"MOC_COMPILATION_FILE_Release" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/paint_core_autogen/mocs_compilation_Release.cpp",
+	"MOC_DEFINITIONS" : [],
+	"MOC_DEFINITIONS_Debug" : 
+	[
+		"PAINT_USE_OPENCV",
+		"QT_CORE_LIB",
+		"UNICODE",
+		"WIN32",
+		"WIN64",
+		"_ENABLE_EXTENDED_ALIGNED_STORAGE",
+		"_UNICODE",
+		"_WIN64"
+	],
+	"MOC_DEFINITIONS_MinSizeRel" : 
+	[
+		"PAINT_USE_OPENCV",
+		"QT_CORE_LIB",
+		"QT_NO_DEBUG",
+		"UNICODE",
+		"WIN32",
+		"WIN64",
+		"_ENABLE_EXTENDED_ALIGNED_STORAGE",
+		"_UNICODE",
+		"_WIN64"
+	],
+	"MOC_DEFINITIONS_RelWithDebInfo" : 
+	[
+		"PAINT_USE_OPENCV",
+		"QT_CORE_LIB",
+		"QT_NO_DEBUG",
+		"UNICODE",
+		"WIN32",
+		"WIN64",
+		"_ENABLE_EXTENDED_ALIGNED_STORAGE",
+		"_UNICODE",
+		"_WIN64"
+	],
+	"MOC_DEFINITIONS_Release" : 
+	[
+		"PAINT_USE_OPENCV",
+		"QT_CORE_LIB",
+		"QT_NO_DEBUG",
+		"UNICODE",
+		"WIN32",
+		"WIN64",
+		"_ENABLE_EXTENDED_ALIGNED_STORAGE",
+		"_UNICODE",
+		"_WIN64"
+	],
+	"MOC_DEPEND_FILTERS" : 
+	[
+		[
+			"Q_PLUGIN_METADATA",
+			"[\n][ \t]*Q_PLUGIN_METADATA[ \t]*\\([^\\)]*FILE[ \t]*\"([^\"]+)\""
+		]
+	],
+	"MOC_INCLUDES" : [],
+	"MOC_INCLUDES_Debug" : 
+	[
+		"C:/Users/Keishi/Portfolio/Painting-app/src",
+		"C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/include/opencv4",
+		"C:/Qt/6.7.2/msvc2019_64/include/QtCore",
+		"C:/Qt/6.7.2/msvc2019_64/include",
+		"C:/Qt/6.7.2/msvc2019_64/mkspecs/win32-msvc"
+	],
+	"MOC_INCLUDES_MinSizeRel" : 
+	[
+		"C:/Users/Keishi/Portfolio/Painting-app/src",
+		"C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/include/opencv4",
+		"C:/Qt/6.7.2/msvc2019_64/include/QtCore",
+		"C:/Qt/6.7.2/msvc2019_64/include",
+		"C:/Qt/6.7.2/msvc2019_64/mkspecs/win32-msvc"
+	],
+	"MOC_INCLUDES_RelWithDebInfo" : 
+	[
+		"C:/Users/Keishi/Portfolio/Painting-app/src",
+		"C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/include/opencv4",
+		"C:/Qt/6.7.2/msvc2019_64/include/QtCore",
+		"C:/Qt/6.7.2/msvc2019_64/include",
+		"C:/Qt/6.7.2/msvc2019_64/mkspecs/win32-msvc"
+	],
+	"MOC_INCLUDES_Release" : 
+	[
+		"C:/Users/Keishi/Portfolio/Painting-app/src",
+		"C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/include/opencv4",
+		"C:/Qt/6.7.2/msvc2019_64/include/QtCore",
+		"C:/Qt/6.7.2/msvc2019_64/include",
+		"C:/Qt/6.7.2/msvc2019_64/mkspecs/win32-msvc"
+	],
+	"MOC_MACRO_NAMES" : 
+	[
+		"Q_OBJECT",
+		"Q_GADGET",
+		"Q_NAMESPACE",
+		"Q_NAMESPACE_EXPORT",
+		"Q_GADGET_EXPORT",
+		"Q_ENUM_NS"
+	],
+	"MOC_OPTIONS" : [],
+	"MOC_PATH_PREFIX" : false,
+	"MOC_PREDEFS_CMD" : [],
+	"MOC_PREDEFS_FILE" : "",
+	"MOC_RELAXED_MODE" : false,
+	"MOC_SKIP" : [],
+	"MULTI_CONFIG" : true,
+	"PARALLEL" : 8,
+	"PARSE_CACHE_FILE" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/ParseCache.txt",
+	"PARSE_CACHE_FILE_Debug" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/ParseCache_Debug.txt",
+	"PARSE_CACHE_FILE_MinSizeRel" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/ParseCache_MinSizeRel.txt",
+	"PARSE_CACHE_FILE_RelWithDebInfo" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/ParseCache_RelWithDebInfo.txt",
+	"PARSE_CACHE_FILE_Release" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/ParseCache_Release.txt",
+	"QT_MOC_EXECUTABLE" : "C:/Qt/6.7.2/msvc2019_64/./bin/moc.exe",
+	"QT_UIC_EXECUTABLE" : "",
+	"QT_VERSION_MAJOR" : 6,
+	"QT_VERSION_MINOR" : 7,
+	"SETTINGS_FILE" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/AutogenUsed.txt",
+	"SETTINGS_FILE_Debug" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/AutogenUsed_Debug.txt",
+	"SETTINGS_FILE_MinSizeRel" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/AutogenUsed_MinSizeRel.txt",
+	"SETTINGS_FILE_RelWithDebInfo" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/AutogenUsed_RelWithDebInfo.txt",
+	"SETTINGS_FILE_Release" : "C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core_autogen.dir/AutogenUsed_Release.txt",
+	"SOURCES" : 
+	[
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/ai/GenerativeFillEngine.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/buffer/PixelBuffer.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/document/Document.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/layer/Layer.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/render/Renderer.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/MaskExporter.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/SelectionEngine.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/SelectionMask.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/SelectionRefiner.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/selection/providers/ClassicProvider.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/AiSelectTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/BrushTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/EraserTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/EyedropperTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/FillTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/FreeTransformTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/GradientTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/HandTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/LineTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/MoveLayerTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/RectSelectionTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/TextTool.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/ToolManager.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/ToolType.cpp",
+			"Mu",
+			null
+		],
+		[
+			"C:/Users/Keishi/Portfolio/Painting-app/src/core/tools/ZoomTool.cpp",
+			"Mu",
+			null
+		]
+	],
+	"USE_BETTER_GRAPH" : false,
+	"VERBOSITY" : 0
+}
