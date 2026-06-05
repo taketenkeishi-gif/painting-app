@@ -2,7 +2,7 @@
 <!-- scheduler が status を更新します -->
 
 ## task-001
-status: in_progress
+status: review_required
 priority: high
 role: developer
 
