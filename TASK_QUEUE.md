@@ -32,7 +32,7 @@ cmake --build build --config Release
 ---
 
 ## task-002
-status: pending
+status: in_progress
 priority: high
 role: developer
 
