@@ -488,8 +488,8 @@ cmake --build build --config Release
 ---
 
 ## task-17
-status: in_progress
-attempt: 0
+status: review_required
+attempt: 1
 priority: high
 role: developer
 category: feature

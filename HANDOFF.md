@@ -1,7 +1,24 @@
 # HANDOFF
-更新: 06/06/2026 08:20:00
+更新: 06/06/2026 08:45:00
 worker: worker-b
-ctx: task-8 完了 → review_required
+ctx: task-17 完了 → review_required
+
+## 完了タスク: task-17
+ToolPropertyPanel にサイズスライダー追加・Opacity スライダー動作確認
+
+### 実施内容
+`src/app/panels/ToolPropertyPanel.cpp` / `.h` に `m_sizeSlider` (QSlider) を追加:
+- 宣言・初期化・レイアウト配置（sizeRow: slider + spinbox）
+- `onSizeSliderChanged` 実装（spinbox 同期・`setBrushSize` 呼び出し）
+- `onSizeChanged` 更新（スライダーへも同期、range: 1-200 でクランプ）
+- `refreshFromController`: visibility・QSignalBlocker・state sync 追加
+- サイズラベルを `StrokeWidth` ツール時に「線幅」と表示するよう修正
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- Opacity スライダーは既に実装済みであることを確認
+
+### 次のworkerへ
 
 ## 完了タスク: task-8
 CanvasWidget マウスイベントの nullptr ガード強化
