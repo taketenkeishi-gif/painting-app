@@ -33,6 +33,7 @@ private slots:
   void refreshFromController();
   void onChooseColor();
   void onSizeChanged(int size);
+  void onSizeSliderChanged(int value);
   void onOpacitySliderChanged(int value);
   void onOpacitySpinChanged(int value);
   void onHardnessSliderChanged(int value);
@@ -132,6 +133,7 @@ private:
   QPushButton* m_pinConfigButton {nullptr};
   QLabel* m_colorLabel {nullptr};
   QLabel* m_sizeLabel {nullptr};
+  QSlider* m_sizeSlider {nullptr};
   QLabel* m_opacityLabel {nullptr};
   QLabel* m_hardnessLabel {nullptr};
   QLabel* m_flowLabel {nullptr};

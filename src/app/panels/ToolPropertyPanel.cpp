@@ -105,6 +105,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_autoSelectThresholdLabel(new QLabel("自動選択しきい値", this)),
       m_colorButton(new QPushButton("色を選択", this)),
       m_sizeSpin(new QSpinBox(this)),
+      m_sizeSlider(new QSlider(Qt::Horizontal, this)),
       m_opacitySlider(new QSlider(Qt::Horizontal, this)),
       m_opacitySpin(new QSpinBox(this)),
       m_hardnessSlider(new QSlider(Qt::Horizontal, this)),
@@ -192,6 +193,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_compatibilityLabel->setStyleSheet("color: #f3bf58; font-weight: 600;");
   m_guideLabel->setVisible(false);
   m_sizeSpin->setRange(1, 2048);
+  m_sizeSlider->setRange(1, 200);
   m_opacitySlider->setRange(0, 100);
   m_opacitySpin->setRange(0, 100);
   m_hardnessSlider->setRange(0, 100);
@@ -349,10 +351,15 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   hardnessRow->addWidget(m_hardnessSlider, 1);
   hardnessRow->addWidget(m_hardnessSpin);
 
+  auto* sizeRow = new QHBoxLayout();
+  markResponsiveRow(sizeRow);
+  sizeRow->addWidget(m_sizeSlider, 1);
+  sizeRow->addWidget(m_sizeSpin);
+
   basicLayout->addWidget(m_colorLabel);
   basicLayout->addWidget(m_colorButton);
   basicLayout->addWidget(m_sizeLabel);
-  basicLayout->addWidget(m_sizeSpin);
+  basicLayout->addLayout(sizeRow);
   basicLayout->addWidget(m_opacityLabel);
   basicLayout->addLayout(opacityRow);
   basicLayout->addWidget(m_hardnessLabel);
@@ -621,6 +628,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_pinConfigButton, &QPushButton::clicked, this, &ToolPropertyPanel::onConfigurePinnedRequested);
   connect(m_colorButton, &QPushButton::clicked, this, &ToolPropertyPanel::onChooseColor);
   connect(m_sizeSpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onSizeChanged);
+  connect(m_sizeSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onSizeSliderChanged);
   connect(m_opacitySlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onOpacitySliderChanged);
   connect(m_opacitySpin, qOverload<int>(&QSpinBox::valueChanged), this, &ToolPropertyPanel::onOpacitySpinChanged);
   connect(m_hardnessSlider, &QSlider::valueChanged, this, &ToolPropertyPanel::onHardnessSliderChanged);
@@ -952,7 +960,8 @@ void ToolPropertyPanel::refreshFromController() {
   const auto pinnedOrDetail = [this](bool supports, const QString& key) {
     return supports && (m_showDetails || isPinned(key));
   };
-  m_sizeLabel->setText((supportsSnapAngle || supportsSimplify) ? "Stroke Width" : "Size");
+  const bool supportsStrokeWidth = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::StrokeWidth);
+  m_sizeLabel->setText(supportsStrokeWidth ? "線幅" : "サイズ");
   const bool showColor = pinnedOrDetail(supportsColor, QStringLiteral("color"));
   const bool showSize = pinnedOrDetail(supportsSize, QStringLiteral("size"));
   const bool showOpacity = pinnedOrDetail(supportsOpacity, QStringLiteral("opacity"));
@@ -966,6 +975,7 @@ void ToolPropertyPanel::refreshFromController() {
   m_colorLabel->setVisible(showColor);
   m_colorButton->setVisible(showColor);
   m_sizeLabel->setVisible(showSize);
+  m_sizeSlider->setVisible(showSize);
   m_sizeSpin->setVisible(showSize);
   m_opacityLabel->setVisible(showOpacity);
   m_opacitySlider->setVisible(showOpacity);
@@ -1077,6 +1087,7 @@ void ToolPropertyPanel::refreshFromController() {
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);
+  const QSignalBlocker blockerSizeSlider(m_sizeSlider);
   const QSignalBlocker blocker2(m_opacitySlider);
   const QSignalBlocker blocker3(m_opacitySpin);
   const QSignalBlocker blocker4(m_hardnessSlider);
@@ -1127,6 +1138,7 @@ void ToolPropertyPanel::refreshFromController() {
   const QSignalBlocker blocker48(m_pressureOpacityMinSlider);
   const QSignalBlocker blocker49(m_pressureOpacityMinSpin);
   m_sizeSpin->setValue(state.size);
+  m_sizeSlider->setValue(std::min(state.size, m_sizeSlider->maximum()));
   m_opacitySlider->setValue(state.opacity);
   m_opacitySpin->setValue(state.opacity);
   m_hardnessSlider->setValue(state.hardness);
@@ -1222,7 +1234,20 @@ void ToolPropertyPanel::onSizeChanged(int size) {
   if (m_controller == nullptr || !m_controller->currentToolSupportsSize()) {
     return;
   }
+  if (m_sizeSlider != nullptr) {
+    const QSignalBlocker blocker(m_sizeSlider);
+    m_sizeSlider->setValue(std::min(size, m_sizeSlider->maximum()));
+  }
   m_controller->setBrushSize(size);
+}
+
+void ToolPropertyPanel::onSizeSliderChanged(int value) {
+  if (m_controller == nullptr || !m_controller->currentToolSupportsSize()) {
+    return;
+  }
+  const QSignalBlocker blocker(m_sizeSpin);
+  m_sizeSpin->setValue(value);
+  m_controller->setBrushSize(value);
 }
 
 void ToolPropertyPanel::onOpacitySliderChanged(int value) {
