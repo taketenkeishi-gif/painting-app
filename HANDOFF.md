@@ -1,7 +1,24 @@
 # HANDOFF
-更新: 06/06/2026 08:45:00
+更新: 06/06/2026 09:05:00
 worker: worker-b
-ctx: task-17 完了 → review_required
+ctx: task-18 完了 → review_required
+
+## 完了タスク: task-18
+CanvasWidget カーソル形状ツール切り替え時に更新されないバグ修正
+
+### 実施内容
+`src/app/canvasview/CanvasWidget.cpp` の `updateCursorForState` を修正:
+- `!canvasPoint.has_value() || m_controller == nullptr` → `unsetCursor()` だった分岐を分離
+- `m_controller == nullptr` のみ `unsetCursor()` に変更
+- `canvasPoint == nullopt` 時（パステボードエリア・マウス未入場）にもツール対応カーソルをセット
+- Brush/Eraser: キャンバス外では `ArrowCursor` (BlankCursor は使わない)
+- RectSelection: キャンバス外では `CrossCursor` をデフォルト
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+
+### 次のworkerへ
+- UIの変更あり（カーソル挙動）→ `.\launch.bat` 起動し目視確認が必要
 
 ## 完了タスク: task-17
 ToolPropertyPanel にサイズスライダー追加・Opacity スライダー動作確認

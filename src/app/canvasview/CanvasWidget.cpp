@@ -1107,7 +1107,7 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
     setCursor(Qt::OpenHandCursor);
     return;
   }
-  if (!canvasPoint.has_value() || m_controller == nullptr) {
+  if (m_controller == nullptr) {
     unsetCursor();
     return;
   }
@@ -1117,18 +1117,27 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
 
   // 選択ツール: 選択範囲内ではSizeAllCursor（移動カーソル）
   if (activeTool == core::ToolKind::RectSelection) {
-    const core::ToolOverlayState toolOverlay = m_controller->canvasOverlay().toolOverlay;
-    if (toolOverlay.cursorHint == core::OverlayCursorHint::Move) {
-      setCursor(Qt::SizeAllCursor);
-      return;
-    }
-    // 選択範囲内にホバー中 → 移動カーソルを先出し
-    const auto& sel = m_controller->documentSelection();
-    if (sel.hasSelection() && sel.contains(canvasPoint->x, canvasPoint->y)) {
-      setCursor(Qt::SizeAllCursor);
-      return;
+    if (canvasPoint.has_value()) {
+      const core::ToolOverlayState toolOverlay = m_controller->canvasOverlay().toolOverlay;
+      if (toolOverlay.cursorHint == core::OverlayCursorHint::Move) {
+        setCursor(Qt::SizeAllCursor);
+        return;
+      }
+      // 選択範囲内にホバー中 → 移動カーソルを先出し
+      const auto& sel = m_controller->documentSelection();
+      if (sel.hasSelection() && sel.contains(canvasPoint->x, canvasPoint->y)) {
+        setCursor(Qt::SizeAllCursor);
+        return;
+      }
     }
     setCursor(Qt::CrossCursor);
+    return;
+  }
+
+  if (!canvasPoint.has_value()) {
+    // キャンバス矩形外: Brush/Eraser の BlankCursor は使わず ArrowCursor、他はツール対応カーソルを維持
+    const bool blankOnCanvas = (activeTool == core::ToolKind::Brush || activeTool == core::ToolKind::Eraser);
+    setCursor(blankOnCanvas ? Qt::ArrowCursor : cursorForTool(activeTool, false));
     return;
   }
 
