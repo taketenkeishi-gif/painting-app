@@ -1,34 +1,25 @@
-# TASK QUEUE — Painting-app ai-night-test
-<!-- scheduler が status を更新します -->
+﻿# TASK QUEUE ?EPainting-app ai-night-test
+<!-- scheduler ��Estatus ��X�V���܂�E-->
 
 ## task-006
-status: pending
+status: completed   
 priority: high
 role: developer
 
-### 目的
-ToolPropertyPanel.cpp に「ブラシサイズ」スライダーの ToolTip を追加する。
-現在 BrushSizeSlider には setToolTip が設定されていない。
-以下の作業を段階的に実施すること:
+### ��?EToolPropertyPanel.cpp �Ɂu�u���V�T�C�Y�v�X���C�_�[�� ToolTip ��ǉ�����AE���� BrushSizeSlider �ɂ� setToolTip ���ݒ肳��Ă�E??��E??E�ȉ�?E��Ƃ�i�K�I�Ɏ��{���邱��:
 
-1. ToolPropertyPanel.cpp / ToolPropertyPanel.h を Read ツールで読んで現状把握
-2. BrushSizeSlider または対応する QSlider を特定
-3. setToolTip("ブラシサイズ (1-500)") を追加
-4. AppController.h か BrushSettings.h でサイズ範囲を確認して ToolTip 文字列を正確に記述
-5. cmake --build build --config Release でビルド確認
-6. HANDOFF_STATE.json を更新（objective / completed / current_files / next_steps を必ず埋める）
+1. ToolPropertyPanel.cpp / ToolPropertyPanel.h ��ERead �`E?E���œǂ�Ō���c��
+2. BrushSizeSlider �܂�?E�Ή�����EQSlider ���?E3. setToolTip("�u���V�T�C�Y (1-500)") ��ǉ�
+4. AppController.h ��EBrushSettings.h �ŃT�C�Y�E??��m�F���� ToolTip ?E???E�𐳊m�ɋL�q
+5. cmake --build build --config Release �Ńr���h�m?E6. HANDOFF_STATE.json ��X�V?E?Ebjective / completed / current_files / next_steps ��?E??���߂�IE
+### �������
+- ToolPropertyPanel �̃u���V�T�C�Y�X���C�_�[�� ToolTip ���\�������E- cmake --build �ŃG���[0��
 
-### 成功条件
-- ToolPropertyPanel のブラシサイズスライダーに ToolTip が表示される
-- cmake --build でエラー0件
+### �֎~����E- ToolPropertyPanel �ȊO?E�t�@�C���̕ύX
+- �V�K�N���X�E�V�K�t�@�C���̍�?E
+- setToolTip �ȊO?E UI �ύX
 
-### 禁止事項
-- ToolPropertyPanel 以外のファイルの変更
-- 新規クラス・新規ファイルの作成
-- setToolTip 以外の UI 変更
-
-### 検証方法
-`powershell
+### ���ؕ���E`powershell
 cmake --build build --config Release
 `
 
@@ -39,29 +30,18 @@ status: completed
 priority: high
 role: developer
 
-### 目的
-ToolPropertyPanel に angle / roundness / taperStart / taperEnd スライダーを追加し、
-AppController の既存 setter (setBrushAngle 等) に接続する。
-BrushSettings に値は保持されているがパネル UI が未接続のため、PARTIAL 状態を解消する。
+### ��?EToolPropertyPanel �� angle / roundness / taperStart / taperEnd �X���C�_�[��ǉ����AEAppController �̊�?Esetter (setBrushAngle ?E �ɐڑ�����AEBrushSettings �ɒl�͕ێ�����Ă�E??���p�l�� UI �����ڑ�?E���߁APARTIAL ��Ԃ�������AE
+### �������
+- ToolPropertyPanel �� angle/roundness/taperStart/taperEnd �̙�E??���C�_�[���\�������E- �X���C�_�[���쎞�� AppController::setBrushAngle �����Ă΂�EToolStateViewModel �ɔ��f�����E- �u���V�`E?E���I����̂ݕ\���A���c�[���ł͔�\���܂�?E����
 
-### 成功条件
-- ToolPropertyPanel に angle/roundness/taperStart/taperEnd の各スライダーが表示される
-- スライダー操作時に AppController::setBrushAngle 等が呼ばれ ToolStateViewModel に反映される
-- ブラシツール選択時のみ表示、他ツールでは非表示または無効
+### �֎~����E- BrushSettings / AppController / core:: ���̕ύX?E?Eetter �͊��Ɏ���E??��?E?E- �V�K�O���ˑ�?E�ǉ�
 
-### 禁止事項
-- BrushSettings / AppController / core:: 側の変更（setter は既に実装済み）
-- 新規外部依存の追加
-
-### 検証方法
-```powershell
+### ���ؕ���E```powershell
 cmake --build build --config Release
-.\launch.bat   # 起動後、ToolPropertyPanel でスライダーが表示・操作できることを目視確認
-```
+.\launch.bat   # �N����AToolPropertyPanel �ŃX���C�_�[���\���E����ł��邱�Ƃ�ڎ��m?E```
 
 ### review_required_when
-- UI変更が含まれるため必須
-
+- UI�ύX���܂܂�邽��?E??E
 ---
 
 ## task-002
@@ -69,28 +49,18 @@ status: blocked
 priority: high
 role: developer
 
-### 目的
-FillTool が SelectionMask がアクティブなとき、選択範囲内のピクセルのみ塗りつぶすように修正する。
-現状は SelectionMask を無視して全域塗りつぶしが発生している（system_status: PARTIAL）。
+### ��?EFillTool ��ESelectionMask ���A�N�`E??�u�ȂƂ��AE??���E???E?E�s�N�Z���̂ݓh��Ԃ��悟E??�C������AE����� SelectionMask �𖳎����đS��h��Ԃ����������Ă�E???E?Eystem_status: PARTIAL?E?�AE
+### �������
+- �I���E??�����݂���Ƃ��A�h��Ԃ����I���E???E?E�݂ɓK�p�����E- �I���E??���Ȃ�E??��?E�]���ǂ���S��܂�?E contiguous fill �����삷��E- undo/redo ������ɋ@?E����
 
-### 成功条件
-- 選択範囲が存在するとき、塗りつぶしが選択範囲内のみに適用される
-- 選択範囲がない場合は従来どおり全域または contiguous fill が動作する
-- undo/redo が正常に機能する
+### �֎~����E- SelectionMask ��EFillTool �̐݌v�ύX?E?�����C���^�[�t�F�[�X���E???E??�C��?E?E- fillGapClose / referAllLayers ��?E���@?E�ւ̉e��
 
-### 禁止事項
-- SelectionMask や FillTool の設計変更（既存インターフェースの範囲内で修正）
-- fillGapClose / referAllLayers 等の他機能への影響
-
-### 検証方法
-```powershell
+### ���ؕ���E```powershell
 cmake --build build --config Release
-# 起動後: 矩形選択 → Fill → 選択範囲外が塗りつぶされないことを確認
-```
+# �N����E ��`�I?E?EFill ?E�I���E??�O���h��Ԃ���Ȃ�E??�Ƃ�m?E```
 
 ### review_required_when
-- 既存の動作を変える可能性があるロジック変更のため必須
-
+- ����?E�����ς���\�������郍�W�`E??�ύX�̂���?E??E
 ---
 
 ## task-003
@@ -98,30 +68,19 @@ status: blocked
 priority: medium
 role: developer
 
-### 目的
-BrushSettings.antiAlias フラグを実際に機能させる。
-現状 stampCircleAA / drawSegmentAA は呼ばれているが、antiAlias=false のとき
-ハードエッジ描画（stampCircle / drawSegment 整数版）への切り替えが未実装。
-SPEC Phase 0-4 の「AA ON/OFF 制御」を完成させる。
+### ��?EBrushSettings.antiAlias �t���O����ۂɋ@?E������AE���� stampCircleAA / drawSegmentAA �͌Ă΂�Ă�E??���AantiAlias=false �̂Ƃ�E�n?E�h�G�`E??�`��?E?EtampCircle / drawSegment �����Łj�ւ�?E??�ւ���������E??ESPEC Phase 0-4 �́uAA ON/OFF ����v���?E������AE
+### �������
+- antiAlias=true: ����Ɠ��� AA �`��?E?�ω��Ȃ��IE- antiAlias=false: �n?E�h�G�`E???E?Eaussian �Ȃ��j�`���?E??�ւ��
+- ToolPropertyPanel �� antiAlias �`�F�`E??�{�b�N�X�����ۂɌ��ʂ���
 
-### 成功条件
-- antiAlias=true: 現状と同じ AA 描画（変化なし）
-- antiAlias=false: ハードエッジ（Gaussian なし）描画に切り替わる
-- ToolPropertyPanel の antiAlias チェックボックスが実際に効果をもつ
+### �֎~����E- Skia �ڍs?Elibmypaint �����i�ʃt�F�[�Y?E?E- stampCircleAA �̍폜��E??�K�̓��t�@�N�^
 
-### 禁止事項
-- Skia 移行・libmypaint 統合（別フェーズ）
-- stampCircleAA の削除や大規模リファクタ
-
-### 検証方法
-```powershell
+### ���ؕ���E```powershell
 cmake --build build --config Release
-# 起動後: antiAlias OFF でブラシストロークがハードエッジになることを確認
-```
+# �N����E antiAlias OFF �Ńu���V�X�g���[�N���n�[�h�G�`E??�ɂȂ邱�Ƃ�m?E```
 
 ### review_required_when
-- 既存の描画動作を変えるロジック変更のため必須
-
+- ����?E�`�擮���ς��郍�W�`E??�ύX�̂���?E??E
 ---
 
 ## task-004
@@ -129,29 +88,18 @@ status: blocked
 priority: medium
 role: developer
 
-### 目的
-Navigator パネル (m_infoDock) に「100%」「Fit」クイックズームボタンを追加し、
-CanvasWidget::resetZoom / fitToScreen に接続する。
-system_status: PARTIAL「navigator mini-canvas preview + quick zoom buttons」を完成させる。
+### ��?ENavigator �p�l�� (m_infoDock) �ɁAE00%�v�uFit�v�N�C�`E??�Y�[���{�^����ǉ����AECanvasWidget::resetZoom / fitToScreen �ɐڑ�����AEsystem_status: PARTIAL�unavigator mini-canvas preview + quick zoom buttons�v���?E������AE
+### �������
+- Navigator �p�l���ɁAE00%�v�uFit�v?E�^�����\�������E- �N���`E??�� CanvasWidget �̃Y�[����?E��ւ��
+- ����?E�i�r�Q�[�^�[�v���r���[�\�������Ȃ�E
+### �֎~����E- CanvasWidget / AppController �̕ύX?E?EesetZoom / fitToScreen �͊��Ɏ���E??��?E?E- Navigator �ȊO?E�p�l���ւ̕ύX
 
-### 成功条件
-- Navigator パネルに「100%」「Fit」ボタンが表示される
-- クリックで CanvasWidget のズームが切り替わる
-- 既存のナビゲータープレビュー表示が壊れない
-
-### 禁止事項
-- CanvasWidget / AppController の変更（resetZoom / fitToScreen は既に実装済み）
-- Navigator 以外のパネルへの変更
-
-### 検証方法
-```powershell
+### ���ؕ���E```powershell
 cmake --build build --config Release
-.\launch.bat   # Navigator に 100%/Fit ボタンが表示・動作することを目視確認
-```
+.\launch.bat   # Navigator �� 100%/Fit �{�^�����\���E���삷�邱�Ƃ�ڎ��m?E```
 
 ### review_required_when
-- UI変更が含まれるため必須
-
+- UI�ύX���܂܂�邽��?E??E
 ---
 
 ## task-005
@@ -159,25 +107,371 @@ status: blocked
 priority: medium
 role: developer
 
+### ��?EColorWheelWidget �܂�?E color dock �`E?E���o?E�� FG/BG swap �{�^����
+B/W reset �{�^����ǉ����AMainWindow::onSwapColors / onResetBlackWhiteColors �ɐڑ�����AEsystem_status: PARTIAL�ucolor system commands�v�� Panel �{�^���Ƃ��Ă����ł���悤�ɂ���AE
+### �������
+- color dock ?E?? swap (?E �{�^���� B/W ���Z�`E??�{�^�����\�������E- �N���`E??�Ŋ�?EAction �Ɠ�����������?E?�F��?E��ւ��?E?E- ����?E�V���[�g�J�`E??/���j���[����Ƌ������Ȃ�E
+### �֎~����E- AppController ��Ecore:: ���̕ύX?E?����?E��?EAction �ɈϏ����邾���IE- ColorWheelWidget �� HSV �`�惍�W�`E??�ւ̕ύX
+
+### ���ؕ���E```powershell
+cmake --build build --config Release
+.\launch.bat   # color dock �� swap/reset �{�^�����\���E���삷�邱�Ƃ�ڎ��m?E```
+
+### review_required_when
+- UI�ύX���܂܂�邽��?E??E
+
+## task-7
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: feature
+
 ### 目的
-ColorWheelWidget または color dock ツールバーに FG/BG swap ボタンと
-B/W reset ボタンを追加し、MainWindow::onSwapColors / onResetBlackWhiteColors に接続する。
-system_status: PARTIAL「color system commands」を Panel ボタンとしても操作できるようにする。
+MainWindow のステータスバーに現在のズーム率（例: 100%）を表示する。
+CanvasWidget が持つズーム変更シグナルを MainWindow で受け取り、QLabel に反映する。
+
+### 対象ファイル候補
+- src/app/mainwindow/MainWindow.cpp
+- src/app/mainwindow/MainWindow.h
+- src/app/canvasview/CanvasWidget.h（シグナル確認のみ・変更可）
 
 ### 成功条件
-- color dock 内に swap (↔) ボタンと B/W リセットボタンが表示される
-- クリックで既存 Action と同じ動作をする（色が切り替わる）
-- 既存のショートカット/メニュー操作と競合しない
+- cmake --build でエラー 0 件
+- アプリ起動後、ステータスバーに「100%」等のズーム率が表示される
+- ズームイン／アウト操作で数値がリアルタイム更新される
+- REVIEW_REQUIRED（UI変更のため）
+
+### 時間見積もり
+30〜45 分
 
 ### 禁止事項
-- AppController や core:: 側の変更（動作は既存 Action に委譲するだけ）
-- ColorWheelWidget の HSV 描画ロジックへの変更
+- CanvasWidget のズーム計算ロジック変更
+- 新規クラス・新規ファイルの作成
 
 ### 検証方法
 ```powershell
 cmake --build build --config Release
-.\launch.bat   # color dock に swap/reset ボタンが表示・動作することを目視確認
+.\launch.bat
 ```
 
-### review_required_when
-- UI変更が含まれるため必須
+---
+
+## task-8
+status: pending
+attempt: 0
+priority: high
+role: developer
+category: bug
+
+### 目的
+CanvasWidget のマウスイベントハンドラ（mousePressEvent / mouseMoveEvent / mouseReleaseEvent）でカレントツールポインタが nullptr の場合にクラッシュする問題を防ぐ。
+ツール切替中の急速な入力やシャットダウン時の誤操作でツールポインタが未設定のままイベントが来るケースに対処する。
+
+### 対象ファイル候補
+- src/app/canvasview/CanvasWidget.cpp
+
+### 成功条件
+- cmake --build でエラー 0 件
+- 各マウスイベント冒頭に nullptr ガードが追加されている（コードレビューで確認）
+- ツール切替直後の連続クリックでクラッシュしない（実行経路をコメントで記録）
+
+### 時間見積もり
+30 分
+
+### 禁止事項
+- CanvasWidget.h のシグナル・スロット定義変更
+- ツール描画ロジックの変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+
+## task-9
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: feature
+
+### 目的
+LineTool 使用時に ToolPropertyPanel へ「線の太さ」スライダーを表示する。
+ToolDescriptor に LineTool 用プロパティ定義を追加し、ToolPropertyPanel 側で対応するウィジェットを生成・接続する。
+
+### 対象ファイル候補
+- src/app/ui/ToolDescriptor.cpp
+- src/app/ui/ToolDescriptor.h
+- src/app/panels/ToolPropertyPanel.cpp
+- src/app/panels/ToolPropertyPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- LineTool 選択時に ToolPropertyPanel に「線の太さ」スライダーが表示される
+- スライダー操作で描画線の太さが変化する
+- REVIEW_REQUIRED（UI変更のため）
+
+### 時間見積もり
+45〜60 分
+
+### 禁止事項
+- LineTool.cpp のアルゴリズム変更
+- 新規クラス・新規ファイルの作成
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+.\launch.bat
+```
+
+---
+
+## task-10
+status: pending
+attempt: 0
+priority: low
+role: developer
+category: refactor
+
+### 目的
+ToolDescriptor.cpp に散在するスライダー初期値・最小値・最大値のマジックナンバーを constexpr 名前付き定数に置き換え、将来の値変更を一箇所で管理できるようにする。
+
+### 対象ファイル候補
+- src/app/ui/ToolDescriptor.cpp
+- src/app/ui/ToolDescriptor.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- ToolDescriptor.cpp 内のスライダー設定数値が constexpr 定数に置き換わっている（コードレビューで確認）
+- 動作変化なし（リファクタのみ）
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- スライダーの値域・デフォルト値の変更
+- ToolPropertyPanel.cpp の変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+
+## task-11
+status: pending
+attempt: 0
+priority: high
+role: developer
+category: bug
+
+### 目的
+AppController の保存・エクスポート・Undo・Redo 処理でドキュメントポインタが nullptr の場合に未定義動作が生じるリスクを排除する。
+各操作の冒頭に nullptr ガードを追加し、ドキュメント未作成状態での操作を安全に無視する。
+
+### 対象ファイル候補
+- src/app/bridge/AppController.cpp
+
+### 成功条件
+- cmake --build でエラー 0 件
+- 保存・Undo・Redo 各ハンドラの冒頭に nullptr チェックが追加されている（コードレビューで確認）
+- 新規起動直後に Ctrl+Z 連打しても クラッシュしない
+
+### 時間見積もり
+30 分
+
+### 禁止事項
+- AppController.h のシグナル定義変更
+- Document.cpp の変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+
+## task-12
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: feature
+
+### 目的
+GradientTool 選択時に ToolPropertyPanel へ「グラデーション種類」セレクタ（線形 / 放射状）を追加する。
+ToolDescriptor に GradientTool 用 enum プロパティを定義し、ToolPropertyPanel で QComboBox として表示・接続する。
+
+### 対象ファイル候補
+- src/app/ui/ToolDescriptor.cpp
+- src/app/ui/ToolDescriptor.h
+- src/app/panels/ToolPropertyPanel.cpp
+- src/app/panels/ToolPropertyPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- GradientTool 選択時に ToolPropertyPanel に「線形 / 放射状」の切替 ComboBox が表示される
+- 切替操作で描画グラデーションの種類が変わる
+- REVIEW_REQUIRED（UI変更のため）
+
+### 時間見積もり
+45〜60 分
+
+### 禁止事項
+- GradientTool.cpp の描画アルゴリズム新規実装
+- 新規クラス・新規ファイルの作成
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+.\launch.bat
+```
+
+---
+
+## task-13
+status: pending
+attempt: 0
+priority: low
+role: developer
+category: refactor
+
+### 目的
+LayerPanel.cpp に散在するレイヤーサムネイルサイズ・行高さ等のハードコード数値を名前付き定数（static constexpr int）に置き換え、一箇所で管理できるようにする。
+
+### 対象ファイル候補
+- src/app/panels/LayerPanel.cpp
+- src/app/panels/LayerPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- LayerPanel.cpp 内のサムネイル・行高サイズ数値が constexpr 定数に置き換わっている（コードレビューで確認）
+- レイヤーパネルの見た目・動作に変化なし
+
+### 時間見積もり
+30 分
+
+### 禁止事項
+- レイヤーパネルの実際のサイズ・見た目の変更
+- LayerPanel のシグナル定義変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+
+## task-14
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: feature
+
+### 目的
+ドキュメントに未保存の変更がある場合、MainWindow のタイトルバーにアスタリスク（例: 「無題 *」）を付加してダーティ状態を示す。
+AppController の変更通知シグナルを MainWindow で受け取り setWindowModified() で反映する。
+
+### 対象ファイル候補
+- src/app/mainwindow/MainWindow.cpp
+- src/app/mainwindow/MainWindow.h
+- src/app/bridge/AppController.h（シグナル確認のみ・変更可）
+
+### 成功条件
+- cmake --build でエラー 0 件
+- 描画操作後にタイトルバーに「*」が付く
+- 保存後に「*」が消える
+- REVIEW_REQUIRED（UI変更のため）
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- AppController のシグナル新規追加（既存シグナルを使うこと）
+- Document.cpp の変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+.\launch.bat
+```
+
+---
+
+## task-15
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: bug
+
+### 目的
+SelectionOverlayRenderer.cpp の描画関数で QPainter::begin() 後に早期 return するパスが存在する場合、end() を呼ばずに関数を抜けると Qt の警告・描画アーティファクトが発生する。
+early return 前に必ず QPainter::end() を呼ぶか、RAII ラッパー（スタック上の QPainter）に切り替えて安全化する。
+
+### 対象ファイル候補
+- src/app/canvasview/SelectionOverlayRenderer.cpp
+
+### 成功条件
+- cmake --build でエラー 0 件
+- SelectionOverlayRenderer の全描画関数で QPainter が必ず終了される（コードレビューで確認）
+- 選択領域オーバーレイ描画時にQtの「painter not ended」警告が出ない
+
+### 時間見積もり
+30 分
+
+### 禁止事項
+- 選択領域の描画スタイル（色・点線パターン等）の変更
+- SelectionOverlayRenderer.h のインターフェイス変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+
+## task-16
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: feature
+
+### 目的
+TextTool 選択時に ToolPropertyPanel へフォントサイズ入力用 QSpinBox を追加する。
+ToolDescriptor に TextTool 用フォントサイズプロパティを定義し、ToolPropertyPanel 側でスピンボックスとして表示・TextTool に値を渡す接続を行う。
+
+### 対象ファイル候補
+- src/app/ui/ToolDescriptor.cpp
+- src/app/ui/ToolDescriptor.h
+- src/app/panels/ToolPropertyPanel.cpp
+- src/app/panels/ToolPropertyPanel.h
+- src/core/tools/TextTool.cpp
+- src/core/tools/TextTool.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- TextTool 選択時に ToolPropertyPanel にフォントサイズ SpinBox（例: 8〜144pt）が表示される
+- SpinBox の値変更が TextTool に反映される（描画文字サイズが変わる）
+- REVIEW_REQUIRED（UI変更のため）
+
+### 時間見積もり
+60〜90 分
+
+### 禁止事項
+- TextTool のテキスト入力ダイアログ全面刷新
+- フォントファミリー選択機能の同時追加（本タスクはサイズのみ）
+- 新規クラス・新規ファイルの作成
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+.\launch.bat
+```
+
+---
