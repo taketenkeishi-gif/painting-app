@@ -1,8 +1,8 @@
-# TASK QUEUE — Painting-app ai-night-test
+﻿# TASK QUEUE — Painting-app ai-night-test
 <!-- scheduler が status を更新します -->
 
 ## task-001
-status: pending
+status: in_progress
 priority: high
 role: developer
 
