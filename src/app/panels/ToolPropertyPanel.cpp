@@ -1015,7 +1015,7 @@ void ToolPropertyPanel::refreshFromController() {
   m_taperEndSlider->setVisible(supportsTaperEnd);
   m_taperEndSpin->setVisible(supportsTaperEnd);
   m_shapeSection->setVisible(
-      m_showDetails && (supportsShape || supportsAngle || supportsRoundness || supportsTaperStart || supportsTaperEnd));
+      supportsShape || supportsAngle || supportsRoundness || supportsTaperStart || supportsTaperEnd);
   m_blendModeCombo->setVisible(showBlend);
   m_buildupModeCheck->setVisible(m_showDetails && showBlend);
   m_eraseModeCheck->setVisible(m_showDetails && supportsEraseMode);
