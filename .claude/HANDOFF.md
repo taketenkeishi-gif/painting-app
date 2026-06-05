@@ -44,6 +44,12 @@ MSVC: Visual Studio 2022 Community (v14.44)
 ### VectorPath float 化
 - 全ツールの VectorPath::points を FPoint に移行
 
+### task-002: FillTool SelectionMask 対応（2026-06）
+- SelectionMask がアクティブなとき塗りつぶしを選択範囲内のみに限定
+- 選択なし時は従来どおり contiguous/non-contiguous fill が動作
+- undo/redo 正常動作確認済み
+- system_status: Fill System 全項目 DONE
+
 ### ベクターレイヤー対応（2026-06）
 - BrushTool: ベクターレイヤーへのストローク記録 + `overlay()` でライブプレビュー
 - ToolDescriptor: ブラシ全サブツールを `TargetLayerKind::Both`（ラスター/ベクター共通）
