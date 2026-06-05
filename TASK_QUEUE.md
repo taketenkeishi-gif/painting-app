@@ -1,25 +1,25 @@
-﻿# TASK QUEUE ?EPainting-app ai-night-test
-<!-- scheduler ��Estatus ��X�V���܂�E-->
+# TASK QUEUE ?EPainting-app ai-night-test
+<!-- scheduler ??Estatus ??X?V?????E-->
 
 ## task-006
 status: completed   
 priority: high
 role: developer
 
-### ��?EToolPropertyPanel.cpp �Ɂu�u���V�T�C�Y�v�X���C�_�[�� ToolTip ��ǉ�����AE���� BrushSizeSlider �ɂ� setToolTip ���ݒ肳��Ă�E??��E??E�ȉ�?E��Ƃ�i�K�I�Ɏ��{���邱��:
+### ???EToolPropertyPanel.cpp ??u?u???V?T?C?Y?v?X???C?_?[?? ToolTip ????????AE???? BrushSizeSlider ??? setToolTip ?????????E????E??E????E????i?K?I????{???�??:
 
-1. ToolPropertyPanel.cpp / ToolPropertyPanel.h ��ERead �`E?E���œǂ�Ō���c��
-2. BrushSizeSlider �܂�?E�Ή�����EQSlider ���?E3. setToolTip("�u���V�T�C�Y (1-500)") ��ǉ�
-4. AppController.h ��EBrushSettings.h �ŃT�C�Y�E??��m�F���� ToolTip ?E???E�𐳊m�ɋL�q
-5. cmake --build build --config Release �Ńr���h�m?E6. HANDOFF_STATE.json ��X�V?E?Ebjective / completed / current_files / next_steps ��?E??���߂�IE
-### �������
-- ToolPropertyPanel �̃u���V�T�C�Y�X���C�_�[�� ToolTip ���\�������E- cmake --build �ŃG���[0��
+1. ToolPropertyPanel.cpp / ToolPropertyPanel.h ??ERead ?`E?E??????????c??
+2. BrushSizeSlider ????E???????EQSlider ????E3. setToolTip("?u???V?T?C?Y (1-500)") ????
+4. AppController.h ??EBrushSettings.h ??T?C?Y?E????m?F???? ToolTip ?E???E???m??L?q
+5. cmake --build build --config Release ??r???h?m?E6. HANDOFF_STATE.json ??X?V?E?Ebjective / completed / current_files / next_steps ???E???????IE
+### ???????
+- ToolPropertyPanel ??u???V?T?C?Y?X???C?_?[?? ToolTip ???\???????E- cmake --build ??G???[0??
 
-### �֎~����E- ToolPropertyPanel �ȊO?E�t�@�C���̕ύX
-- �V�K�N���X�E�V�K�t�@�C���̍�?E
-- setToolTip �ȊO?E UI �ύX
+### ??~????E- ToolPropertyPanel ??O?E?t?@?C?????X
+- ?V?K?N???X?E?V?K?t?@?C??????E
+- setToolTip ??O?E UI ??X
 
-### ���ؕ���E`powershell
+### ???????E`powershell
 cmake --build build --config Release
 `
 
@@ -30,18 +30,18 @@ status: completed
 priority: high
 role: developer
 
-### ��?EToolPropertyPanel �� angle / roundness / taperStart / taperEnd �X���C�_�[��ǉ����AEAppController �̊�?Esetter (setBrushAngle ?E �ɐڑ�����AEBrushSettings �ɒl�͕ێ�����Ă�E??���p�l�� UI �����ڑ�?E���߁APARTIAL ��Ԃ�������AE
-### �������
-- ToolPropertyPanel �� angle/roundness/taperStart/taperEnd �̙�E??���C�_�[���\�������E- �X���C�_�[���쎞�� AppController::setBrushAngle �����Ă΂�EToolStateViewModel �ɔ��f�����E- �u���V�`E?E���I����̂ݕ\���A���c�[���ł͔�\���܂�?E����
+### ???EToolPropertyPanel ?? angle / roundness / taperStart / taperEnd ?X???C?_?[???????AEAppController ????Esetter (setBrushAngle ?E ????????AEBrushSettings ??l??????????E?????p?l?? UI ????????E????APARTIAL ??????????AE
+### ???????
+- ToolPropertyPanel ?? angle/roundness/taperStart/taperEnd ???E?????C?_?[???\???????E- ?X???C?_?[?????? AppController::setBrushAngle ????????EToolStateViewModel ????f?????E- ?u???V?`E?E???I??????\???A???c?[??????\??????E????
 
-### �֎~����E- BrushSettings / AppController / core:: ���̕ύX?E?Eetter �͊��Ɏ���E??��?E?E- �V�K�O���ˑ�?E�ǉ�
+### ??~????E- BrushSettings / AppController / core:: ?????X?E?Eetter ????????E?????E?E- ?V?K?O??????E???
 
-### ���ؕ���E```powershell
+### ???????E```powershell
 cmake --build build --config Release
-.\launch.bat   # �N����AToolPropertyPanel �ŃX���C�_�[���\���E����ł��邱�Ƃ�ڎ��m?E```
+.\launch.bat   # ?N????AToolPropertyPanel ??X???C?_?[???\???E???????�??????m?E```
 
 ### review_required_when
-- UI�ύX���܂܂�邽��?E??E
+- UI??X??????????E??E
 ---
 
 ## task-002
@@ -49,18 +49,18 @@ status: blocked
 priority: high
 role: developer
 
-### ��?EFillTool ��ESelectionMask ���A�N�`E??�u�ȂƂ��AE??���E???E?E�s�N�Z���̂ݓh��Ԃ��悟E??�C������AE����� SelectionMask �𖳎����đS��h��Ԃ����������Ă�E???E?Eystem_status: PARTIAL?E?�AE
-### �������
-- �I���E??�����݂���Ƃ��A�h��Ԃ����I���E???E?E�݂ɓK�p�����E- �I���E??���Ȃ�E??��?E�]���ǂ���S��܂�?E contiguous fill �����삷��E- undo/redo ������ɋ@?E����
+### ???EFillTool ??ESelectionMask ???A?N?`E???u?????AE?????E???E?E?s?N?Z?????h??????��E???C??????AE????? SelectionMask ????????S??h????????????????E???E?Eystem_status: PARTIAL?E??AE
+### ???????
+- ?I???E??????????????A?h????????I???E???E?E???K?p?????E- ?I???E???????E?????E?]???????S?????E contiguous fill ????????E- undo/redo ???????@?E????
 
-### �֎~����E- SelectionMask ��EFillTool �̐݌v�ύX?E?�����C���^�[�t�F�[�X���E???E??�C��?E?E- fillGapClose / referAllLayers ��?E���@?E�ւ̉e��
+### ??~????E- SelectionMask ??EFillTool ???v??X?E??????C???^?[?t?F?[?X???E???E???C???E?E- fillGapClose / referAllLayers ???E???@?E???e??
 
-### ���ؕ���E```powershell
+### ???????E```powershell
 cmake --build build --config Release
-# �N����E ��`�I?E?EFill ?E�I���E??�O���h��Ԃ���Ȃ�E??�Ƃ�m?E```
+# ?N????E ??`?I?E?EFill ?E?I???E???O???h?????????E?????m?E```
 
 ### review_required_when
-- ����?E�����ς���\�������郍�W�`E??�ύX�̂���?E??E
+- ?????E??????????\?????????W?`E????X??????E??E
 ---
 
 ## task-003
@@ -68,19 +68,19 @@ status: blocked
 priority: medium
 role: developer
 
-### ��?EBrushSettings.antiAlias �t���O����ۂɋ@?E������AE���� stampCircleAA / drawSegmentAA �͌Ă΂�Ă�E??���AantiAlias=false �̂Ƃ�E�n?E�h�G�`E??�`��?E?EtampCircle / drawSegment �����Łj�ւ�?E??�ւ���������E??ESPEC Phase 0-4 �́uAA ON/OFF ����v���?E������AE
-### �������
-- antiAlias=true: ����Ɠ��� AA �`��?E?�ω��Ȃ��IE- antiAlias=false: �n?E�h�G�`E???E?Eaussian �Ȃ��j�`���?E??�ւ��
-- ToolPropertyPanel �� antiAlias �`�F�`E??�{�b�N�X�����ۂɌ��ʂ���
+### ???EBrushSettings.antiAlias ?t???O??????@?E??????AE???? stampCircleAA / drawSegmentAA ???????E?????AantiAlias=false ????E?n?E?h?G?`E???`???E?EtampCircle / drawSegment ??????j????E?????????????E??ESPEC Phase 0-4 ??uAA ON/OFF ????v????E??????AE
+### ???????
+- antiAlias=true: ???????? AA ?`???E??��?????IE- antiAlias=false: ?n?E?h?G?`E???E?Eaussian ????j?`????E??????
+- ToolPropertyPanel ?? antiAlias ?`?F?`E???{?b?N?X?????????????
 
-### �֎~����E- Skia �ڍs?Elibmypaint �����i�ʃt�F�[�Y?E?E- stampCircleAA �̍폜��E??�K�̓��t�@�N�^
+### ??~????E- Skia ??s?Elibmypaint ?????i??t?F?[?Y?E?E- stampCircleAA ?????E???K????t?@?N?^
 
-### ���ؕ���E```powershell
+### ???????E```powershell
 cmake --build build --config Release
-# �N����E antiAlias OFF �Ńu���V�X�g���[�N���n�[�h�G�`E??�ɂȂ邱�Ƃ�m?E```
+# ?N????E antiAlias OFF ??u???V?X?g???[?N???n?[?h?G?`E?????�???m?E```
 
 ### review_required_when
-- ����?E�`�擮���ς��郍�W�`E??�ύX�̂���?E??E
+- ?????E?`??????????W?`E????X??????E??E
 ---
 
 ## task-004
@@ -88,18 +88,18 @@ status: blocked
 priority: medium
 role: developer
 
-### ��?ENavigator �p�l�� (m_infoDock) �ɁAE00%�v�uFit�v�N�C�`E??�Y�[���{�^����ǉ����AECanvasWidget::resetZoom / fitToScreen �ɐڑ�����AEsystem_status: PARTIAL�unavigator mini-canvas preview + quick zoom buttons�v���?E������AE
-### �������
-- Navigator �p�l���ɁAE00%�v�uFit�v?E�^�����\�������E- �N���`E??�� CanvasWidget �̃Y�[����?E��ւ��
-- ����?E�i�r�Q�[�^�[�v���r���[�\�������Ȃ�E
-### �֎~����E- CanvasWidget / AppController �̕ύX?E?EesetZoom / fitToScreen �͊��Ɏ���E??��?E?E- Navigator �ȊO?E�p�l���ւ̕ύX
+### ???ENavigator ?p?l?? (m_infoDock) ??AE00%?v?uFit?v?N?C?`E???Y?[???{?^?????????AECanvasWidget::resetZoom / fitToScreen ????????AEsystem_status: PARTIAL?unavigator mini-canvas preview + quick zoom buttons?v????E??????AE
+### ???????
+- Navigator ?p?l????AE00%?v?uFit?v?E?^?????\???????E- ?N???`E???? CanvasWidget ??Y?[?????E?????
+- ?????E?i?r?Q?[?^?[?v???r???[?\?????????E
+### ??~????E- CanvasWidget / AppController ???X?E?EesetZoom / fitToScreen ????????E?????E?E- Navigator ??O?E?p?l??????X
 
-### ���ؕ���E```powershell
+### ???????E```powershell
 cmake --build build --config Release
-.\launch.bat   # Navigator �� 100%/Fit �{�^�����\���E���삷�邱�Ƃ�ڎ��m?E```
+.\launch.bat   # Navigator ?? 100%/Fit ?{?^?????\???E?????�??????m?E```
 
 ### review_required_when
-- UI�ύX���܂܂�邽��?E??E
+- UI??X??????????E??E
 ---
 
 ## task-005
@@ -107,49 +107,51 @@ status: blocked
 priority: medium
 role: developer
 
-### ��?EColorWheelWidget �܂�?E color dock �`E?E���o?E�� FG/BG swap �{�^����
-B/W reset �{�^����ǉ����AMainWindow::onSwapColors / onResetBlackWhiteColors �ɐڑ�����AEsystem_status: PARTIAL�ucolor system commands�v�� Panel �{�^���Ƃ��Ă����ł���悤�ɂ���AE
-### �������
-- color dock ?E?? swap (?E �{�^���� B/W ���Z�`E??�{�^�����\�������E- �N���`E??�Ŋ�?EAction �Ɠ�����������?E?�F��?E��ւ��?E?E- ����?E�V���[�g�J�`E??/���j���[����Ƌ������Ȃ�E
-### �֎~����E- AppController ��Ecore:: ���̕ύX?E?����?E��?EAction �ɈϏ����邾���IE- ColorWheelWidget �� HSV �`�惍�W�`E??�ւ̕ύX
+### ???EColorWheelWidget ????E color dock ?`E?E???o?E?? FG/BG swap ?{?^????
+B/W reset ?{?^?????????AMainWindow::onSwapColors / onResetBlackWhiteColors ????????AEsystem_status: PARTIAL?ucolor system commands?v?? Panel ?{?^?????????????????????AE
+### ???????
+- color dock ?E?? swap (?E ?{?^???? B/W ???Z?`E???{?^?????\???????E- ?N???`E??????EAction ??????????????E??F???E??????E?E- ?????E?V???[?g?J?`E??/???j???[?????????????E
+### ??~????E- AppController ??Ecore:: ?????X?E??????E???EAction ???????????IE- ColorWheelWidget ?? HSV ?`???W?`E??????X
 
-### ���ؕ���E```powershell
+### ???????E```powershell
 cmake --build build --config Release
-.\launch.bat   # color dock �� swap/reset �{�^�����\���E���삷�邱�Ƃ�ڎ��m?E```
+.\launch.bat   # color dock ?? swap/reset ?{?^?????\???E?????�??????m?E```
 
 ### review_required_when
-- UI�ύX���܂܂�邽��?E??E
+- UI??X??????????E??E
 
 ## task-7
-status: pending
-attempt: 0
+status: review_required
+attempt: 1
+completed_by: worker-b
+summary: MainWindow コンストラクタに viewTransformChanged → m_zoomStatusLabel 更新の signal-slot 接続を追加。既存の updateZoomStatusLabel (CanvasWidget 側 findChild) はそのまま残し、MainWindow 側の正式接続を追加した。ビルドエラー0件確認済み。
 priority: medium
 role: developer
 category: feature
 
-### 目的
-MainWindow のステータスバーに現在のズーム率（例: 100%）を表示する。
-CanvasWidget が持つズーム変更シグナルを MainWindow で受け取り、QLabel に反映する。
+### �ړI
+MainWindow �̃X�e�[�^�X�o�[�Ɍ��݂̃Y�[�����i��: 100%�j��\������B
+CanvasWidget �����Y�[���ύX�V�O�i���� MainWindow �Ŏ󂯎��AQLabel �ɔ��f����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/mainwindow/MainWindow.cpp
 - src/app/mainwindow/MainWindow.h
-- src/app/canvasview/CanvasWidget.h（シグナル確認のみ・変更可）
+- src/app/canvasview/CanvasWidget.h�i�V�O�i���m�F�̂݁E�ύX�j
 
-### 成功条件
-- cmake --build でエラー 0 件
-- アプリ起動後、ステータスバーに「100%」等のズーム率が表示される
-- ズームイン／アウト操作で数値がリアルタイム更新される
-- REVIEW_REQUIRED（UI変更のため）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- �A�v���N����A�X�e�[�^�X�o�[�Ɂu100%�v���̃Y�[�������\�������
+- �Y�[���C���^�A�E�g����Ő��l�����A���^�C���X�V�����
+- REVIEW_REQUIRED�iUI�ύX�̂��߁j
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- CanvasWidget のズーム計算ロジック変更
-- 新規クラス・新規ファイルの作成
+### �֎~����
+- CanvasWidget �̃Y�[���v�Z���W�b�N�ύX
+- �V�K�N���X�E�V�K�t�@�C���̍쐬
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
@@ -164,26 +166,26 @@ priority: high
 role: developer
 category: bug
 
-### 目的
-CanvasWidget のマウスイベントハンドラ（mousePressEvent / mouseMoveEvent / mouseReleaseEvent）でカレントツールポインタが nullptr の場合にクラッシュする問題を防ぐ。
-ツール切替中の急速な入力やシャットダウン時の誤操作でツールポインタが未設定のままイベントが来るケースに対処する。
+### �ړI
+CanvasWidget �̃}�E�X�C�x���g�n���h���imousePressEvent / mouseMoveEvent / mouseReleaseEvent�j�ŃJ�����g�c�[���|�C���^�� nullptr �̏ꍇ�ɃN���b�V���������h���B
+�c�[���ؑ֒��̋}���ȓ��͂�V���b�g�_�E�����̌둀��Ńc�[���|�C���^�����ݒ�̂܂܃C�x���g������P�[�X�ɑΏ�����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/canvasview/CanvasWidget.cpp
 
-### 成功条件
-- cmake --build でエラー 0 件
-- 各マウスイベント冒頭に nullptr ガードが追加されている（コードレビューで確認）
-- ツール切替直後の連続クリックでクラッシュしない（実行経路をコメントで記録）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- �e�}�E�X�C�x���g�`���� nullptr �K�[�h���ǉ�����Ă���i�R�[�h���r���[�Ŋm�F�j
+- �c�[���ؑ֒���̘A���N���b�N�ŃN���b�V�����Ȃ��i���s�o�H���R�����g�ŋL�^�j
 
-### 時間見積もり
-30 分
+### ���Ԍ��ς���
+30 ��
 
-### 禁止事項
-- CanvasWidget.h のシグナル・スロット定義変更
-- ツール描画ロジックの変更
+### �֎~����
+- CanvasWidget.h �̃V�O�i���E�X���b�g��`�ύX
+- �c�[���`�惍�W�b�N�̕ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -197,30 +199,30 @@ priority: medium
 role: developer
 category: feature
 
-### 目的
-LineTool 使用時に ToolPropertyPanel へ「線の太さ」スライダーを表示する。
-ToolDescriptor に LineTool 用プロパティ定義を追加し、ToolPropertyPanel 側で対応するウィジェットを生成・接続する。
+### �ړI
+LineTool �g�p���� ToolPropertyPanel �ցu���̑����v�X���C�_�[��\������B
+ToolDescriptor �� LineTool �p�v���p�e�B��`��ǉ����AToolPropertyPanel ���őΉ�����E�B�W�F�b�g�𐶐��E�ڑ�����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/ui/ToolDescriptor.cpp
 - src/app/ui/ToolDescriptor.h
 - src/app/panels/ToolPropertyPanel.cpp
 - src/app/panels/ToolPropertyPanel.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- LineTool 選択時に ToolPropertyPanel に「線の太さ」スライダーが表示される
-- スライダー操作で描画線の太さが変化する
-- REVIEW_REQUIRED（UI変更のため）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- LineTool �I������ ToolPropertyPanel �Ɂu���̑����v�X���C�_�[���\�������
+- �X���C�_�[����ŕ`����̑������ω�����
+- REVIEW_REQUIRED�iUI�ύX�̂��߁j
 
-### 時間見積もり
-45〜60 分
+### ���Ԍ��ς���
+45?60 ��
 
-### 禁止事項
-- LineTool.cpp のアルゴリズム変更
-- 新規クラス・新規ファイルの作成
+### �֎~����
+- LineTool.cpp �̃A���S���Y���ύX
+- �V�K�N���X�E�V�K�t�@�C���̍쐬
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
@@ -235,26 +237,26 @@ priority: low
 role: developer
 category: refactor
 
-### 目的
-ToolDescriptor.cpp に散在するスライダー初期値・最小値・最大値のマジックナンバーを constexpr 名前付き定数に置き換え、将来の値変更を一箇所で管理できるようにする。
+### �ړI
+ToolDescriptor.cpp �ɎU�݂���X���C�_�[�����l�E�ŏ��l�E�ő�l�̃}�W�b�N�i���o�[�� constexpr ���O�t���萔�ɒu�������A�����̒l�ύX����ӏ��ŊǗ��ł���悤�ɂ���B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/ui/ToolDescriptor.cpp
 - src/app/ui/ToolDescriptor.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- ToolDescriptor.cpp 内のスライダー設定数値が constexpr 定数に置き換わっている（コードレビューで確認）
-- 動作変化なし（リファクタのみ）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- ToolDescriptor.cpp ���̃X���C�_�[�ݒ萔�l�� constexpr �萔�ɒu��������Ă���i�R�[�h���r���[�Ŋm�F�j
+- ����ω��Ȃ��i���t�@�N�^�̂݁j
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- スライダーの値域・デフォルト値の変更
-- ToolPropertyPanel.cpp の変更
+### �֎~����
+- �X���C�_�[�̒l��E�f�t�H���g�l�̕ύX
+- ToolPropertyPanel.cpp �̕ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -268,26 +270,26 @@ priority: high
 role: developer
 category: bug
 
-### 目的
-AppController の保存・エクスポート・Undo・Redo 処理でドキュメントポインタが nullptr の場合に未定義動作が生じるリスクを排除する。
-各操作の冒頭に nullptr ガードを追加し、ドキュメント未作成状態での操作を安全に無視する。
+### �ړI
+AppController �̕ۑ��E�G�N�X�|�[�g�EUndo�ERedo �����Ńh�L�������g�|�C���^�� nullptr �̏ꍇ�ɖ���`���삪�����郊�X�N��r������B
+�e����̖`���� nullptr �K�[�h��ǉ����A�h�L�������g���쐬��Ԃł̑�������S�ɖ�������B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/bridge/AppController.cpp
 
-### 成功条件
-- cmake --build でエラー 0 件
-- 保存・Undo・Redo 各ハンドラの冒頭に nullptr チェックが追加されている（コードレビューで確認）
-- 新規起動直後に Ctrl+Z 連打しても クラッシュしない
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- �ۑ��EUndo�ERedo �e�n���h���̖`���� nullptr �`�F�b�N���ǉ�����Ă���i�R�[�h���r���[�Ŋm�F�j
+- �V�K�N������� Ctrl+Z �A�ł��Ă� �N���b�V�����Ȃ�
 
-### 時間見積もり
-30 分
+### ���Ԍ��ς���
+30 ��
 
-### 禁止事項
-- AppController.h のシグナル定義変更
-- Document.cpp の変更
+### �֎~����
+- AppController.h �̃V�O�i����`�ύX
+- Document.cpp �̕ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -301,30 +303,30 @@ priority: medium
 role: developer
 category: feature
 
-### 目的
-GradientTool 選択時に ToolPropertyPanel へ「グラデーション種類」セレクタ（線形 / 放射状）を追加する。
-ToolDescriptor に GradientTool 用 enum プロパティを定義し、ToolPropertyPanel で QComboBox として表示・接続する。
+### �ړI
+GradientTool �I������ ToolPropertyPanel �ցu�O���f�[�V������ށv�Z���N�^�i���` / ���ˏ�j��ǉ�����B
+ToolDescriptor �� GradientTool �p enum �v���p�e�B���`���AToolPropertyPanel �� QComboBox �Ƃ��ĕ\���E�ڑ�����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/ui/ToolDescriptor.cpp
 - src/app/ui/ToolDescriptor.h
 - src/app/panels/ToolPropertyPanel.cpp
 - src/app/panels/ToolPropertyPanel.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- GradientTool 選択時に ToolPropertyPanel に「線形 / 放射状」の切替 ComboBox が表示される
-- 切替操作で描画グラデーションの種類が変わる
-- REVIEW_REQUIRED（UI変更のため）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- GradientTool �I������ ToolPropertyPanel �Ɂu���` / ���ˏ�v�̐ؑ� ComboBox ���\�������
+- �֑ؑ���ŕ`��O���f�[�V�����̎�ނ��ς��
+- REVIEW_REQUIRED�iUI�ύX�̂��߁j
 
-### 時間見積もり
-45〜60 分
+### ���Ԍ��ς���
+45?60 ��
 
-### 禁止事項
-- GradientTool.cpp の描画アルゴリズム新規実装
-- 新規クラス・新規ファイルの作成
+### �֎~����
+- GradientTool.cpp �̕`��A���S���Y���V�K����
+- �V�K�N���X�E�V�K�t�@�C���̍쐬
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
@@ -339,26 +341,26 @@ priority: low
 role: developer
 category: refactor
 
-### 目的
-LayerPanel.cpp に散在するレイヤーサムネイルサイズ・行高さ等のハードコード数値を名前付き定数（static constexpr int）に置き換え、一箇所で管理できるようにする。
+### �ړI
+LayerPanel.cpp �ɎU�݂��郌�C���[�T���l�C���T�C�Y�E�s�������̃n�[�h�R�[�h���l�𖼑O�t���萔�istatic constexpr int�j�ɒu�������A��ӏ��ŊǗ��ł���悤�ɂ���B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/panels/LayerPanel.cpp
 - src/app/panels/LayerPanel.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- LayerPanel.cpp 内のサムネイル・行高サイズ数値が constexpr 定数に置き換わっている（コードレビューで確認）
-- レイヤーパネルの見た目・動作に変化なし
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- LayerPanel.cpp ���̃T���l�C���E�s���T�C�Y���l�� constexpr �萔�ɒu��������Ă���i�R�[�h���r���[�Ŋm�F�j
+- ���C���[�p�l���̌����ځE����ɕω��Ȃ�
 
-### 時間見積もり
-30 分
+### ���Ԍ��ς���
+30 ��
 
-### 禁止事項
-- レイヤーパネルの実際のサイズ・見た目の変更
-- LayerPanel のシグナル定義変更
+### �֎~����
+- ���C���[�p�l���̎��ۂ̃T�C�Y�E�����ڂ̕ύX
+- LayerPanel �̃V�O�i����`�ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -372,29 +374,29 @@ priority: medium
 role: developer
 category: feature
 
-### 目的
-ドキュメントに未保存の変更がある場合、MainWindow のタイトルバーにアスタリスク（例: 「無題 *」）を付加してダーティ状態を示す。
-AppController の変更通知シグナルを MainWindow で受け取り setWindowModified() で反映する。
+### �ړI
+�h�L�������g�ɖ��ۑ��̕ύX������ꍇ�AMainWindow �̃^�C�g���o�[�ɃA�X�^���X�N�i��: �u���� *�v�j��t�����ă_�[�e�B��Ԃ������B
+AppController �̕ύX�ʒm�V�O�i���� MainWindow �Ŏ󂯎�� setWindowModified() �Ŕ��f����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/mainwindow/MainWindow.cpp
 - src/app/mainwindow/MainWindow.h
-- src/app/bridge/AppController.h（シグナル確認のみ・変更可）
+- src/app/bridge/AppController.h�i�V�O�i���m�F�̂݁E�ύX�j
 
-### 成功条件
-- cmake --build でエラー 0 件
-- 描画操作後にタイトルバーに「*」が付く
-- 保存後に「*」が消える
-- REVIEW_REQUIRED（UI変更のため）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- �`�摀���Ƀ^�C�g���o�[�Ɂu*�v���t��
+- �ۑ���Ɂu*�v��������
+- REVIEW_REQUIRED�iUI�ύX�̂��߁j
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- AppController のシグナル新規追加（既存シグナルを使うこと）
-- Document.cpp の変更
+### �֎~����
+- AppController �̃V�O�i���V�K�ǉ��i�����V�O�i�����g�����Ɓj
+- Document.cpp �̕ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
@@ -409,26 +411,26 @@ priority: medium
 role: developer
 category: bug
 
-### 目的
-SelectionOverlayRenderer.cpp の描画関数で QPainter::begin() 後に早期 return するパスが存在する場合、end() を呼ばずに関数を抜けると Qt の警告・描画アーティファクトが発生する。
-early return 前に必ず QPainter::end() を呼ぶか、RAII ラッパー（スタック上の QPainter）に切り替えて安全化する。
+### �ړI
+SelectionOverlayRenderer.cpp �̕`��֐��� QPainter::begin() ��ɑ��� return ����p�X�����݂���ꍇ�Aend() ���Ă΂��Ɋ֐��𔲂���� Qt �̌x���E�`��A�[�e�B�t�@�N�g����������B
+early return �O�ɕK�� QPainter::end() ���ĂԂ��ARAII ���b�p�[�i�X�^�b�N��� QPainter�j�ɐ؂�ւ��Ĉ��S������B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/canvasview/SelectionOverlayRenderer.cpp
 
-### 成功条件
-- cmake --build でエラー 0 件
-- SelectionOverlayRenderer の全描画関数で QPainter が必ず終了される（コードレビューで確認）
-- 選択領域オーバーレイ描画時にQtの「painter not ended」警告が出ない
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- SelectionOverlayRenderer �̑S�`��֐��� QPainter ���K���I�������i�R�[�h���r���[�Ŋm�F�j
+- �I��̈�I�[�o�[���C�`�掞��Qt�́upainter not ended�v�x�����o�Ȃ�
 
-### 時間見積もり
-30 分
+### ���Ԍ��ς���
+30 ��
 
-### 禁止事項
-- 選択領域の描画スタイル（色・点線パターン等）の変更
-- SelectionOverlayRenderer.h のインターフェイス変更
+### �֎~����
+- �I��̈�̕`��X�^�C���i�F�E�_���p�^�[�����j�̕ύX
+- SelectionOverlayRenderer.h �̃C���^�[�t�F�C�X�ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -442,11 +444,11 @@ priority: medium
 role: developer
 category: feature
 
-### 目的
-TextTool 選択時に ToolPropertyPanel へフォントサイズ入力用 QSpinBox を追加する。
-ToolDescriptor に TextTool 用フォントサイズプロパティを定義し、ToolPropertyPanel 側でスピンボックスとして表示・TextTool に値を渡す接続を行う。
+### �ړI
+TextTool �I������ ToolPropertyPanel �փt�H���g�T�C�Y���͗p QSpinBox ��ǉ�����B
+ToolDescriptor �� TextTool �p�t�H���g�T�C�Y�v���p�e�B���`���AToolPropertyPanel ���ŃX�s���{�b�N�X�Ƃ��ĕ\���ETextTool �ɒl��n���ڑ����s���B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/ui/ToolDescriptor.cpp
 - src/app/ui/ToolDescriptor.h
 - src/app/panels/ToolPropertyPanel.cpp
@@ -454,21 +456,21 @@ ToolDescriptor に TextTool 用フォントサイズプロパティを定義し�
 - src/core/tools/TextTool.cpp
 - src/core/tools/TextTool.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- TextTool 選択時に ToolPropertyPanel にフォントサイズ SpinBox（例: 8〜144pt）が表示される
-- SpinBox の値変更が TextTool に反映される（描画文字サイズが変わる）
-- REVIEW_REQUIRED（UI変更のため）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- TextTool �I������ ToolPropertyPanel �Ƀt�H���g�T�C�Y SpinBox�i��: 8?144pt�j���\�������
+- SpinBox �̒l�ύX�� TextTool �ɔ��f�����i�`�敶���T�C�Y���ς��j
+- REVIEW_REQUIRED�iUI�ύX�̂��߁j
 
-### 時間見積もり
-60〜90 分
+### ���Ԍ��ς���
+60?90 ��
 
-### 禁止事項
-- TextTool のテキスト入力ダイアログ全面刷新
-- フォントファミリー選択機能の同時追加（本タスクはサイズのみ）
-- 新規クラス・新規ファイルの作成
+### �֎~����
+- TextTool �̃e�L�X�g���̓_�C�A���O�S�ʍ��V
+- �t�H���g�t�@�~���[�I���@�\�̓����ǉ��i�{�^�X�N�̓T�C�Y�̂݁j
+- �V�K�N���X�E�V�K�t�@�C���̍쐬
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 .\launch.bat

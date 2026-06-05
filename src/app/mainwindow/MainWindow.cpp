@@ -566,6 +566,11 @@ MainWindow::MainWindow(QWidget* parent)
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateNavigatorPreview);
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateNavigatorPreview);
   connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, &MainWindow::updateNavigatorPreview);
+  connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, [this]() {
+    if (m_zoomStatusLabel != nullptr) {
+      m_zoomStatusLabel->setText(QString("ズーム: %1%").arg(m_canvasWidget->zoomPercent()));
+    }
+  });
 
   onToolStateChanged();
   updateUndoRedoState();
