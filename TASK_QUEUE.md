@@ -1,8 +1,41 @@
-﻿# TASK QUEUE — Painting-app ai-night-test
+# TASK QUEUE — Painting-app ai-night-test
 <!-- scheduler が status を更新します -->
 
+## task-006
+status: pending
+priority: high
+role: developer
+
+### 目的
+ToolPropertyPanel.cpp に「ブラシサイズ」スライダーの ToolTip を追加する。
+現在 BrushSizeSlider には setToolTip が設定されていない。
+以下の作業を段階的に実施すること:
+
+1. ToolPropertyPanel.cpp / ToolPropertyPanel.h を Read ツールで読んで現状把握
+2. BrushSizeSlider または対応する QSlider を特定
+3. setToolTip("ブラシサイズ (1-500)") を追加
+4. AppController.h か BrushSettings.h でサイズ範囲を確認して ToolTip 文字列を正確に記述
+5. cmake --build build --config Release でビルド確認
+6. HANDOFF_STATE.json を更新（objective / completed / current_files / next_steps を必ず埋める）
+
+### 成功条件
+- ToolPropertyPanel のブラシサイズスライダーに ToolTip が表示される
+- cmake --build でエラー0件
+
+### 禁止事項
+- ToolPropertyPanel 以外のファイルの変更
+- 新規クラス・新規ファイルの作成
+- setToolTip 以外の UI 変更
+
+### 検証方法
+`powershell
+cmake --build build --config Release
+`
+
+---
+
 ## task-001
-status: review_required
+status: completed
 priority: high
 role: developer
 
@@ -32,7 +65,7 @@ cmake --build build --config Release
 ---
 
 ## task-002
-status: review_required
+status: blocked
 priority: high
 role: developer
 
@@ -61,7 +94,7 @@ cmake --build build --config Release
 ---
 
 ## task-003
-status: pending
+status: blocked
 priority: medium
 role: developer
 
@@ -92,7 +125,7 @@ cmake --build build --config Release
 ---
 
 ## task-004
-status: pending
+status: blocked
 priority: medium
 role: developer
 
@@ -122,7 +155,7 @@ cmake --build build --config Release
 ---
 
 ## task-005
-status: pending
+status: blocked
 priority: medium
 role: developer
 

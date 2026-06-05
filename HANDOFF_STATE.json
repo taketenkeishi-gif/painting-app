@@ -1,0 +1,30 @@
+﻿{
+    "updated_at":  "2026-06-05T20:10:52.6761125+09:00",
+    "next_steps":  [
+                       "未コミット変更を確認・コミット実行",
+                       "cmake --build でビルド確認"
+                   ],
+    "commands_run":  [
+
+                     ],
+    "current_files":  [
+
+                      ],
+    "decisions":  [
+
+                  ],
+    "investigated_files":  [
+
+                           ],
+    "task_id":  "task-006",
+    "last_worker":  "worker-b",
+    "git_commit":  "34158f3a2bd3e879ff38997d6221f89f6db2de50",
+    "last_reasoning":  "",
+    "completed":  [
+
+                  ],
+    "git_diff_summary":  " NIGHT_REPORT.md |  80 ++---------------------\n REVIEW_QUEUE.md |   2 +-\n TASK_QUEUE.md   | 193 ++++++++++++++++++++++++++++++++++----------------------\n 3 files changed, 124 insertions(+), 151 deletions(-)",
+    "objective":  "ToolPropertyPanel.cpp に「ブラシサイズ」スライダーの ToolTip を追加する。\n現在 BrushSizeSlider には setToolTip が設定されていない。\n以下の作業を段階的に実施すること:\n\n1. ToolPropertyPanel.cpp / ToolPropertyPanel.h を Read ツールで読んで現状把握\n2. BrushSizeSlider または対応する QSlider を特定\n3. setToolTip(\"ブラシサイズ (1-500)\") を追加\n4. AppController.h か BrushSettings.h でサイズ範囲",
+    "blocked_reason":  "",
+    "current_phase":  "starting"
+}
