@@ -488,6 +488,9 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     return;
   }
   if (m_controller == nullptr) {
+    // controller disconnected mid-stroke: reset stale drawing state
+    m_mouseDrawing = false;
+    stateFor(this).hasLastStrokeDispatchPos = false;
     return;
   }
   m_controller->setInputModifiers(
@@ -572,6 +575,9 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
 
 void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   if (m_controller == nullptr) {
+    // controller disconnected mid-stroke: reset stale drawing state
+    m_mouseDrawing = false;
+    stateFor(this).hasLastStrokeDispatchPos = false;
     return;
   }
   m_controller->setInputModifiers(
@@ -696,6 +702,9 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
 
 void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
   if (m_controller == nullptr) {
+    // controller disconnected mid-stroke: reset stale drawing state
+    m_mouseDrawing = false;
+    stateFor(this).hasLastStrokeDispatchPos = false;
     return;
   }
   m_controller->setInputModifiers(

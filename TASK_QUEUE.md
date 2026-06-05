@@ -6,7 +6,7 @@ status: completed
 priority: high
 role: developer
 
-### ???EToolPropertyPanel.cpp ??u?u???V?T?C?Y?v?X???C?_?[?? ToolTip ????????AE???? BrushSizeSlider ??? setToolTip ?????????E????E??E????E????i?K?I????{???�??:
+### ???EToolPropertyPanel.cpp ??u?u???V?T?C?Y?v?X???C?_?[?? ToolTip ????????AE???? BrushSizeSlider ??? setToolTip ?????????E????E??E????E????i?K?I????{???�E�??:
 
 1. ToolPropertyPanel.cpp / ToolPropertyPanel.h ??ERead ?`E?E??????????c??
 2. BrushSizeSlider ????E???????EQSlider ????E3. setToolTip("?u???V?T?C?Y (1-500)") ????
@@ -38,7 +38,7 @@ role: developer
 
 ### ???????E```powershell
 cmake --build build --config Release
-.\launch.bat   # ?N????AToolPropertyPanel ??X???C?_?[???\???E???????�??????m?E```
+.\launch.bat   # ?N????AToolPropertyPanel ??X???C?_?[???\???E???????�E�??????m?E```
 
 ### review_required_when
 - UI??X??????????E??E
@@ -49,7 +49,7 @@ status: blocked
 priority: high
 role: developer
 
-### ???EFillTool ??ESelectionMask ???A?N?`E???u?????AE?????E???E?E?s?N?Z?????h??????��E???C??????AE????? SelectionMask ????????S??h????????????????E???E?Eystem_status: PARTIAL?E??AE
+### ???EFillTool ??ESelectionMask ???A?N?`E???u?????AE?????E???E?E?s?N?Z?????h??????�E��E�E???C??????AE????? SelectionMask ????????S??h????????????????E???E?Eystem_status: PARTIAL?E??AE
 ### ???????
 - ?I???E??????????????A?h????????I???E???E?E???K?p?????E- ?I???E???????E?????E?]???????S?????E contiguous fill ????????E- undo/redo ???????@?E????
 
@@ -70,14 +70,14 @@ role: developer
 
 ### ???EBrushSettings.antiAlias ?t???O??????@?E??????AE???? stampCircleAA / drawSegmentAA ???????E?????AantiAlias=false ????E?n?E?h?G?`E???`???E?EtampCircle / drawSegment ??????j????E?????????????E??ESPEC Phase 0-4 ??uAA ON/OFF ????v????E??????AE
 ### ???????
-- antiAlias=true: ???????? AA ?`???E??��?????IE- antiAlias=false: ?n?E?h?G?`E???E?Eaussian ????j?`????E??????
+- antiAlias=true: ???????? AA ?`???E??�E��E�?????IE- antiAlias=false: ?n?E?h?G?`E???E?Eaussian ????j?`????E??????
 - ToolPropertyPanel ?? antiAlias ?`?F?`E???{?b?N?X?????????????
 
 ### ??~????E- Skia ??s?Elibmypaint ?????i??t?F?[?Y?E?E- stampCircleAA ?????E???K????t?@?N?^
 
 ### ???????E```powershell
 cmake --build build --config Release
-# ?N????E antiAlias OFF ??u???V?X?g???[?N???n?[?h?G?`E?????�???m?E```
+# ?N????E antiAlias OFF ??u???V?X?g???[?N???n?[?h?G?`E?????�E�???m?E```
 
 ### review_required_when
 - ?????E?`??????????W?`E????X??????E??E
@@ -96,7 +96,7 @@ role: developer
 
 ### ???????E```powershell
 cmake --build build --config Release
-.\launch.bat   # Navigator ?? 100%/Fit ?{?^?????\???E?????�??????m?E```
+.\launch.bat   # Navigator ?? 100%/Fit ?{?^?????\???E?????�E�??????m?E```
 
 ### review_required_when
 - UI??X??????????E??E
@@ -115,7 +115,7 @@ B/W reset ?{?^?????????AMainWindow::onSwapColors / onResetBlackWhiteColors ?????
 
 ### ???????E```powershell
 cmake --build build --config Release
-.\launch.bat   # color dock ?? swap/reset ?{?^?????\???E?????�??????m?E```
+.\launch.bat   # color dock ?? swap/reset ?{?^?????\???E?????�E�??????m?E```
 
 ### review_required_when
 - UI??X??????????E??E
@@ -124,34 +124,33 @@ cmake --build build --config Release
 status: review_required
 attempt: 1
 completed_by: worker-b
-summary: MainWindow コンストラクタに viewTransformChanged → m_zoomStatusLabel 更新の signal-slot 接続を追加。既存の updateZoomStatusLabel (CanvasWidget 側 findChild) はそのまま残し、MainWindow 側の正式接続を追加した。ビルドエラー0件確認済み。
-priority: medium
+summary: MainWindow コンストラクタに viewTransformChanged ↁEm_zoomStatusLabel 更新の signal-slot 接続を追加。既存�E updateZoomStatusLabel (CanvasWidget 側 findChild) はそ�Eまま残し、MainWindow 側の正式接続を追加した。ビルドエラー0件確認済み、Epriority: medium
 role: developer
 category: feature
 
-### �ړI
-MainWindow �̃X�e�[�^�X�o�[�Ɍ��݂̃Y�[�����i��: 100%�j��\������B
-CanvasWidget �����Y�[���ύX�V�O�i���� MainWindow �Ŏ󂯎��AQLabel �ɔ��f����B
+### �E�ړI
+MainWindow �E�̃X�E�e�E�[�E�^�E�X�E�o�E�[�E�Ɍ��E�݂̃Y�E�[�E��E��E��E��E�i�E��E�: 100%�E�j�E��E�\�E��E��E��E��E��E�B
+CanvasWidget �E��E��E��E��E�Y�E�[�E��E��E�ύX�E�V�E�O�E�i�E��E��E��E� MainWindow �E�Ŏ󂯎��E�AQLabel �E�ɔ��E�f�E��E��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/mainwindow/MainWindow.cpp
 - src/app/mainwindow/MainWindow.h
-- src/app/canvasview/CanvasWidget.h�i�V�O�i���m�F�̂݁E�ύX�j
+- src/app/canvasview/CanvasWidget.h�E�i�E�V�E�O�E�i�E��E��E�m�E�F�E�̂݁E�E�ύX�E�j
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- �A�v���N����A�X�e�[�^�X�o�[�Ɂu100%�v���̃Y�[�������\�������
-- �Y�[���C���^�A�E�g����Ő��l�����A���^�C���X�V�����
-- REVIEW_REQUIRED�iUI�ύX�̂��߁j
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- �E�A�E�v�E��E��E�N�E��E��E��E�A�E�X�E�e�E�[�E�^�E�X�E�o�E�[�E�Ɂu100%�E�v�E��E��E�̃Y�E�[�E��E��E��E��E��E��E�\�E��E��E��E��E��E��E�
+- �E�Y�E�[�E��E��E�C�E��E��E�^�E�A�E�E�E�g�E��E��E��E�Ő��E�l�E��E��E��E��E�A�E��E��E�^�E�C�E��E��E�X�E�V�E��E��E��E��E�
+- REVIEW_REQUIRED�E�iUI�E�ύX�E�̂��E�߁j
 
-### ���Ԍ��ς���
-30?45 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+30?45 �E��E�
 
-### �֎~����
-- CanvasWidget �̃Y�[���v�Z���W�b�N�ύX
-- �V�K�N���X�E�V�K�t�@�C���̍쐬
+### �E�֎~�E��E��E��E�
+- CanvasWidget �E�̃Y�E�[�E��E��E�v�E�Z�E��E��E�W�E�b�E�N�E�ύX
+- �E�V�E�K�E�N�E��E��E�X�E�E�E�V�E�K�E�t�E�@�E�C�E��E��E�̍쐬
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
@@ -160,32 +159,37 @@ cmake --build build --config Release
 ---
 
 ## task-8
-status: pending
-attempt: 0
+status: review_required
+attempt: 1
 priority: high
 role: developer
 category: bug
 
-### �ړI
-CanvasWidget �̃}�E�X�C�x���g�n���h���imousePressEvent / mouseMoveEvent / mouseReleaseEvent�j�ŃJ�����g�c�[���|�C���^�� nullptr �̏ꍇ�ɃN���b�V���������h���B
-�c�[���ؑ֒��̋}���ȓ��͂�V���b�g�_�E�����̌둀��Ńc�[���|�C���^�����ݒ�̂܂܃C�x���g������P�[�X�ɑΏ�����B
+### 完了概要
+mousePressEvent / mouseMoveEvent / mouseReleaseEvent の nullptr ガードに
+`m_mouseDrawing = false` と `hasLastStrokeDispatchPos = false` のリセットを追加。
+コントローラ切断時にストローク状態が残るバグを修正。ビルド確認: エラー0件。
 
-### �Ώۃt�@�C�����
+### �E�ړI
+CanvasWidget �E�̃}�E�E�E�X�E�C�E�x�E��E��E�g�E�n�E��E��E�h�E��E��E�imousePressEvent / mouseMoveEvent / mouseReleaseEvent�E�j�E�ŃJ�E��E��E��E��E�g�E�c�E�[�E��E��E�|�E�C�E��E��E�^�E��E� nullptr �E�̏ꍇ�E�ɃN�E��E��E�b�E�V�E��E��E��E��E��E��E��E��E�h�E��E��E�B
+�E�c�E�[�E��E��E�ؑ֒��E�̋}�E��E��E�ȓ��E�͂�V�E��E��E�b�E�g�E�_�E�E�E��E��E��E��E�̌둀�E��E�Ńc�E�[�E��E��E�|�E�C�E��E��E�^�E��E��E��E��E�ݒ�̂܂܃C�E�x�E��E��E�g�E��E��E��E��E��E�P�E�[�E�X�E�ɑΏ��E��E��E��E�B
+
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/canvasview/CanvasWidget.cpp
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- �e�}�E�X�C�x���g�`���� nullptr �K�[�h���ǉ�����Ă���i�R�[�h���r���[�Ŋm�F�j
-- �c�[���ؑ֒���̘A���N���b�N�ŃN���b�V�����Ȃ��i���s�o�H���R�����g�ŋL�^�j
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- �E�e�E�}�E�E�E�X�E�C�E�x�E��E��E�g�E�`�E��E��E��E� nullptr �E�K�E�[�E�h�E��E��E�ǉ��E��E��E��E�Ă��E��E�i�E�R�E�[�E�h�E��E��E�r�E��E��E�[�E�Ŋm�E�F�E�j
+- �E�c�E�[�E��E��E�ؑ֒��E��E�̘A�E��E��E�N�E��E��E�b�E�N�E�ŃN�E��E��E�b�E�V�E��E��E��E��E�Ȃ��E�i�E��E��E�s�E�o�E�H�E��E��E�R�E��E��E��E��E�g�E�ŋL�E�^�E�j
 
-### ���Ԍ��ς���
-30 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+30 �E��E�
 
-### �֎~����
-- CanvasWidget.h �̃V�O�i���E�X���b�g��`�ύX
-- �c�[���`�惍�W�b�N�̕ύX
+### �E�֎~�E��E��E��E�
+- CanvasWidget.h �E�̃V�E�O�E�i�E��E��E�E�E�X�E��E��E�b�E�g�E��E�`�E�ύX
+- �E�c�E�[�E��E��E�`�E�惍�W�E�b�E�N�E�̕ύX
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -199,30 +203,30 @@ priority: medium
 role: developer
 category: feature
 
-### �ړI
-LineTool �g�p���� ToolPropertyPanel �ցu���̑����v�X���C�_�[��\������B
-ToolDescriptor �� LineTool �p�v���p�e�B��`��ǉ����AToolPropertyPanel ���őΉ�����E�B�W�F�b�g�𐶐��E�ڑ�����B
+### �E�ړI
+LineTool �E�g�E�p�E��E��E��E� ToolPropertyPanel �E�ցu�E��E��E�̑��E��E��E�v�E�X�E��E��E�C�E�_�E�[�E��E�\�E��E��E��E��E��E�B
+ToolDescriptor �E��E� LineTool �E�p�E�v�E��E��E�p�E�e�E�B�E��E�`�E��E�ǉ��E��E��E�AToolPropertyPanel �E��E��E�őΉ��E��E��E��E�E�E�B�E�W�E�F�E�b�E�g�E�𐶐��E�E�E�ڑ��E��E��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/ui/ToolDescriptor.cpp
 - src/app/ui/ToolDescriptor.h
 - src/app/panels/ToolPropertyPanel.cpp
 - src/app/panels/ToolPropertyPanel.h
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- LineTool �I������ ToolPropertyPanel �Ɂu���̑����v�X���C�_�[���\�������
-- �X���C�_�[����ŕ`����̑������ω�����
-- REVIEW_REQUIRED�iUI�ύX�̂��߁j
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- LineTool �E�I�E��E��E��E��E��E� ToolPropertyPanel �E�Ɂu�E��E��E�̑��E��E��E�v�E�X�E��E��E�C�E�_�E�[�E��E��E�\�E��E��E��E��E��E��E�
+- �E�X�E��E��E�C�E�_�E�[�E��E��E��E�ŕ`�E��E��E��E�̑��E��E��E��E��E�ω��E��E��E��E�
+- REVIEW_REQUIRED�E�iUI�E�ύX�E�̂��E�߁j
 
-### ���Ԍ��ς���
-45?60 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+45?60 �E��E�
 
-### �֎~����
-- LineTool.cpp �̃A���S���Y���ύX
-- �V�K�N���X�E�V�K�t�@�C���̍쐬
+### �E�֎~�E��E��E��E�
+- LineTool.cpp �E�̃A�E��E��E�S�E��E��E�Y�E��E��E�ύX
+- �E�V�E�K�E�N�E��E��E�X�E�E�E�V�E�K�E�t�E�@�E�C�E��E��E�̍쐬
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
@@ -237,26 +241,26 @@ priority: low
 role: developer
 category: refactor
 
-### �ړI
-ToolDescriptor.cpp �ɎU�݂���X���C�_�[�����l�E�ŏ��l�E�ő�l�̃}�W�b�N�i���o�[�� constexpr ���O�t���萔�ɒu�������A�����̒l�ύX����ӏ��ŊǗ��ł���悤�ɂ���B
+### �E�ړI
+ToolDescriptor.cpp �E�ɎU�E�݂��E��E�X�E��E��E�C�E�_�E�[�E��E��E��E��E�l�E�E�E�ŏ��E�l�E�E�E�ő�l�E�̃}�E�W�E�b�E�N�E�i�E��E��E�o�E�[�E��E� constexpr �E��E��E�O�E�t�E��E��E�萔�ɒu�E��E��E��E��E��E��E�A�E��E��E��E��E�̒l�E�ύX�E��E��E��E�ӏ��E�ŊǗ��E�ł��E��E�悤�E�ɂ��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/ui/ToolDescriptor.cpp
 - src/app/ui/ToolDescriptor.h
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- ToolDescriptor.cpp ���̃X���C�_�[�ݒ萔�l�� constexpr �萔�ɒu��������Ă���i�R�[�h���r���[�Ŋm�F�j
-- ����ω��Ȃ��i���t�@�N�^�̂݁j
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- ToolDescriptor.cpp �E��E��E�̃X�E��E��E�C�E�_�E�[�E�ݒ萔�E�l�E��E� constexpr �E�萔�ɒu�E��E��E��E��E��E��E��E�Ă��E��E�i�E�R�E�[�E�h�E��E��E�r�E��E��E�[�E�Ŋm�E�F�E�j
+- �E��E��E��E�ω��E�Ȃ��E�i�E��E��E�t�E�@�E�N�E�^�E�̂݁j
 
-### ���Ԍ��ς���
-30?45 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+30?45 �E��E�
 
-### �֎~����
-- �X���C�_�[�̒l��E�f�t�H���g�l�̕ύX
-- ToolPropertyPanel.cpp �̕ύX
+### �E�֎~�E��E��E��E�
+- �E�X�E��E��E�C�E�_�E�[�E�̒l�E��E�E�E�f�E�t�E�H�E��E��E�g�E�l�E�̕ύX
+- ToolPropertyPanel.cpp �E�̕ύX
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -270,26 +274,26 @@ priority: high
 role: developer
 category: bug
 
-### �ړI
-AppController �̕ۑ��E�G�N�X�|�[�g�EUndo�ERedo �����Ńh�L�������g�|�C���^�� nullptr �̏ꍇ�ɖ���`���삪�����郊�X�N��r������B
-�e����̖`���� nullptr �K�[�h��ǉ����A�h�L�������g���쐬��Ԃł̑�������S�ɖ�������B
+### �E�ړI
+AppController �E�̕ۑ��E�E�E�G�E�N�E�X�E�|�E�[�E�g�E�EUndo�E�ERedo �E��E��E��E��E�Ńh�E�L�E��E��E��E��E��E��E�g�E�|�E�C�E��E��E�^�E��E� nullptr �E�̏ꍇ�E�ɖ��E��E�`�E��E��E��E��E��E��E��E��E�郊�X�E�N�E��E�r�E��E��E��E��E��E�B
+�E�e�E��E��E��E�̖`�E��E��E��E� nullptr �E�K�E�[�E�h�E��E�ǉ��E��E��E�A�E�h�E�L�E��E��E��E��E��E��E�g�E��E��E��E��E��E�Ԃł̑��E��E��E��E��E��E�S�E�ɖ��E��E��E��E��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/bridge/AppController.cpp
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- �ۑ��EUndo�ERedo �e�n���h���̖`���� nullptr �`�F�b�N���ǉ�����Ă���i�R�[�h���r���[�Ŋm�F�j
-- �V�K�N������� Ctrl+Z �A�ł��Ă� �N���b�V�����Ȃ�
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- �E�ۑ��E�EUndo�E�ERedo �E�e�E�n�E��E��E�h�E��E��E�̖`�E��E��E��E� nullptr �E�`�E�F�E�b�E�N�E��E��E�ǉ��E��E��E��E�Ă��E��E�i�E�R�E�[�E�h�E��E��E�r�E��E��E�[�E�Ŋm�E�F�E�j
+- �E�V�E�K�E�N�E��E��E��E��E��E��E� Ctrl+Z �E�A�E�ł��E�Ă� �E�N�E��E��E�b�E�V�E��E��E��E��E�Ȃ�
 
-### ���Ԍ��ς���
-30 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+30 �E��E�
 
-### �֎~����
-- AppController.h �̃V�O�i����`�ύX
-- Document.cpp �̕ύX
+### �E�֎~�E��E��E��E�
+- AppController.h �E�̃V�E�O�E�i�E��E��E��E�`�E�ύX
+- Document.cpp �E�̕ύX
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -303,30 +307,30 @@ priority: medium
 role: developer
 category: feature
 
-### �ړI
-GradientTool �I������ ToolPropertyPanel �ցu�O���f�[�V������ށv�Z���N�^�i���` / ���ˏ�j��ǉ�����B
-ToolDescriptor �� GradientTool �p enum �v���p�e�B���`���AToolPropertyPanel �� QComboBox �Ƃ��ĕ\���E�ڑ�����B
+### �E�ړI
+GradientTool �E�I�E��E��E��E��E��E� ToolPropertyPanel �E�ցu�E�O�E��E��E�f�E�[�E�V�E��E��E��E��E��E�ށv�E�Z�E��E��E�N�E�^�E�i�E��E��E�` / �E��E��E�ˏ�j�E��E�ǉ��E��E��E��E�B
+ToolDescriptor �E��E� GradientTool �E�p enum �E�v�E��E��E�p�E�e�E�B�E��E��E�`�E��E��E�AToolPropertyPanel �E��E� QComboBox �E�Ƃ��E�ĕ\�E��E��E�E�E�ڑ��E��E��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/ui/ToolDescriptor.cpp
 - src/app/ui/ToolDescriptor.h
 - src/app/panels/ToolPropertyPanel.cpp
 - src/app/panels/ToolPropertyPanel.h
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- GradientTool �I������ ToolPropertyPanel �Ɂu���` / ���ˏ�v�̐ؑ� ComboBox ���\�������
-- �֑ؑ���ŕ`��O���f�[�V�����̎�ނ��ς��
-- REVIEW_REQUIRED�iUI�ύX�̂��߁j
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- GradientTool �E�I�E��E��E��E��E��E� ToolPropertyPanel �E�Ɂu�E��E��E�` / �E��E��E�ˏ�v�E�̐ؑ� ComboBox �E��E��E�\�E��E��E��E��E��E��E�
+- �E�֑ؑ��E��E�ŕ`�E��E�O�E��E��E�f�E�[�E�V�E��E��E��E��E�̎�ނ��E�ς��E�
+- REVIEW_REQUIRED�E�iUI�E�ύX�E�̂��E�߁j
 
-### ���Ԍ��ς���
-45?60 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+45?60 �E��E�
 
-### �֎~����
-- GradientTool.cpp �̕`��A���S���Y���V�K����
-- �V�K�N���X�E�V�K�t�@�C���̍쐬
+### �E�֎~�E��E��E��E�
+- GradientTool.cpp �E�̕`�E��E�A�E��E��E�S�E��E��E�Y�E��E��E�V�E�K�E��E��E��E�
+- �E�V�E�K�E�N�E��E��E�X�E�E�E�V�E�K�E�t�E�@�E�C�E��E��E�̍쐬
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
@@ -341,26 +345,26 @@ priority: low
 role: developer
 category: refactor
 
-### �ړI
-LayerPanel.cpp �ɎU�݂��郌�C���[�T���l�C���T�C�Y�E�s�������̃n�[�h�R�[�h���l�𖼑O�t���萔�istatic constexpr int�j�ɒu�������A��ӏ��ŊǗ��ł���悤�ɂ���B
+### �E�ړI
+LayerPanel.cpp �E�ɎU�E�݂��E�郌�C�E��E��E�[�E�T�E��E��E�l�E�C�E��E��E�T�E�C�E�Y�E�E�E�s�E��E��E��E��E��E��E�̃n�E�[�E�h�E�R�E�[�E�h�E��E��E�l�E�𖼑O�E�t�E��E��E�萔�istatic constexpr int�E�j�E�ɒu�E��E��E��E��E��E��E�A�E��E�ӏ��E�ŊǗ��E�ł��E��E�悤�E�ɂ��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/panels/LayerPanel.cpp
 - src/app/panels/LayerPanel.h
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- LayerPanel.cpp ���̃T���l�C���E�s���T�C�Y���l�� constexpr �萔�ɒu��������Ă���i�R�[�h���r���[�Ŋm�F�j
-- ���C���[�p�l���̌����ځE����ɕω��Ȃ�
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- LayerPanel.cpp �E��E��E�̃T�E��E��E�l�E�C�E��E��E�E�E�s�E��E��E�T�E�C�E�Y�E��E��E�l�E��E� constexpr �E�萔�ɒu�E��E��E��E��E��E��E��E�Ă��E��E�i�E�R�E�[�E�h�E��E��E�r�E��E��E�[�E�Ŋm�E�F�E�j
+- �E��E��E�C�E��E��E�[�E�p�E�l�E��E��E�̌��E��E��E�ځE�E��E��E��E�ɕω��E�Ȃ�
 
-### ���Ԍ��ς���
-30 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+30 �E��E�
 
-### �֎~����
-- ���C���[�p�l���̎��ۂ̃T�C�Y�E�����ڂ̕ύX
-- LayerPanel �̃V�O�i����`�ύX
+### �E�֎~�E��E��E��E�
+- �E��E��E�C�E��E��E�[�E�p�E�l�E��E��E�̎��E�ۂ̃T�E�C�E�Y�E�E�E��E��E��E��E�ڂ̕ύX
+- LayerPanel �E�̃V�E�O�E�i�E��E��E��E�`�E�ύX
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -374,29 +378,29 @@ priority: medium
 role: developer
 category: feature
 
-### �ړI
-�h�L�������g�ɖ��ۑ��̕ύX������ꍇ�AMainWindow �̃^�C�g���o�[�ɃA�X�^���X�N�i��: �u���� *�v�j��t�����ă_�[�e�B��Ԃ������B
-AppController �̕ύX�ʒm�V�O�i���� MainWindow �Ŏ󂯎�� setWindowModified() �Ŕ��f����B
+### �E�ړI
+�E�h�E�L�E��E��E��E��E��E��E�g�E�ɖ��E�ۑ��E�̕ύX�E��E��E��E��E��E�ꍁE��AMainWindow �E�̃^�E�C�E�g�E��E��E�o�E�[�E�ɃA�E�X�E�^�E��E��E�X�E�N�E�i�E��E�: �E�u�E��E��E��E� *�E�v�E�j�E��E�t�E��E��E��E��E�ă_�E�[�E�e�E�B�E��E�Ԃ��E��E��E��E��E�B
+AppController �E�̕ύX�E�ʒm�E�V�E�O�E�i�E��E��E��E� MainWindow �E�Ŏ󂯎��E� setWindowModified() �E�Ŕ��E�f�E��E��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/mainwindow/MainWindow.cpp
 - src/app/mainwindow/MainWindow.h
-- src/app/bridge/AppController.h�i�V�O�i���m�F�̂݁E�ύX�j
+- src/app/bridge/AppController.h�E�i�E�V�E�O�E�i�E��E��E�m�E�F�E�̂݁E�E�ύX�E�j
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- �`�摀���Ƀ^�C�g���o�[�Ɂu*�v���t��
-- �ۑ���Ɂu*�v��������
-- REVIEW_REQUIRED�iUI�ύX�̂��߁j
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- �E�`�E�摀�E��E��E�Ƀ^�E�C�E�g�E��E��E�o�E�[�E�Ɂu*�E�v�E��E��E�t�E��E�
+- �E�ۑ��E��E�Ɂu*�E�v�E��E��E��E��E��E��E��E�
+- REVIEW_REQUIRED�E�iUI�E�ύX�E�̂��E�߁j
 
-### ���Ԍ��ς���
-30?45 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+30?45 �E��E�
 
-### �֎~����
-- AppController �̃V�O�i���V�K�ǉ��i�����V�O�i�����g�����Ɓj
-- Document.cpp �̕ύX
+### �E�֎~�E��E��E��E�
+- AppController �E�̃V�E�O�E�i�E��E��E�V�E�K�E�ǉ��E�i�E��E��E��E��E�V�E�O�E�i�E��E��E��E��E�g�E��E��E��E��E�Ɓj
+- Document.cpp �E�̕ύX
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
@@ -411,26 +415,26 @@ priority: medium
 role: developer
 category: bug
 
-### �ړI
-SelectionOverlayRenderer.cpp �̕`��֐��� QPainter::begin() ��ɑ��� return ����p�X�����݂���ꍇ�Aend() ���Ă΂��Ɋ֐��𔲂���� Qt �̌x���E�`��A�[�e�B�t�@�N�g����������B
-early return �O�ɕK�� QPainter::end() ���ĂԂ��ARAII ���b�p�[�i�X�^�b�N��� QPainter�j�ɐ؂�ւ��Ĉ��S������B
+### �E�ړI
+SelectionOverlayRenderer.cpp �E�̕`�E��E�֐��E��E� QPainter::begin() �E��E�ɑ��E��E� return �E��E��E��E�p�E�X�E��E��E��E��E�݂��E��E�ꍁE��Aend() �E��E��E�Ă΂��E�Ɋ֐��E�𔲂��E��E��E� Qt �E�̌x�E��E��E�E�E�`�E��E�A�E�[�E�e�E�B�E�t�E�@�E�N�E�g�E��E��E��E��E��E��E��E��E��E�B
+early return �E�O�E�ɕK�E��E� QPainter::end() �E��E��E�ĂԂ��E�ARAII �E��E��E�b�E�p�E�[�E�i�E�X�E�^�E�b�E�N�E��E��E� QPainter�E�j�E�ɐ؂�ւ��E�Ĉ��E�S�E��E��E��E��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/canvasview/SelectionOverlayRenderer.cpp
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- SelectionOverlayRenderer �̑S�`��֐��� QPainter ���K���I�������i�R�[�h���r���[�Ŋm�F�j
-- �I��̈�I�[�o�[���C�`�掞��Qt�́upainter not ended�v�x�����o�Ȃ�
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- SelectionOverlayRenderer �E�̑S�E�`�E��E�֐��E��E� QPainter �E��E��E�K�E��E��E�I�E��E��E��E��E��E��E�i�E�R�E�[�E�h�E��E��E�r�E��E��E�[�E�Ŋm�E�F�E�j
+- �E�I�E��E�̈�I�E�[�E�o�E�[�E��E��E�C�E�`�E�掞��E�Qt�E�́upainter not ended�E�v�E�x�E��E��E��E��E�o�E�Ȃ�
 
-### ���Ԍ��ς���
-30 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+30 �E��E�
 
-### �֎~����
-- �I��̈�̕`��X�^�C���i�F�E�_���p�^�[�����j�̕ύX
-- SelectionOverlayRenderer.h �̃C���^�[�t�F�C�X�ύX
+### �E�֎~�E��E��E��E�
+- �E�I�E��E�̈�̕`�E��E�X�E�^�E�C�E��E��E�i�E�F�E�E�E�_�E��E��E�p�E�^�E�[�E��E��E��E��E�j�E�̕ύX
+- SelectionOverlayRenderer.h �E�̃C�E��E��E�^�E�[�E�t�E�F�E�C�E�X�E�ύX
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -444,11 +448,11 @@ priority: medium
 role: developer
 category: feature
 
-### �ړI
-TextTool �I������ ToolPropertyPanel �փt�H���g�T�C�Y���͗p QSpinBox ��ǉ�����B
-ToolDescriptor �� TextTool �p�t�H���g�T�C�Y�v���p�e�B���`���AToolPropertyPanel ���ŃX�s���{�b�N�X�Ƃ��ĕ\���ETextTool �ɒl��n���ڑ����s���B
+### �E�ړI
+TextTool �E�I�E��E��E��E��E��E� ToolPropertyPanel �E�փt�E�H�E��E��E�g�E�T�E�C�E�Y�E��E��E�͗p QSpinBox �E��E�ǉ��E��E��E��E�B
+ToolDescriptor �E��E� TextTool �E�p�E�t�E�H�E��E��E�g�E�T�E�C�E�Y�E�v�E��E��E�p�E�e�E�B�E��E��E�`�E��E��E�AToolPropertyPanel �E��E��E�ŃX�E�s�E��E��E�{�E�b�E�N�E�X�E�Ƃ��E�ĕ\�E��E��E�ETextTool �E�ɒl�E��E�n�E��E��E�ڑ��E��E��E�s�E��E��E�B
 
-### �Ώۃt�@�C�����
+### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
 - src/app/ui/ToolDescriptor.cpp
 - src/app/ui/ToolDescriptor.h
 - src/app/panels/ToolPropertyPanel.cpp
@@ -456,21 +460,21 @@ ToolDescriptor �� TextTool �p�t�H���g�T�C�Y�v���p�
 - src/core/tools/TextTool.cpp
 - src/core/tools/TextTool.h
 
-### ��������
-- cmake --build �ŃG���[ 0 ��
-- TextTool �I������ ToolPropertyPanel �Ƀt�H���g�T�C�Y SpinBox�i��: 8?144pt�j���\�������
-- SpinBox �̒l�ύX�� TextTool �ɔ��f�����i�`�敶���T�C�Y���ς��j
-- REVIEW_REQUIRED�iUI�ύX�̂��߁j
+### �E��E��E��E��E��E��E��E�
+- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
+- TextTool �E�I�E��E��E��E��E��E� ToolPropertyPanel �E�Ƀt�E�H�E��E��E�g�E�T�E�C�E�Y SpinBox�E�i�E��E�: 8?144pt�E�j�E��E��E�\�E��E��E��E��E��E��E�
+- SpinBox �E�̒l�E�ύX�E��E� TextTool �E�ɔ��E�f�E��E��E��E��E�i�E�`�E�敶�E��E��E�T�E�C�E�Y�E��E��E�ς��E�j
+- REVIEW_REQUIRED�E�iUI�E�ύX�E�̂��E�߁j
 
-### ���Ԍ��ς���
-60?90 ��
+### �E��E��E�Ԍ��E�ς��E��E�
+60?90 �E��E�
 
-### �֎~����
-- TextTool �̃e�L�X�g���̓_�C�A���O�S�ʍ��V
-- �t�H���g�t�@�~���[�I���@�\�̓����ǉ��i�{�^�X�N�̓T�C�Y�̂݁j
-- �V�K�N���X�E�V�K�t�@�C���̍쐬
+### �E�֎~�E��E��E��E�
+- TextTool �E�̃e�E�L�E�X�E�g�E��E��E�̓_�E�C�E�A�E��E��E�O�E�S�E�ʍ��E�V
+- �E�t�E�H�E��E��E�g�E�t�E�@�E�~�E��E��E�[�E�I�E��E��E�@�E�\�E�̓��E��E��E�ǉ��E�i�E�{�E�^�E�X�E�N�E�̓T�E�C�E�Y�E�̂݁j
+- �E�V�E�K�E�N�E��E��E�X�E�E�E�V�E�K�E�t�E�@�E�C�E��E��E�̍쐬
 
-### ���ؕ��@
+### �E��E��E�ؕ��E�@
 ```powershell
 cmake --build build --config Release
 .\launch.bat
