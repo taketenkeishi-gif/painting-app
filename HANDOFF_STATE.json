@@ -1,66 +1,39 @@
-﻿{
-    "updated_at":  "2026-06-07T06:18:12.6655006+09:00",
-    "next_steps":  [
-                       "未コミット変更を確認・コミット実行"
-                   ],
-    "commands_run":  [
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 cmake --build build --config Rele"
-                     ],
-    "current_files":  [
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
-                              "reason":  "修正"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
-                              "reason":  "修正"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
-                              "reason":  "修正"
-                          },
-                          {
-                              "path":  "statusBar|StatusBar|m_zoomStatusLabel|m_cursorPos|m_toolStatusLabel|m_activeLayer|m_selectionStatus",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "void MainWindow::updateDockTitleBars",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                              "reason":  "修正"
-                          },
-                          {
-                              "path":  "## task-35",
-                              "reason":  "調査"
-                          }
-                      ],
-    "decisions":  [
-
-                  ],
-    "investigated_files":  [
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
-                               "statusBar|StatusBar|m_zoomStatusLabel|m_cursorPos|m_toolStatusLabel|m_activeLayer|m_selectionStatus",
-                               "void MainWindow::updateDockTitleBars",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                               "## task-35"
-                           ],
-    "task_id":  "task-35",
+{
+    "updated_at":  "2026-06-07T06:45:00.0000000+09:00",
+    "task_id":  "task-36",
     "last_worker":  "worker-b",
-    "git_commit":  "cf02e7aea30c585a4daac4d1d16651503ca69fc6",
-    "last_reasoning":  "HANDOFF_STATE.json を最終更新します。",
+    "current_phase":  "completed",
+    "objective":  "AppController の m_dirty 直接代入を private setDirty(bool) メソッドに集約し、dirtyChanged シグナルを追加する",
+    "current_files":  [
+        "src/app/bridge/AppController.h",
+        "src/app/bridge/AppController.cpp"
+    ],
     "completed":  [
-                      "Modified: HANDOFF_STATE.json",
-                      "Modified: MainWindow.h",
-                      "Modified: MainWindow.cpp",
-                      "Modified: TASK_QUEUE.md",
-                      "Build: cmake --build 実行済み"
-                  ],
-    "git_diff_summary":  " HANDOFF_STATE.json                |  48 ++++---\n STATUS_REPORT.md                  |  10 +-\n TASK_QUEUE.md                     | 283 +++++++++++++++++++-------------------\n src/app/mainwindow/MainWindow.cpp |  70 +++++-----\n src/app/mainwindow/MainWindow.h   |   1 +\n 5 files changed, 216 insertions(+), 196 deletions(-)",
-    "objective":  "",
+        "AppController.h に dirtyChanged(bool) シグナルを追加",
+        "AppController.h に private void setDirty(bool) メソッド宣言を追加",
+        "AppController.h の markClean() を setDirty(false) 呼び出しに変更",
+        "AppController.cpp の documentChanged コネクト内 m_dirty = true を setDirty(true) に変更",
+        "AppController.cpp の newDocument() 内 m_dirty = false を setDirty(false) に変更",
+        "AppController.cpp の importFlattenedBuffer() 内 m_dirty = false を setDirty(false) に変更",
+        "AppController.cpp に setDirty() 実装を追加（変化時のみ dirtyChanged を emit）",
+        "cmake --build でビルド成功（エラー0件）"
+    ],
+    "decisions":  [
+        "setDirty() は m_dirty の値が変わった場合のみ emit することで不要なシグナル発火を防止",
+        "markClean() はインライン実装のまま setDirty(false) を呼ぶように変更（公開APIは維持）"
+    ],
+    "next_steps":  [
+        "MainWindow が dirtyChanged シグナルを受信して updateWindowTitle() を呼ぶ接続を追加すれば、dirty 変化をより正確にタイトルに反映できる（今回の範囲外）",
+        "タスクの review_required 確認・レビュー"
+    ],
     "blocked_reason":  "",
-    "current_phase":  "editing"
+    "git_commit":  "",
+    "commands_run":  [
+        "cmake --build build --config Release"
+    ],
+    "investigated_files":  [
+        "src/app/bridge/AppController.h",
+        "src/app/bridge/AppController.cpp"
+    ],
+    "git_diff_summary":  "AppController.h: dirtyChanged signal + setDirty() private decl / AppController.cpp: 3 direct m_dirty assignments -> setDirty() + implementation"
 }

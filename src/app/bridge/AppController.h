@@ -146,7 +146,7 @@ public:
   const core::SelectionMask& documentSelection() const noexcept { return m_document.selection(); }
   std::uint64_t compositeRevision() const noexcept { return m_compositeRevision; }
   bool isDirty() const noexcept { return m_dirty; }
-  void markClean() noexcept { m_dirty = false; }
+  void markClean() noexcept { setDirty(false); }
   CanvasOverlayViewModel canvasOverlay() const;
 
   std::vector<LayerViewModel> layerViewModels() const;
@@ -426,8 +426,10 @@ signals:
   void aiGenerationError(QString message);
   /// インペイント時に選択範囲がなかった
   void selectionMissing();
+  void dirtyChanged(bool dirty);
 
 private:
+  void setDirty(bool dirty) noexcept;
   enum class HistoryKind {
     Stroke,
     LayerVisibility,

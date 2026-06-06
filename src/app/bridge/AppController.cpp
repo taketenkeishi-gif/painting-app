@@ -296,7 +296,7 @@ AppController::AppController(QObject* parent)
   applyUiStateToTools();
   rerender();
 
-  connect(this, &AppController::documentChanged, this, [this]() { m_dirty = true; });
+  connect(this, &AppController::documentChanged, this, [this]() { setDirty(true); });
 }
 
 CanvasOverlayViewModel AppController::canvasOverlay() const {
@@ -441,7 +441,7 @@ void AppController::newDocument(int width, int height, int dpi) {
   emit toolStateChanged();
   emit layersChanged();
   emit documentChanged();
-  m_dirty = false;
+  setDirty(false);
 }
 
 bool AppController::resizeCanvas(int newWidth, int newHeight, int offsetX, int offsetY) {
@@ -1322,7 +1322,7 @@ void AppController::importFlattenedBuffer(const core::PixelBuffer& buffer, const
   emit toolStateChanged();
   emit layersChanged();
   emit documentChanged();
-  m_dirty = false;
+  setDirty(false);
 }
 
 bool AppController::pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName) {
@@ -3928,6 +3928,12 @@ void AppController::applyBatchCandidate(const QPixmap& px, const QString& layerN
   }
   pasteBufferAsNewRasterLayer(std::move(buf), layerName.toStdString());
   emit aiGenerationComplete("apply_candidate");
+}
+
+void AppController::setDirty(bool dirty) noexcept {
+  if (m_dirty == dirty) return;
+  m_dirty = dirty;
+  emit dirtyChanged(m_dirty);
 }
 
 } // namespace app::bridge
