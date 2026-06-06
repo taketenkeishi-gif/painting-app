@@ -37,16 +37,23 @@ QPointF pointFromHue(const QPointF& center, double radius, int hue) {
 
 ColorWheelWidget::ColorWheelWidget(QWidget* parent)
     : QWidget(parent) {
-  setMinimumSize(104, 104);
+  setMinimumSize(104, 104 + kHexEditMargin + kHexEditHeight);
   setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+
+  m_hexEdit = new QLineEdit(this);
+  m_hexEdit->setMaxLength(7);
+  m_hexEdit->setAlignment(Qt::AlignCenter);
+  m_hexEdit->setPlaceholderText(QStringLiteral("#RRGGBB"));
+  connect(m_hexEdit, &QLineEdit::returnPressed, this, &ColorWheelWidget::onHexReturnPressed);
+  updateHexEdit();
 }
 
 QSize ColorWheelWidget::sizeHint() const {
-  return QSize(210, 210);
+  return QSize(210, 210 + kHexEditMargin + kHexEditHeight);
 }
 
 QSize ColorWheelWidget::minimumSizeHint() const {
-  return QSize(104, 104);
+  return QSize(104, 104 + kHexEditMargin + kHexEditHeight);
 }
 
 QColor ColorWheelWidget::normalizedHsvColor(const QColor& color) const {
@@ -69,16 +76,21 @@ void ColorWheelWidget::setColor(const QColor& color) {
   }
   if (!m_color.isValid() || m_color.toHsv() != next) {
     m_color = next;
+    updateHexEdit();
     update();
   }
 }
 
+int ColorWheelWidget::wheelAreaHeight() const {
+  return height() - kHexEditMargin - kHexEditHeight;
+}
+
 QPointF ColorWheelWidget::centerPoint() const {
-  return QPointF(width() / 2.0, height() / 2.0);
+  return QPointF(width() / 2.0, wheelAreaHeight() / 2.0);
 }
 
 double ColorWheelWidget::outerRadius() const {
-  return std::max(10.0, std::min(width(), height()) * 0.5 - 2.0);
+  return std::max(10.0, std::min(width(), wheelAreaHeight()) * 0.5 - 2.0);
 }
 
 double ColorWheelWidget::innerRadius() const {
@@ -199,7 +211,7 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
   painter.setPen(QPen(QColor(10, 10, 10, 220), 1.3));
   painter.setBrush(QColor(240, 240, 240, 220));
   painter.save();
-  const QPointF hueDirection = hueHandle - QPointF(width() / 2.0, height() / 2.0);
+  const QPointF hueDirection = hueHandle - c;
   const double hueAngle =
       std::atan2(hueDirection.y(), hueDirection.x()) * 180.0 / 3.14159265358979323846 + 90.0;
   painter.translate(hueHandle);
@@ -219,7 +231,10 @@ void ColorWheelWidget::paintEvent(QPaintEvent* event) {
 
 void ColorWheelWidget::resizeEvent(QResizeEvent* event) {
   QWidget::resizeEvent(event);
-  m_ringCache = QImage();  // サイズ変更時にキャッシュを破棄
+  m_ringCache = QImage();
+  if (m_hexEdit) {
+    m_hexEdit->setGeometry(0, height() - kHexEditHeight, width(), kHexEditHeight);
+  }
 }
 
 bool ColorWheelWidget::updateHueFromPoint(const QPointF& point) {
@@ -231,6 +246,7 @@ bool ColorWheelWidget::updateHueFromPoint(const QPointF& point) {
   }
   next.setHsv(hue, next.hsvSaturation(), next.value(), next.alpha());
   m_color = normalizedHsvColor(next);
+  updateHexEdit();
   emit colorChanged(m_color);
   update();
   return true;
@@ -249,6 +265,7 @@ bool ColorWheelWidget::updateSvFromPoint(const QPointF& point) {
   }
   next.setHsv(next.hsvHue(), std::clamp(saturation, 0, 255), std::clamp(value, 0, 255), next.alpha());
   m_color = normalizedHsvColor(next);
+  updateHexEdit();
   emit colorChanged(m_color);
   update();
   return true;
@@ -286,6 +303,25 @@ void ColorWheelWidget::mouseReleaseEvent(QMouseEvent* event) {
   Q_UNUSED(event);
   m_dragHue = false;
   m_dragSv = false;
+}
+
+void ColorWheelWidget::updateHexEdit() {
+  if (!m_hexEdit) return;
+  const QString hex = m_color.toRgb().name().toUpper();
+  if (m_hexEdit->text().compare(hex, Qt::CaseInsensitive) != 0) {
+    m_hexEdit->setText(hex);
+  }
+}
+
+void ColorWheelWidget::onHexReturnPressed() {
+  const QString text = m_hexEdit->text().trimmed();
+  const QColor parsed(text);
+  if (!parsed.isValid()) return;
+  const QColor before = m_color;
+  setColor(parsed);
+  if (m_color != before) {
+    emit colorChanged(m_color);
+  }
 }
 
 } // namespace app::panels
