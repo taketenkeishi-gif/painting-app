@@ -5,9 +5,10 @@
 #include <tuple>
 #include <vector>
 
-#include <QColorDialog>
 #include <QCheckBox>
+#include <QColorDialog>
 #include <QComboBox>
+#include <QDebug>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFrame>
@@ -360,18 +361,13 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   dynamicsLayout->setContentsMargins(4, 4, 4, 4);
   dynamicsLayout->setSpacing(4);
 
-  auto* flowRow = new QHBoxLayout();
-  markResponsiveRow(flowRow);
-  flowRow->addWidget(m_flowSlider, 1);
-  flowRow->addWidget(m_flowSpin);
+  appendLabeledRow(dynamicsLayout, m_flowLabel, m_flowSlider, m_flowSpin);
 
   auto* spacingRow = new QHBoxLayout();
   markResponsiveRow(spacingRow);
   spacingRow->addWidget(m_spacingSlider, 1);
   spacingRow->addWidget(m_spacingSpin);
 
-  dynamicsLayout->addWidget(m_flowLabel);
-  dynamicsLayout->addLayout(flowRow);
   dynamicsLayout->addWidget(m_spacingLabel);
   dynamicsLayout->addLayout(spacingRow);
   contentLayout->addWidget(dynamicsGroup);
@@ -952,13 +948,13 @@ void ToolPropertyPanel::refreshFromController() {
   m_hardnessLabel->setVisible(showHardness);
   m_hardnessSlider->setVisible(showHardness);
   m_hardnessSpin->setVisible(showHardness);
-  m_flowLabel->setVisible(m_showDetails && supportsFlow);
-  m_flowSlider->setVisible(m_showDetails && supportsFlow);
-  m_flowSpin->setVisible(m_showDetails && supportsFlow);
+  m_flowLabel->setVisible(supportsFlow);
+  m_flowSlider->setVisible(supportsFlow);
+  m_flowSpin->setVisible(supportsFlow);
   m_spacingLabel->setVisible(m_showDetails && supportsSpacing);
   m_spacingSlider->setVisible(m_showDetails && supportsSpacing);
   m_spacingSpin->setVisible(m_showDetails && supportsSpacing);
-  m_brushDynamicsSection->setVisible(m_showDetails && (supportsFlow || supportsSpacing));
+  m_brushDynamicsSection->setVisible(supportsFlow || (m_showDetails && supportsSpacing));
   m_antiAliasCheck->setVisible(showAntiAlias);
   m_stabilizationLabel->setVisible(showStabilization);
   m_stabilizationSlider->setVisible(showStabilization);
@@ -1259,6 +1255,7 @@ void ToolPropertyPanel::onFlowSliderChanged(int value) {
   if (m_controller == nullptr || !m_controller->currentToolSupportsFlow()) {
     return;
   }
+  qDebug() << "[ToolPropertyPanel] Flow slider changed:" << value;
   const QSignalBlocker blocker(m_flowSpin);
   m_flowSpin->setValue(value);
   m_controller->setBrushFlow(value);
