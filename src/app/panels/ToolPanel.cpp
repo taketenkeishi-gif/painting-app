@@ -497,7 +497,8 @@ void ToolPanel::refreshFromController() {
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
     const bool enabled = m_controller->canUseToolOnActiveLayer(kind);
-    QString tip = QString("%1 [%2]").arg(toolNameJa(kind), toolShortcut(kind));
+    const QString sc = toolShortcut(kind);
+    QString tip = sc.isEmpty() ? toolNameJa(kind) : QString("%1 (%2)").arg(toolNameJa(kind), sc);
     if (!enabled) {
       tip = QString("%1（%2では使用不可）").arg(toolNameJa(kind), layerKind);
     }

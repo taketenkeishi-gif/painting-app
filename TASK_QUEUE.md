@@ -720,8 +720,10 @@ cmake --build build --config Release
 
 ---
 ## task-24
-status: in_progress
-attempt: 0
+status: review_required
+attempt: 1
+completed_by: worker-a
+summary: ToolDescriptor.h に shortcut フィールド追加。ToolDescriptor.cpp の全ツール（Brush=B, Eraser=E, Eyedropper=I, Fill=G, Line=U, RectSelection=R, MoveLayer=M, Hand=H, Zoom=Z, Gradient=なし）にショートカット設定。ToolPanel.cpp のツールチップフォーマットを [B] から (B) に変更、空ショートカット時はブラケットなし。ビルドエラー0。
 priority: medium
 role: developer
 category: feature

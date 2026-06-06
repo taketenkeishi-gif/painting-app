@@ -204,6 +204,7 @@ struct ToolDescriptor {
   std::vector<SubToolDescriptor> subTools;
   std::vector<ToolPropertyKey> availableProperties;
   std::string guide;
+  std::string shortcut;  ///< keyboard shortcut key label (e.g. "B"), empty if none
 };
 
 class ToolCatalog {
