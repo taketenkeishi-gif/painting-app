@@ -1,4 +1,4 @@
-# TASK QUEUE ?EPainting-app ai-night-test
+﻿# TASK QUEUE ?EPainting-app ai-night-test
 <!-- scheduler ??Estatus ??X?V?????E-->
 
 ## task-006
@@ -847,3 +847,305 @@ Fix task-20 -- supervisor detected fake success: No files modified despite succe
 
 ### Estimate
 30-60 min
+
+## task-28
+status: pending
+attempt: 0
+priority: high
+role: developer
+category: feature
+
+### 目的
+LayerPanel の下部に「新規レイヤー (+)」「レイヤー削除 (-)」ボタンを追加する。
+LayerPanel.cpp に QHBoxLayout + QPushButton を追加し、AppController::addLayer / removeLayer にシグナルを接続する。
+
+### 対象ファイル候補
+- src/app/panels/LayerPanel.cpp
+- src/app/panels/LayerPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- (+) ボタン押下で新規レイヤーが LayerPanel リストに追加される
+- (-) ボタン押下で選択中レイヤーが削除される
+- レイヤーが 0 件の場合、(-) ボタンが disabled になる
+
+### 時間見積もり
+45〜60 分
+
+### 禁止事項
+- 対象ファイル以外の新規クラス作成
+- AppController 側の addLayer / removeLayer 実装が未実装の場合はスタブ呼び出しで完了とする
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-29
+status: pending
+attempt: 0
+priority: high
+role: developer
+category: feature
+
+### 目的
+ToolPropertyPanel にブラシの Flow（不透明度流量）スライダーを追加する。
+task-27 で導入済みの appendLabeledRow() ヘルパーを使い、BrushTool 選択時のみ表示する m_flowSlider (0–100) を実装する。
+
+### 対象ファイル候補
+- src/app/panels/ToolPropertyPanel.cpp
+- src/app/panels/ToolPropertyPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- Brush ツール選択時に「Flow: 〇〇%」スライダーが ToolPropertyPanel に表示される
+- 他ツール選択時はスライダーが非表示になる
+- スライダー値変更時に AppController の対応スロットが呼ばれる（qDebug ログで確認可）
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- 新規 Widget クラスの作成（appendLabeledRow() を使う）
+- 他ツールのスライダーへの影響
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-30
+status: pending
+attempt: 0
+priority: high
+role: developer
+category: feature
+
+### 目的
+LayerPanel でレイヤー名をダブルクリックしてインライン編集できるようにする。
+QListWidgetItem::setFlags(Qt::ItemIsEditable | ...) を設定し、editingFinished 相当のシグナルで AppController::renameLayer を呼ぶ。
+
+### 対象ファイル候補
+- src/app/panels/LayerPanel.cpp
+- src/app/panels/LayerPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- レイヤー名をダブルクリックするとインライン QLineEdit が出現する
+- Enter 押下またはフォーカスアウトで名前変更が確定し、リストに反映される
+- Escape で変更がキャンセルされ元の名前に戻る
+
+### 時間見積もり
+45〜60 分
+
+### 禁止事項
+- モーダルダイアログでの名前入力（インライン編集のみ）
+- 新規ウィジェットクラスの作成
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-31
+status: pending
+attempt: 0
+priority: high
+role: developer
+category: feature
+
+### 目的
+CanvasWidget でマウス中ボタンドラッグによるキャンバスパン（移動）を実装する。
+m_isPanning フラグと m_panStartPos を追加し、mousePressEvent / mouseMoveEvent / mouseReleaseEvent で Qt::MiddleButton を処理する。
+
+### 対象ファイル候補
+- src/app/canvasview/CanvasWidget.cpp
+- src/app/canvasview/CanvasWidget.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- 中ボタン押下中にドラッグするとキャンバスが追従して移動する
+- 中ボタン離したときパン状態が終了し、既存ストローク処理に影響がない
+- パン中はカーソルが Qt::ClosedHandCursor に変わる
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- 既存の左ボタン描画ロジックへの変更
+- 右ボタン処理の変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-32
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: feature
+
+### 目的
+MainWindow に Ctrl+0「フィット表示（全体表示）」と Ctrl+1「100% 表示」のキーボードショートカットを追加する。
+CanvasWidget に fitToWindow() と resetZoom() スロットを追加し、MainWindow の QShortcut から接続する。
+
+### 対象ファイル候補
+- src/app/mainwindow/MainWindow.cpp
+- src/app/mainwindow/MainWindow.h
+- src/app/canvasview/CanvasWidget.cpp
+- src/app/canvasview/CanvasWidget.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- Ctrl+0 でキャンバス全体が CanvasWidget に収まるスケールに自動調整される
+- Ctrl+1 でズームが 100%（等倍）にリセットされる
+- ステータスバーのズーム表示が連動して更新される（既存 viewTransformChanged シグナルを使用）
+
+### 時間見積もり
+45〜60 分
+
+### 禁止事項
+- View メニューへの追加（ショートカット追加のみ）
+- 既存ズームロジックの削除・置き換え
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-33
+status: pending
+attempt: 0
+priority: high
+role: developer
+category: bug
+
+### 目的
+LayerPanel でレイヤーが 0 件のときボタン操作・refreshButtonState() が currentItem() == nullptr を参照してクラッシュするケースを防ぐ。
+各ハンドラ先頭に isEmpty() / currentItem() != nullptr ガードを追加する。
+
+### 対象ファイル候補
+- src/app/panels/LayerPanel.cpp
+
+### 成功条件
+- cmake --build でエラー 0 件
+- レイヤーを全削除した状態で上移動・下移動・不透明度スライダー操作を行ってもクラッシュしない
+- refreshButtonState() がレイヤー 0 件時に全ボタンを disabled に設定する
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- LayerPanel.h のインターフェース変更
+- AppController 側の変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-34
+status: pending
+attempt: 0
+priority: high
+role: developer
+category: bug
+
+### 目的
+CanvasWidget でストローク中にマウスカーソルがウィジェット外に出た場合、leaveEvent() でストロークを強制終了させる。
+現状は m_isDrawing が true のまま残り、次回マウスプレスで 2 重ストロークが発生しうる。
+
+### 対象ファイル候補
+- src/app/canvasview/CanvasWidget.cpp
+
+### 成功条件
+- cmake --build でエラー 0 件
+- ストローク中にカーソルを素早くウィジェット外へ出した後に戻って描画しても、不正なストローク継続が起きない
+- leaveEvent() で strokeEnd 相当処理が呼ばれ、m_isDrawing が false にリセットされる
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- mousePressEvent / mouseMoveEvent の既存フロー変更
+- 新規シグナル追加
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-35
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: refactor
+
+### 目的
+MainWindow のコンストラクタに散在するステータスバーラベル生成コード（zoom ラベル・カーソル座標ラベル等）を private メソッド setupStatusBar() に抽出し、コンストラクタをスリム化する。
+
+### 対象ファイル候補
+- src/app/mainwindow/MainWindow.cpp
+- src/app/mainwindow/MainWindow.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- コンストラクタに statusBar 関連コードが残らず setupStatusBar() 呼び出し 1 行になる
+- ステータスバーの表示内容・動作が変更前と完全に同一である
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- 既存のシグナル・スロット接続ロジックの変更
+- ステータスバーの UI 変更（リファクタのみ）
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-36
+status: pending
+attempt: 0
+priority: medium
+role: developer
+category: refactor
+
+### 目的
+AppController 全体に散在する `m_dirty = true` / `m_dirty = false` の直接代入を private ヘルパー `setDirty(bool)` に集約する。
+setDirty() 内で dirtyChanged シグナル emit と MainWindow タイトル更新を一元管理する。
+
+### 対象ファイル候補
+- src/app/bridge/AppController.cpp
+- src/app/bridge/AppController.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- AppController.cpp に `m_dirty = true` / `m_dirty = false` の直接代入が残らない
+- タイトルバーの dirty フラグ表示（`*` マーク）が変更前と同じタイミングで更新される
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- MainWindow 側のロジック変更
+- 既存の公開 API（isDirty() 等）のシグネチャ変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
