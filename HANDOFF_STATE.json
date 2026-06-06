@@ -1,74 +1,36 @@
-﻿{
-    "updated_at":  "2026-06-07T09:10:00.0000000+09:00",
-    "next_steps":  [
-                       "REVIEW: 新規キャンバス・ファイルを開く操作でダイアログが出ることを目視確認（launch.bat 起動）",
-                       "UIの文言（未保存の変更）が適切か確認"
-                   ],
-    "commands_run":  [
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git diff HEAD --stat",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 grep -n \"task-21\\|status:\\|summar",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 sed -n \u0027625,665p\u0027 TASK_QUEUE.md"
-                     ],
-    "current_files":  [
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
-                              "reason":  "修正"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.h",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.cpp",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "onNewCanvas|onOpenTriggered|onNewFromClipboard",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "task-21",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                              "reason":  "修正"
-                          },
-                          {
-                              "path":  "^status:|^summary_jp|^attempt:|^priority:",
-                              "reason":  "調査"
-                          }
-                      ],
-    "decisions":  [
-                      "ダイアログは QMessageBox::Discard | QMessageBox::Cancel の2択とした（Yes/Noより意図明確）",
-                      "デフォルトボタンを Cancel にして誤操作による作業消失を防ぐ設計を採用"
-                  ],
-    "investigated_files":  [
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.h",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.cpp",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
-                               "onNewCanvas|onOpenTriggered|onNewFromClipboard",
-                               "task-21",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                               "^status:|^summary_jp|^attempt:|^priority:"
-                           ],
-    "task_id":  "task-21",
+{
+    "updated_at":  "2026-06-07T09:30:00.0000000+09:00",
+    "task_id":  "task-22",
     "last_worker":  "worker-b-sonnet",
-    "git_commit":  "766645cc57363c46fa1322b446581e1187b6ba83",
-    "last_reasoning":  "次に HANDOFF_STATE.json を更新します。",
+    "git_commit":  "12b51a0",
+    "current_phase":  "completed",
+    "objective":  "updateWindowTitle()を実装し、タイトルバーにdirtyフラグ(*)を表示する",
+    "current_files":  [
+        "src/app/mainwindow/MainWindow.cpp",
+        "src/app/mainwindow/MainWindow.h"
+    ],
     "completed":  [
-                      "MainWindow::onNewCanvas に isDirty() チェックと QMessageBox::question 破棄確認ダイアログを追加（commit 033b1e5 済み）",
-                      "MainWindow::onOpenTriggered に同様の破棄確認ダイアログを追加（commit 033b1e5 済み）",
-                      "MainWindow::onNewFromClipboardTriggered に同様の破棄確認ダイアログを追加（commit 033b1e5 済み）",
-                      "TASK_QUEUE.md の task-21 ステータスを review_required + summary_jp に更新した"
-                  ],
-    "git_diff_summary":  " HANDOFF_STATE.json | 71 ++++++++++++++++++++++++------------------------------\n NIGHT_REPORT.md    | 11 +++------\n STATUS_REPORT.md   | 21 +++++++++-------\n TASK_QUEUE.md      |  3 ++-\n 4 files changed, 49 insertions(+), 57 deletions(-)",
-    "objective":  "新規/ファイルオープン時に未保存確認ダイアログを表示する（MainWindow の3メソッドに追加）",
+        "updateWindowTitle()を実装: dirty時は「*ファイル名 — Painting-app」、clean時は「ファイル名 — Painting-app」形式",
+        "documentChanged/layersChangedシグナルをupdateWindowTitleに接続（コンストラクタ568-569行）",
+        "saveImageFile()でmarkClean()+updateWindowTitle()を呼び出し、保存後にdirtyフラグをクリア",
+        "openImageFile()/onNewCanvas()/onNewFromClipboardTriggered()でupdateWindowTitle()を呼び出し"
+    ],
+    "decisions":  [
+        "dirty表示に「*」プレフィックスを採用（一般的なエディタ慣習に準拠）",
+        "documentChanged/layersChangedの両シグナルに接続することで、あらゆる変更を確実に捕捉"
+    ],
+    "next_steps":  [
+        "マネージャーによるレビュー確認",
+        "次のpendingタスクを実行"
+    ],
+    "investigated_files":  [
+        "src/app/mainwindow/MainWindow.cpp",
+        "src/app/mainwindow/MainWindow.h"
+    ],
+    "commands_run":  [
+        "cmake --build build --config Release (commit 12b51a0時点で成功済み)"
+    ],
     "blocked_reason":  "",
-    "current_phase":  "completed"
+    "last_reasoning":  "実装はcommit 12b51a0で完了済み。TASK_QUEUEのステータス更新のみ必要",
+    "git_diff_summary":  "src/app/mainwindow/MainWindow.cpp: updateWindowTitle()実装、signal接続、markClean()呼び出し追加"
 }

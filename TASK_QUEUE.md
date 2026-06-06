@@ -658,7 +658,8 @@ cmake --build build --config Release
 
 ---
 ## task-22
-status: pending
+status: review_required
+summary_jp: updateWindowTitle()を実装し、dirty時に「*ファイル名」形式でタイトルを更新。saveImageFile()でmarkClean()+updateWindowTitle()を呼び出し、documentChanged/layersChangedシグナルにも接続済み。
 attempt: 1
 priority: medium
 role: developer
