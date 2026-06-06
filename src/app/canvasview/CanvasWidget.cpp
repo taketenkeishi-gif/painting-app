@@ -591,6 +591,9 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   state.hasMousePos = true;
   const auto canvasPoint = mapToCanvas(state.lastMousePos);
   updateCursorForState(canvasPoint);
+  if (canvasPoint.has_value()) {
+    emit canvasPositionChanged(canvasPoint->x, canvasPoint->y);
+  }
 
   // Ctrl+Space drag → zoom
   if (m_ctrlSpaceZoom && (event->buttons() & Qt::LeftButton)) {
@@ -764,6 +767,11 @@ void CanvasWidget::mouseDoubleClickEvent(QMouseEvent* event) {
   auto& state = stateFor(this);
   state.hasLastStrokeDispatchPos = false;
   update();
+}
+
+void CanvasWidget::leaveEvent(QEvent* event) {
+  emit canvasPositionChanged(-1, -1);
+  QWidget::leaveEvent(event);
 }
 
 void CanvasWidget::wheelEvent(QWheelEvent* event) {

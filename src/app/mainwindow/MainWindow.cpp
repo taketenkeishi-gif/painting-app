@@ -571,6 +571,15 @@ MainWindow::MainWindow(QWidget* parent)
       m_zoomStatusLabel->setText(QString("ズーム: %1%").arg(m_canvasWidget->zoomPercent()));
     }
   });
+  connect(m_canvasWidget, &app::canvasview::CanvasWidget::canvasPositionChanged,
+          this, [this](int x, int y) {
+    if (m_cursorPosStatusLabel == nullptr) return;
+    if (x < 0 || y < 0) {
+      m_cursorPosStatusLabel->setText("X: -  Y: -");
+    } else {
+      m_cursorPosStatusLabel->setText(QString("X: %1  Y: %2").arg(x).arg(y));
+    }
+  });
 
   onToolStateChanged();
   updateUndoRedoState();
@@ -1735,6 +1744,9 @@ void MainWindow::createMenus() {
   m_activeLayerStatusLabel->setObjectName("ActiveLayerStatusLabel");
   m_zoomStatusLabel = new QLabel("ズーム: 100%", this);
   m_zoomStatusLabel->setObjectName("ZoomStatusLabel");
+  m_cursorPosStatusLabel = new QLabel("X: -  Y: -", this);
+  m_cursorPosStatusLabel->setObjectName("CursorPosStatusLabel");
+  m_cursorPosStatusLabel->setMinimumWidth(100);
   m_selectionStatusLabel = new QLabel("選択: OFF", this);
   m_selectionStatusLabel->setObjectName("SelectionStatusLabel");
   m_comfyUiStatusLabel = new QLabel("ComfyUI: 未接続", this);
@@ -1746,6 +1758,7 @@ void MainWindow::createMenus() {
   statusBar()->addWidget(m_guideStatusLabel, 1);
   statusBar()->addPermanentWidget(m_colorStatusLabel);
   statusBar()->addPermanentWidget(m_sizeStatusLabel);
+  statusBar()->addPermanentWidget(m_cursorPosStatusLabel);
   statusBar()->addPermanentWidget(m_zoomStatusLabel);
   statusBar()->addPermanentWidget(m_selectionStatusLabel);
   statusBar()->addPermanentWidget(m_activeLayerStatusLabel);

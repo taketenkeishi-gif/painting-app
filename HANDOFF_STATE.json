@@ -1,10 +1,9 @@
 ﻿{
-    "updated_at":  "2026-06-06T08:20:34.7862528+09:00",
+    "updated_at":  "2026-06-06T17:08:46.0933275+09:00",
     "next_steps":  [
                        "未コミット変更を確認・コミット実行"
                    ],
     "commands_run":  [
-                         "grep -n \"emit toolStateChanged\\|setCurrentTool\" \"C:\\Users\\Keishi\\Portfolio\\Paint",
                          "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 cmake --build build --config Rele"
                      ],
     "current_files":  [
@@ -13,15 +12,19 @@
                               "reason":  "修正"
                           },
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
                               "reason":  "修正"
                           },
                           {
-                              "path":  "task-18",
-                              "reason":  "調査"
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
+                              "reason":  "修正"
                           },
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
+                              "reason":  "修正"
+                          },
+                          {
+                              "path":  "zoomStatusLabel|statusBar|updateZoom|viewTransformChanged",
                               "reason":  "調査"
                           },
                           {
@@ -29,40 +32,52 @@
                               "reason":  "修正"
                           },
                           {
-                              "path":  "toolChanged|toolStateChanged|currentTool|onToolChanged",
+                              "path":  "mouseMoveEvent",
                               "reason":  "調査"
                           },
                           {
-                              "path":  "emit toolStateChanged|toolStateChanged\\(\\)",
+                              "path":  "void CanvasWidget::mouseReleaseEvent|void CanvasWidget::mouseDoubleClickEvent",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
+                              "reason":  "修正"
+                          },
+                          {
+                              "path":  "## task-20",
                               "reason":  "調査"
                           }
                       ],
     "decisions":  [
-                      "updateCursorForState 内で canvasPoint==nullopt の分岐を修正: m_controller==nullptr のみ unsetCursor、canvasPoint==nullopt はツール別カーソル設定へ",
-                      "Brush/Eraser はキャンバス外では BlankCursor を避け ArrowCursor を使用する",
-                      "RectSelection は canvasPoint がある場合のみ選択範囲ホバー判定、ない場合は CrossCursor をデフォルトにする"
+
                   ],
     "investigated_files":  [
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                               "task-18",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
+                               "zoomStatusLabel|statusBar|updateZoom|viewTransformChanged",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
-                               "toolChanged|toolStateChanged|currentTool|onToolChanged",
-                               "emit toolStateChanged|toolStateChanged\\(\\)"
+                               "mouseMoveEvent",
+                               "void CanvasWidget::mouseReleaseEvent|void CanvasWidget::mouseDoubleClickEvent",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
+                               "## task-20"
                            ],
-    "task_id":  "task-18",
+    "task_id":  "task-20",
     "last_worker":  "worker-b",
-    "git_commit":  "d324dc105c7dacf53e504025bb834a122602805e",
-    "last_reasoning":  "ビルド成功（エラー0件）。TASK_QUEUE.md を更新してコミットします。",
+    "git_commit":  "47b13d25d1b64fb2b87346e47f592fea776f97f4",
+    "last_reasoning":  "HANDOFF_STATE.json を更新します。",
     "completed":  [
-                      "Modified: HANDOFF_STATE.json",
+                      "Modified: CanvasWidget.h",
                       "Modified: CanvasWidget.cpp",
+                      "Modified: MainWindow.h",
+                      "Modified: MainWindow.cpp",
                       "Modified: TASK_QUEUE.md",
+                      "Modified: HANDOFF_STATE.json",
                       "Build: cmake --build 実行済み"
                   ],
-    "git_diff_summary":  " HANDOFF_STATE.json                  | 140 ++++++++---------\n NIGHT_REPORT.md                     |  78 +---------\n STATUS_REPORT.md                    |  16 +-\n TASK_QUEUE.md                       | 301 ++++++++++++++++++------------------\n src/app/canvasview/CanvasWidget.cpp |  31 ++--\n 5 files changed, 255 insertions(+), 311 deletions(-)",
-    "objective":  "",
+    "git_diff_summary":  " HANDOFF_STATE.json                   |  55 +++---\n NIGHT_REPORT.md                      |  85 ++-------\n STATUS_REPORT.md                     |  16 +-\n TASK_QUEUE.md                        | 334 +++++++++++++++++++----------------\n src/app/canvasview/CanvasWidget.cpp  |   8 +\n src/app/canvasview/CanvasWidget.h    |   2 +\n src/app/mainwindow/MainWindow.cpp    |  13 ++\n src/app/mainwindow/MainWindow.h      |   1 +\n src/app/panels/ToolPropertyPanel.cpp |  83 ++++-----\n src/app/panels/ToolPropertyPanel.h   |   7 +\n 10 files changed, 306 insertions(+), 298 deletions(-)",
+    "objective":  "ステータスバーにマウスカーソルのキャンバス座標 (X, Y) を X: N  Y: M 形式で表示",
     "blocked_reason":  "",
-    "current_phase":  "editing"
+    "current_phase":  "review_required"
 }

@@ -184,6 +184,7 @@ private:
   QLabel* m_colorStatusLabel {nullptr};
   QLabel* m_sizeStatusLabel {nullptr};
   QLabel* m_zoomStatusLabel {nullptr};
+  QLabel* m_cursorPosStatusLabel {nullptr};
   QLabel* m_activeLayerStatusLabel {nullptr};
   QLabel* m_selectionStatusLabel {nullptr};
   QLabel* m_navigatorImageLabel {nullptr};

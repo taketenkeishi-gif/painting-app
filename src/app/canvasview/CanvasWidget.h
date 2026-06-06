@@ -24,6 +24,7 @@ class CanvasWidget : public QWidget {
 
 signals:
   void viewTransformChanged();
+  void canvasPositionChanged(int x, int y);
 
 public:
   explicit CanvasWidget(QWidget* parent = nullptr);
@@ -52,6 +53,7 @@ protected:
   void keyPressEvent(QKeyEvent* event) override;
   void keyReleaseEvent(QKeyEvent* event) override;
   void tabletEvent(QTabletEvent* event) override;
+  void leaveEvent(QEvent* event) override;
 
 private slots:
   void refreshFromController();
