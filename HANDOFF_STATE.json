@@ -1,51 +1,25 @@
 ﻿{
-    "updated_at":  "2026-06-07T03:26:00.2587519+09:00",
-    "next_steps":  [
-                       "未コミット変更を確認・コミット実行"
-                   ],
-    "commands_run":  [
-                         "cd C:\\Users\\Keishi\\Portfolio\\Painting-app \u0026\u0026 git diff HEAD -- src/app/panels/Lay",
-                         "cd /mnt/c/Users/Keishi/Portfolio/Painting-app \u0026\u0026 git diff HEAD -- src/app/panels",
-                         "powershell.exe -Command \"cd \u0027C:\\Users\\Keishi\\Portfolio\\Painting-app\u0027; cmake --bu"
-                     ],
-    "current_files":  [
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\LayerPanel.cpp",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
-                              "reason":  "修正"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                              "reason":  "修正"
-                          },
-                          {
-                              "path":  "task-33",
-                              "reason":  "調査"
-                          }
-                      ],
-    "decisions":  [
-
-                  ],
-    "investigated_files":  [
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\LayerPanel.cpp",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                               "task-33"
-                           ],
-    "task_id":  "task-33",
-    "last_worker":  "worker-b",
-    "git_commit":  "2bd02559a0730df558ad08148e6f4e8d17a092a0",
-    "last_reasoning":  "ファイル全体を書き直します。",
-    "completed":  [
-                      "Modified: TASK_QUEUE.md",
-                      "Modified: HANDOFF_STATE.json",
-                      "Build: cmake --build 実行済み"
-                  ],
-    "git_diff_summary":  " HANDOFF_STATE.json            |  43 +++----\n NIGHT_REPORT.md               |   7 +-\n STATUS_REPORT.md              |  19 ++-\n TASK_QUEUE.md                 | 282 +++++++++++++++++++++---------------------\n src/app/panels/LayerPanel.cpp |   4 +-\n 5 files changed, 168 insertions(+), 187 deletions(-)",
-    "objective":  "",
-    "blocked_reason":  "",
-    "current_phase":  "editing"
+    "updated_at": "2026-06-07T03:33:00.0000000+09:00",
+    "task_id": "task-33",
+    "last_worker": "worker-b",
+    "current_phase": "done",
+    "objective": "LayerPanel::refreshButtonState() でリスト空または選択なし時にボタン群を正しくdisabledにする",
+    "completed": [
+        "LayerPanel.cpp: refreshButtonState()のhasSelection判定をcurrentItem()!=nullptrに修正",
+        "cmake --build build --config Release エラー0件確認",
+        "TASK_QUEUE.md: task-33をreview_requiredに更新",
+        "git commit: 171bbf8"
+    ],
+    "decisions": [
+        "currentItem() != nullptr はcurrentRow()>=0より確実に未選択状態を検出できる"
+    ],
+    "current_files": [
+        { "path": "src/app/panels/LayerPanel.cpp", "reason": "refreshButtonState() hasSelection 判定修正" }
+    ],
+    "investigated_files": ["src/app/panels/LayerPanel.cpp"],
+    "commands_run": ["cmake --build build --config Release"],
+    "next_steps": ["task-34 (CanvasWidget スタイラス/ホバー cursor) に着手"],
+    "git_commit": "171bbf8",
+    "blocked_reason": "",
+    "last_reasoning": "ビルド成功・コミット完了"
 }
