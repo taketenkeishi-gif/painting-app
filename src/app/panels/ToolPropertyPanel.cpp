@@ -928,7 +928,7 @@ void ToolPropertyPanel::refreshFromController() {
   const bool supportsStrokeWidth = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::StrokeWidth);
   m_sizeLabel->setText(supportsStrokeWidth ? "線幅" : "サイズ");
   const bool showColor = pinnedOrDetail(supportsColor, QStringLiteral("color"));
-  const bool showSize = pinnedOrDetail(supportsSize, QStringLiteral("size"));
+  const bool showSize = supportsStrokeWidth || pinnedOrDetail(supportsSize, QStringLiteral("size"));
   const bool showOpacity = pinnedOrDetail(supportsOpacity, QStringLiteral("opacity"));
   const bool showHardness = pinnedOrDetail(supportsHardness, QStringLiteral("hardness"));
   const bool showBlend = pinnedOrDetail(supportsBlend, QStringLiteral("blend"));

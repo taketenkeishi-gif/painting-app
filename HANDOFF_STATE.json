@@ -1,39 +1,80 @@
-{
-    "updated_at":  "2026-06-07T06:45:00.0000000+09:00",
-    "task_id":  "task-36",
-    "last_worker":  "worker-b",
-    "current_phase":  "completed",
-    "objective":  "AppController の m_dirty 直接代入を private setDirty(bool) メソッドに集約し、dirtyChanged シグナルを追加する",
-    "current_files":  [
-        "src/app/bridge/AppController.h",
-        "src/app/bridge/AppController.cpp"
-    ],
-    "completed":  [
-        "AppController.h に dirtyChanged(bool) シグナルを追加",
-        "AppController.h に private void setDirty(bool) メソッド宣言を追加",
-        "AppController.h の markClean() を setDirty(false) 呼び出しに変更",
-        "AppController.cpp の documentChanged コネクト内 m_dirty = true を setDirty(true) に変更",
-        "AppController.cpp の newDocument() 内 m_dirty = false を setDirty(false) に変更",
-        "AppController.cpp の importFlattenedBuffer() 内 m_dirty = false を setDirty(false) に変更",
-        "AppController.cpp に setDirty() 実装を追加（変化時のみ dirtyChanged を emit）",
-        "cmake --build でビルド成功（エラー0件）"
-    ],
-    "decisions":  [
-        "setDirty() は m_dirty の値が変わった場合のみ emit することで不要なシグナル発火を防止",
-        "markClean() はインライン実装のまま setDirty(false) を呼ぶように変更（公開APIは維持）"
-    ],
+﻿{
+    "updated_at":  "2026-06-07T08:35:18.3706646+09:00",
     "next_steps":  [
-        "MainWindow が dirtyChanged シグナルを受信して updateWindowTitle() を呼ぶ接続を追加すれば、dirty 変化をより正確にタイトルに反映できる（今回の範囲外）",
-        "タスクの review_required 確認・レビュー"
-    ],
-    "blocked_reason":  "",
-    "git_commit":  "",
+                       "launch.bat で起動し LineTool 選択時に「線幅」スライダーが常時表示されることを目視確認",
+                       "スライダー操作が LineTool の描画幅に正しく反映されることを確認",
+                       "REVIEW_REQUIRED: UI変更のため目視レビュー必須"
+                   ],
     "commands_run":  [
-        "cmake --build build --config Release"
-    ],
+                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 cmake --build build --config Rele",
+                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 grep -n \"task-9\\|## task-9\" TASK_"
+                     ],
+    "current_files":  [
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
+                              "reason":  "修正"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\ToolPropertyPanel.h",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\ui\\ToolDescriptor.h",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\ToolPropertyPanel.cpp",
+                              "reason":  "修正"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\ui\\ToolDescriptor.cpp",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\core\\tools\\LineTool.cpp",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "currentToolSupportsSize|currentToolHasProperty",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.cpp",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
+                              "reason":  "修正"
+                          }
+                      ],
+    "decisions":  [
+                      "currentToolSupportsSize() が Size||StrokeWidth を両方チェックするため onSizeSliderChanged のガード修正は不要",
+                      "ラベル切り替え（線幅/サイズ）は既存コードで実装済みのため変更なし",
+                      "最小限の1行変更（showSize 条件に supportsStrokeWidth を OR 追加）でタスク要件を満たした"
+                  ],
     "investigated_files":  [
-        "src/app/bridge/AppController.h",
-        "src/app/bridge/AppController.cpp"
-    ],
-    "git_diff_summary":  "AppController.h: dirtyChanged signal + setDirty() private decl / AppController.cpp: 3 direct m_dirty assignments -> setDirty() + implementation"
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\ToolPropertyPanel.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\ui\\ToolDescriptor.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\ToolPropertyPanel.cpp",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\ui\\ToolDescriptor.cpp",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\core\\tools\\LineTool.cpp",
+                               "currentToolSupportsSize|currentToolHasProperty",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.cpp",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md"
+                           ],
+    "task_id":  "task-9",
+    "last_worker":  "worker-b-sonnet",
+    "git_commit":  "2473aaa764c29332100db5dc1ae78376bd303b51",
+    "last_reasoning":  "HANDOFF_STATE.json を更新します。",
+    "completed":  [
+                      "Modified: ToolPropertyPanel.cpp",
+                      "Modified: TASK_QUEUE.md",
+                      "Modified: HANDOFF_STATE.json",
+                      "Build: cmake --build 実行済み"
+                  ],
+    "git_diff_summary":  " HANDOFF_STATE.json                   | 107 ++++++++----\n NIGHT_REPORT.md                      |  11 +-\n STATUS_REPORT.md                     |  16 +-\n TASK_QUEUE.md                        | 320 +++++++++++++++++------------------\n src/app/panels/ToolPropertyPanel.cpp |   2 +-\n 5 files changed, 245 insertions(+), 211 deletions(-)",
+    "objective":  "LineTool 選択時に ToolPropertyPanel の線幅スライダーを常時表示する",
+    "blocked_reason":  "",
+    "current_phase":  "review_required"
 }
