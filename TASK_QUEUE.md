@@ -522,11 +522,12 @@ cmake --build build --config Release
 
 ---
 ## task-18
-status: pending
+status: review_required
 attempt: 1
 priority: high
 role: developer
 category: bug
+summary_jp: updateCursorForState の canvasPoint==nullopt 分岐を修正。キャンバス矩形外でも setCursor() を呼ぶよう変更し、Brush/Eraser は ArrowCursor、RectSelection は CrossCursor をデフォルトとした。toolStateChanged シグナルで nullopt を渡すハンドラも追加。
 
 ### ???E???vE(worker-b)
 `updateCursorForState` ?? `canvasPoint==nullopt` ?E?????C???AE- ??X?E `!canvasPoint.has_value() || m_controller==nullptr` ?E`unsetCursor()`
