@@ -773,6 +773,16 @@ void CanvasWidget::mouseDoubleClickEvent(QMouseEvent* event) {
 }
 
 void CanvasWidget::leaveEvent(QEvent* event) {
+  auto& state = stateFor(this);
+  state.hasMousePos = false;
+
+  if (m_mouseDrawing && m_controller != nullptr) {
+    m_controller->endStroke();
+    m_mouseDrawing = false;
+    state.hasLastStrokeDispatchPos = false;
+    update();
+  }
+
   emit canvasPositionChanged(-1, -1);
   QWidget::leaveEvent(event);
 }
