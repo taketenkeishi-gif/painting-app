@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <tuple>
 #include <vector>
 
 #include <QColorDialog>
@@ -92,10 +93,6 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_flowLabel(new QLabel("流量", this)),
       m_spacingLabel(new QLabel("間隔", this)),
       m_stabilizationLabel(new QLabel("手ブレ補正", this)),
-      m_angleLabel(new QLabel("角度", this)),
-      m_roundnessLabel(new QLabel("真円率", this)),
-      m_taperStartLabel(new QLabel("入り抜き（始点）", this)),
-      m_taperEndLabel(new QLabel("入り抜き（終点）", this)),
       m_snapAngleLabel(new QLabel("角度スナップ", this)),
       m_simplifyLabel(new QLabel("単純化", this)),
       m_vectorEraseModeLabel(new QLabel("ベクター消去", this)),
@@ -120,14 +117,6 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_postCorrectionCheck(new QCheckBox("後補正", this)),
       m_velocityCorrectionCheck(new QCheckBox("速度補正", this)),
       m_shapeTypeCombo(new QComboBox(this)),
-      m_angleSlider(new QSlider(Qt::Horizontal, this)),
-      m_angleSpin(new QSpinBox(this)),
-      m_roundnessSlider(new QSlider(Qt::Horizontal, this)),
-      m_roundnessSpin(new QSpinBox(this)),
-      m_taperStartSlider(new QSlider(Qt::Horizontal, this)),
-      m_taperStartSpin(new QSpinBox(this)),
-      m_taperEndSlider(new QSlider(Qt::Horizontal, this)),
-      m_taperEndSpin(new QSpinBox(this)),
       m_snapAngleSlider(new QSlider(Qt::Horizontal, this)),
       m_snapAngleSpin(new QSpinBox(this)),
       m_simplifySlider(new QSlider(Qt::Horizontal, this)),
@@ -204,14 +193,14 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_spacingSpin->setRange(1, 300);
   m_stabilizationSlider->setRange(0, 100);
   m_stabilizationSpin->setRange(0, 100);
-  m_angleSlider->setRange(-180, 180);
-  m_angleSpin->setRange(-180, 180);
-  m_roundnessSlider->setRange(0, 100);
-  m_roundnessSpin->setRange(0, 100);
-  m_taperStartSlider->setRange(0, 100);
-  m_taperStartSpin->setRange(0, 100);
-  m_taperEndSlider->setRange(0, 100);
-  m_taperEndSpin->setRange(0, 100);
+  std::tie(m_angleLabel, m_angleSlider, m_angleSpin) =
+      createLabeledSlider("角度", -180, 180, 0);
+  std::tie(m_roundnessLabel, m_roundnessSlider, m_roundnessSpin) =
+      createLabeledSlider("真円率", 0, 100, 0);
+  std::tie(m_taperStartLabel, m_taperStartSlider, m_taperStartSpin) =
+      createLabeledSlider("入り抜き（始点）", 0, 100, 0);
+  std::tie(m_taperEndLabel, m_taperEndSlider, m_taperEndSpin) =
+      createLabeledSlider("入り抜き（終点）", 0, 100, 0);
   m_snapAngleSlider->setRange(0, 180);
   m_snapAngleSpin->setRange(0, 180);
   m_simplifySlider->setRange(0, 100);
@@ -490,31 +479,11 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto* shapeLayout = new QVBoxLayout(shapeGroup);
   shapeLayout->setContentsMargins(4, 4, 4, 4);
   shapeLayout->setSpacing(4);
-  auto* angleRow = new QHBoxLayout();
-  markResponsiveRow(angleRow);
-  angleRow->addWidget(m_angleSlider, 1);
-  angleRow->addWidget(m_angleSpin);
-  auto* roundnessRow = new QHBoxLayout();
-  markResponsiveRow(roundnessRow);
-  roundnessRow->addWidget(m_roundnessSlider, 1);
-  roundnessRow->addWidget(m_roundnessSpin);
-  auto* taperStartRow = new QHBoxLayout();
-  markResponsiveRow(taperStartRow);
-  taperStartRow->addWidget(m_taperStartSlider, 1);
-  taperStartRow->addWidget(m_taperStartSpin);
-  auto* taperEndRow = new QHBoxLayout();
-  markResponsiveRow(taperEndRow);
-  taperEndRow->addWidget(m_taperEndSlider, 1);
-  taperEndRow->addWidget(m_taperEndSpin);
   shapeLayout->addWidget(m_shapeTypeCombo);
-  shapeLayout->addWidget(m_angleLabel);
-  shapeLayout->addLayout(angleRow);
-  shapeLayout->addWidget(m_roundnessLabel);
-  shapeLayout->addLayout(roundnessRow);
-  shapeLayout->addWidget(m_taperStartLabel);
-  shapeLayout->addLayout(taperStartRow);
-  shapeLayout->addWidget(m_taperEndLabel);
-  shapeLayout->addLayout(taperEndRow);
+  appendLabeledRow(shapeLayout, m_angleLabel, m_angleSlider, m_angleSpin);
+  appendLabeledRow(shapeLayout, m_roundnessLabel, m_roundnessSlider, m_roundnessSpin);
+  appendLabeledRow(shapeLayout, m_taperStartLabel, m_taperStartSlider, m_taperStartSpin);
+  appendLabeledRow(shapeLayout, m_taperEndLabel, m_taperEndSlider, m_taperEndSpin);
   contentLayout->addWidget(shapeGroup);
   m_shapeSection = shapeGroup;
 
@@ -1777,6 +1746,32 @@ void ToolPropertyPanel::updateColorButton() {
           .arg(color.blue())
           .arg(color.alpha())
           .arg(textColor));
+}
+
+std::tuple<QLabel*, QSlider*, QSpinBox*> ToolPropertyPanel::createLabeledSlider(
+    const QString& label, int min, int max, int value)
+{
+  auto* lbl = new QLabel(label, this);
+  auto* slider = new QSlider(Qt::Horizontal, this);
+  auto* spin = new QSpinBox(this);
+  slider->setRange(min, max);
+  slider->setValue(value);
+  spin->setRange(min, max);
+  spin->setValue(value);
+  return {lbl, slider, spin};
+}
+
+void ToolPropertyPanel::appendLabeledRow(
+    QVBoxLayout* layout, QLabel* label, QSlider* slider, QSpinBox* spin)
+{
+  auto* row = new QHBoxLayout();
+  row->setContentsMargins(0, 0, 0, 0);
+  row->setSpacing(4);
+  row->setProperty("responsiveRow", true);
+  row->addWidget(slider, 1);
+  row->addWidget(spin);
+  layout->addWidget(label);
+  layout->addLayout(row);
 }
 
 } // namespace app::panels

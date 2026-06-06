@@ -1,14 +1,18 @@
 #pragma once
 
+#include <tuple>
+
 #include <QWidget>
 #include <QSet>
 
+class QHBoxLayout;
 class QLabel;
 class QPushButton;
 class QResizeEvent;
 class QSpinBox;
 class QSlider;
 class QScrollArea;
+class QVBoxLayout;
 class QWidget;
 class QCheckBox;
 class QComboBox;
@@ -115,6 +119,9 @@ private:
   void loadPinnedForCurrentTool();
   void savePinnedForCurrentTool() const;
   void refreshDetailToggleText();
+  std::tuple<QLabel*, QSlider*, QSpinBox*> createLabeledSlider(
+      const QString& label, int min, int max, int value);
+  void appendLabeledRow(QVBoxLayout* layout, QLabel* label, QSlider* slider, QSpinBox* spin);
 
   app::bridge::AppController* m_controller {nullptr};
   QScrollArea* m_scrollArea {nullptr};

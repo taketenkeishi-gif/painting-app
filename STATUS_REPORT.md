@@ -1,6 +1,6 @@
-﻿# STATUS REPORT
-Updated: 2026-06-05 20:11:00
-Phase: stopped
+# STATUS REPORT
+Updated: 2026-06-06 17:47:55
+Phase: running
 
 ---
 
@@ -8,14 +8,14 @@ Phase: stopped
 
 | Key | Value |
 |-----|-------|
-| Worker | — |
-| Task   | — |
-| Phase  | stopped |
+| Worker | worker-a |
+| Task   | task-27 |
+| Phase  | running |
 
 ## Worker Reset Times
 
-- worker-b : available
 - worker-a : available
+- worker-b : available
 
 ## Completed
 
@@ -27,11 +27,14 @@ Phase: stopped
 
 ## Review Required
 
-- task-006
+- task-23
+- task-24
+- task-25
+- task-26
 
 ## Last Event
 
-スケジューラー停止完了
+worker-a が task-27 を開始
 
 ---
-*Scheduler v6 - 2026-06-05 20:11:00*
+*Scheduler v6 - 2026-06-06 17:47:55*
