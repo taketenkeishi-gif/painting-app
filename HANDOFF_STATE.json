@@ -1,5 +1,5 @@
 ﻿{
-    "updated_at":  "2026-06-06T19:32:10.9262907+09:00",
+    "updated_at":  "2026-06-06T19:37:54.0341293+09:00",
     "next_steps":  [
                        "未コミット変更を確認・コミット実行"
                    ],
@@ -8,23 +8,31 @@
                      ],
     "current_files":  [
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\LayerPanel.h",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
                               "reason":  "調査"
                           },
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\LayerPanel.cpp",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
                               "reason":  "修正"
+                          },
+                          {
+                              "path":  "onResetZoomTriggered|onFitToScreenTriggered",
+                              "reason":  "調査"
                           },
                           {
                               "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
                               "reason":  "修正"
                           },
                           {
-                              "path":  "task-30",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
+                              "path":  "## task-32",
                               "reason":  "調査"
                           }
                       ],
@@ -32,23 +40,25 @@
 
                   ],
     "investigated_files":  [
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\LayerPanel.h",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\LayerPanel.cpp",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
+                               "onResetZoomTriggered|onFitToScreenTriggered",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                               "task-30",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json"
+                               "## task-32"
                            ],
-    "task_id":  "task-30",
+    "task_id":  "task-32",
     "last_worker":  "worker-b",
-    "git_commit":  "f4aca9084953fc6fb7a5db001d03eb1b16812b55",
-    "last_reasoning":  "HANDOFF_STATE.json を更新します。",
+    "git_commit":  "f44bbb58b20fd7ce61c7ea1d2c1c5551a67c2603",
+    "last_reasoning":  "TASK_QUEUE.md とHANDOFF_STATE.json を更新します。",
     "completed":  [
-                      "Modified: LayerPanel.cpp",
+                      "Modified: MainWindow.cpp",
                       "Modified: TASK_QUEUE.md",
                       "Build: cmake --build 実行済み"
                   ],
-    "git_diff_summary":  " HANDOFF_STATE.json            |  45 ++++---\n NIGHT_REPORT.md               |   7 +-\n STATUS_REPORT.md              |  19 ++-\n TASK_QUEUE.md                 | 286 +++++++++++++++++++++---------------------\n src/app/panels/LayerPanel.cpp |  43 +++++++\n 5 files changed, 219 insertions(+), 181 deletions(-)",
-    "objective":  "LayerPanel ダブルクリックによるインライン名前編集を実装。LayerItemDelegate に editor メソッド群を追加し、名前エリアに QLineEdit を配置。Enter で renameLayer、Escape で復元。",
+    "git_diff_summary":  " HANDOFF_STATE.json                |  46 ++++---\n NIGHT_REPORT.md                   |   7 +-\n STATUS_REPORT.md                  |  20 ++-\n TASK_QUEUE.md                     | 282 +++++++++++++++++++-------------------\n src/app/mainwindow/MainWindow.cpp |   4 +-\n 5 files changed, 182 insertions(+), 177 deletions(-)",
+    "objective":  "Ctrl+0 → fitToScreen, Ctrl+1 → resetZoom(100%) に変更",
     "blocked_reason":  "",
     "current_phase":  "completed"
 }

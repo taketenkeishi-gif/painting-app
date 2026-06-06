@@ -1241,8 +1241,8 @@ void MainWindow::createMenus() {
   m_brushSizeUpAction->setShortcut(QKeySequence(Qt::Key_BracketRight));
   m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
   m_zoomOutAction->setShortcut(QKeySequence::ZoomOut);
-  m_resetZoomAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
-  m_fitToScreenAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_9));
+  m_resetZoomAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_1));
+  m_fitToScreenAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
   m_toggleGridAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_QuoteLeft));
   m_toggleOverlayAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_8));
   m_resetWorkspaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_W));
