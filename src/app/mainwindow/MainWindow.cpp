@@ -565,6 +565,8 @@ MainWindow::MainWindow(QWidget* parent)
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateUndoRedoState);
   connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateNavigatorPreview);
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateNavigatorPreview);
+  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateWindowTitle);
+  connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateWindowTitle);
   connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, &MainWindow::updateNavigatorPreview);
   connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, [this]() {
     if (m_zoomStatusLabel != nullptr) {
@@ -587,6 +589,7 @@ MainWindow::MainWindow(QWidget* parent)
   updateTopToolInfo();
   updateColorPanel();
   updateNavigatorPreview();
+  updateWindowTitle();
 }
 
 void MainWindow::setupShellLayout() {
@@ -2303,6 +2306,14 @@ void MainWindow::applyUiChrome() {
   );
 }
 
+void MainWindow::updateWindowTitle() {
+  const bool dirty = m_controller && m_controller->isDirty();
+  const QString name = m_currentFilePath.isEmpty()
+      ? QString::fromUtf8(u8"無題")
+      : QFileInfo(m_currentFilePath).fileName();
+  setWindowTitle(QString("%1%2 — Painting-app").arg(dirty ? "*" : "", name));
+}
+
 void MainWindow::updateUndoRedoState() {
   if (m_undoAction == nullptr || m_redoAction == nullptr) {
     return;
@@ -2563,7 +2574,9 @@ void MainWindow::onNewCanvas() {
   m_lastCanvasWidth  = widthSpin->value();
   m_lastCanvasHeight = heightSpin->value();
   m_lastCanvasDpi    = dpiSpin->value();
+  m_currentFilePath.clear();
   m_controller->newDocument(m_lastCanvasWidth, m_lastCanvasHeight, m_lastCanvasDpi);
+  updateWindowTitle();
 }
 
 void MainWindow::onResizeCanvas() {
@@ -2770,6 +2783,7 @@ void MainWindow::onNewFromClipboardTriggered() {
   m_controller->importFlattenedBuffer(buffer, "クリップボード");
   m_currentFilePath.clear();
   statusBar()->showMessage("クリップボード画像から新規キャンバスを作成しました", 2200);
+  updateWindowTitle();
 }
 
 void MainWindow::onImportAsLayerTriggered() {
@@ -3861,6 +3875,7 @@ bool MainWindow::openImageFile(const QString& path) {
   m_currentFilePath = path;
   pushRecentFile(path);
   statusBar()->showMessage(QString("開きました: %1").arg(path), 2500);
+  updateWindowTitle();
   return true;
 }
 
@@ -3874,6 +3889,8 @@ bool MainWindow::saveImageFile(const QString& path) {
     statusBar()->showMessage(QString("保存に失敗しました: %1").arg(path), 2500);
     return false;
   }
+  m_controller->markClean();
+  updateWindowTitle();
   return true;
 }
 

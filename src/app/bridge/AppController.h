@@ -146,6 +146,7 @@ public:
   const core::SelectionMask& documentSelection() const noexcept { return m_document.selection(); }
   std::uint64_t compositeRevision() const noexcept { return m_compositeRevision; }
   bool isDirty() const noexcept { return m_dirty; }
+  void markClean() noexcept { m_dirty = false; }
   CanvasOverlayViewModel canvasOverlay() const;
 
   std::vector<LayerViewModel> layerViewModels() const;

@@ -148,6 +148,7 @@ private:
   void saveShortcutOverride(const QString& commandId, const QKeySequence& sequence);
   QAction* createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut);
   void auditUIMetrics();
+  void updateWindowTitle();
   void updateDockTitleBars();
 
   app::bridge::AppController* m_controller {nullptr};
