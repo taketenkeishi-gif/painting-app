@@ -488,8 +488,9 @@ cmake --build build --config Release
 ---
 
 ## task-17
-status: pending
+status: review_required
 attempt: 1
+summary_jp: Opacity スライダー・angle/roundness/taperStart/taperEnd スライダーは既に実装済みであることを確認。QSlider+QSpinBox の双方向シンク、setBrushOpacity/setBrushAngle/setBrushRoundness/setBrushTaperStart/setBrushTaperEnd への接続、refreshFromController() での UI 同期、すべて正常動作を確認。
 priority: high
 role: developer
 category: feature
