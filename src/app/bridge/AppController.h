@@ -145,6 +145,7 @@ public:
   const core::PixelBuffer& compositedBuffer() const noexcept { return m_composited; }
   const core::SelectionMask& documentSelection() const noexcept { return m_document.selection(); }
   std::uint64_t compositeRevision() const noexcept { return m_compositeRevision; }
+  bool isDirty() const noexcept { return m_dirty; }
   CanvasOverlayViewModel canvasOverlay() const;
 
   std::vector<LayerViewModel> layerViewModels() const;
@@ -530,6 +531,7 @@ private:
   std::size_t m_maxStrokeHistory {50};
   std::optional<core::Rect> m_lastCompositeDirtyRect;
   std::uint64_t m_compositeRevision {0};
+  bool m_dirty {false};
 };
 
 } // namespace app::bridge

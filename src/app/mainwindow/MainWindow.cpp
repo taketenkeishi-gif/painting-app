@@ -2406,6 +2406,17 @@ void MainWindow::onRedoTriggered() {
 }
 
 void MainWindow::onNewCanvas() {
+  if (m_controller && m_controller->isDirty()) {
+    const int ret = QMessageBox::question(
+        this,
+        "未保存の変更",
+        "保存されていない変更があります。新規キャンバスを作成しますか？",
+        QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Cancel);
+    if (ret != QMessageBox::Discard) {
+      return;
+    }
+  }
   QDialog dialog(this);
   dialog.setWindowTitle("新規キャンバス");
   dialog.setMinimumWidth(360);
@@ -2712,6 +2723,17 @@ void MainWindow::onToolStateChanged() {
 }
 
 void MainWindow::onOpenTriggered() {
+  if (m_controller && m_controller->isDirty()) {
+    const int ret = QMessageBox::question(
+        this,
+        "未保存の変更",
+        "保存されていない変更があります。ファイルを開きますか？",
+        QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Cancel);
+    if (ret != QMessageBox::Discard) {
+      return;
+    }
+  }
   const QString path = QFileDialog::getOpenFileName(
       this,
       "画像を開く",
@@ -2724,6 +2746,17 @@ void MainWindow::onOpenTriggered() {
 }
 
 void MainWindow::onNewFromClipboardTriggered() {
+  if (m_controller && m_controller->isDirty()) {
+    const int ret = QMessageBox::question(
+        this,
+        "未保存の変更",
+        "保存されていない変更があります。クリップボードから新規キャンバスを作成しますか？",
+        QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Cancel);
+    if (ret != QMessageBox::Discard) {
+      return;
+    }
+  }
   const QImage image = QGuiApplication::clipboard()->image();
   if (image.isNull()) {
     statusBar()->showMessage("クリップボードに画像がありません", 1800);

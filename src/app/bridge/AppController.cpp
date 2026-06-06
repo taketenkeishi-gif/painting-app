@@ -295,6 +295,8 @@ AppController::AppController(QObject* parent)
   setBrushColor(core::Color::OpaqueBlack());
   applyUiStateToTools();
   rerender();
+
+  connect(this, &AppController::documentChanged, this, [this]() { m_dirty = true; });
 }
 
 CanvasOverlayViewModel AppController::canvasOverlay() const {
@@ -439,6 +441,7 @@ void AppController::newDocument(int width, int height, int dpi) {
   emit toolStateChanged();
   emit layersChanged();
   emit documentChanged();
+  m_dirty = false;
 }
 
 bool AppController::resizeCanvas(int newWidth, int newHeight, int offsetX, int offsetY) {
@@ -1317,6 +1320,7 @@ void AppController::importFlattenedBuffer(const core::PixelBuffer& buffer, const
   emit toolStateChanged();
   emit layersChanged();
   emit documentChanged();
+  m_dirty = false;
 }
 
 bool AppController::pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName) {
