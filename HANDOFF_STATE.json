@@ -1,80 +1,74 @@
 ﻿{
-    "updated_at":  "2026-06-07T08:49:20.1185838+09:00",
+    "updated_at":  "2026-06-07T09:10:00.0000000+09:00",
     "next_steps":  [
-                       "未コミット変更を確認・コミット実行"
+                       "REVIEW: 新規キャンバス・ファイルを開く操作でダイアログが出ることを目視確認（launch.bat 起動）",
+                       "UIの文言（未保存の変更）が適切か確認"
                    ],
     "commands_run":  [
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 cmake --build build --config Rele",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 powershell -Command \"Get-Content "
+                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git diff HEAD --stat",
+                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 grep -n \"task-21\\|status:\\|summar",
+                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 sed -n \u0027625,665p\u0027 TASK_QUEUE.md"
                      ],
     "current_files":  [
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
-                              "reason":  "調査"
-                          },
-                          {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
-                              "reason":  "調査"
-                          },
                           {
                               "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
                               "reason":  "修正"
                           },
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.h",
                               "reason":  "調査"
                           },
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.cpp",
                               "reason":  "調査"
                           },
                           {
-                              "path":  "m_cursorPosStatusLabel",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
                               "reason":  "調査"
                           },
                           {
-                              "path":  "setupStatusBar",
+                              "path":  "onNewCanvas|onOpenTriggered|onNewFromClipboard",
                               "reason":  "調査"
                           },
                           {
-                              "path":  "task-20",
+                              "path":  "task-21",
                               "reason":  "調査"
                           },
                           {
                               "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
                               "reason":  "修正"
+                          },
+                          {
+                              "path":  "^status:|^summary_jp|^attempt:|^priority:",
+                              "reason":  "調査"
                           }
                       ],
     "decisions":  [
-                      "canvasPositionChanged は canvasPoint.has_value() の場合のみ emit — leaveEvent で (-1,-1) をクリアする設計で十分",
-                      "m_cursorPosStatusLabel は setupStatusBar() で生成・追加済み、nullptr ガードあり"
+                      "ダイアログは QMessageBox::Discard | QMessageBox::Cancel の2択とした（Yes/Noより意図明確）",
+                      "デフォルトボタンを Cancel にして誤操作による作業消失を防ぐ設計を採用"
                   ],
     "investigated_files":  [
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
-                               "m_cursorPosStatusLabel",
-                               "setupStatusBar",
-                               "task-20",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md"
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.cpp",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
+                               "onNewCanvas|onOpenTriggered|onNewFromClipboard",
+                               "task-21",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
+                               "^status:|^summary_jp|^attempt:|^priority:"
                            ],
-    "task_id":  "task-20",
+    "task_id":  "task-21",
     "last_worker":  "worker-b-sonnet",
-    "git_commit":  "087beeb499b64c74da45ddb1b965b39119b3f1bf",
-    "last_reasoning":  "task-20 の全実装が先行 worker によって完了済みを確認。ビルド成功後 TASK_QUEUE を review_required に更新。",
+    "git_commit":  "766645cc57363c46fa1322b446581e1187b6ba83",
+    "last_reasoning":  "次に HANDOFF_STATE.json を更新します。",
     "completed":  [
-                      "CanvasWidget.h に canvasPositionChanged シグナル宣言確認",
-                      "mouseMoveEvent で canvasPositionChanged emit 確認",
-                      "leaveEvent で canvasPositionChanged(-1,-1) emit 確認",
-                      "MainWindow コンストラクタでシグナルスロット接続確認",
-                      "setupStatusBar() で m_cursorPosStatusLabel 生成確認",
-                      "cmake --build build --config Release エラー0確認",
-                      "TASK_QUEUE.md の task-20 を review_required に更新"
+                      "MainWindow::onNewCanvas に isDirty() チェックと QMessageBox::question 破棄確認ダイアログを追加（commit 033b1e5 済み）",
+                      "MainWindow::onOpenTriggered に同様の破棄確認ダイアログを追加（commit 033b1e5 済み）",
+                      "MainWindow::onNewFromClipboardTriggered に同様の破棄確認ダイアログを追加（commit 033b1e5 済み）",
+                      "TASK_QUEUE.md の task-21 ステータスを review_required + summary_jp に更新した"
                   ],
-    "git_diff_summary":  " HANDOFF_STATE.json | 50 +++++++++++++++++++++++++++++++++++---------------\n NIGHT_REPORT.md    | 11 ++++-------\n STATUS_REPORT.md   | 20 +++++++++++---------\n TASK_QUEUE.md      |  3 ++-\n 4 files changed, 52 insertions(+), 32 deletions(-)",
-    "objective":  "ステータスバーにマウスカーソルのキャンバス座標 (X, Y) を表示する",
+    "git_diff_summary":  " HANDOFF_STATE.json | 71 ++++++++++++++++++++++++------------------------------\n NIGHT_REPORT.md    | 11 +++------\n STATUS_REPORT.md   | 21 +++++++++-------\n TASK_QUEUE.md      |  3 ++-\n 4 files changed, 49 insertions(+), 57 deletions(-)",
+    "objective":  "新規/ファイルオープン時に未保存確認ダイアログを表示する（MainWindow の3メソッドに追加）",
     "blocked_reason":  "",
     "current_phase":  "completed"
 }

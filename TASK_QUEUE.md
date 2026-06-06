@@ -626,7 +626,8 @@ cmake --build build --config Release
 
 ---
 ## task-21
-status: pending
+status: review_required
+summary_jp: MainWindow の onNewCanvas / onOpenTriggered / onNewFromClipboardTriggered に isDirty() チェックを追加し、未保存変更がある場合は QMessageBox::question で破棄確認ダイアログを表示するよう実装した。キャンセル時は処理を中断し、Discard 選択時のみ次処理に進む。
 attempt: 1
 priority: high
 role: developer
