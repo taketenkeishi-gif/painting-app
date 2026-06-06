@@ -527,6 +527,49 @@ QString layerPaintName(const QModelIndex& index) {
 
     return QStyledItemDelegate::editorEvent(event, model, option, index);
   }
+
+  QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+    Q_UNUSED(option);
+    if (index.data(kPaperRole).toBool()) {
+      return nullptr;
+    }
+    auto* editor = new QLineEdit(parent);
+    editor->setFrame(false);
+    editor->setStyleSheet(
+        "QLineEdit {"
+        "  background: #1a2030;"
+        "  color: #edf0f9;"
+        "  border: 1px solid #4e8ef7;"
+        "  border-radius: 2px;"
+        "  padding: 0px 2px;"
+        "}");
+    return editor;
+  }
+
+  void setEditorData(QWidget* editor, const QModelIndex& index) const override {
+    auto* lineEdit = qobject_cast<QLineEdit*>(editor);
+    if (lineEdit == nullptr) {
+      return;
+    }
+    lineEdit->setText(layerPaintName(index));
+    lineEdit->selectAll();
+  }
+
+  void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override {
+    auto* lineEdit = qobject_cast<QLineEdit*>(editor);
+    if (lineEdit == nullptr) {
+      return;
+    }
+    const QString text = lineEdit->text().trimmed();
+    if (!text.isEmpty()) {
+      model->setData(index, text, Qt::EditRole);
+    }
+  }
+
+  void updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+    const bool hasMask = index.data(kHasMaskRole).toBool();
+    editor->setGeometry(layerNameRect(option.rect, hasMask));
+  }
 };
 
 } // namespace

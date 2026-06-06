@@ -591,7 +591,7 @@ cmake --build build --config Release
 ## task-20
 status: review_required
 attempt: 1
-completed_summary: CanvasWidget �E��E� canvasPositionChanged(int x,int y) �E�V�E�O�E�i�E��E��E��E�ǉ��E�AmouseMoveEvent �E��E� emit�E�AleaveEvent �E��E� (-1,-1) �E��E�emit�E�AEainWindow �E��E� m_cursorPosStatusLabel �E��E�ǉ��E��E��E�ăX�E�`E?E?E?E?E�E�^�E�X�E�o?E�E�E�E��E��E�ɕ\�E��E��E�Bcmake --build �E�G�E��E��E�[0�E��E��E�m�E�F�E�ς݁AEpriority: high
+completed_summary: CanvasWidget �E�E�E��E�E�E� canvasPositionChanged(int x,int y) �E�E�E�V�E�E�E�O�E�E�E�i�E�E�E��E�E�E��E�E�E��E�E�E�ǉ��E�E�E�AmouseMoveEvent �E�E�E��E�E�E� emit�E�E�E�AleaveEvent �E�E�E��E�E�E� (-1,-1) �E�E�E��E�E�E�emit�E�E�E�AEainWindow �E�E�E��E�E�E� m_cursorPosStatusLabel �E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E�ăX�E�E�E�`E?E?E?E?E�E�E�E�^�E�E�E�X�E�E�E�o?E�E�E�E�E�E�E�E��E�E�E��E�E�E�ɕ\�E�E�E��E�E�E��E�E�E�Bcmake --build �E�E�E�G�E�E�E��E�E�E��E�E�E�[0�E�E�E��E�E�E��E�E�E�m�E�E�E�F�E�E�E�ς݁AEpriority: high
 role: developer
 category: feature
 
@@ -627,7 +627,7 @@ attempt: 1
 priority: high
 role: developer
 category: bug
-completed_summary: AppController.h�E��E�isDirty()/m_dirty�E�ǉ��E�B�E�R�E��E��E�X�E�g�E��E��E�N�E�^�E��E�documentChanged�E�V�E�O�E�i�E��E��E�ɁE���E��E��E�_�E��E�?Em_dirty=true)�E�BnewDocument/importFlattenedBuffer�E��E��E��E��E��E�m_dirty=false�E�AEainWindow::onNewCanvas/onOpenTriggered/onNewFromClipboardTriggered�E��E�3?E?E??E?�E��E�QMessageBox::question�E�ɂ�関�E�ۑ��E�m�E�F�E�_�E�C�E�A�E��E��E�O�E��E�ǉ��E�B�E�r�E��E��E�h�E�G�E��E��E�[0�E��E��E�AE
+completed_summary: AppController.h�E�E�E��E�E�E�isDirty()/m_dirty�E�E�E�ǉ��E�E�E�B�E�E�E�R�E�E�E��E�E�E��E�E�E�X�E�E�E�g�E�E�E��E�E�E��E�E�E�N�E�E�E�^�E�E�E��E�E�E�documentChanged�E�E�E�V�E�E�E�O�E�E�E�i�E�E�E��E�E�E��E�E�E�ɁE�E��E��E�E�E��E�E�E��E�E�E�_�E�E�E��E�E�E�?Em_dirty=true)�E�E�E�BnewDocument/importFlattenedBuffer�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�m_dirty=false�E�E�E�AEainWindow::onNewCanvas/onOpenTriggered/onNewFromClipboardTriggered�E�E�E��E�E�E�3?E?E??E?�E�E�E��E�E�E�QMessageBox::question�E�E�E�ɂ�関�E�E�E�ۑ��E�E�E�m�E�E�E�F�E�E�E�_�E�E�E�C�E�E�E�A�E�E�E��E�E�E��E�E�E�O�E�E�E��E�E�E�ǉ��E�E�E�B�E�E�E�r�E�E�E��E�E�E��E�E�E�h�E�E�E�G�E�E�E��E�E�E��E�E�E�[0�E�E�E��E�E�E��E�E�E�AE
 ### ?E?E?E??I
 `AppController.cpp` ?E?E?E??u?E?E?E?V?E?E?E?K?E?E?E??E?E?E??E?E?E?v?E?E?E?u?E?E?E?t?E?E?E?@?E?E?E?C?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?J?E?E?E??E?E?E??E?E?E?v?E?E?E?u?E?E?E?A?E?E?E?v?E?E?E??E?E?E??E?E?E?I?E?E?E??E?E?E??E?E?E?v?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??A?E?E?E?h?E?E?E?L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?g?E?E?E????E?E?E????E?E?E???X?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E??E??x?E?E?E??E?E?E??E?E?E?_?E?E?E?C?E?E?E?A?E?E?E??E?E?E??E?E?E?O?E?E?E??E?E?E??E?E?E?\?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?C?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B`Document` ?E?E?E??E?E?E? dirty ?E?E?E?t?E?E?E??E?E?E??E?E?E?O?E?E?E??E?E?E??E?E?E?m?E?E?E?F?E?E?E??E?E?E??E?E?E?A`QMessageBox::question` ?E?E?E?????E?E?E?E?E?E?E?j?E?E?E??E?E?E??E?E?E?E?E?E?E?L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?Z?E?E?E??E?E?E??E?E?E??I?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?\?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B
 
@@ -659,7 +659,7 @@ priority: medium
 role: developer
 category: refactor
 completed_by: worker-b
-summary: updateWindowTitle()�E��E�ǉ��E�AEppController::markClean()�E�ǉ��E�BsaveImageFile()�E��E��E��E��E��E��E��E�markClean()+updateWindowTitle()�E�Ăяo�E��E��E�BopenImageFile()/onNewCanvas()/onNewFromClipboardTriggered()�E�ł�updateWindowTitle()�E�Ăяo�E��E��E�BdocumentChanged/layersChanged�E�V�E�O�E�i�E��E��E��E�updateWindowTitle�E�ɐڑ��E�B�E�r�E��E��E�h�E�G�E��E��E�[0�E�AE
+summary: updateWindowTitle()�E�E�E��E�E�E�ǉ��E�E�E�AEppController::markClean()�E�E�E�ǉ��E�E�E�BsaveImageFile()�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�markClean()+updateWindowTitle()�E�E�E�Ăяo�E�E�E��E�E�E��E�E�E�BopenImageFile()/onNewCanvas()/onNewFromClipboardTriggered()�E�E�E�ł�updateWindowTitle()�E�E�E�Ăяo�E�E�E��E�E�E��E�E�E�BdocumentChanged/layersChanged�E�E�E�V�E�E�E�O�E�E�E�i�E�E�E��E�E�E��E�E�E��E�E�E�updateWindowTitle�E�E�E�ɐڑ��E�E�E�B�E�E�E�r�E�E�E��E�E�E��E�E�E�h�E�E�E�G�E�E�E��E�E�E��E�E�E�[0�E�E�E�AE
 ### ?E?E?E??I
 `MainWindow.cpp` ?E?E?E??E?E?E??E?E?E??E?E?E?E?B?E?E?E??E?E?E??E?E?E?h?E?E?E?E?E?E?E?^?E?E?E?C?E?E?E?g?E?E?E??E?E?E??E?E?E?i?E?E?E?t?E?E?E?@?E?E?E?C?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?Edirty ?E?E?E??E?E?E??j?E?E?E??E?E?E??E?E?E?X?E?E?E?V?E?E?E??E?E?E??E?E?E??E?E?E?R?E?E?E?[?E?E?E?h?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E????E?E?E??U?E?E?E????E?E?E????E?E?E??E?E?E?B`updateWindowTitle()` ?E?E?E?v?E?E?E??E?E?E??E?E?E?C?E?E?E?x?E?E?E?[?E?E?E?g?E?E?E?X?E?E?E??E?E?E??E?E?E?b?E?E?E?g?E?E?E??W?E?E?E???A?E?E?E?h?E?E?E?L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?g?E?E?E??X?E?E?E?V?E?E?E?O?E?E?E?i?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E?`?E?E?E????E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B
 
@@ -692,7 +692,7 @@ priority: high
 role: developer
 category: feature
 completed_by: worker-b
-summary: refreshButtonState()�E��E�opacity�E��E��E��E��E��E�ǉ��E�iblend mode�E�ƈ�ѐ��E�j�E�BAppController::setLayerOpacity/setLayerBlendMode�E��E�emit canvasChanged()�E��E�ǉ��E��E��E�ăL�E��E��E��E��E�o�E�X�E�ĕ`�E��E��E�ۏ؁B�E�r�E��E��E�h�E�G�E��E��E�[0�E�B
+summary: refreshButtonState()�E�E�E��E�E�E�opacity�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ǉ��E�E�E�iblend mode�E�E�E�ƈ�ѐ��E�E�E�j�E�E�E�BAppController::setLayerOpacity/setLayerBlendMode�E�E�E��E�E�E�emit canvasChanged()�E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E�ăL�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�o�E�E�E�X�E�E�E�ĕ`�E�E�E��E�E�E��E�E�E�ۏ؁B�E�E�E�r�E�E�E��E�E�E��E�E�E�h�E�E�E�G�E�E�E��E�E�E��E�E�E�[0�E�E�E�B
 
 ### ?E?E?E??I
 `LayerPanel.cpp` ?E?E?E??E?E??E??E?E?E?C?E?E?E??E?E?E??E?E?E?[?E?E?E?s?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?x?E?E?E?X?E?E?E??E?E?E??E?E?E?C?E?E?E?_?E?E?E?[?E?E?E?i0?100%?E?E?E?j?E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E?B?E?E?E?I?E?E?E??E?E?E?E?E??E?E?E?C?E?E?E??E?E?E??E?E?E?[?E?E?E??E?E?E? opacity ?E?E?E?l?E?E?E??E?E?E?\?E?E?E??E?E?E??E?E?E?E?E?E?E??X?E?E?E????E?E?E?A`LayerManager` ?E?E?E????E?E?E??E?E?E? `Document` ?E?E?E?o?E?E?E?R?E?E?E??E?E??E??E?E?E?C?E?E?E??E?E?E??E?E?E?[?E?E?E????E?E?E?f?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B?E?E?E?X?E?E?E??E?E?E??E?E?E?C?E?E?E?_?E?E?E?[?E?E?E??X?E?E?E??E?E?E??E?E?E??E?E?E? `update()` ?E?E?E??L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?o?E?E?E?X?E?E?E??E?E?E??E?E?E??`?E?E?E???E?E?E??E?E?E?B
@@ -723,7 +723,7 @@ cmake --build build --config Release
 status: review_required
 attempt: 1
 completed_by: worker-a
-summary: ToolDescriptor.h �E��E� shortcut �E�t�E�B�E�[�E��E��E�h�E�ǉ��E�BToolDescriptor.cpp �E�̑S�E�c�E�[�E��E��E�iBrush=B, Eraser=E, Eyedropper=I, Fill=G, Line=U, RectSelection=R, MoveLayer=M, Hand=H, Zoom=Z, Gradient=�E�Ȃ��E�j�E�ɃV�E��E��E�[�E�g�E�J�E�b�E�g�E�ݒ�BToolPanel.cpp �E�̃c�E�[�E��E��E�`�E�b�E�v�E�t�E�H�E�[�E�}�E�b�E�g�E��E� [B] �E��E��E��E� (B) �E�ɕύX�E�A�E��E�V�E��E��E�[�E�g�E�J�E�b�E�g�E��E��E�̓u�E��E��E�P�E�b�E�g�E�Ȃ��E�B�E�r�E��E��E�h�E�G�E��E��E�[0�E�B
+summary: ToolDescriptor.h �E�E�E��E�E�E� shortcut �E�E�E�t�E�E�E�B�E�E�E�[�E�E�E��E�E�E��E�E�E�h�E�E�E�ǉ��E�E�E�BToolDescriptor.cpp �E�E�E�̑S�E�E�E�c�E�E�E�[�E�E�E��E�E�E��E�E�E�iBrush=B, Eraser=E, Eyedropper=I, Fill=G, Line=U, RectSelection=R, MoveLayer=M, Hand=H, Zoom=Z, Gradient=�E�E�E�Ȃ��E�E�E�j�E�E�E�ɃV�E�E�E��E�E�E��E�E�E�[�E�E�E�g�E�E�E�J�E�E�E�b�E�E�E�g�E�E�E�ݒ�BToolPanel.cpp �E�E�E�̃c�E�E�E�[�E�E�E��E�E�E��E�E�E�`�E�E�E�b�E�E�E�v�E�E�E�t�E�E�E�H�E�E�E�[�E�E�E�}�E�E�E�b�E�E�E�g�E�E�E��E�E�E� [B] �E�E�E��E�E�E��E�E�E��E�E�E� (B) �E�E�E�ɕύX�E�E�E�A�E�E�E��E�E�E�V�E�E�E��E�E�E��E�E�E�[�E�E�E�g�E�E�E�J�E�E�E�b�E�E�E�g�E�E�E��E�E�E��E�E�E�̓u�E�E�E��E�E�E��E�E�E�P�E�E�E�b�E�E�E�g�E�E�E�Ȃ��E�E�E�B�E�E�E�r�E�E�E��E�E�E��E�E�E�h�E�E�E�G�E�E�E��E�E�E��E�E�E�[0�E�E�E�B
 priority: medium
 role: developer
 category: feature
@@ -791,7 +791,7 @@ priority: medium
 role: developer
 category: feature
 completed_by: worker-a
-summary: ColorWheelWidget �E��E� QLineEdit(#RRGGBB) �E��E�ǉ��E�B�E�z�E�C�E�[�E��E��E�`�E��E�G�E��E��E�A�E��E� wheelAreaHeight() �E�ŕ��E��E��E��E��E�A�E�F�E�ύX�E��E��E��E� updateHexEdit() �E�œ��E��E��E�AreturnPressed �E��E� onHexReturnPressed() �E��E��E�Ă��E� setColor + colorChanged emit�E�B�E�r�E��E��E�h�E�G�E��E��E�[0�E��E��E�B
+summary: ColorWheelWidget �E�E�E��E�E�E� QLineEdit(#RRGGBB) �E�E�E��E�E�E�ǉ��E�E�E�B�E�E�E�z�E�E�E�C�E�E�E�[�E�E�E��E�E�E��E�E�E�`�E�E�E��E�E�E�G�E�E�E��E�E�E��E�E�E�A�E�E�E��E�E�E� wheelAreaHeight() �E�E�E�ŕ��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�A�E�E�E�F�E�E�E�ύX�E�E�E��E�E�E��E�E�E��E�E�E� updateHexEdit() �E�E�E�œ��E�E�E��E�E�E��E�E�E�AreturnPressed �E�E�E��E�E�E� onHexReturnPressed() �E�E�E��E�E�E��E�E�E�Ă��E�E�E� setColor + colorChanged emit�E�E�E�B�E�E�E�r�E�E�E��E�E�E��E�E�E�h�E�E�E�G�E�E�E��E�E�E��E�E�E�[0�E�E�E��E�E�E��E�E�E�B
 
 ### ?E?E?E??I
 `ColorWheelWidget.cpp` ?E?E?E??E?E?E? 16 ?E?E?E?i?E?E?E?J?E?E?E??E?E?E??E?E?E?[?E?E?E?R?E?E?E?[?E?E?E?h?E?E?E??E?E?E??E?E?E??E?E?E? QLineEdit?E?E?E?i`#RRGGBB` ?E?E?E?`?E?E?E??E?E?E??E?E?E?j?E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E?B?E?E?E?J?E?E?E??E?E?E??E?E?E?[?E?E?E?z?E?E?E?C?E?E?E?[?E?E?E??E?E?E??E?E?E??F?E?E?E??X?E?E?E??E?E?E? QLineEdit ?E?E?E??E?E?E??E?E?E?X?E?E?E?V?E?E?E??E?E?E??E?E?E?AQLineEdit ?E?E?E??W?E?E?E?m?E?E?E??E?E?E?ireturnPressed?E?E?E?j?E?E?E??J?E?E?E??E?E?E??E?E?E?[?E?E?E?z?E?E?E?C?E?E?E?[?E?E?E??E?E?E??E?E?E??F?E?E?E??E?E?E??E?E?E?X?E?E?E?V?E?E?E??E?E?E??E?E?E??E?E?E?o?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?o?E?E?E?C?E?E?E??E?E?E??E?E?E?f?E?E?E?B?E?E?E??E?E?E??E?E?E?O?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B
@@ -830,7 +830,7 @@ role: developer
 category: fix
 parent: task-20
 completed_by: worker-a
-summary: task-20�E��E��E��E��E�̓R�E�~�E�b�E�g896b168�E�Ŋm�E�F�E�ς݁icanvasPositionChanged/m_cursorPosStatusLabel�E�j�E�BToolPropertyPanel.cpp/h�E��E�createdLabeledSlider()+appendLabeledRow()�E�w�E��E��E�p�E�[�E��E�ǉ��E��E��E��E�angle/roundness/taperStart/taperEnd�E�X�E��E��E�C�E�_�E�[�E��E��E��E��E��E��E��E��E�t�E�@�E�N�E�^�E��E��E��E��E�O�E�Bcmake --build�E�G�E��E��E�[0�E��E��E�B
+summary: task-20�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̓R�E�E�E�~�E�E�E�b�E�E�E�g896b168�E�E�E�Ŋm�E�E�E�F�E�E�E�ς݁icanvasPositionChanged/m_cursorPosStatusLabel�E�E�E�j�E�E�E�BToolPropertyPanel.cpp/h�E�E�E��E�E�E�createdLabeledSlider()+appendLabeledRow()�E�E�E�w�E�E�E��E�E�E��E�E�E�p�E�E�E�[�E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E��E�E�E�angle/roundness/taperStart/taperEnd�E�E�E�X�E�E�E��E�E�E��E�E�E�C�E�E�E�_�E�E�E�[�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�t�E�E�E�@�E�E�E�N�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�O�E�E�E�Bcmake --build�E�E�E�G�E�E�E��E�E�E��E�E�E�[0�E�E�E��E�E�E��E�E�E�B
 
 ### Objective
 Fix task-20 -- supervisor detected fake success: No files modified despite success claim (WorkerModified=false, EditCount=0)
@@ -855,28 +855,28 @@ priority: high
 role: developer
 category: feature
 
-### �E�ړI
-LayerPanel �E�̉��E��E��E�Ɂu�E�V�E�K�E��E��E�C�E��E��E�[ (+)�E�v�E�u�E��E��E�C�E��E��E�[�E����E(-)�E�v�E�{�E�^�E��E��E��E�ǉ��E��E��E��E�B
-LayerPanel.cpp �E��E� QHBoxLayout + QPushButton �E��E�ǉ��E��E��E�AAppController::addLayer / removeLayer �E�ɃV�E�O�E�i�E��E��E��E�ڑ��E��E��E��E�B
+### �E�E�E�ړI
+LayerPanel �E�E�E�̉��E�E�E��E�E�E��E�E�E�Ɂu�E�E�E�V�E�E�E�K�E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�[ (+)�E�E�E�v�E�E�E�u�E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�[�E�E�E��E��E��E�E(-)�E�E�E�v�E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E��E�E�E�B
+LayerPanel.cpp �E�E�E��E�E�E� QHBoxLayout + QPushButton �E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E�AAppController::addLayer / removeLayer �E�E�E�ɃV�E�E�E�O�E�E�E�i�E�E�E��E�E�E��E�E�E��E�E�E�ڑ��E�E�E��E�E�E��E�E�E��E�E�E�B
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/panels/LayerPanel.cpp
 - src/app/panels/LayerPanel.h
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- (+) �E�{�E�^�E��E��E��E��E��E��E�ŐV�E�K�E��E��E�C�E��E��E�[�E��E� LayerPanel �E��E��E�X�E�g�E�ɒǉ��E��E��E��E��E�
-- (-) �E�{�E�^�E��E��E��E��E��E��E�őI�E��E�E��E�C�E��E��E�[�E��E��E������E��E��E��E�
-- �E��E��E�C�E��E��E�[�E��E� 0 �E��E��E�̏ꍇ�E�A(-) �E�{�E�^�E��E��E��E� disabled �E�ɂȂ�
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- (+) �E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ŐV�E�E�E�K�E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�[�E�E�E��E�E�E� LayerPanel �E�E�E��E�E�E��E�E�E�X�E�E�E�g�E�E�E�ɒǉ��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- (-) �E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�őI�E�E�E��E�E�E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�[�E�E�E��E�E�E��E�E�E��E��E��E��E��E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�[�E�E�E��E�E�E� 0 �E�E�E��E�E�E��E�E�E�̏ꍇ�E�E�E�A(-) �E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E� disabled �E�E�E�ɂȂ�
 
-### �E��E��E�Ԍ��E�ς��E��E�
-45?60 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+45?60 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- �E�Ώۃt�E�@�E�C�E��E��E�ȊO�E�̐V�E�K�E�N�E��E��E�X�E��E�
-- AppController �E��E��E��E� addLayer / removeLayer �E��E��E��E��E��E��E��E��E��E��E��E��E�̏ꍇ�E�̓X�E�^�E�u�E�Ăяo�E��E��E�Ŋ��E��E��E�Ƃ��E��E�
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E�ȊO�E�E�E�̐V�E�E�E�K�E�E�E�N�E�E�E��E�E�E��E�E�E�X�E�E�E��E�E�E�
+- AppController �E�E�E��E�E�E��E�E�E��E�E�E� addLayer / removeLayer �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̏ꍇ�E�E�E�̓X�E�E�E�^�E�E�E�u�E�E�E�Ăяo�E�E�E��E�E�E��E�E�E�Ŋ��E�E�E��E�E�E��E�E�E�Ƃ��E�E�E��E�E�E�
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -885,70 +885,74 @@ cmake --build build --config Release
 ## task-29
 status: review_required
 attempt: 1
-result: appendLabeledRow() を使用し m_flowSlider を BrushTool 選択時のみ表示するよう変更。cmake --build エラー 0 件。
-priority: high
+result: appendLabeledRow() を使用ぁEm_flowSlider めEBrushTool 選択時のみ表示するよう変更。cmake --build エラー 0 件、Epriority: high
 role: developer
 category: feature
 
-### �E�ړI
-ToolPropertyPanel �E�Ƀu�E��E��E�V�E��E� Flow�E�i�E�s�E��E��E��E��E�x�E��E��E�ʁj�E�X�E��E��E�C�E�_�E�[�E��E�ǉ��E��E��E��E�B
-task-27 �E�œ��E��E��E�ς݂� appendLabeledRow() �E�w�E��E��E�p�E�[�E��E��E�g�E��E��E�ABrushTool �E�I�E��E��E��E��E�̂ݕ\�E��E��E��E��E��E� m_flowSlider (0?100) �E��E��E��E��E��E��E��E��E��E�B
+### �E�E�E�ړI
+ToolPropertyPanel �E�E�E�Ƀu�E�E�E��E�E�E��E�E�E�V�E�E�E��E�E�E� Flow�E�E�E�i�E�E�E�s�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�x�E�E�E��E�E�E��E�E�E�ʁj�E�E�E�X�E�E�E��E�E�E��E�E�E�C�E�E�E�_�E�E�E�[�E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E��E�E�E�B
+task-27 �E�E�E�œ��E�E�E��E�E�E��E�E�E�ς݂� appendLabeledRow() �E�E�E�w�E�E�E��E�E�E��E�E�E�p�E�E�E�[�E�E�E��E�E�E��E�E�E�g�E�E�E��E�E�E��E�E�E�ABrushTool �E�E�E�I�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̂ݕ\�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E� m_flowSlider (0?100) �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�B
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/panels/ToolPropertyPanel.cpp
 - src/app/panels/ToolPropertyPanel.h
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- Brush �E�c�E�[�E��E��E�I�E��E��E��E��E�ɁuFlow: �E�Z�E�Z%�E�v�E�X�E��E��E�C�E�_�E�[�E��E� ToolPropertyPanel �E�ɕ\�E��E��E��E��E��E��E�
-- �E��E��E�c�E�[�E��E��E�I�E��E��E��E��E�̓X�E��E��E�C�E�_�E�[�E��E��E��E�\�E��E��E�ɂȂ�
-- �E�X�E��E��E�C�E�_�E�[�E�l�E�ύX�E��E��E��E� AppController �E�̑Ή��E�X�E��E��E�b�E�g�E��E��E�Ă΂��E�iqDebug �E��E��E�O�E�Ŋm�E�F�E�j
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- Brush �E�E�E�c�E�E�E�[�E�E�E��E�E�E��E�E�E�I�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ɁuFlow: �E�E�E�Z�E�E�E�Z%�E�E�E�v�E�E�E�X�E�E�E��E�E�E��E�E�E�C�E�E�E�_�E�E�E�[�E�E�E��E�E�E� ToolPropertyPanel �E�E�E�ɕ\�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E�c�E�E�E�[�E�E�E��E�E�E��E�E�E�I�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̓X�E�E�E��E�E�E��E�E�E�C�E�E�E�_�E�E�E�[�E�E�E��E�E�E��E�E�E��E�E�E�\�E�E�E��E�E�E��E�E�E�ɂȂ�
+- �E�E�E�X�E�E�E��E�E�E��E�E�E�C�E�E�E�_�E�E�E�[�E�E�E�l�E�E�E�ύX�E�E�E��E�E�E��E�E�E��E�E�E� AppController �E�E�E�̑Ή��E�E�E�X�E�E�E��E�E�E��E�E�E�b�E�E�E�g�E�E�E��E�E�E��E�E�E�Ă΂��E�E�E�iqDebug �E�E�E��E�E�E��E�E�E�O�E�E�E�Ŋm�E�E�E�F�E�E�E�j
 
-### �E��E��E�Ԍ��E�ς��E��E�
-30?45 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+30?45 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- �E�V�E�K Widget �E�N�E��E��E�X�E�̍쐬�E�iappendLabeledRow() �E��E��E�g�E��E��E�j
-- �E��E��E�c�E�[�E��E��E�̃X�E��E��E�C�E�_�E�[�E�ւ̉e�E��E�
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E�V�E�E�E�K Widget �E�E�E�N�E�E�E��E�E�E��E�E�E�X�E�E�E�̍쐬�E�E�E�iappendLabeledRow() �E�E�E��E�E�E��E�E�E�g�E�E�E��E�E�E��E�E�E�j
+- �E�E�E��E�E�E��E�E�E�c�E�E�E�[�E�E�E��E�E�E��E�E�E�̃X�E�E�E��E�E�E��E�E�E�C�E�E�E�_�E�E�E�[�E�E�E�ւ̉e�E�E�E��E�E�E�
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
 
 ---
 ## task-30
-status: pending
-attempt: 0
+status: review_required
+attempt: 1
 priority: high
 role: developer
 category: feature
 
-### �E�ړI
-LayerPanel �E�ŁE���E�C�E��E��E�[�E��E��E��E��E�_�E�u�E��E��E�N�E��E��E�b�E�N�E��E��E�ăC�E��E��E��E��E�C�E��E��E�ҏW�E�ł��E��E�悤�E�ɂ��E��E�B
-QListWidgetItem::setFlags(Qt::ItemIsEditable | ...) �E��E�ݒ肵�E�AeditingFinished �E��E��E��E��E�̃V�E�O�E�i�E��E��E��E� AppController::renameLayer �E��E��E�ĂԁB
+### �E�E�E�ړI
+LayerPanel �E�E�E�ŁE�E��E��E�E�E�C�E�E�E��E�E�E��E�E�E�[�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�_�E�E�E�u�E�E�E��E�E�E��E�E�E�N�E�E�E��E�E�E��E�E�E�b�E�E�E�N�E�E�E��E�E�E��E�E�E�ăC�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�ҏW�E�E�E�ł��E�E�E��E�E�E�悤�E�E�E�ɂ��E�E�E��E�E�E�B
+QListWidgetItem::setFlags(Qt::ItemIsEditable | ...) �E�E�E��E�E�E�ݒ肵�E�E�E�AeditingFinished �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̃V�E�E�E�O�E�E�E�i�E�E�E��E�E�E��E�E�E��E�E�E� AppController::renameLayer �E�E�E��E�E�E��E�E�E�ĂԁB
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/panels/LayerPanel.cpp
 - src/app/panels/LayerPanel.h
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- �E��E��E�C�E��E��E�[�E��E��E��E��E�_�E�u�E��E��E�N�E��E��E�b�E�N�E��E��E��E�ƃC�E��E��E��E��E�C�E��E� QLineEdit �E��E��E�o�E��E��E��E��E��E�
-- Enter �E��E��E��E��E�܂��E�̓t�E�H�E�[�E�J�E�X�E�A�E�E�E�g�E�Ŗ��E�O�E�ύX�E��E��E�m�E�肵�E�A�E��E��E�X�E�g�E�ɔ��E�f�E��E��E��E��E�
-- Escape �E�ŕύX�E��E��E�L�E��E��E��E��E�Z�E��E��E��E��E�ꌳ�E�̖��E�O�E�ɖ߂�
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�[�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�_�E�E�E�u�E�E�E��E�E�E��E�E�E�N�E�E�E��E�E�E��E�E�E�b�E�E�E�N�E�E�E��E�E�E��E�E�E��E�E�E�ƃC�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E� QLineEdit �E�E�E��E�E�E��E�E�E�o�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- Enter �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�܂��E�E�E�̓t�E�E�E�H�E�E�E�[�E�E�E�J�E�E�E�X�E�E�E�A�E�E�E�E�E�E�E�g�E�E�E�Ŗ��E�E�E�O�E�E�E�ύX�E�E�E��E�E�E��E�E�E�m�E�E�E�肵�E�E�E�A�E�E�E��E�E�E��E�E�E�X�E�E�E�g�E�E�E�ɔ��E�E�E�f�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- Escape �E�E�E�ŕύX�E�E�E��E�E�E��E�E�E�L�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�Z�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ꌳ�E�E�E�̖��E�E�E�O�E�E�E�ɖ߂�
 
-### �E��E��E�Ԍ��E�ς��E��E�
-45?60 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+45?60 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- �E��E��E�[�E�_�E��E��E�_�E�C�E�A�E��E��E�O�E�ł̖��E�O�E��E��E�́i�E�C�E��E��E��E��E�C�E��E��E�ҏW�E�̂݁j
-- �E�V�E�K�E�E�E�B�E�W�E�F�E�b�E�g�E�N�E��E��E�X�E�̍쐬
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E�[�E�E�E�_�E�E�E��E�E�E��E�E�E�_�E�E�E�C�E�E�E�A�E�E�E��E�E�E��E�E�E�O�E�E�E�ł̖��E�E�E�O�E�E�E��E�E�E��E�E�E�́i�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�ҏW�E�E�E�̂݁j
+- �E�E�E�V�E�E�E�K�E�E�E�E�E�E�E�B�E�E�E�W�E�E�E�F�E�E�E�b�E�E�E�g�E�E�E�N�E�E�E��E�E�E��E�E�E�X�E�E�E�̍쐬
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
+
+### 実装概要 (worker-b)
+LayerItemDelegate に createEditor/setEditorData/setModelData/updateEditorGeometry を追加。
+ダブルクリックで layerNameRect エリアに QLineEdit 出現。Enter で renameLayer 呼び出し、Escape で自動復元。
+cmake --build Release エラー0件。
 
 ---
 ## task-31
@@ -958,28 +962,28 @@ priority: high
 role: developer
 category: feature
 
-### �E�ړI
-CanvasWidget �E�Ń}�E�E�E�X�E��E��E�{�E�^�E��E��E�h�E��E��E�b�E�O�E�ɂ��E�L�E��E��E��E��E�o�E�X�E�p�E��E��E�i�E�ړ��E�j�E��E��E��E��E��E��E��E��E��E�B
-m_isPanning �E�t�E��E��E�O�E��E� m_panStartPos �E��E�ǉ��E��E��E�AmousePressEvent / mouseMoveEvent / mouseReleaseEvent �E��E� Qt::MiddleButton �E��E��E��E��E��E��E��E��E��E�B
+### �E�E�E�ړI
+CanvasWidget �E�E�E�Ń}�E�E�E�E�E�E�E�X�E�E�E��E�E�E��E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E�h�E�E�E��E�E�E��E�E�E�b�E�E�E�O�E�E�E�ɂ��E�E�E�L�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�o�E�E�E�X�E�E�E�p�E�E�E��E�E�E��E�E�E�i�E�E�E�ړ��E�E�E�j�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�B
+m_isPanning �E�E�E�t�E�E�E��E�E�E��E�E�E�O�E�E�E��E�E�E� m_panStartPos �E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E�AmousePressEvent / mouseMoveEvent / mouseReleaseEvent �E�E�E��E�E�E� Qt::MiddleButton �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�B
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/canvasview/CanvasWidget.cpp
 - src/app/canvasview/CanvasWidget.h
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- �E��E��E�{�E�^�E��E��E��E��E��E��E��E��E�Ƀh�E��E��E�b�E�O�E��E��E��E�ƃL�E��E��E��E��E�o�E�X�E��E��E�Ǐ]�E��E��E�Ĉړ��E��E��E��E�
-- �E��E��E�{�E�^�E��E��E��E��E��E��E��E��E�Ƃ��E�p�E��E��E��E�Ԃ��E�I�E��E��E��E��E�A�E��E��E��E��E�X�E�g�E��E��E�[�E�N�E��E��E��E��E�ɉe�E��E��E��E��E�Ȃ�
-- �E�p�E��E��E��E��E�̓J�E�[�E�\�E��E��E��E� Qt::ClosedHandCursor �E�ɕς��E�
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�Ƀh�E�E�E��E�E�E��E�E�E�b�E�E�E�O�E�E�E��E�E�E��E�E�E��E�E�E�ƃL�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�o�E�E�E�X�E�E�E��E�E�E��E�E�E�Ǐ]�E�E�E��E�E�E��E�E�E�Ĉړ��E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�Ƃ��E�E�E�p�E�E�E��E�E�E��E�E�E��E�E�E�Ԃ��E�E�E�I�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�A�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�X�E�E�E�g�E�E�E��E�E�E��E�E�E�[�E�E�E�N�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ɉe�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�Ȃ�
+- �E�E�E�p�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̓J�E�E�E�[�E�E�E�\�E�E�E��E�E�E��E�E�E��E�E�E� Qt::ClosedHandCursor �E�E�E�ɕς��E�E�E�
 
-### �E��E��E�Ԍ��E�ς��E��E�
-30?45 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+30?45 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- �E��E��E��E��E�̍��E�{�E�^�E��E��E�`�E�惍�W�E�b�E�N�E�ւ̕ύX
-- �E�E�E�{�E�^�E��E��E��E��E��E��E�̕ύX
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̍��E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E�`�E�E�E�惍�W�E�E�E�b�E�E�E�N�E�E�E�ւ̕ύX
+- �E�E�E�E�E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̕ύX
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -992,30 +996,30 @@ priority: medium
 role: developer
 category: feature
 
-### �E�ړI
-MainWindow �E��E� Ctrl+0�E�u�E�t�E�B�E�b�E�g�E�\�E��E��E�i�E�S�E�̕\�E��E��E�j�E�v�E��E� Ctrl+1�E�u100% �E�\�E��E��E�v�E�̃L�E�[�E�{�E�[�E�h�E�V�E��E��E�[�E�g�E�J�E�b�E�g�E��E�ǉ��E��E��E��E�B
-CanvasWidget �E��E� fitToWindow() �E��E� resetZoom() �E�X�E��E��E�b�E�g�E��E�ǉ��E��E��E�AMainWindow �E��E� QShortcut �E��E��E��E�ڑ��E��E��E��E�B
+### �E�E�E�ړI
+MainWindow �E�E�E��E�E�E� Ctrl+0�E�E�E�u�E�E�E�t�E�E�E�B�E�E�E�b�E�E�E�g�E�E�E�\�E�E�E��E�E�E��E�E�E�i�E�E�E�S�E�E�E�̕\�E�E�E��E�E�E��E�E�E�j�E�E�E�v�E�E�E��E�E�E� Ctrl+1�E�E�E�u100% �E�E�E�\�E�E�E��E�E�E��E�E�E�v�E�E�E�̃L�E�E�E�[�E�E�E�{�E�E�E�[�E�E�E�h�E�E�E�V�E�E�E��E�E�E��E�E�E�[�E�E�E�g�E�E�E�J�E�E�E�b�E�E�E�g�E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E��E�E�E�B
+CanvasWidget �E�E�E��E�E�E� fitToWindow() �E�E�E��E�E�E� resetZoom() �E�E�E�X�E�E�E��E�E�E��E�E�E�b�E�E�E�g�E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E�AMainWindow �E�E�E��E�E�E� QShortcut �E�E�E��E�E�E��E�E�E��E�E�E�ڑ��E�E�E��E�E�E��E�E�E��E�E�E�B
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/mainwindow/MainWindow.cpp
 - src/app/mainwindow/MainWindow.h
 - src/app/canvasview/CanvasWidget.cpp
 - src/app/canvasview/CanvasWidget.h
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- Ctrl+0 �E�ŃL�E��E��E��E��E�o�E�X�E�S�E�̂� CanvasWidget �E�Ɏ��E�܂�X�E�P�E�[�E��E��E�Ɏ��E��E��E��E��E��E��E��E��E��E��E�
-- Ctrl+1 �E�ŃY�E�[�E��E��E��E� 100%�E�i�E��E��E�{�E�j�E�ɁE���E�Z�E�b�E�g�E��E��E��E��E�
-- �E�X�E�e�E�[�E�^�E�X�E�o�E�[�E�̃Y�E�[�E��E��E�\�E��E��E��E��E�A�E��E��E��E��E�čX�E�V�E��E��E��E��E�i�E��E��E��E� viewTransformChanged �E�V�E�O�E�i�E��E��E��E��E�g�E�p�E�j
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- Ctrl+0 �E�E�E�ŃL�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�o�E�E�E�X�E�E�E�S�E�E�E�̂� CanvasWidget �E�E�E�Ɏ��E�E�E�܂�X�E�E�E�P�E�E�E�[�E�E�E��E�E�E��E�E�E�Ɏ��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- Ctrl+1 �E�E�E�ŃY�E�E�E�[�E�E�E��E�E�E��E�E�E��E�E�E� 100%�E�E�E�i�E�E�E��E�E�E��E�E�E�{�E�E�E�j�E�E�E�ɁE�E��E��E�E�E�Z�E�E�E�b�E�E�E�g�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E�X�E�E�E�e�E�E�E�[�E�E�E�^�E�E�E�X�E�E�E�o�E�E�E�[�E�E�E�̃Y�E�E�E�[�E�E�E��E�E�E��E�E�E�\�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�A�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�čX�E�E�E�V�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�i�E�E�E��E�E�E��E�E�E��E�E�E� viewTransformChanged �E�E�E�V�E�E�E�O�E�E�E�i�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�g�E�E�E�p�E�E�E�j
 
-### �E��E��E�Ԍ��E�ς��E��E�
-45?60 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+45?60 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- View �E��E��E�j�E��E��E�[�E�ւ̒ǉ��E�i�E�V�E��E��E�[�E�g�E�J�E�b�E�g�E�ǉ��E�̂݁j
-- �E��E��E��E��E�Y�E�[�E��E��E��E��E�W�E�b�E�N�E�̍폜�E�E�E�u�E��E��E��E��E��E�
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- View �E�E�E��E�E�E��E�E�E�j�E�E�E��E�E�E��E�E�E�[�E�E�E�ւ̒ǉ��E�E�E�i�E�E�E�V�E�E�E��E�E�E��E�E�E�[�E�E�E�g�E�E�E�J�E�E�E�b�E�E�E�g�E�E�E�ǉ��E�E�E�̂݁j
+- �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�Y�E�E�E�[�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�W�E�E�E�b�E�E�E�N�E�E�E�̍폜�E�E�E�E�E�E�E�u�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -1028,26 +1032,26 @@ priority: high
 role: developer
 category: bug
 
-### �E�ړI
-LayerPanel �E�ŁE���E�C�E��E��E�[�E��E� 0 �E��E��E�̂Ƃ��E�{�E�^�E��E��E��E��E��E�ErefreshButtonState() �E��E� currentItem() == nullptr �E��E��E�Q�E�Ƃ��E�ăN�E��E��E�b�E�V�E��E��E��E��E��E�P�E�[�E�X�E��E�h�E��E��E�B
-�E�e�E�n�E��E��E�h�E��E��E�擪�E��E� isEmpty() / currentItem() != nullptr �E�K�E�[�E�h�E��E�ǉ��E��E��E��E�B
+### �E�E�E�ړI
+LayerPanel �E�E�E�ŁE�E��E��E�E�E�C�E�E�E��E�E�E��E�E�E�[�E�E�E��E�E�E� 0 �E�E�E��E�E�E��E�E�E�̂Ƃ��E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ErefreshButtonState() �E�E�E��E�E�E� currentItem() == nullptr �E�E�E��E�E�E��E�E�E�Q�E�E�E�Ƃ��E�E�E�ăN�E�E�E��E�E�E��E�E�E�b�E�E�E�V�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�P�E�E�E�[�E�E�E�X�E�E�E��E�E�E�h�E�E�E��E�E�E��E�E�E�B
+�E�E�E�e�E�E�E�n�E�E�E��E�E�E��E�E�E�h�E�E�E��E�E�E��E�E�E�擪�E�E�E��E�E�E� isEmpty() / currentItem() != nullptr �E�E�E�K�E�E�E�[�E�E�E�h�E�E�E��E�E�E�ǉ��E�E�E��E�E�E��E�E�E��E�E�E�B
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/panels/LayerPanel.cpp
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- �E��E��E�C�E��E��E�[�E��E�S�E������E��E��E��E��E�Ԃŏ�ړ��E�E�E��E��E�ړ��E�E�E�s�E��E��E��E��E�x�E�X�E��E��E�C�E�_�E�[�E��E��E��E��E��E�s�E��E��E�Ă��E�N�E��E��E�b�E�V�E��E��E��E��E�Ȃ�
-- refreshButtonState() �E��E��E��E��E�C�E��E��E�[ 0 �E��E��E��E��E�ɑS�E�{�E�^�E��E��E��E� disabled �E�ɐݒ肷�E��E�
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�[�E�E�E��E�E�E�S�E�E�E��E��E��E��E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�Ԃŏ�ړ��E�E�E�E�E�E�E��E�E�E��E�E�E�ړ��E�E�E�E�E�E�E�s�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�x�E�E�E�X�E�E�E��E�E�E��E�E�E�C�E�E�E�_�E�E�E�[�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�s�E�E�E��E�E�E��E�E�E�Ă��E�E�E�N�E�E�E��E�E�E��E�E�E�b�E�E�E�V�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�Ȃ�
+- refreshButtonState() �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�C�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ɑS�E�E�E�{�E�E�E�^�E�E�E��E�E�E��E�E�E��E�E�E� disabled �E�E�E�ɐݒ肷�E�E�E��E�E�E�
 
-### �E��E��E�Ԍ��E�ς��E��E�
-30?45 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+30?45 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- LayerPanel.h �E�̃C�E��E��E�^�E�[�E�t�E�F�E�[�E�X�E�ύX
-- AppController �E��E��E�̕ύX
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- LayerPanel.h �E�E�E�̃C�E�E�E��E�E�E��E�E�E�^�E�E�E�[�E�E�E�t�E�E�E�F�E�E�E�[�E�E�E�X�E�E�E�ύX
+- AppController �E�E�E��E�E�E��E�E�E�̕ύX
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -1060,26 +1064,26 @@ priority: high
 role: developer
 category: bug
 
-### �E�ړI
-CanvasWidget �E�ŃX�E�g�E��E��E�[�E�N�E��E��E�Ƀ}�E�E�E�X�E�J�E�[�E�\�E��E��E��E��E�E�E�B�E�W�E�F�E�b�E�g�E�O�E�ɏo�E��E��E�ꍁE��AleaveEvent() �E�ŃX�E�g�E��E��E�[�E�N�E��E��E��E��E��E��E�I�E��E��E��E��E��E��E��E�B
-�E��E��E��E��E� m_isDrawing �E��E� true �E�̂܂܎c�E��E�A�E��E��E��E�}�E�E�E�X�E�v�E��E��E�X�E��E� 2 �E�d�E�X�E�g�E��E��E�[�E�N�E��E��E��E��E��E��E��E��E��E��E��E�B
+### �E�E�E�ړI
+CanvasWidget �E�E�E�ŃX�E�E�E�g�E�E�E��E�E�E��E�E�E�[�E�E�E�N�E�E�E��E�E�E��E�E�E�Ƀ}�E�E�E�E�E�E�E�X�E�E�E�J�E�E�E�[�E�E�E�\�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�E�E�E�E�B�E�E�E�W�E�E�E�F�E�E�E�b�E�E�E�g�E�E�E�O�E�E�E�ɏo�E�E�E��E�E�E��E�E�E�ꍁE�E��E�AleaveEvent() �E�E�E�ŃX�E�E�E�g�E�E�E��E�E�E��E�E�E�[�E�E�E�N�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�I�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�B
+�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E� m_isDrawing �E�E�E��E�E�E� true �E�E�E�̂܂܎c�E�E�E��E�E�E�A�E�E�E��E�E�E��E�E�E��E�E�E�}�E�E�E�E�E�E�E�X�E�E�E�v�E�E�E��E�E�E��E�E�E�X�E�E�E��E�E�E� 2 �E�E�E�d�E�E�E�X�E�E�E�g�E�E�E��E�E�E��E�E�E�[�E�E�E�N�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�B
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/canvasview/CanvasWidget.cpp
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- �E�X�E�g�E��E��E�[�E�N�E��E��E�ɃJ�E�[�E�\�E��E��E��E�f�E��E��E��E��E�E�E�B�E�W�E�F�E�b�E�g�E�O�E�֏o�E��E��E��E��E��E�ɖ߂��E�ĕ`�E�悵�E�Ă��E�A�E�s�E��E��E�ȃX�E�g�E��E��E�[�E�N�E�p�E��E��E��E��E�N�E��E��E�Ȃ�
-- leaveEvent() �E��E� strokeEnd �E��E��E��E��E��E��E��E��E��E��E�Ă΂�Am_isDrawing �E��E� false �E�ɁE���E�Z�E�b�E�g�E��E��E��E��E�
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- �E�E�E�X�E�E�E�g�E�E�E��E�E�E��E�E�E�[�E�E�E�N�E�E�E��E�E�E��E�E�E�ɃJ�E�E�E�[�E�E�E�\�E�E�E��E�E�E��E�E�E��E�E�E�f�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�E�E�E�E�B�E�E�E�W�E�E�E�F�E�E�E�b�E�E�E�g�E�E�E�O�E�E�E�֏o�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ɖ߂��E�E�E�ĕ`�E�E�E�悵�E�E�E�Ă��E�E�E�A�E�E�E�s�E�E�E��E�E�E��E�E�E�ȃX�E�E�E�g�E�E�E��E�E�E��E�E�E�[�E�E�E�N�E�E�E�p�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�N�E�E�E��E�E�E��E�E�E�Ȃ�
+- leaveEvent() �E�E�E��E�E�E� strokeEnd �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�Ă΂�Am_isDrawing �E�E�E��E�E�E� false �E�E�E�ɁE�E��E��E�E�E�Z�E�E�E�b�E�E�E�g�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 
-### �E��E��E�Ԍ��E�ς��E��E�
-30?45 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+30?45 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- mousePressEvent / mouseMoveEvent �E�̊��E��E��E�t�E��E��E�[�E�ύX
-- �E�V�E�K�E�V�E�O�E�i�E��E��E�ǉ�
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- mousePressEvent / mouseMoveEvent �E�E�E�̊��E�E�E��E�E�E��E�E�E�t�E�E�E��E�E�E��E�E�E�[�E�E�E�ύX
+- �E�E�E�V�E�E�E�K�E�E�E�V�E�E�E�O�E�E�E�i�E�E�E��E�E�E��E�E�E�ǉ�
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -1092,26 +1096,26 @@ priority: medium
 role: developer
 category: refactor
 
-### �E�ړI
-MainWindow �E�̃R�E��E��E�X�E�g�E��E��E�N�E�^�E�ɎU�E�݂��E��E�X�E�e�E�[�E�^�E�X�E�o�E�[�E��E��E�x�E��E��E��E��E��E��E�R�E�[�E�h�E�izoom �E��E��E�x�E��E��E�E�E�J�E�[�E�\�E��E��E��E��E�W�E��E��E�x�E��E��E��E��E�j�E��E� private �E��E��E�\�E�b�E�h setupStatusBar() �E�ɒ��E�o�E��E��E�A�E�R�E��E��E�X�E�g�E��E��E�N�E�^�E��E��E�X�E��E��E��E��E��E��E��E��E��E�B
+### �E�E�E�ړI
+MainWindow �E�E�E�̃R�E�E�E��E�E�E��E�E�E�X�E�E�E�g�E�E�E��E�E�E��E�E�E�N�E�E�E�^�E�E�E�ɎU�E�E�E�݂��E�E�E��E�E�E�X�E�E�E�e�E�E�E�[�E�E�E�^�E�E�E�X�E�E�E�o�E�E�E�[�E�E�E��E�E�E��E�E�E�x�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�R�E�E�E�[�E�E�E�h�E�E�E�izoom �E�E�E��E�E�E��E�E�E�x�E�E�E��E�E�E��E�E�E�E�E�E�E�J�E�E�E�[�E�E�E�\�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�W�E�E�E��E�E�E��E�E�E�x�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�j�E�E�E��E�E�E� private �E�E�E��E�E�E��E�E�E�\�E�E�E�b�E�E�E�h setupStatusBar() �E�E�E�ɒ��E�E�E�o�E�E�E��E�E�E��E�E�E�A�E�E�E�R�E�E�E��E�E�E��E�E�E�X�E�E�E�g�E�E�E��E�E�E��E�E�E�N�E�E�E�^�E�E�E��E�E�E��E�E�E�X�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�B
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/mainwindow/MainWindow.cpp
 - src/app/mainwindow/MainWindow.h
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- �E�R�E��E��E�X�E�g�E��E��E�N�E�^�E��E� statusBar �E�֘A�E�R�E�[�E�h�E��E��E�c�E�炸 setupStatusBar() �E�Ăяo�E��E� 1 �E�s�E�ɂȂ�
-- �E�X�E�e�E�[�E�^�E�X�E�o�E�[�E�̕\�E��E��E��E��E�e�E�E�E��E��E��E��E�ύX�E�O�E�Ɗ��E�S�E�ɓ��E��E�ł��E��E�
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- �E�E�E�R�E�E�E��E�E�E��E�E�E�X�E�E�E�g�E�E�E��E�E�E��E�E�E�N�E�E�E�^�E�E�E��E�E�E� statusBar �E�E�E�֘A�E�E�E�R�E�E�E�[�E�E�E�h�E�E�E��E�E�E��E�E�E�c�E�E�E�炸 setupStatusBar() �E�E�E�Ăяo�E�E�E��E�E�E� 1 �E�E�E�s�E�E�E�ɂȂ�
+- �E�E�E�X�E�E�E�e�E�E�E�[�E�E�E�^�E�E�E�X�E�E�E�o�E�E�E�[�E�E�E�̕\�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�e�E�E�E�E�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�ύX�E�E�E�O�E�E�E�Ɗ��E�E�E�S�E�E�E�ɓ��E�E�E��E�E�E�ł��E�E�E��E�E�E�
 
-### �E��E��E�Ԍ��E�ς��E��E�
-30?45 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+30?45 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- �E��E��E��E��E�̃V�E�O�E�i�E��E��E�E�E�X�E��E��E�b�E�g�E�ڑ��E��E��E�W�E�b�E�N�E�̕ύX
-- �E�X�E�e�E�[�E�^�E�X�E�o�E�[�E��E� UI �E�ύX�E�i�E��E��E�t�E�@�E�N�E�^�E�̂݁j
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̃V�E�E�E�O�E�E�E�i�E�E�E��E�E�E��E�E�E�E�E�E�E�X�E�E�E��E�E�E��E�E�E�b�E�E�E�g�E�E�E�ڑ��E�E�E��E�E�E��E�E�E�W�E�E�E�b�E�E�E�N�E�E�E�̕ύX
+- �E�E�E�X�E�E�E�e�E�E�E�[�E�E�E�^�E�E�E�X�E�E�E�o�E�E�E�[�E�E�E��E�E�E� UI �E�E�E�ύX�E�E�E�i�E�E�E��E�E�E��E�E�E�t�E�E�E�@�E�E�E�N�E�E�E�^�E�E�E�̂݁j
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
@@ -1124,27 +1128,27 @@ priority: medium
 role: developer
 category: refactor
 
-### �E�ړI
-AppController �E�S�E�̂ɎU�E�݂��E��E� `m_dirty = true` / `m_dirty = false` �E�̒��E�ڑ��E��E��E� private �E�w�E��E��E�p�E�[ `setDirty(bool)` �E�ɏW�E�񂷂�B
-setDirty() �E��E��E��E� dirtyChanged �E�V�E�O�E�i�E��E� emit �E��E� MainWindow �E�^�E�C�E�g�E��E��E�X�E�V�E��E��E�ꌳ�E�Ǘ��E��E��E��E�B
+### �E�E�E�ړI
+AppController �E�E�E�S�E�E�E�̂ɎU�E�E�E�݂��E�E�E��E�E�E� `m_dirty = true` / `m_dirty = false` �E�E�E�̒��E�E�E�ڑ��E�E�E��E�E�E��E�E�E� private �E�E�E�w�E�E�E��E�E�E��E�E�E�p�E�E�E�[ `setDirty(bool)` �E�E�E�ɏW�E�E�E�񂷂�B
+setDirty() �E�E�E��E�E�E��E�E�E��E�E�E� dirtyChanged �E�E�E�V�E�E�E�O�E�E�E�i�E�E�E��E�E�E� emit �E�E�E��E�E�E� MainWindow �E�E�E�^�E�E�E�C�E�E�E�g�E�E�E��E�E�E��E�E�E�X�E�E�E�V�E�E�E��E�E�E��E�E�E�ꌳ�E�E�E�Ǘ��E�E�E��E�E�E��E�E�E��E�E�E�B
 
-### �E�Ώۃt�E�@�E�C�E��E��E��E��E�
+### �E�E�E�Ώۃt�E�E�E�@�E�E�E�C�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 - src/app/bridge/AppController.cpp
 - src/app/bridge/AppController.h
 
-### �E��E��E��E��E��E��E��E�
-- cmake --build �E�ŃG�E��E��E�[ 0 �E��E�
-- AppController.cpp �E��E� `m_dirty = true` / `m_dirty = false` �E�̒��E�ڑ��E��E��E��E�c�E��E�Ȃ�
-- �E�^�E�C�E�g�E��E��E�o�E�[�E��E� dirty �E�t�E��E��E�O�E�\�E��E��E�i`*` �E�}�E�[�E�N�E�j�E��E��E�ύX�E�O�E�Ɠ��E��E��E�^�E�C�E�~�E��E��E�O�E�ōX�E�V�E��E��E��E��E�
+### �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
+- cmake --build �E�E�E�ŃG�E�E�E��E�E�E��E�E�E�[ 0 �E�E�E��E�E�E�
+- AppController.cpp �E�E�E��E�E�E� `m_dirty = true` / `m_dirty = false` �E�E�E�̒��E�E�E�ڑ��E�E�E��E�E�E��E�E�E��E�E�E�c�E�E�E��E�E�E�Ȃ�
+- �E�E�E�^�E�E�E�C�E�E�E�g�E�E�E��E�E�E��E�E�E�o�E�E�E�[�E�E�E��E�E�E� dirty �E�E�E�t�E�E�E��E�E�E��E�E�E�O�E�E�E�\�E�E�E��E�E�E��E�E�E�i`*` �E�E�E�}�E�E�E�[�E�E�E�N�E�E�E�j�E�E�E��E�E�E��E�E�E�ύX�E�E�E�O�E�E�E�Ɠ��E�E�E��E�E�E��E�E�E�^�E�E�E�C�E�E�E�~�E�E�E��E�E�E��E�E�E�O�E�E�E�ōX�E�E�E�V�E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�
 
-### �E��E��E�Ԍ��E�ς��E��E�
-30?45 �E��E�
+### �E�E�E��E�E�E��E�E�E�Ԍ��E�E�E�ς��E�E�E��E�E�E�
+30?45 �E�E�E��E�E�E�
 
-### �E�֎~�E��E��E��E�
-- MainWindow �E��E��E�́E���E�W�E�b�E�N�E�ύX
-- �E��E��E��E��E�̌��E�J API�E�iisDirty() �E��E��E�j�E�̃V�E�O�E�l�E�`�E��E��E�ύX
+### �E�E�E�֎~�E�E�E��E�E�E��E�E�E��E�E�E�
+- MainWindow �E�E�E��E�E�E��E�E�E�́E�E��E��E�E�E�W�E�E�E�b�E�E�E�N�E�E�E�ύX
+- �E�E�E��E�E�E��E�E�E��E�E�E��E�E�E�̌��E�E�E�J API�E�E�E�iisDirty() �E�E�E��E�E�E��E�E�E�j�E�E�E�̃V�E�E�E�O�E�E�E�l�E�E�E�`�E�E�E��E�E�E��E�E�E�ύX
 
-### �E��E��E�ؕ��E�@
+### �E�E�E��E�E�E��E�E�E�ؕ��E�E�E�@
 ```powershell
 cmake --build build --config Release
 ```
