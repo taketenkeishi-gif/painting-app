@@ -1,20 +1,15 @@
 ﻿{
-    "updated_at":  "2026-06-07T08:46:11.8581861+09:00",
+    "updated_at":  "2026-06-07T08:49:20.1185838+09:00",
     "next_steps":  [
                        "未コミット変更を確認・コミット実行"
                    ],
     "commands_run":  [
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git log --oneline -10",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git log --oneline -- src/app/canv",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git show 47b13d2 --stat",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 grep -n \"task-18\" TASK_QUEUE.md |",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git log --oneline -- TASK_QUEUE.m",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git status --short \u0026\u0026 git diff HE",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 cmake --build build --config Rele"
+                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 cmake --build build --config Rele",
+                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 powershell -Command \"Get-Content "
                      ],
     "current_files":  [
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
                               "reason":  "調査"
                           },
                           {
@@ -26,31 +21,60 @@
                               "reason":  "修正"
                           },
                           {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "m_cursorPosStatusLabel",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "setupStatusBar",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "task-20",
+                              "reason":  "調査"
+                          },
+                          {
                               "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
                               "reason":  "修正"
                           }
                       ],
     "decisions":  [
-                      "Brush/Eraser のキャンバス外では BlankCursor は不適切なため ArrowCursor を採用",
-                      "RectSelection はキャンバス外でもツール使用中を示す CrossCursor を維持"
+                      "canvasPositionChanged は canvasPoint.has_value() の場合のみ emit — leaveEvent で (-1,-1) をクリアする設計で十分",
+                      "m_cursorPosStatusLabel は setupStatusBar() で生成・追加済み、nullptr ガードあり"
                   ],
     "investigated_files":  [
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.cpp",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\mainwindow\\MainWindow.h",
+                               "m_cursorPosStatusLabel",
+                               "setupStatusBar",
+                               "task-20",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md"
                            ],
-    "task_id":  "task-18",
+    "task_id":  "task-20",
     "last_worker":  "worker-b-sonnet",
-    "git_commit":  "e8b0c2ac944657a391dfba974a5f5c72979d2ab5",
-    "last_reasoning":  "次に HANDOFF_STATE.json を更新します。",
+    "git_commit":  "087beeb499b64c74da45ddb1b965b39119b3f1bf",
+    "last_reasoning":  "task-20 の全実装が先行 worker によって完了済みを確認。ビルド成功後 TASK_QUEUE を review_required に更新。",
     "completed":  [
-                      "Modified: TASK_QUEUE.md",
-                      "Modified: HANDOFF_STATE.json",
-                      "Build: cmake --build 実行済み"
+                      "CanvasWidget.h に canvasPositionChanged シグナル宣言確認",
+                      "mouseMoveEvent で canvasPositionChanged emit 確認",
+                      "leaveEvent で canvasPositionChanged(-1,-1) emit 確認",
+                      "MainWindow コンストラクタでシグナルスロット接続確認",
+                      "setupStatusBar() で m_cursorPosStatusLabel 生成確認",
+                      "cmake --build build --config Release エラー0確認",
+                      "TASK_QUEUE.md の task-20 を review_required に更新"
                   ],
-    "git_diff_summary":  " HANDOFF_STATE.json | 131 ++++++++++++++++++++++-------------------------------\n NIGHT_REPORT.md    |  11 ++---\n STATUS_REPORT.md   |  19 ++++----\n TASK_QUEUE.md      |   3 +-\n 4 files changed, 71 insertions(+), 93 deletions(-)",
-    "objective":  "",
+    "git_diff_summary":  " HANDOFF_STATE.json | 50 +++++++++++++++++++++++++++++++++++---------------\n NIGHT_REPORT.md    | 11 ++++-------\n STATUS_REPORT.md   | 20 +++++++++++---------\n TASK_QUEUE.md      |  3 ++-\n 4 files changed, 52 insertions(+), 32 deletions(-)",
+    "objective":  "ステータスバーにマウスカーソルのキャンバス座標 (X, Y) を表示する",
     "blocked_reason":  "",
-    "current_phase":  "editing"
+    "current_phase":  "completed"
 }
