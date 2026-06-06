@@ -722,6 +722,7 @@ void AppController::setLayerOpacity(std::size_t index, int opacityPercent) {
   }
   layer.setOpacity(normalized);
   rerender();
+  emit canvasChanged();
   emit layersChanged();
   emit documentChanged();
 }
@@ -751,6 +752,7 @@ void AppController::setLayerBlendMode(std::size_t index, core::BlendMode mode) {
   }
   layer.setBlendMode(mode);
   rerender();
+  emit canvasChanged();
   emit layersChanged();
   emit documentChanged();
 }

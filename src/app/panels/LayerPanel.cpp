@@ -1507,6 +1507,13 @@ void LayerPanel::refreshButtonState() {
         if (blendIndex >= 0) {
           m_blendModeCombo->setCurrentIndex(blendIndex);
         }
+        const int opacityPct = static_cast<int>(
+            std::lround(std::clamp(layer.opacity(), 0.0F, 1.0F) * 100.0F));
+        const QSignalBlocker sliderBlocker(m_opacitySlider);
+        const QSignalBlocker spinBlocker(m_opacitySpin);
+        m_opacitySlider->setValue(opacityPct);
+        m_opacitySpin->setValue(opacityPct);
+        m_opacityLabel->setText(QStringLiteral("不透明度: %1%").arg(opacityPct));
       }
     }
   }
