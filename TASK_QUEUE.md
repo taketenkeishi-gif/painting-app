@@ -1,4 +1,4 @@
-﻿# TASK QUEUE ?EPainting-app ai-night-test
+# TASK QUEUE ?EPainting-app ai-night-test
 <!-- scheduler ??Estatus ??X?V?????E-->
 
 ## task-006
@@ -591,7 +591,7 @@ cmake --build build --config Release
 ## task-20
 status: review_required
 attempt: 1
-completed_summary: CanvasWidget に canvasPositionChanged(int x,int y) シグナルを追加、mouseMoveEvent で emit、leaveEvent で (-1,-1) をemit、EainWindow に m_cursorPosStatusLabel を追加してスチE�E�E�E�Eタスバ�E右側に表示。cmake --build エラー0件確認済み、Epriority: high
+completed_summary: CanvasWidget �� canvasPositionChanged(int x,int y) �V�O�i����ǉ��AmouseMoveEvent �� emit�AleaveEvent �� (-1,-1) ��emit�AEainWindow �� m_cursorPosStatusLabel ��ǉ����ăX�`E?E?E?E?E�^�X�o?E�E���ɕ\���Bcmake --build �G���[0���m�F�ς݁AEpriority: high
 role: developer
 category: feature
 
@@ -627,7 +627,7 @@ attempt: 1
 priority: high
 role: developer
 category: bug
-completed_summary: AppController.hにisDirty()/m_dirty追加。コンストラクタでdocumentChangedシグナルにラムダ接綁Em_dirty=true)。newDocument/importFlattenedBuffer末尾でm_dirty=false、EainWindow::onNewCanvas/onOpenTriggered/onNewFromClipboardTriggeredの3箁E�E��E�にQMessageBox::questionによる未保存確認ダイアログを追加。ビルドエラー0件、E
+completed_summary: AppController.h��isDirty()/m_dirty�ǉ��B�R���X�g���N�^��documentChanged�V�O�i���Ƀ����_��?Em_dirty=true)�BnewDocument/importFlattenedBuffer������m_dirty=false�AEainWindow::onNewCanvas/onOpenTriggered/onNewFromClipboardTriggered��3?E?E??E?��QMessageBox::question�ɂ�関�ۑ��m�F�_�C�A���O��ǉ��B�r���h�G���[0���AE
 ### ?E?E?E??I
 `AppController.cpp` ?E?E?E??u?E?E?E?V?E?E?E?K?E?E?E??E?E?E??E?E?E?v?E?E?E?u?E?E?E?t?E?E?E?@?E?E?E?C?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?J?E?E?E??E?E?E??E?E?E?v?E?E?E?u?E?E?E?A?E?E?E?v?E?E?E??E?E?E??E?E?E?I?E?E?E??E?E?E??E?E?E?v?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??A?E?E?E?h?E?E?E?L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?g?E?E?E????E?E?E????E?E?E???X?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E??E??x?E?E?E??E?E?E??E?E?E?_?E?E?E?C?E?E?E?A?E?E?E??E?E?E??E?E?E?O?E?E?E??E?E?E??E?E?E?\?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?C?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B`Document` ?E?E?E??E?E?E? dirty ?E?E?E?t?E?E?E??E?E?E??E?E?E?O?E?E?E??E?E?E??E?E?E?m?E?E?E?F?E?E?E??E?E?E??E?E?E?A`QMessageBox::question` ?E?E?E?????E?E?E?E?E?E?E?j?E?E?E??E?E?E??E?E?E?E?E?E?E?L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?Z?E?E?E??E?E?E??E?E?E??I?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?\?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B
 
@@ -659,7 +659,7 @@ priority: medium
 role: developer
 category: refactor
 completed_by: worker-b
-summary: updateWindowTitle()を追加、EppController::markClean()追加。saveImageFile()成功時にmarkClean()+updateWindowTitle()呼び出し。openImageFile()/onNewCanvas()/onNewFromClipboardTriggered()でもupdateWindowTitle()呼び出し。documentChanged/layersChangedシグナルをupdateWindowTitleに接続。ビルドエラー0、E
+summary: updateWindowTitle()��ǉ��AEppController::markClean()�ǉ��BsaveImageFile()��������markClean()+updateWindowTitle()�Ăяo���BopenImageFile()/onNewCanvas()/onNewFromClipboardTriggered()�ł�updateWindowTitle()�Ăяo���BdocumentChanged/layersChanged�V�O�i����updateWindowTitle�ɐڑ��B�r���h�G���[0�AE
 ### ?E?E?E??I
 `MainWindow.cpp` ?E?E?E??E?E?E??E?E?E??E?E?E?E?B?E?E?E??E?E?E??E?E?E?h?E?E?E?E?E?E?E?^?E?E?E?C?E?E?E?g?E?E?E??E?E?E??E?E?E?i?E?E?E?t?E?E?E?@?E?E?E?C?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?Edirty ?E?E?E??E?E?E??j?E?E?E??E?E?E??E?E?E?X?E?E?E?V?E?E?E??E?E?E??E?E?E??E?E?E?R?E?E?E?[?E?E?E?h?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E????E?E?E??U?E?E?E????E?E?E????E?E?E??E?E?E?B`updateWindowTitle()` ?E?E?E?v?E?E?E??E?E?E??E?E?E?C?E?E?E?x?E?E?E?[?E?E?E?g?E?E?E?X?E?E?E??E?E?E??E?E?E?b?E?E?E?g?E?E?E??W?E?E?E???A?E?E?E?h?E?E?E?L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?g?E?E?E??X?E?E?E?V?E?E?E?O?E?E?E?i?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E?`?E?E?E????E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B
 
@@ -692,7 +692,7 @@ priority: high
 role: developer
 category: feature
 completed_by: worker-b
-summary: refreshButtonState()にopacity同期を追加（blend modeと一貫性）。AppController::setLayerOpacity/setLayerBlendModeにemit canvasChanged()を追加してキャンバス再描画を保証。ビルドエラー0。
+summary: refreshButtonState()��opacity������ǉ��iblend mode�ƈ�ѐ��j�BAppController::setLayerOpacity/setLayerBlendMode��emit canvasChanged()��ǉ����ăL�����o�X�ĕ`���ۏ؁B�r���h�G���[0�B
 
 ### ?E?E?E??I
 `LayerPanel.cpp` ?E?E?E??E?E??E??E?E?E?C?E?E?E??E?E?E??E?E?E?[?E?E?E?s?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?x?E?E?E?X?E?E?E??E?E?E??E?E?E?C?E?E?E?_?E?E?E?[?E?E?E?i0?100%?E?E?E?j?E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E?B?E?E?E?I?E?E?E??E?E?E?E?E??E?E?E?C?E?E?E??E?E?E??E?E?E?[?E?E?E??E?E?E? opacity ?E?E?E?l?E?E?E??E?E?E?\?E?E?E??E?E?E??E?E?E?E?E?E?E??X?E?E?E????E?E?E?A`LayerManager` ?E?E?E????E?E?E??E?E?E? `Document` ?E?E?E?o?E?E?E?R?E?E?E??E?E??E??E?E?E?C?E?E?E??E?E?E??E?E?E?[?E?E?E????E?E?E?f?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B?E?E?E?X?E?E?E??E?E?E??E?E?E?C?E?E?E?_?E?E?E?[?E?E?E??X?E?E?E??E?E?E??E?E?E??E?E?E? `update()` ?E?E?E??L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?o?E?E?E?X?E?E?E??E?E?E??E?E?E??`?E?E?E???E?E?E??E?E?E?B
@@ -723,7 +723,7 @@ cmake --build build --config Release
 status: review_required
 attempt: 1
 completed_by: worker-a
-summary: ToolDescriptor.h に shortcut フィールド追加。ToolDescriptor.cpp の全ツール（Brush=B, Eraser=E, Eyedropper=I, Fill=G, Line=U, RectSelection=R, MoveLayer=M, Hand=H, Zoom=Z, Gradient=なし）にショートカット設定。ToolPanel.cpp のツールチップフォーマットを [B] から (B) に変更、空ショートカット時はブラケットなし。ビルドエラー0。
+summary: ToolDescriptor.h �� shortcut �t�B�[���h�ǉ��BToolDescriptor.cpp �̑S�c�[���iBrush=B, Eraser=E, Eyedropper=I, Fill=G, Line=U, RectSelection=R, MoveLayer=M, Hand=H, Zoom=Z, Gradient=�Ȃ��j�ɃV���[�g�J�b�g�ݒ�BToolPanel.cpp �̃c�[���`�b�v�t�H�[�}�b�g�� [B] ���� (B) �ɕύX�A��V���[�g�J�b�g���̓u���P�b�g�Ȃ��B�r���h�G���[0�B
 priority: medium
 role: developer
 category: feature
@@ -791,7 +791,7 @@ priority: medium
 role: developer
 category: feature
 completed_by: worker-a
-summary: ColorWheelWidget に QLineEdit(#RRGGBB) を追加。ホイール描画エリアを wheelAreaHeight() で分離し、色変更時に updateHexEdit() で同期、returnPressed で onHexReturnPressed() を呼んで setColor + colorChanged emit。ビルドエラー0件。
+summary: ColorWheelWidget �� QLineEdit(#RRGGBB) ��ǉ��B�z�C�[���`��G���A�� wheelAreaHeight() �ŕ������A�F�ύX���� updateHexEdit() �œ����AreturnPressed �� onHexReturnPressed() ���Ă�� setColor + colorChanged emit�B�r���h�G���[0���B
 
 ### ?E?E?E??I
 `ColorWheelWidget.cpp` ?E?E?E??E?E?E? 16 ?E?E?E?i?E?E?E?J?E?E?E??E?E?E??E?E?E?[?E?E?E?R?E?E?E?[?E?E?E?h?E?E?E??E?E?E??E?E?E??E?E?E? QLineEdit?E?E?E?i`#RRGGBB` ?E?E?E?`?E?E?E??E?E?E??E?E?E?j?E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E?B?E?E?E?J?E?E?E??E?E?E??E?E?E?[?E?E?E?z?E?E?E?C?E?E?E?[?E?E?E??E?E?E??E?E?E??F?E?E?E??X?E?E?E??E?E?E? QLineEdit ?E?E?E??E?E?E??E?E?E?X?E?E?E?V?E?E?E??E?E?E??E?E?E?AQLineEdit ?E?E?E??W?E?E?E?m?E?E?E??E?E?E?ireturnPressed?E?E?E?j?E?E?E??J?E?E?E??E?E?E??E?E?E?[?E?E?E?z?E?E?E?C?E?E?E?[?E?E?E??E?E?E??E?E?E??F?E?E?E??E?E?E??E?E?E?X?E?E?E?V?E?E?E??E?E?E??E?E?E??E?E?E?o?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?o?E?E?E?C?E?E?E??E?E?E??E?E?E?f?E?E?E?B?E?E?E??E?E?E??E?E?E?O?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B
@@ -830,7 +830,7 @@ role: developer
 category: fix
 parent: task-20
 completed_by: worker-a
-summary: task-20実装はコミット896b168で確認済み（canvasPositionChanged/m_cursorPosStatusLabel）。ToolPropertyPanel.cpp/hにcreatedLabeledSlider()+appendLabeledRow()ヘルパーを追加してangle/roundness/taperStart/taperEndスライダー生成をリファクタリング。cmake --buildエラー0件。
+summary: task-20�����̓R�~�b�g896b168�Ŋm�F�ς݁icanvasPositionChanged/m_cursorPosStatusLabel�j�BToolPropertyPanel.cpp/h��createdLabeledSlider()+appendLabeledRow()�w���p�[��ǉ�����angle/roundness/taperStart/taperEnd�X���C�_�[���������t�@�N�^�����O�Bcmake --build�G���[0���B
 
 ### Objective
 Fix task-20 -- supervisor detected fake success: No files modified despite success claim (WorkerModified=false, EditCount=0)
@@ -849,34 +849,34 @@ Fix task-20 -- supervisor detected fake success: No files modified despite succe
 30-60 min
 
 ## task-28
-status: pending
-attempt: 0
+status: review_required
+attempt: 1
 priority: high
 role: developer
 category: feature
 
-### 目的
-LayerPanel の下部に「新規レイヤー (+)」「レイヤー削除 (-)」ボタンを追加する。
-LayerPanel.cpp に QHBoxLayout + QPushButton を追加し、AppController::addLayer / removeLayer にシグナルを接続する。
+### �ړI
+LayerPanel �̉����Ɂu�V�K���C���[ (+)�v�u���C���[�폜 (-)�v�{�^����ǉ�����B
+LayerPanel.cpp �� QHBoxLayout + QPushButton ��ǉ����AAppController::addLayer / removeLayer �ɃV�O�i����ڑ�����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/panels/LayerPanel.cpp
 - src/app/panels/LayerPanel.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- (+) ボタン押下で新規レイヤーが LayerPanel リストに追加される
-- (-) ボタン押下で選択中レイヤーが削除される
-- レイヤーが 0 件の場合、(-) ボタンが disabled になる
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- (+) �{�^�������ŐV�K���C���[�� LayerPanel ���X�g�ɒǉ������
+- (-) �{�^�������őI�𒆃��C���[���폜�����
+- ���C���[�� 0 ���̏ꍇ�A(-) �{�^���� disabled �ɂȂ�
 
-### 時間見積もり
-45〜60 分
+### ���Ԍ��ς���
+45?60 ��
 
-### 禁止事項
-- 対象ファイル以外の新規クラス作成
-- AppController 側の addLayer / removeLayer 実装が未実装の場合はスタブ呼び出しで完了とする
+### �֎~����
+- �Ώۃt�@�C���ȊO�̐V�K�N���X�쐬
+- AppController ���� addLayer / removeLayer �������������̏ꍇ�̓X�^�u�Ăяo���Ŋ����Ƃ���
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -889,28 +889,28 @@ priority: high
 role: developer
 category: feature
 
-### 目的
-ToolPropertyPanel にブラシの Flow（不透明度流量）スライダーを追加する。
-task-27 で導入済みの appendLabeledRow() ヘルパーを使い、BrushTool 選択時のみ表示する m_flowSlider (0–100) を実装する。
+### �ړI
+ToolPropertyPanel �Ƀu���V�� Flow�i�s�����x���ʁj�X���C�_�[��ǉ�����B
+task-27 �œ����ς݂� appendLabeledRow() �w���p�[���g���ABrushTool �I�����̂ݕ\������ m_flowSlider (0?100) ����������B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/panels/ToolPropertyPanel.cpp
 - src/app/panels/ToolPropertyPanel.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- Brush ツール選択時に「Flow: 〇〇%」スライダーが ToolPropertyPanel に表示される
-- 他ツール選択時はスライダーが非表示になる
-- スライダー値変更時に AppController の対応スロットが呼ばれる（qDebug ログで確認可）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- Brush �c�[���I�����ɁuFlow: �Z�Z%�v�X���C�_�[�� ToolPropertyPanel �ɕ\�������
+- ���c�[���I�����̓X���C�_�[����\���ɂȂ�
+- �X���C�_�[�l�ύX���� AppController �̑Ή��X���b�g���Ă΂��iqDebug ���O�Ŋm�F�j
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- 新規 Widget クラスの作成（appendLabeledRow() を使う）
-- 他ツールのスライダーへの影響
+### �֎~����
+- �V�K Widget �N���X�̍쐬�iappendLabeledRow() ���g���j
+- ���c�[���̃X���C�_�[�ւ̉e��
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -923,28 +923,28 @@ priority: high
 role: developer
 category: feature
 
-### 目的
-LayerPanel でレイヤー名をダブルクリックしてインライン編集できるようにする。
-QListWidgetItem::setFlags(Qt::ItemIsEditable | ...) を設定し、editingFinished 相当のシグナルで AppController::renameLayer を呼ぶ。
+### �ړI
+LayerPanel �Ń��C���[�����_�u���N���b�N���ăC�����C���ҏW�ł���悤�ɂ���B
+QListWidgetItem::setFlags(Qt::ItemIsEditable | ...) ��ݒ肵�AeditingFinished �����̃V�O�i���� AppController::renameLayer ���ĂԁB
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/panels/LayerPanel.cpp
 - src/app/panels/LayerPanel.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- レイヤー名をダブルクリックするとインライン QLineEdit が出現する
-- Enter 押下またはフォーカスアウトで名前変更が確定し、リストに反映される
-- Escape で変更がキャンセルされ元の名前に戻る
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- ���C���[�����_�u���N���b�N����ƃC�����C�� QLineEdit ���o������
+- Enter �����܂��̓t�H�[�J�X�A�E�g�Ŗ��O�ύX���m�肵�A���X�g�ɔ��f�����
+- Escape �ŕύX���L�����Z�����ꌳ�̖��O�ɖ߂�
 
-### 時間見積もり
-45〜60 分
+### ���Ԍ��ς���
+45?60 ��
 
-### 禁止事項
-- モーダルダイアログでの名前入力（インライン編集のみ）
-- 新規ウィジェットクラスの作成
+### �֎~����
+- ���[�_���_�C�A���O�ł̖��O���́i�C�����C���ҏW�̂݁j
+- �V�K�E�B�W�F�b�g�N���X�̍쐬
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -957,28 +957,28 @@ priority: high
 role: developer
 category: feature
 
-### 目的
-CanvasWidget でマウス中ボタンドラッグによるキャンバスパン（移動）を実装する。
-m_isPanning フラグと m_panStartPos を追加し、mousePressEvent / mouseMoveEvent / mouseReleaseEvent で Qt::MiddleButton を処理する。
+### �ړI
+CanvasWidget �Ń}�E�X���{�^���h���b�O�ɂ��L�����o�X�p���i�ړ��j����������B
+m_isPanning �t���O�� m_panStartPos ��ǉ����AmousePressEvent / mouseMoveEvent / mouseReleaseEvent �� Qt::MiddleButton ����������B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/canvasview/CanvasWidget.cpp
 - src/app/canvasview/CanvasWidget.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- 中ボタン押下中にドラッグするとキャンバスが追従して移動する
-- 中ボタン離したときパン状態が終了し、既存ストローク処理に影響がない
-- パン中はカーソルが Qt::ClosedHandCursor に変わる
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- ���{�^���������Ƀh���b�O����ƃL�����o�X���Ǐ]���Ĉړ�����
+- ���{�^���������Ƃ��p����Ԃ��I�����A�����X�g���[�N�����ɉe�����Ȃ�
+- �p�����̓J�[�\���� Qt::ClosedHandCursor �ɕς��
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- 既存の左ボタン描画ロジックへの変更
-- 右ボタン処理の変更
+### �֎~����
+- �����̍��{�^���`�惍�W�b�N�ւ̕ύX
+- �E�{�^�������̕ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -991,30 +991,30 @@ priority: medium
 role: developer
 category: feature
 
-### 目的
-MainWindow に Ctrl+0「フィット表示（全体表示）」と Ctrl+1「100% 表示」のキーボードショートカットを追加する。
-CanvasWidget に fitToWindow() と resetZoom() スロットを追加し、MainWindow の QShortcut から接続する。
+### �ړI
+MainWindow �� Ctrl+0�u�t�B�b�g�\���i�S�̕\���j�v�� Ctrl+1�u100% �\���v�̃L�[�{�[�h�V���[�g�J�b�g��ǉ�����B
+CanvasWidget �� fitToWindow() �� resetZoom() �X���b�g��ǉ����AMainWindow �� QShortcut ����ڑ�����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/mainwindow/MainWindow.cpp
 - src/app/mainwindow/MainWindow.h
 - src/app/canvasview/CanvasWidget.cpp
 - src/app/canvasview/CanvasWidget.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- Ctrl+0 でキャンバス全体が CanvasWidget に収まるスケールに自動調整される
-- Ctrl+1 でズームが 100%（等倍）にリセットされる
-- ステータスバーのズーム表示が連動して更新される（既存 viewTransformChanged シグナルを使用）
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- Ctrl+0 �ŃL�����o�X�S�̂� CanvasWidget �Ɏ��܂�X�P�[���Ɏ������������
+- Ctrl+1 �ŃY�[���� 100%�i���{�j�Ƀ��Z�b�g�����
+- �X�e�[�^�X�o�[�̃Y�[���\�����A�����čX�V�����i���� viewTransformChanged �V�O�i�����g�p�j
 
-### 時間見積もり
-45〜60 分
+### ���Ԍ��ς���
+45?60 ��
 
-### 禁止事項
-- View メニューへの追加（ショートカット追加のみ）
-- 既存ズームロジックの削除・置き換え
+### �֎~����
+- View ���j���[�ւ̒ǉ��i�V���[�g�J�b�g�ǉ��̂݁j
+- �����Y�[�����W�b�N�̍폜�E�u������
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -1027,26 +1027,26 @@ priority: high
 role: developer
 category: bug
 
-### 目的
-LayerPanel でレイヤーが 0 件のときボタン操作・refreshButtonState() が currentItem() == nullptr を参照してクラッシュするケースを防ぐ。
-各ハンドラ先頭に isEmpty() / currentItem() != nullptr ガードを追加する。
+### �ړI
+LayerPanel �Ń��C���[�� 0 ���̂Ƃ��{�^������ErefreshButtonState() �� currentItem() == nullptr ���Q�Ƃ��ăN���b�V������P�[�X��h���B
+�e�n���h���擪�� isEmpty() / currentItem() != nullptr �K�[�h��ǉ�����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/panels/LayerPanel.cpp
 
-### 成功条件
-- cmake --build でエラー 0 件
-- レイヤーを全削除した状態で上移動・下移動・不透明度スライダー操作を行ってもクラッシュしない
-- refreshButtonState() がレイヤー 0 件時に全ボタンを disabled に設定する
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- ���C���[��S�폜������Ԃŏ�ړ��E���ړ��E�s�����x�X���C�_�[������s���Ă��N���b�V�����Ȃ�
+- refreshButtonState() �����C���[ 0 �����ɑS�{�^���� disabled �ɐݒ肷��
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- LayerPanel.h のインターフェース変更
-- AppController 側の変更
+### �֎~����
+- LayerPanel.h �̃C���^�[�t�F�[�X�ύX
+- AppController ���̕ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -1059,26 +1059,26 @@ priority: high
 role: developer
 category: bug
 
-### 目的
-CanvasWidget でストローク中にマウスカーソルがウィジェット外に出た場合、leaveEvent() でストロークを強制終了させる。
-現状は m_isDrawing が true のまま残り、次回マウスプレスで 2 重ストロークが発生しうる。
+### �ړI
+CanvasWidget �ŃX�g���[�N���Ƀ}�E�X�J�[�\�����E�B�W�F�b�g�O�ɏo���ꍇ�AleaveEvent() �ŃX�g���[�N�������I��������B
+����� m_isDrawing �� true �̂܂܎c��A����}�E�X�v���X�� 2 �d�X�g���[�N������������B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/canvasview/CanvasWidget.cpp
 
-### 成功条件
-- cmake --build でエラー 0 件
-- ストローク中にカーソルを素早くウィジェット外へ出した後に戻って描画しても、不正なストローク継続が起きない
-- leaveEvent() で strokeEnd 相当処理が呼ばれ、m_isDrawing が false にリセットされる
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- �X�g���[�N���ɃJ�[�\����f�����E�B�W�F�b�g�O�֏o������ɖ߂��ĕ`�悵�Ă��A�s���ȃX�g���[�N�p�����N���Ȃ�
+- leaveEvent() �� strokeEnd �����������Ă΂�Am_isDrawing �� false �Ƀ��Z�b�g�����
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- mousePressEvent / mouseMoveEvent の既存フロー変更
-- 新規シグナル追加
+### �֎~����
+- mousePressEvent / mouseMoveEvent �̊����t���[�ύX
+- �V�K�V�O�i���ǉ�
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -1091,26 +1091,26 @@ priority: medium
 role: developer
 category: refactor
 
-### 目的
-MainWindow のコンストラクタに散在するステータスバーラベル生成コード（zoom ラベル・カーソル座標ラベル等）を private メソッド setupStatusBar() に抽出し、コンストラクタをスリム化する。
+### �ړI
+MainWindow �̃R���X�g���N�^�ɎU�݂���X�e�[�^�X�o�[���x�������R�[�h�izoom ���x���E�J�[�\�����W���x�����j�� private ���\�b�h setupStatusBar() �ɒ��o���A�R���X�g���N�^���X����������B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/mainwindow/MainWindow.cpp
 - src/app/mainwindow/MainWindow.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- コンストラクタに statusBar 関連コードが残らず setupStatusBar() 呼び出し 1 行になる
-- ステータスバーの表示内容・動作が変更前と完全に同一である
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- �R���X�g���N�^�� statusBar �֘A�R�[�h���c�炸 setupStatusBar() �Ăяo�� 1 �s�ɂȂ�
+- �X�e�[�^�X�o�[�̕\�����e�E���삪�ύX�O�Ɗ��S�ɓ���ł���
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- 既存のシグナル・スロット接続ロジックの変更
-- ステータスバーの UI 変更（リファクタのみ）
+### �֎~����
+- �����̃V�O�i���E�X���b�g�ڑ����W�b�N�̕ύX
+- �X�e�[�^�X�o�[�� UI �ύX�i���t�@�N�^�̂݁j
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```
@@ -1123,27 +1123,27 @@ priority: medium
 role: developer
 category: refactor
 
-### 目的
-AppController 全体に散在する `m_dirty = true` / `m_dirty = false` の直接代入を private ヘルパー `setDirty(bool)` に集約する。
-setDirty() 内で dirtyChanged シグナル emit と MainWindow タイトル更新を一元管理する。
+### �ړI
+AppController �S�̂ɎU�݂��� `m_dirty = true` / `m_dirty = false` �̒��ڑ���� private �w���p�[ `setDirty(bool)` �ɏW�񂷂�B
+setDirty() ���� dirtyChanged �V�O�i�� emit �� MainWindow �^�C�g���X�V���ꌳ�Ǘ�����B
 
-### 対象ファイル候補
+### �Ώۃt�@�C�����
 - src/app/bridge/AppController.cpp
 - src/app/bridge/AppController.h
 
-### 成功条件
-- cmake --build でエラー 0 件
-- AppController.cpp に `m_dirty = true` / `m_dirty = false` の直接代入が残らない
-- タイトルバーの dirty フラグ表示（`*` マーク）が変更前と同じタイミングで更新される
+### ��������
+- cmake --build �ŃG���[ 0 ��
+- AppController.cpp �� `m_dirty = true` / `m_dirty = false` �̒��ڑ�����c��Ȃ�
+- �^�C�g���o�[�� dirty �t���O�\���i`*` �}�[�N�j���ύX�O�Ɠ����^�C�~���O�ōX�V�����
 
-### 時間見積もり
-30〜45 分
+### ���Ԍ��ς���
+30?45 ��
 
-### 禁止事項
-- MainWindow 側のロジック変更
-- 既存の公開 API（isDirty() 等）のシグネチャ変更
+### �֎~����
+- MainWindow ���̃��W�b�N�ύX
+- �����̌��J API�iisDirty() ���j�̃V�O�l�`���ύX
 
-### 検証方法
+### ���ؕ��@
 ```powershell
 cmake --build build --config Release
 ```

@@ -556,7 +556,9 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_primaryGroup(new QGroupBox(QString(), this)),
       m_stateGroup(new QGroupBox(QString(), this)),
       m_primaryGrid(new QGridLayout()),
-      m_stateGrid(new QGridLayout()) {
+      m_stateGrid(new QGridLayout()),
+      m_quickAddButton(new QPushButton(QStringLiteral("+"), this)),
+      m_quickRemoveButton(new QPushButton(QStringLiteral("-"), this)) {
   // m_headerLabel is nullptr — not created
   m_primaryGroup->setTitle(QString());
   m_stateGroup->setTitle(QString());
@@ -772,6 +774,36 @@ LayerPanel::LayerPanel(QWidget* parent)
   layout->addWidget(m_blendModeCombo);
   layout->addWidget(m_primaryGroup);
   layout->addWidget(m_stateGroup);
+
+  auto styleQuickButton = [](QPushButton* btn) {
+    btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    btn->setMinimumHeight(28);
+    btn->setFocusPolicy(Qt::NoFocus);
+    btn->setStyleSheet(QStringLiteral(
+        "QPushButton {"
+        " padding: 2px 6px;"
+        " border: 1px solid #2a2e3e;"
+        " border-radius: 4px;"
+        " background: #272c3c;"
+        " color: #c5cde0;"
+        " font-size: 14px;"
+        "}"
+        "QPushButton:hover { background: #2f3447; border-color: #4a5370; color: #edf0f9; }"
+        "QPushButton:pressed { background: #1d3a7a; border-color: #4e8ef7; color: #edf0f9; }"
+        "QPushButton:disabled { color: #4a5268; border-color: #252a38; background: #1a1d27; }"));
+  };
+  styleQuickButton(m_quickAddButton);
+  styleQuickButton(m_quickRemoveButton);
+  m_quickAddButton->setToolTip(QStringLiteral("新規レイヤーを追加 (+)"));
+  m_quickRemoveButton->setToolTip(QStringLiteral("選択中のレイヤーを削除 (-)"));
+
+  auto* quickButtonRow = new QHBoxLayout();
+  quickButtonRow->setContentsMargins(0, 0, 0, 0);
+  quickButtonRow->setSpacing(4);
+  quickButtonRow->addWidget(m_quickAddButton);
+  quickButtonRow->addWidget(m_quickRemoveButton);
+  layout->addLayout(quickButtonRow);
+
   setLayout(layout);
 
   connect(m_addRasterButton, &QPushButton::clicked, this, &LayerPanel::onAddRasterLayerClicked);
@@ -787,6 +819,8 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_lockButton, &QPushButton::clicked, this, &LayerPanel::onToggleLockClicked);
   connect(m_lockAlphaButton, &QPushButton::clicked, this, &LayerPanel::onToggleAlphaLockClicked);
   connect(m_lockPositionButton, &QPushButton::clicked, this, &LayerPanel::onTogglePositionLockClicked);
+  connect(m_quickAddButton, &QPushButton::clicked, this, &LayerPanel::onQuickAddClicked);
+  connect(m_quickRemoveButton, &QPushButton::clicked, this, &LayerPanel::onQuickRemoveClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
   auto* layerThumbnailRefreshTimer = new QTimer(this);
@@ -1160,6 +1194,28 @@ void LayerPanel::onTogglePositionLockClicked() {
   m_controller->toggleActiveLayerPositionLock();
 }
 
+void LayerPanel::onQuickAddClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  m_controller->addLayer();
+}
+
+void LayerPanel::onQuickRemoveClicked() {
+  if (m_controller == nullptr) {
+    return;
+  }
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  if (currentItem == nullptr) {
+    return;
+  }
+  const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
+  if (layerIndex < 0) {
+    return;
+  }
+  m_controller->removeLayer(static_cast<std::size_t>(layerIndex));
+}
+
 void LayerPanel::onCurrentLayerChanged(int row) {
   if (m_controller == nullptr || m_isRefreshing || row < 0) {
     return;
@@ -1452,6 +1508,7 @@ void LayerPanel::refreshButtonState() {
     m_lockButton->setEnabled(false);
     m_lockAlphaButton->setEnabled(false);
     m_lockPositionButton->setEnabled(false);
+    m_quickRemoveButton->setEnabled(false);
     return;
   }
 
@@ -1524,6 +1581,7 @@ void LayerPanel::refreshButtonState() {
   m_lockButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
   m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
   m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
+  m_quickRemoveButton->setEnabled(hasSelection && !paperSelected && canDelete);
 
 }
 
