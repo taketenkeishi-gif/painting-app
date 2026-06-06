@@ -150,6 +150,7 @@ private:
   void auditUIMetrics();
   void updateWindowTitle();
   void updateDockTitleBars();
+  void setupStatusBar();
 
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};

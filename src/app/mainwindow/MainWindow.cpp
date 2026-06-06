@@ -1733,39 +1733,7 @@ void MainWindow::createMenus() {
     QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::currentPath() + "/README.md"));
   });
 
-  m_toolStatusLabel = new QLabel("ツール: ブラシ", this);
-  m_toolStatusLabel->setObjectName("ToolStatusLabel");
-  m_subToolStatusLabel = new QLabel("サブツール: 通常", this);
-  m_subToolStatusLabel->setObjectName("SubToolStatusLabel");
-  m_guideStatusLabel = new QLabel("操作: 左ドラッグで描画 / ホイールでサイズ / 中ボタンドラッグで一時パン", this);
-  m_guideStatusLabel->setObjectName("ToolGuideStatusLabel");
-  m_colorStatusLabel = new QLabel("色: #000000", this);
-  m_colorStatusLabel->setObjectName("BrushColorStatusLabel");
-  m_sizeStatusLabel = new QLabel("サイズ: 8", this);
-  m_sizeStatusLabel->setObjectName("BrushSizeStatusLabel");
-  m_activeLayerStatusLabel = new QLabel("レイヤー: Layer 1", this);
-  m_activeLayerStatusLabel->setObjectName("ActiveLayerStatusLabel");
-  m_zoomStatusLabel = new QLabel("ズーム: 100%", this);
-  m_zoomStatusLabel->setObjectName("ZoomStatusLabel");
-  m_cursorPosStatusLabel = new QLabel("X: -  Y: -", this);
-  m_cursorPosStatusLabel->setObjectName("CursorPosStatusLabel");
-  m_cursorPosStatusLabel->setMinimumWidth(100);
-  m_selectionStatusLabel = new QLabel("選択: OFF", this);
-  m_selectionStatusLabel->setObjectName("SelectionStatusLabel");
-  m_comfyUiStatusLabel = new QLabel("ComfyUI: 未接続", this);
-  m_comfyUiStatusLabel->setObjectName("ComfyUiStatusLabel");
-  m_comfyUiStatusLabel->setStyleSheet("color: #6a7484; font-size: 10px;");
-
-  statusBar()->addWidget(m_toolStatusLabel);
-  statusBar()->addWidget(m_subToolStatusLabel);
-  statusBar()->addWidget(m_guideStatusLabel, 1);
-  statusBar()->addPermanentWidget(m_colorStatusLabel);
-  statusBar()->addPermanentWidget(m_sizeStatusLabel);
-  statusBar()->addPermanentWidget(m_cursorPosStatusLabel);
-  statusBar()->addPermanentWidget(m_zoomStatusLabel);
-  statusBar()->addPermanentWidget(m_selectionStatusLabel);
-  statusBar()->addPermanentWidget(m_activeLayerStatusLabel);
-  statusBar()->addPermanentWidget(m_comfyUiStatusLabel);
+  setupStatusBar();
 
   const auto markCommand = [](QAction* action, const QString& id) {
     if (action == nullptr) {
@@ -1932,6 +1900,42 @@ void MainWindow::updateDockTitleBars() {
     if (auto* tb = dynamic_cast<DockTitleBar*>(dock->titleBarWidget()))
       tb->rebuildTabs();
   }
+}
+
+void MainWindow::setupStatusBar() {
+  m_toolStatusLabel = new QLabel("ツール: ブラシ", this);
+  m_toolStatusLabel->setObjectName("ToolStatusLabel");
+  m_subToolStatusLabel = new QLabel("サブツール: 通常", this);
+  m_subToolStatusLabel->setObjectName("SubToolStatusLabel");
+  m_guideStatusLabel = new QLabel("操作: 左ドラッグで描画 / ホイールでサイズ / 中ボタンドラッグで一時パン", this);
+  m_guideStatusLabel->setObjectName("ToolGuideStatusLabel");
+  m_colorStatusLabel = new QLabel("色: #000000", this);
+  m_colorStatusLabel->setObjectName("BrushColorStatusLabel");
+  m_sizeStatusLabel = new QLabel("サイズ: 8", this);
+  m_sizeStatusLabel->setObjectName("BrushSizeStatusLabel");
+  m_activeLayerStatusLabel = new QLabel("レイヤー: Layer 1", this);
+  m_activeLayerStatusLabel->setObjectName("ActiveLayerStatusLabel");
+  m_zoomStatusLabel = new QLabel("ズーム: 100%", this);
+  m_zoomStatusLabel->setObjectName("ZoomStatusLabel");
+  m_cursorPosStatusLabel = new QLabel("X: -  Y: -", this);
+  m_cursorPosStatusLabel->setObjectName("CursorPosStatusLabel");
+  m_cursorPosStatusLabel->setMinimumWidth(100);
+  m_selectionStatusLabel = new QLabel("選択: OFF", this);
+  m_selectionStatusLabel->setObjectName("SelectionStatusLabel");
+  m_comfyUiStatusLabel = new QLabel("ComfyUI: 未接続", this);
+  m_comfyUiStatusLabel->setObjectName("ComfyUiStatusLabel");
+  m_comfyUiStatusLabel->setStyleSheet("color: #6a7484; font-size: 10px;");
+
+  statusBar()->addWidget(m_toolStatusLabel);
+  statusBar()->addWidget(m_subToolStatusLabel);
+  statusBar()->addWidget(m_guideStatusLabel, 1);
+  statusBar()->addPermanentWidget(m_colorStatusLabel);
+  statusBar()->addPermanentWidget(m_sizeStatusLabel);
+  statusBar()->addPermanentWidget(m_cursorPosStatusLabel);
+  statusBar()->addPermanentWidget(m_zoomStatusLabel);
+  statusBar()->addPermanentWidget(m_selectionStatusLabel);
+  statusBar()->addPermanentWidget(m_activeLayerStatusLabel);
+  statusBar()->addPermanentWidget(m_comfyUiStatusLabel);
 }
 
 void MainWindow::applyUiChrome() {
