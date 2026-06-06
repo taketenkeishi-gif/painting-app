@@ -77,6 +77,8 @@ private:
   bool m_rotateKeyHeld {false};
   bool m_ctrlSpaceZoom {false};
   bool m_mirrorView {false};
+  bool m_isPanning {false};
+  QPoint m_panStartPos;
   QPoint m_ctrlSpaceStartPos;
   double m_ctrlSpaceStartZoom {1.0};
 };
