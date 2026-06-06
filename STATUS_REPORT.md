@@ -1,5 +1,5 @@
-# STATUS REPORT
-Updated: 2026-06-06 17:47:55
+﻿# STATUS REPORT
+Updated: 2026-06-07 03:24:23
 Phase: running
 
 ---
@@ -8,14 +8,14 @@ Phase: running
 
 | Key | Value |
 |-----|-------|
-| Worker | worker-a |
-| Task   | task-27 |
+| Worker | worker-b |
+| Task   | task-33 |
 | Phase  | running |
 
 ## Worker Reset Times
 
-- worker-a : available
 - worker-b : available
+- worker-a : available
 
 ## Completed
 
@@ -27,14 +27,11 @@ Phase: running
 
 ## Review Required
 
-- task-23
-- task-24
-- task-25
-- task-26
+(none)
 
 ## Last Event
 
-worker-a が task-27 を開始
+worker-b が task-33 を開始
 
 ---
-*Scheduler v6 - 2026-06-06 17:47:55*
+*Scheduler v6 - 2026-06-07 03:24:23*

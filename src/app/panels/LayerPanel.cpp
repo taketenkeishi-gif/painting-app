@@ -1555,11 +1555,11 @@ void LayerPanel::refreshButtonState() {
     return;
   }
 
-  const bool hasSelection = m_layerList->currentRow() >= 0;
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  const bool hasSelection = currentItem != nullptr;
   const bool canDelete = m_controller->document().layerCount() > 1;
   const int current = m_layerList->currentRow();
   const int lastRow = static_cast<int>(m_controller->document().layerCount()) - 1;
-  QListWidgetItem* currentItem = current >= 0 ? m_layerList->item(current) : nullptr;
   const bool paperSelected = currentItem != nullptr && currentItem->data(kPaperRole).toBool();
 
   const bool canMoveUp = current > 0;

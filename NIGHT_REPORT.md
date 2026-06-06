@@ -1,5 +1,5 @@
-﻿# NIGHT REPORT (Snapshot)
-生成日時: 2026-06-06 10:41:15
+# NIGHT REPORT (Snapshot)
+生成日時: 2026-06-06 17:52:00
 Branch: ai-night-test
 
 ---
@@ -11,9 +11,6 @@ Branch: ai-night-test
 （なし）
 
 ## レビュー待ち
-- task-20
-- task-21
-- task-22
 - task-23
 - task-24
 - task-25
