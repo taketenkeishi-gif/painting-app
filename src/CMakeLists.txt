@@ -21,6 +21,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/MoveLayerTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/AiSelectTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/GradientTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FreeTransformTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/GenerativeFillEngine.cpp
 )
 

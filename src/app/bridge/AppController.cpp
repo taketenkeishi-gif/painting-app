@@ -12,6 +12,7 @@
 
 #include <QBuffer>
 #include <QImage>
+#include <QPainter>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -135,6 +136,8 @@ QString toolKindSettingsKey(core::ToolKind kind) {
       return QStringLiteral("ai_select");
     case core::ToolKind::Gradient:
       return QStringLiteral("gradient");
+    case core::ToolKind::FreeTransform:
+      return QStringLiteral("free_transform");
     default:
       return QStringLiteral("tool");
   }
@@ -260,6 +263,10 @@ AppController::AppController(QObject* parent)
   m_aiSelectTool = aiSel.get();
   m_toolManager.registerTool(std::move(aiSel));
 
+  auto freeTransform = std::make_unique<core::FreeTransformTool>();
+  m_freeTransformTool = freeTransform.get();
+  m_toolManager.registerTool(std::move(freeTransform));
+
   // SelectionEngine を ClassicProvider で初期化
   m_selectionEngine.setDocument(&m_document);
   m_selectionEngine.setProvider(std::make_unique<core::ClassicProvider>());
@@ -303,6 +310,19 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
   CanvasOverlayViewModel view;
   view.toolOverlay   = m_toolManager.overlay();
   view.selectionMask = &m_document.selection();
+
+  if (m_freeTransformTool != nullptr && m_freeTransformTool->isActive() && m_transformSession.has_value()) {
+    view.hasTransformPreview = true;
+    view.transformFloatingImage = m_transformSession->floatingImage;
+    view.transformCenterX = m_freeTransformTool->centerX();
+    view.transformCenterY = m_freeTransformTool->centerY();
+    view.transformSx      = m_freeTransformTool->scaleX();
+    view.transformSy      = m_freeTransformTool->scaleY();
+    view.transformRot     = m_freeTransformTool->rot();
+    view.transformHalfW   = m_freeTransformTool->halfW();
+    view.transformHalfH   = m_freeTransformTool->halfH();
+  }
+
   return view;
 }
 
@@ -1376,25 +1396,34 @@ bool AppController::canUseToolOnActiveLayer(core::ToolKind kind) const {
     return true;
   }
   if (active->kind() == core::LayerKind::Folder) {
-    return kind == core::ToolKind::Hand || kind == core::ToolKind::Zoom;
+    // Zoom は常に可。MoveLayer はフォルダでも Hand サブツール経由で使える。
+    return kind == core::ToolKind::Zoom || kind == core::ToolKind::MoveLayer;
   }
   return firstCompatibleSubTool(kind, active->kind()) != nullptr;
 }
 
 bool AppController::setCurrentTool(core::ToolKind kind) {
-  if (!m_toolManager.setActiveTool(kind)) {
-    return false;
+  // Hand は MoveLayer カテゴリに統合。カテゴリを振り替える。
+  const core::ToolKind category = (kind == core::ToolKind::Hand)
+      ? core::ToolKind::MoveLayer : kind;
+
+  m_activeCategoryKind = category;
+  m_uiState.toolKind = category;
+
+  // H ショートカット等で Hand が直接指定された場合は hand_default サブツールを選択
+  if (kind == core::ToolKind::Hand) {
+    m_selectedSubToolByTool[core::ToolKind::MoveLayer] = "hand_default";
   }
 
-  m_uiState.toolKind = kind;
-  if (m_selectedSubToolByTool.find(kind) == m_selectedSubToolByTool.end()) {
-    const app::ui::SubToolDescriptor* defaultSub = m_toolCatalog.defaultSubTool(kind);
+  if (m_selectedSubToolByTool.find(category) == m_selectedSubToolByTool.end()) {
+    const app::ui::SubToolDescriptor* defaultSub = m_toolCatalog.defaultSubTool(category);
     if (defaultSub != nullptr) {
-      m_selectedSubToolByTool[kind] = defaultSub->id;
+      m_selectedSubToolByTool[category] = defaultSub->id;
     }
   }
 
   ensureCurrentSubToolCompatibility();
+  // selectSubToolInternal が targetToolKind に応じて実際のツールを起動する
   selectSubToolInternal(currentSubToolId(), false);
   saveSubToolCatalogToSettings();
   emit toolStateChanged();
@@ -1404,6 +1433,10 @@ bool AppController::setCurrentTool(core::ToolKind kind) {
 
 core::ToolKind AppController::currentTool() const noexcept {
   return m_toolManager.activeToolKind();
+}
+
+core::ToolKind AppController::currentToolCategoryKind() const noexcept {
+  return m_activeCategoryKind;
 }
 
 bool AppController::setCurrentSubTool(const std::string& subToolId) {
@@ -1420,18 +1453,18 @@ bool AppController::setCurrentSubTool(const std::string& subToolId) {
 }
 
 std::string AppController::currentSubToolId() const {
-  const auto it = m_selectedSubToolByTool.find(currentTool());
+  const auto it = m_selectedSubToolByTool.find(m_activeCategoryKind);
   if (it != m_selectedSubToolByTool.end()) {
     return it->second;
   }
-  const app::ui::SubToolDescriptor* sub = m_toolCatalog.defaultSubTool(currentTool());
+  const app::ui::SubToolDescriptor* sub = m_toolCatalog.defaultSubTool(m_activeCategoryKind);
   return sub == nullptr ? std::string {} : sub->id;
 }
 
 bool AppController::createCurrentSubTool() {
   const app::ui::SubToolDescriptor* source = currentSubToolDescriptor();
   const std::string baseName = source == nullptr ? std::string {"New Sub Tool"} : (source->displayName + " New");
-  if (!m_toolCatalog.createSubTool(currentTool(), baseName)) {
+  if (!m_toolCatalog.createSubTool(m_activeCategoryKind, baseName)) {
     return false;
   }
   const app::ui::ToolDescriptor* tool = currentToolDescriptor();
@@ -1449,7 +1482,7 @@ bool AppController::duplicateCurrentSubTool() {
   if (source == nullptr) {
     return false;
   }
-  if (!m_toolCatalog.duplicateSubTool(currentTool(), sourceId, source->displayName + " Copy")) {
+  if (!m_toolCatalog.duplicateSubTool(m_activeCategoryKind, sourceId, source->displayName + " Copy")) {
     return false;
   }
   const app::ui::ToolDescriptor* tool = currentToolDescriptor();
@@ -1462,7 +1495,7 @@ bool AppController::duplicateCurrentSubTool() {
 }
 
 bool AppController::renameCurrentSubTool(const std::string& displayName) {
-  if (!m_toolCatalog.renameSubTool(currentTool(), currentSubToolId(), displayName)) {
+  if (!m_toolCatalog.renameSubTool(m_activeCategoryKind, currentSubToolId(), displayName)) {
     return false;
   }
   saveSubToolCatalogToSettings();
@@ -1472,12 +1505,12 @@ bool AppController::renameCurrentSubTool(const std::string& displayName) {
 
 bool AppController::deleteCurrentSubTool() {
   const std::string deletingId = currentSubToolId();
-  if (!m_toolCatalog.removeSubTool(currentTool(), deletingId)) {
+  if (!m_toolCatalog.removeSubTool(m_activeCategoryKind, deletingId)) {
     return false;
   }
-  const app::ui::SubToolDescriptor* fallback = m_toolCatalog.defaultSubTool(currentTool());
+  const app::ui::SubToolDescriptor* fallback = m_toolCatalog.defaultSubTool(m_activeCategoryKind);
   if (fallback != nullptr) {
-    m_selectedSubToolByTool[currentTool()] = fallback->id;
+    m_selectedSubToolByTool[m_activeCategoryKind] = fallback->id;
     selectSubToolInternal(fallback->id, true);
   }
   saveSubToolCatalogToSettings();
@@ -1487,7 +1520,7 @@ bool AppController::deleteCurrentSubTool() {
 
 bool AppController::resetCurrentSubTool() {
   const std::string id = currentSubToolId();
-  if (!m_toolCatalog.resetSubTool(currentTool(), id)) {
+  if (!m_toolCatalog.resetSubTool(m_activeCategoryKind, id)) {
     return false;
   }
   selectSubToolInternal(id, true);
@@ -2860,10 +2893,201 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
     case core::ToolKind::AiSelect:
       return u8"AI\u9078\u629E";
     case core::ToolKind::Gradient:
-      return u8"\u30B0\u30E9\u30C7\u30FC\u30B7\u30E7\u30F3";  // "\u30B0\u30E9\u30C7\u30FC\u30B7\u30E7\u30F3"
+      return u8"\u30B0\u30E9\u30C7\u30FC\u30B7\u30E7\u30F3";
+    case core::ToolKind::FreeTransform:
+      return u8"\u5909\u5F62";  // "\u5909\u5F62"
     default:
       return u8"\u64CD\u4F5C";
   }
+}
+
+// \u2500\u2500 \u81EA\u7531\u5909\u5F62\u30BB\u30C3\u30B7\u30E7\u30F3 (Ctrl+T) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+bool AppController::isInTransformMode() const noexcept {
+  return m_freeTransformTool != nullptr && m_freeTransformTool->isActive();
+}
+
+void AppController::setCanvasZoom(double zoom) {
+  if (m_freeTransformTool != nullptr) {
+    m_freeTransformTool->setZoom(static_cast<float>(zoom));
+  }
+}
+
+bool AppController::beginTransformSession() {
+  if (isInTransformMode()) {
+    return false;  // \u65E2\u306B\u30BB\u30C3\u30B7\u30E7\u30F3\u4E2D
+  }
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || active->kind() != core::LayerKind::Raster) {
+    return false;
+  }
+
+  const core::SelectionMask& sel = m_document.selection();
+  const bool hasSelection = sel.hasSelection();
+
+  // \u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u9818\u57DF\u306E\u62BD\u51FA\u7BC4\u56F2
+  core::PixelBuffer& buf = active->buffer();
+  const int canvasW = buf.width();
+  const int canvasH = buf.height();
+
+  int offX = 0, offY = 0, regW = canvasW, regH = canvasH;
+  if (hasSelection) {
+    // \u9078\u629E\u7BC4\u56F2\u306E\u30D0\u30A6\u30F3\u30C7\u30A3\u30F3\u30B0\u30DC\u30C3\u30AF\u30B9\u3092\u8A08\u7B97
+    int minX = canvasW, minY = canvasH, maxX = -1, maxY = -1;
+    for (int y = 0; y < canvasH; ++y) {
+      for (int x = 0; x < canvasW; ++x) {
+        if (sel.contains(x, y)) {
+          minX = std::min(minX, x);
+          minY = std::min(minY, y);
+          maxX = std::max(maxX, x);
+          maxY = std::max(maxY, y);
+        }
+      }
+    }
+    if (maxX < 0) {
+      return false;  // \u9078\u629E\u7BC4\u56F2\u304C\u7A7A
+    }
+    offX = minX;
+    offY = minY;
+    regW = maxX - minX + 1;
+    regH = maxY - minY + 1;
+  }
+
+  // \u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u30D0\u30C3\u30D5\u30A1\u62BD\u51FA
+  core::PixelBuffer floatBuf(regW, regH, core::Color::Transparent());
+  for (int y = 0; y < regH; ++y) {
+    for (int x = 0; x < regW; ++x) {
+      const int cx = offX + x, cy = offY + y;
+      if (!hasSelection || sel.contains(cx, cy)) {
+        floatBuf.setPixel(x, y, buf.pixel(cx, cy));
+        buf.setPixel(cx, cy, core::Color::Transparent());
+      }
+    }
+  }
+
+  // \u30BB\u30C3\u30B7\u30E7\u30F3\u4FDD\u5B58
+  TransformSession session;
+  session.savedLayer     = *active;  // optional<Layer> \u3078\u306E\u30B3\u30D4\u30FC
+  session.savedSelection = m_document.selection();
+  session.layerIndex     = m_document.activeLayerIndex();
+  session.floatingImage  = platform::qt::QtImageConverter::toQImage(floatBuf);
+  m_transformSession     = std::move(session);
+
+  // \u5909\u5F62\u30C4\u30FC\u30EB\u8D77\u52D5
+  m_freeTransformTool->beginSession(std::move(floatBuf), offX, offY, canvasW, canvasH);
+  m_toolManager.setActiveTool(core::ToolKind::FreeTransform);
+
+  rerender();
+  emit canvasChanged();
+  emit overlayChanged();
+  return true;
+}
+
+bool AppController::commitTransformSession() {
+  if (!isInTransformMode() || !m_transformSession.has_value()) {
+    return false;
+  }
+
+  const int canvasW = m_document.canvasSize().width;
+  const int canvasH = m_document.canvasSize().height;
+
+  const float cx   = m_freeTransformTool->centerX();
+  const float cy   = m_freeTransformTool->centerY();
+  const float sx   = m_freeTransformTool->scaleX();
+  const float sy   = m_freeTransformTool->scaleY();
+  const float rotDeg = m_freeTransformTool->rotationDeg();
+  const float hw   = m_freeTransformTool->halfW();
+  const float hh   = m_freeTransformTool->halfH();
+
+  // \u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u753B\u50CF\u3092\u30AD\u30E3\u30F3\u30D0\u30B9\u30B5\u30A4\u30BA\u306EQImage\u306B\u5408\u6210\uFF08QPainter\u5909\u63DB\uFF09
+  QImage canvas(canvasW, canvasH, QImage::Format_RGBA8888);
+  canvas.fill(Qt::transparent);
+  {
+    QPainter p(&canvas);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    p.setRenderHint(QPainter::Antialiasing, false);
+    p.translate(static_cast<double>(cx), static_cast<double>(cy));
+    p.rotate(static_cast<double>(rotDeg));
+    p.scale(static_cast<double>(sx), static_cast<double>(sy));
+    p.drawImage(
+        QRectF(-static_cast<double>(hw), -static_cast<double>(hh),
+               static_cast<double>(hw) * 2.0, static_cast<double>(hh) * 2.0),
+        m_transformSession->floatingImage);
+    p.end();
+  }
+
+  // \u30A2\u30AF\u30C6\u30A3\u30D6\u30EC\u30A4\u30E4\u30FC\u306B\u5408\u6210\u7D50\u679C\u3092\u30D6\u30EA\u30C3\u30C8
+  core::PixelBuffer resultBuf = platform::qt::QtImageConverter::fromQImage(canvas);
+  core::Layer* active = m_document.activeLayer();
+  if (active != nullptr && active->kind() == core::LayerKind::Raster) {
+    core::PixelBuffer& layerBuf = active->buffer();
+    for (int y = 0; y < canvasH; ++y) {
+      for (int x = 0; x < canvasW; ++x) {
+        const core::Color src = resultBuf.pixel(x, y);
+        if (src.a == 0) {
+          continue;
+        }
+        // Porter-Duff src-over
+        const core::Color dst = layerBuf.pixel(x, y);
+        const float sa = src.a / 255.f;
+        const float da = dst.a / 255.f * (1.f - sa);
+        const float oa = sa + da;
+        if (oa < 1e-6f) {
+          layerBuf.setPixel(x, y, core::Color::Transparent());
+        } else {
+          layerBuf.setPixel(x, y, core::Color {
+              static_cast<uint8_t>((src.r * sa + dst.r * da) / oa),
+              static_cast<uint8_t>((src.g * sa + dst.g * da) / oa),
+              static_cast<uint8_t>((src.b * sa + dst.b * da) / oa),
+              static_cast<uint8_t>(oa * 255.f)});
+        }
+      }
+    }
+  }
+
+  // \u30A2\u30F3\u30C9\u30A5\u5C65\u6B74
+  StrokeHistoryEntry entry;
+  entry.kind        = HistoryKind::StrokeWithSelection;
+  entry.actionName  = u8"\u5909\u5F62";
+  entry.layerIndex  = m_transformSession->layerIndex;
+  entry.beforeLayer = m_transformSession->savedLayer;  // optional<Layer> → optional<Layer>
+  entry.afterLayer  = *m_document.activeLayer();
+  entry.beforeSelection = m_transformSession->savedSelection;
+  entry.afterSelection  = m_document.selection();
+  pushHistoryEntry(std::move(entry));
+
+  // \u30BB\u30C3\u30B7\u30E7\u30F3\u7D42\u4E86
+  m_freeTransformTool->cancelSession();
+  m_transformSession.reset();
+  m_toolManager.setActiveTool(m_activeCategoryKind);
+
+  rerender();
+  emit canvasChanged();
+  emit overlayChanged();
+  setDirty(true);
+  return true;
+}
+
+bool AppController::cancelTransformSession() {
+  if (!isInTransformMode() || !m_transformSession.has_value()) {
+    return false;
+  }
+
+  // \u5143\u306B\u623B\u3059
+  const std::size_t idx = m_transformSession->layerIndex;
+  if (idx < m_document.layerCount() && m_transformSession->savedLayer.has_value()) {
+    m_document.layerAt(idx) = *m_transformSession->savedLayer;
+  }
+  m_document.selection() = m_transformSession->savedSelection;
+
+  m_freeTransformTool->cancelSession();
+  m_transformSession.reset();
+  m_toolManager.setActiveTool(m_activeCategoryKind);
+
+  rerender();
+  emit canvasChanged();
+  emit overlayChanged();
+  return true;
 }
 
 // \u2500\u2500 AI / ComfyUI API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -3030,7 +3254,8 @@ bool AppController::isSubToolCompatibleWithLayerKind(
     const app::ui::SubToolDescriptor& subTool,
     core::LayerKind layerKind) const noexcept {
   if (layerKind == core::LayerKind::Folder) {
-    return false;
+    // Hand サブツール（targetToolKind == Hand）はフォルダでも使える
+    return subTool.targetToolKind == core::ToolKind::Hand;
   }
   const app::ui::TargetLayerKind target = subTool.profile.targetLayerKind;
   if (target == app::ui::TargetLayerKind::Both) {
@@ -3072,33 +3297,37 @@ void AppController::ensureCurrentSubToolCompatibility() {
     return;
   }
   const std::string currentId = currentSubToolId();
-  const app::ui::SubToolDescriptor* current = m_toolCatalog.findSubTool(currentTool(), currentId);
+  const app::ui::SubToolDescriptor* current = m_toolCatalog.findSubTool(m_activeCategoryKind, currentId);
   if (current != nullptr && isSubToolCompatibleWithLayerKind(*current, active->kind())) {
     return;
   }
-  const app::ui::SubToolDescriptor* compatible = firstCompatibleSubTool(currentTool(), active->kind());
+  const app::ui::SubToolDescriptor* compatible = firstCompatibleSubTool(m_activeCategoryKind, active->kind());
   if (compatible != nullptr) {
-    m_selectedSubToolByTool[currentTool()] = compatible->id;
+    m_selectedSubToolByTool[m_activeCategoryKind] = compatible->id;
   }
 }
 
 const app::ui::ToolDescriptor* AppController::currentToolDescriptor() const noexcept {
-  return m_toolCatalog.findTool(currentTool());
+  return m_toolCatalog.findTool(m_activeCategoryKind);
 }
 
 const app::ui::SubToolDescriptor* AppController::currentSubToolDescriptor() const noexcept {
-  return m_toolCatalog.findSubTool(currentTool(), currentSubToolId());
+  return m_toolCatalog.findSubTool(m_activeCategoryKind, currentSubToolId());
 }
 
 bool AppController::selectSubToolInternal(std::string_view subToolId, bool emitSignal) {
-  const app::ui::SubToolDescriptor* sub = m_toolCatalog.findSubTool(currentTool(), subToolId);
+  const app::ui::SubToolDescriptor* sub = m_toolCatalog.findSubTool(m_activeCategoryKind, subToolId);
   if (sub == nullptr) {
     return false;
   }
 
-
-  m_selectedSubToolByTool[currentTool()] = sub->id;
+  m_selectedSubToolByTool[m_activeCategoryKind] = sub->id;
   resetToolStateFromDescriptor(*sub);
+
+  // targetToolKind が設定されていればそのツールを起動、なければカテゴリのツールを使う
+  const core::ToolKind activeTool = sub->targetToolKind.value_or(m_activeCategoryKind);
+  m_toolManager.setActiveTool(activeTool);
+
   applyUiStateToTools();
 
   if (emitSignal) {
@@ -3374,7 +3603,7 @@ void AppController::loadSubToolCatalogFromSettings() {
     return;
   }
   QSettings settings("taketenkeishi", "LayeredPaintApp");
-  const QByteArray catalogBytes = settings.value(QStringLiteral("subToolsV2/catalog")).toByteArray();
+  const QByteArray catalogBytes = settings.value(QStringLiteral("subToolsV3/catalog")).toByteArray();
   if (!catalogBytes.isEmpty()) {
     const QJsonDocument doc = QJsonDocument::fromJson(catalogBytes);
     if (doc.isArray()) {
@@ -3485,7 +3714,7 @@ void AppController::loadSubToolCatalogFromSettings() {
     }
   }
 
-  const QByteArray selectedBytes = settings.value(QStringLiteral("subToolsV2/selected")).toByteArray();
+  const QByteArray selectedBytes = settings.value(QStringLiteral("subToolsV3/selected")).toByteArray();
   if (!selectedBytes.isEmpty()) {
     const QJsonDocument selectedDoc = QJsonDocument::fromJson(selectedBytes);
     if (selectedDoc.isObject()) {
@@ -3527,13 +3756,13 @@ void AppController::saveSubToolCatalogToSettings() const {
     toolObj.insert(QStringLiteral("subTools"), subToolsArray);
     toolsArray.push_back(toolObj);
   }
-  settings.setValue(QStringLiteral("subToolsV2/catalog"), QJsonDocument(toolsArray).toJson(QJsonDocument::Compact));
+  settings.setValue(QStringLiteral("subToolsV3/catalog"), QJsonDocument(toolsArray).toJson(QJsonDocument::Compact));
 
   QJsonObject selectedObj;
   for (const auto& [kind, subToolId] : m_selectedSubToolByTool) {
     selectedObj.insert(toolKindSettingsKey(kind), QString::fromStdString(subToolId));
   }
-  settings.setValue(QStringLiteral("subToolsV2/selected"), QJsonDocument(selectedObj).toJson(QJsonDocument::Compact));
+  settings.setValue(QStringLiteral("subToolsV3/selected"), QJsonDocument(selectedObj).toJson(QJsonDocument::Compact));
 }
 
 core::ToolContext AppController::makeToolContext() {

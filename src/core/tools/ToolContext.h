@@ -59,6 +59,12 @@ struct ToolOverlayState {
   float vectorPreviewWidth {2.0f};
 
   OverlayCursorHint cursorHint {OverlayCursorHint::Default};
+
+  // FreeTransformTool 変形ボックス
+  bool   hasTransformBox       {false};
+  FPoint transformCorners[4]   {};   // TL TR BR BL (canvas px)
+  FPoint transformHandles[9]   {};   // 0-7: スケール, 8: 回転
+  int    transformActiveHandle {-1};
 };
 
 struct ToolResult {

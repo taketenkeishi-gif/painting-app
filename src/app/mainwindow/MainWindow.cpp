@@ -1694,12 +1694,15 @@ void MainWindow::createMenus() {
       m_canvasWidget->setMirrorView(checked);
     }
   });
-  // スタブ: 変形/フィルターは将来実装
-  connect(m_transformAction,     &QAction::triggered, this, [this]() {
-    statusBar()->showMessage(QString::fromUtf8(u8"変形: 未実装"), 3000);
+  connect(m_transformAction, &QAction::triggered, this, [this]() {
+    if (!m_controller->beginTransformSession()) {
+      statusBar()->showMessage(QString::fromUtf8(u8"変形: ラスターレイヤーを選択してください"), 3000);
+    }
   });
   connect(m_freeTransformAction, &QAction::triggered, this, [this]() {
-    statusBar()->showMessage(QString::fromUtf8(u8"自由変形: 未実装"), 3000);
+    if (!m_controller->beginTransformSession()) {
+      statusBar()->showMessage(QString::fromUtf8(u8"自由変形: ラスターレイヤーを選択してください"), 3000);
+    }
   });
   connect(m_gaussianBlurAction,  &QAction::triggered, this, [this]() {
     statusBar()->showMessage(QString::fromUtf8(u8"ガウスぼかし: 未実装"), 3000);

@@ -10,6 +10,7 @@
 
 #include <functional>
 
+#include <QImage>
 #include <QList>
 #include <QObject>
 #include <QPixmap>
@@ -33,6 +34,7 @@
 #include "core/tools/GradientTool.h"
 #include "core/tools/HandTool.h"
 #include "core/tools/LineTool.h"
+#include "core/tools/FreeTransformTool.h"
 #include "core/tools/MoveLayerTool.h"
 #include "core/tools/RectSelectionTool.h"
 #include "core/tools/ToolManager.h"
@@ -133,6 +135,17 @@ struct ToolStateViewModel {
 struct CanvasOverlayViewModel {
   core::ToolOverlayState     toolOverlay;
   const core::SelectionMask* selectionMask {nullptr};
+
+  // FreeTransformTool フローティングプレビュー
+  bool   hasTransformPreview  {false};
+  QImage transformFloatingImage;
+  float  transformCenterX     {0.f};
+  float  transformCenterY     {0.f};
+  float  transformSx          {1.f};
+  float  transformSy          {1.f};
+  float  transformRot         {0.f};  ///< ラジアン
+  float  transformHalfW       {0.f};
+  float  transformHalfH       {0.f};
 };
 
 class AppController : public QObject {
@@ -224,6 +237,8 @@ public:
   bool canUseToolOnActiveLayer(core::ToolKind kind) const;
   bool setCurrentTool(core::ToolKind kind);
   core::ToolKind currentTool() const noexcept;
+  /// ToolPanel のボタン強調表示用カテゴリ種別（Hand は MoveLayer に統合）
+  core::ToolKind currentToolCategoryKind() const noexcept;
   bool setCurrentSubTool(const std::string& subToolId);
   std::string currentSubToolId() const;
   bool createCurrentSubTool();
@@ -281,6 +296,13 @@ public:
   void doubleClickAt(float x, float y);
   bool pickColorAt(int x, int y);
   void setInputModifiers(bool shift, bool ctrl, bool alt);
+
+  // ── 自由変形セッション（Ctrl+T） ───────────────────────────────────────────
+  bool beginTransformSession();
+  bool commitTransformSession();
+  bool cancelTransformSession();
+  bool isInTransformMode() const noexcept;
+  void setCanvasZoom(double zoom);
 
   bool undo();
   bool redo();
@@ -504,6 +526,15 @@ private:
   core::FillTool*          m_fillTool           {nullptr};
   core::GradientTool*      m_gradientTool       {nullptr};
   core::AiSelectTool*      m_aiSelectTool       {nullptr};
+  core::FreeTransformTool* m_freeTransformTool  {nullptr};
+
+  struct TransformSession {
+    std::optional<core::Layer> savedLayer;
+    core::SelectionMask        savedSelection;
+    std::size_t                layerIndex {0};
+    QImage                     floatingImage;
+  };
+  std::optional<TransformSession> m_transformSession;
   ComfyUiClient*           m_comfyUiClient      {nullptr};
   enum class AiOpType { None, SamSelect, Inpaint, TextToImage, CustomWorkflow };
   AiOpType                 m_currentAiOp        {AiOpType::None};
@@ -518,6 +549,8 @@ private:
   app::ui::ToolCatalog m_toolCatalog;
   app::ui::UiState m_uiState;
   std::unordered_map<core::ToolKind, std::string> m_selectedSubToolByTool;
+  // ToolPanel ボタン強調用カテゴリ。Hand は MoveLayer に統合されるため別管理。
+  core::ToolKind m_activeCategoryKind {core::ToolKind::Brush};
 
   bool m_stroking {false};
   std::size_t m_layerCounter {1};

@@ -279,9 +279,26 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   }
 
   if (m_controller != nullptr && m_showOverlay) {
+    m_controller->setCanvasZoom(state.zoom);
     const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
     const core::ToolKind activeTool = m_controller->currentTool();
     painter.setRenderHint(QPainter::Antialiasing, true);
+
+    // ── FreeTransform フローティング画像プレビュー ───────────────────────────
+    if (overlay.hasTransformPreview && !overlay.transformFloatingImage.isNull()) {
+      const double screenCX = target.x() + static_cast<double>(overlay.transformCenterX) * state.zoom;
+      const double screenCY = target.y() + static_cast<double>(overlay.transformCenterY) * state.zoom;
+      const double fw = static_cast<double>(overlay.transformHalfW) * state.zoom;
+      const double fh = static_cast<double>(overlay.transformHalfH) * state.zoom;
+      painter.save();
+      painter.translate(screenCX, screenCY);
+      painter.rotate(static_cast<double>(overlay.transformRot) * (180.0 / 3.14159265358979323846));
+      painter.scale(static_cast<double>(overlay.transformSx), static_cast<double>(overlay.transformSy));
+      painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 8.0);
+      painter.drawImage(QRectF(-fw, -fh, fw * 2.0, fh * 2.0), overlay.transformFloatingImage);
+      painter.restore();
+      painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    }
 
     // ── Tool line overlay (LineTool / MoveLayer) ────────────────────────────
     if (overlay.toolOverlay.hasLine) {
@@ -418,9 +435,11 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       QPolygonF poly;
       poly.reserve(static_cast<int>(pts.size()));
       for (const auto& fp : pts) {
+        // fp.x/y はキャンバス連続座標（mapToCanvasF由来）のため +0.5 不要。
+        // 整数ピクセルインデックス用の +0.5 を加えると確定後ラスタと 0.5*zoom ずれる。
         poly.append(QPointF(
-            target.x() + (static_cast<double>(fp.x) + 0.5) * state.zoom,
-            target.y() + (static_cast<double>(fp.y) + 0.5) * state.zoom));
+            target.x() + static_cast<double>(fp.x) * state.zoom,
+            target.y() + static_cast<double>(fp.y) * state.zoom));
       }
 
       const double penW = std::max(1.0, static_cast<double>(vw) * state.zoom);
@@ -446,6 +465,48 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
           state.zoom,
           QPointF(target.x(), target.y()),
           m_marchingOffset);
+    }
+
+    // ── FreeTransform 変形ボックス ───────────────────────────────────────────
+    if (overlay.toolOverlay.hasTransformBox) {
+      auto toScreen = [&](const core::FPoint& fp) -> QPointF {
+        return QPointF(target.x() + static_cast<double>(fp.x) * state.zoom,
+                       target.y() + static_cast<double>(fp.y) * state.zoom);
+      };
+
+      // 外枠（4コーナーを繋ぐ破線）
+      QPolygonF box;
+      for (int i = 0; i < 4; ++i) {
+        box << toScreen(overlay.toolOverlay.transformCorners[i]);
+      }
+      box << toScreen(overlay.toolOverlay.transformCorners[0]);
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      painter.setPen(QPen(QColor(0, 0, 0, 160), 2.0, Qt::DashLine));
+      painter.drawPolyline(box);
+      painter.setPen(QPen(QColor(255, 255, 255, 220), 1.0, Qt::SolidLine));
+      painter.drawPolyline(box);
+
+      // 回転ハンドルへの線（handle[1] TC → handle[8] Rotate）
+      const QPointF tcPt = toScreen(overlay.toolOverlay.transformHandles[1]);
+      const QPointF rotPt = toScreen(overlay.toolOverlay.transformHandles[8]);
+      painter.setPen(QPen(QColor(255, 255, 255, 180), 1.0, Qt::DotLine));
+      painter.drawLine(tcPt, rotPt);
+
+      // スケールハンドル (0-7): 白い正方形
+      painter.setPen(QPen(QColor(0, 0, 0, 220), 1.5));
+      painter.setBrush(overlay.toolOverlay.transformActiveHandle >= 0 &&
+                       overlay.toolOverlay.transformActiveHandle <= 7
+                       ? QBrush(QColor(72, 195, 255)) : QBrush(Qt::white));
+      for (int i = 0; i < 8; ++i) {
+        const QPointF pt = toScreen(overlay.toolOverlay.transformHandles[i]);
+        painter.drawRect(QRectF(pt.x() - 4.5, pt.y() - 4.5, 9.0, 9.0));
+      }
+
+      // 回転ハンドル (8): 青い円
+      const bool rotActive = (overlay.toolOverlay.transformActiveHandle == 8);
+      painter.setPen(QPen(QColor(0, 0, 0, 220), 1.5));
+      painter.setBrush(rotActive ? QColor(72, 195, 255) : QColor(200, 230, 255));
+      painter.drawEllipse(rotPt, 5.5, 5.5);
     }
 
   }
@@ -842,6 +903,19 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
   if (event->isAutoRepeat()) {
     QWidget::keyPressEvent(event);
     return;
+  }
+  // 変形セッション: Enter → コミット, Escape → キャンセル
+  if (m_controller != nullptr && m_controller->isInTransformMode()) {
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+      m_controller->commitTransformSession();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Escape) {
+      m_controller->cancelTransformSession();
+      event->accept();
+      return;
+    }
   }
   if (event->key() == Qt::Key_Space) {
     // Ctrl+Space → zoom drag mode; plain Space → pan
