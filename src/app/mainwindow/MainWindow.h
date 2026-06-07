@@ -288,6 +288,7 @@ private:
   // 選択範囲
   QAction* m_expandSelectionAction     {nullptr};
   QAction* m_contractSelectionAction   {nullptr};
+  QAction* m_quickMaskAction           {nullptr};
   // フィルター
   QAction* m_gaussianBlurAction        {nullptr};
   QAction* m_motionBlurAction          {nullptr};

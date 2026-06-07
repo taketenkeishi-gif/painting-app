@@ -84,7 +84,7 @@ Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
       return Qt::CrossCursor;
     case core::ToolKind::Fill:
       return Qt::PointingHandCursor;
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
     case core::ToolKind::RectSelection:
       return Qt::CrossCursor;
     case core::ToolKind::MoveLayer:

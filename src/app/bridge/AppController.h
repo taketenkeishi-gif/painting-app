@@ -33,8 +33,7 @@
 #include "core/tools/FillTool.h"
 #include "core/tools/GradientTool.h"
 #include "core/tools/HandTool.h"
-#include "core/tools/LineTool.h"
-#include "core/tools/CurveTool.h"
+#include "core/tools/ShapeTool.h"
 #include "core/tools/FreeTransformTool.h"
 #include "core/tools/MoveLayerTool.h"
 #include "core/tools/RectSelectionTool.h"
@@ -231,6 +230,11 @@ public:
   bool invertSelection();
   bool expandSelection(int radiusPixels);
   bool contractSelection(int radiusPixels);
+
+  // ── クイックマスクモード（Photoshop 相当） ───────────────────────────────
+  bool isQuickMaskMode() const noexcept { return m_quickMaskMode; }
+  bool toggleQuickMaskMode();  ///< Alt+Q で切り替え
+
   bool fillSelectionOrCanvas();
   bool deleteSelectionPixels();
   core::PixelBuffer exportSelectionOrCanvasFromComposite() const;
@@ -592,6 +596,10 @@ private:
   std::optional<core::Rect> m_lastCompositeDirtyRect;
   std::uint64_t m_compositeRevision {0};
   bool m_dirty {false};
+
+  // ── クイックマスクモード ──────────────────────────────────────────────────
+  bool m_quickMaskMode {false};
+  core::SelectionMask m_quickMaskSnapshot;  ///< mode 再開時の復帰用
 };
 
 } // namespace app::bridge

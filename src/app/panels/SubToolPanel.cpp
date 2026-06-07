@@ -302,8 +302,8 @@ QString toolNameJa(core::ToolKind kind) {
       return QString::fromUtf8(u8"スポイト");
     case core::ToolKind::Fill:
       return QString::fromUtf8(u8"塗りつぶし");
-    case core::ToolKind::Line:
-      return QString::fromUtf8(u8"直線");
+    case core::ToolKind::Shape:
+      return QString::fromUtf8(u8"図形");
     case core::ToolKind::RectSelection:
       return QString::fromUtf8(u8"選択");
     case core::ToolKind::MoveLayer:
@@ -333,6 +333,9 @@ QString subToolNameJa(QString id, const QString& displayName) {
   if (id == "line_vector_snap") return QString::fromUtf8(u8"ベクター直線（角度スナップ）");
   if (id == "line_vector_thick") return QString::fromUtf8(u8"ベクター直線（太）");
   if (id == "line_vector_thin") return QString::fromUtf8(u8"ベクター直線（細）");
+  if (id == "curve_vector_basic") return QString::fromUtf8(u8"ベジェ曲線");
+  if (id == "curve_vector_thin") return QString::fromUtf8(u8"ベジェ曲線（細）");
+  if (id == "curve_vector_thick") return QString::fromUtf8(u8"ベジェ曲線（太）");
   if (id == "fill_contiguous") return QString::fromUtf8(u8"塗りつぶし（連結）");
   if (id == "fill_gapclose") return QString::fromUtf8(u8"塗りつぶし（隙間閉じ）");
   if (id == "rect_default") return QString::fromUtf8(u8"矩形選択");

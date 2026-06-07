@@ -480,8 +480,8 @@ QString toolNameJa(core::ToolKind kind) {
       return "スポイト";
     case core::ToolKind::Fill:
       return "塗りつぶし";
-    case core::ToolKind::Line:
-      return "直線";
+    // case core::ToolKind::Line:
+    //   return "直線";
     case core::ToolKind::RectSelection:
       return "選択";
     case core::ToolKind::MoveLayer:
@@ -1192,6 +1192,7 @@ void MainWindow::createMenus() {
   m_mirrorViewAction          = new QAction(QString::fromUtf8(u8"左右反転表示(&F)"), this);
   m_expandSelectionAction     = new QAction(QString::fromUtf8(u8"選択範囲を拡張(&E)..."), this);
   m_contractSelectionAction   = new QAction(QString::fromUtf8(u8"選択範囲を縮小(&C)..."), this);
+  m_quickMaskAction           = new QAction(QString::fromUtf8(u8"クイックマスクモード(&Q)"), this);
   m_gaussianBlurAction        = new QAction(QString::fromUtf8(u8"ガウスぼかし(&G)..."), this);
   m_motionBlurAction          = new QAction(QString::fromUtf8(u8"モーションぼかし(&M)..."), this);
   m_transformAction           = new QAction(QString::fromUtf8(u8"変形(&T)"), this);
@@ -1237,6 +1238,7 @@ void MainWindow::createMenus() {
   m_deselectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
   m_clearSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
   m_invertSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
+  m_quickMaskAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Q));
   m_brushSizeDownAction->setShortcut(QKeySequence(Qt::Key_BracketLeft));
   m_brushSizeUpAction->setShortcut(QKeySequence(Qt::Key_BracketRight));
   m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
@@ -1349,7 +1351,7 @@ void MainWindow::createMenus() {
   bindTool(core::ToolKind::Eyedropper, "スポイト(&I)", QKeySequence(Qt::Key_I));
   bindTool(core::ToolKind::Fill, "塗りつぶし(&G)", QKeySequence(Qt::Key_G));
   bindTool(core::ToolKind::Gradient, "グラデーション(&N)", QKeySequence(Qt::Key_N));
-  bindTool(core::ToolKind::Line, "直線(&U)", QKeySequence(Qt::Key_U));
+  bindTool(core::ToolKind::Shape, QString::fromUtf8(u8"図形(&U)"), QKeySequence(Qt::Key_U));
   bindTool(core::ToolKind::RectSelection, QString::fromUtf8(u8"選択(&S)"), QKeySequence(Qt::Key_S));
   bindTool(core::ToolKind::MoveLayer, "移動(&M)", QKeySequence(Qt::Key_M));
   bindTool(core::ToolKind::Hand, "手のひら(&H)", QKeySequence(Qt::Key_H));
@@ -1362,6 +1364,7 @@ void MainWindow::createMenus() {
   selectMenu->addAction(m_invertSelectionAction);
   selectMenu->addAction(m_expandSelectionAction);
   selectMenu->addAction(m_contractSelectionAction);
+  selectMenu->addAction(m_quickMaskAction);
   selectMenu->addSeparator();
   selectMenu->addAction(m_clearSelectionAction);
 
@@ -1715,6 +1718,15 @@ void MainWindow::createMenus() {
   });
   connect(m_contractSelectionAction, &QAction::triggered, this, [this]() {
     statusBar()->showMessage(QString::fromUtf8(u8"選択範囲を縮小: 未実装"), 3000);
+  });
+  connect(m_quickMaskAction, &QAction::triggered, this, [this]() {
+    if (m_controller->toggleQuickMaskMode()) {
+      statusBar()->showMessage(
+          m_controller->isQuickMaskMode()
+              ? QString::fromUtf8(u8"クイックマスクモード ON")
+              : QString::fromUtf8(u8"クイックマスクモード OFF"),
+          2000);
+    }
   });
   connect(m_controller, &app::bridge::AppController::comfyUiStateChanged,
           this, &MainWindow::onComfyUiStateChanged);

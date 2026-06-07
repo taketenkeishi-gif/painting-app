@@ -71,6 +71,14 @@ struct UiState {
   bool  smear     {false};
   float smearRate {0.9f};
 
+  // ── Dab 散布 / 角度ジッター / 粒子数 (OSS 吸収改善) ────────────────────────
+  // デフォルト有効化：常に最高品質を提供
+  bool  scatter           {true};  // Dab散布 ON
+  float scatterAmount     {0.3f};  // 程よい散布（0-4.0 スケール）
+  bool  angleJitter       {true};  // 角度ジッター ON
+  float angleJitterAmount {45.0f}; // 自然な回転（度）
+  int   dabCount          {1};     // 単一粒子
+
   // ── グラデーション ────────────────────────────────────────────────────────
   int gradientType {0};  ///< 0=Linear, 1=Radial
   int gradientFill {0};  ///< 0=FgToBg, 1=FgToTransparent

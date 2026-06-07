@@ -54,7 +54,7 @@ QString toolNameJa(core::ToolKind kind) {
       return "スポイト";
     case core::ToolKind::Fill:
       return "塗りつぶし";
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
       return "直線";
     case core::ToolKind::RectSelection:
       return "選択";
@@ -172,7 +172,14 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_wetMixCheck(new QCheckBox("ウェットミックス", this)),
       m_wetMixRateSlider(new QSlider(Qt::Horizontal, this)),
       m_smearCheck(new QCheckBox("スメア（にじみ）", this)),
-      m_smearRateSlider(new QSlider(Qt::Horizontal, this)) {
+      m_smearRateSlider(new QSlider(Qt::Horizontal, this)),
+      m_dabSection(nullptr),
+      m_scatterCheck(new QCheckBox("Dab散布（Scatter）", this)),
+      m_scatterAmountSlider(new QSlider(Qt::Horizontal, this)),
+      m_angleJitterCheck(new QCheckBox("角度ジッター", this)),
+      m_angleJitterAmountSlider(new QSlider(Qt::Horizontal, this)),
+      m_dabCountLabel(new QLabel("粒子数", this)),
+      m_dabCountSlider(new QSlider(Qt::Horizontal, this)) {
   auto* hostLayout = new QVBoxLayout(this);
   hostLayout->setContentsMargins(0, 0, 0, 0);
   hostLayout->setSpacing(0);
@@ -236,6 +243,10 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   // ウェットミックス / スメア (0-100)
   m_wetMixRateSlider->setRange(0, 100);
   m_smearRateSlider->setRange(0, 100);
+  // Dab 散布 / 角度ジッター / 粒子数
+  m_scatterAmountSlider->setRange(0, 400);   // 0.0-4.0 (×0.01)
+  m_angleJitterAmountSlider->setRange(0, 180);
+  m_dabCountSlider->setRange(1, 64);
 
   m_shapeTypeCombo->addItem("円",   static_cast<int>(core::BrushShapeType::Circle));
   m_shapeTypeCombo->addItem("四角", static_cast<int>(core::BrushShapeType::Square));
@@ -471,6 +482,30 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
     m_wetSection = grp;
   }
 
+  // Dab 散布 / 角度ジッター / 粒子数（OSS吸収改善）
+  {
+    auto* grp = new QGroupBox("高度な Dab 制御", m_contentWidget);
+    auto* lay = new QVBoxLayout(grp);
+    lay->setContentsMargins(4, 4, 4, 4);
+    lay->setSpacing(4);
+    lay->addWidget(m_scatterCheck);
+    auto* scatterRow = new QHBoxLayout();
+    scatterRow->addWidget(new QLabel("散布量", grp));
+    scatterRow->addWidget(m_scatterAmountSlider, 1);
+    lay->addLayout(scatterRow);
+    lay->addWidget(m_angleJitterCheck);
+    auto* angleRow = new QHBoxLayout();
+    angleRow->addWidget(new QLabel("回転度", grp));
+    angleRow->addWidget(m_angleJitterAmountSlider, 1);
+    lay->addLayout(angleRow);
+    auto* dabRow = new QHBoxLayout();
+    dabRow->addWidget(m_dabCountLabel);
+    dabRow->addWidget(m_dabCountSlider, 1);
+    lay->addLayout(dabRow);
+    contentLayout->addWidget(grp);
+    m_dabSection = grp;
+  }
+
   auto* shapeGroup = new QGroupBox("形状", m_contentWidget);
   auto* shapeLayout = new QVBoxLayout(shapeGroup);
   shapeLayout->setContentsMargins(4, 4, 4, 4);
@@ -680,6 +715,12 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_wetMixRateSlider,        &QSlider::valueChanged,      this, &ToolPropertyPanel::onWetMixRateSliderChanged);
   connect(m_smearCheck,              &QCheckBox::toggled,         this, &ToolPropertyPanel::onSmearToggled);
   connect(m_smearRateSlider,         &QSlider::valueChanged,      this, &ToolPropertyPanel::onSmearRateSliderChanged);
+  // Dab 散布 / 角度ジッター / 粒子数
+  connect(m_scatterCheck,            &QCheckBox::toggled,         this, &ToolPropertyPanel::onScatterToggled);
+  connect(m_scatterAmountSlider,     &QSlider::valueChanged,      this, &ToolPropertyPanel::onScatterAmountSliderChanged);
+  connect(m_angleJitterCheck,        &QCheckBox::toggled,         this, &ToolPropertyPanel::onAngleJitterToggled);
+  connect(m_angleJitterAmountSlider, &QSlider::valueChanged,      this, &ToolPropertyPanel::onAngleJitterAmountSliderChanged);
+  connect(m_dabCountSlider,          &QSlider::valueChanged,      this, &ToolPropertyPanel::onDabCountSliderChanged);
 
   applyResponsiveLayout();
 }
@@ -741,7 +782,7 @@ QString ToolPropertyPanel::currentToolSettingsKey() const {
     case core::ToolKind::Fill:
       toolKey = QStringLiteral("fill");
       break;
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
       toolKey = QStringLiteral("line");
       break;
     case core::ToolKind::RectSelection:
@@ -1180,6 +1221,12 @@ void ToolPropertyPanel::refreshFromController() {
   m_wetMixRateSlider->setValue(state.wetMixRate);
   m_smearCheck->setChecked(state.smear);
   m_smearRateSlider->setValue(state.smearRate);
+  // Dab 散布 / 角度ジッター / 粒子数
+  m_scatterCheck->setChecked(state.scatter);
+  m_scatterAmountSlider->setValue(static_cast<int>(state.scatterAmount * 100));
+  m_angleJitterCheck->setChecked(state.angleJitter);
+  m_angleJitterAmountSlider->setValue(static_cast<int>(state.angleJitterAmount));
+  m_dabCountSlider->setValue(state.dabCount);
   updateColorButton();
 }
 
@@ -1723,6 +1770,23 @@ void ToolPropertyPanel::onSmearToggled(bool checked) {
 }
 void ToolPropertyPanel::onSmearRateSliderChanged(int value) {
   if (m_controller) m_controller->setSmearRate(value);
+}
+
+// Dab 散布 / 角度ジッター / 粒子数
+void ToolPropertyPanel::onScatterToggled(bool checked) {
+  if (m_controller) m_controller->setScatter(checked);
+}
+void ToolPropertyPanel::onScatterAmountSliderChanged(int value) {
+  if (m_controller) m_controller->setScatterAmount(value / 100.0f);
+}
+void ToolPropertyPanel::onAngleJitterToggled(bool checked) {
+  if (m_controller) m_controller->setAngleJitter(checked);
+}
+void ToolPropertyPanel::onAngleJitterAmountSliderChanged(int value) {
+  if (m_controller) m_controller->setAngleJitterAmount(static_cast<float>(value));
+}
+void ToolPropertyPanel::onDabCountSliderChanged(int value) {
+  if (m_controller) m_controller->setDabCount(value);
 }
 
 void ToolPropertyPanel::updateColorButton() {

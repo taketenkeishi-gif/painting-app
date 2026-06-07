@@ -8,7 +8,7 @@ enum class ToolKind {
   Eyedropper,
   Hand,
   Zoom,
-  Line,
+  Shape,         ///< 図形ツール（直線・曲線・矩形・円など）
   RectSelection,
   MoveLayer,
   Fill,

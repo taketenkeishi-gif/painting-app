@@ -110,6 +110,12 @@ private slots:
   void onWetMixRateSliderChanged(int value);
   void onSmearToggled(bool checked);
   void onSmearRateSliderChanged(int value);
+  // Dab 散布 / 角度ジッター / 粒子数 (OSS 吸収改善)
+  void onScatterToggled(bool checked);
+  void onScatterAmountSliderChanged(int value);
+  void onAngleJitterToggled(bool checked);
+  void onAngleJitterAmountSliderChanged(int value);
+  void onDabCountSliderChanged(int value);
 
 private:
   void applyResponsiveLayout();
@@ -242,6 +248,14 @@ private:
   QSlider*   m_wetMixRateSlider {nullptr};
   QCheckBox* m_smearCheck {nullptr};
   QSlider*   m_smearRateSlider {nullptr};
+  // Dab 散布 / 角度ジッター / 粒子数
+  QWidget*   m_dabSection {nullptr};
+  QCheckBox* m_scatterCheck {nullptr};
+  QSlider*   m_scatterAmountSlider {nullptr};
+  QCheckBox* m_angleJitterCheck {nullptr};
+  QSlider*   m_angleJitterAmountSlider {nullptr};
+  QLabel*    m_dabCountLabel {nullptr};
+  QSlider*   m_dabCountSlider {nullptr};
   bool m_compactLayout {false};
   bool m_showDetails {false};
   QSet<QString> m_pinnedKeys;

@@ -122,7 +122,7 @@ QString toolKindSettingsKey(core::ToolKind kind) {
       return QStringLiteral("eyedropper");
     case core::ToolKind::Fill:
       return QStringLiteral("fill");
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
       return QStringLiteral("line");
     case core::ToolKind::RectSelection:
       return QStringLiteral("selection");
@@ -244,13 +244,6 @@ AppController::AppController(QObject* parent)
   m_toolManager.registerTool(std::make_unique<core::EyedropperTool>());
   m_toolManager.registerTool(std::make_unique<core::HandTool>());
   m_toolManager.registerTool(std::make_unique<core::ZoomTool>());
-  auto line = std::make_unique<core::LineTool>();
-  m_lineTool = line.get();
-  m_toolManager.registerTool(std::move(line));
-
-  auto curve = std::make_unique<core::CurveTool>();
-  m_curveTool = curve.get();
-  m_toolManager.registerTool(std::move(curve));
 
   auto rectSelection = std::make_unique<core::RectSelectionTool>();
   m_rectSelectionTool = rectSelection.get();
@@ -1258,6 +1251,24 @@ bool AppController::contractSelection(int radiusPixels) {
   return true;
 }
 
+bool AppController::toggleQuickMaskMode() {
+  if (!m_quickMaskMode) {
+    // クイックマスクモード ON: 現在の選択をマスク化
+    m_quickMaskSnapshot = m_document.selection();
+    m_quickMaskMode = true;
+    // マスク表示のみ、選択範囲は一時消去（選択→マスク表示に）
+    m_document.selection().clear();
+  } else {
+    // クイックマスクモード OFF: マスクを選択に戻す
+    m_quickMaskMode = false;
+    m_document.selection() = m_quickMaskSnapshot;
+    m_quickMaskSnapshot.clear();
+  }
+  emit documentChanged();
+  emit overlayChanged();
+  return true;
+}
+
 bool AppController::fillSelectionOrCanvas() {
   core::Layer* active = m_document.activeLayer();
   if (active == nullptr || active->kind() != core::LayerKind::Raster) {
@@ -1599,7 +1610,7 @@ std::string AppController::currentToolGuide() const {
     case core::ToolKind::Fill:
       guide = u8"\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u5857\u308A\u3064\u3076\u3057\u3002";
       break;
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
       guide = u8"\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u76F4\u7DDA\u3092\u63CF\u753B\u3002";
       break;
     case core::ToolKind::RectSelection:
@@ -2921,7 +2932,7 @@ bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
   switch (kind) {
     case core::ToolKind::Brush:
     case core::ToolKind::Eraser:
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
     case core::ToolKind::Fill:
     case core::ToolKind::Gradient:
     case core::ToolKind::MoveLayer:
@@ -2943,7 +2954,7 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
       return u8"\u63CF\u753B";
     case core::ToolKind::Eraser:
       return u8"\u6D88\u53BB";
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
       return u8"\u76F4\u7DDA";
     case core::ToolKind::Fill:
       return u8"\u5857\u308A\u3064\u3076\u3057";
@@ -3490,15 +3501,6 @@ void AppController::applyUiStateToTools() {
     }
     m_eraserTool->setVectorEraseMode(mode);
     m_eraserTool->setVectorTrimOutside(m_uiState.vectorTrimOutside);
-  }
-
-  if (m_lineTool != nullptr) {
-    m_lineTool->setSnapAngleDegrees(m_uiState.snapAngle);
-  }
-
-  if (m_curveTool != nullptr) {
-    m_curveTool->setSnapAngleDegrees(m_uiState.snapAngle);
-    m_curveTool->setSimplifyLevel(m_uiState.simplifyLevel);
   }
 
   if (m_fillTool != nullptr) {
