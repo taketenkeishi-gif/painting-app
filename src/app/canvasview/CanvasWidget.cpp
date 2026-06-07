@@ -608,14 +608,12 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     }
 
     // ── Committed selection — marching ants ─────────────────────────────────
-    if (overlay.selectionMask != nullptr) {
-      SelectionOverlayRenderer::render(
-          painter,
-          *overlay.selectionMask,
-          state.zoom,
-          QPointF(target.x(), target.y()),
-          m_marchingOffset);
-    }
+    SelectionOverlayRenderer::render(
+        painter,
+        overlay.selectionMask,
+        state.zoom,
+        QPointF(target.x(), target.y()),
+        m_marchingOffset);
 
     // ── FreeTransform 変形ボックス ───────────────────────────────────────────
     if (overlay.toolOverlay.hasTransformBox) {

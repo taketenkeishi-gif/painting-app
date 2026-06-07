@@ -21,18 +21,19 @@ namespace app::canvasview {
 //   All paths are drawn with a 1px cosmetic pen so thickness is
 //   zoom-invariant.
 
-void SelectionOverlayRenderer::render(QPainter&                  painter,
-                                       const core::SelectionMask& mask,
-                                       double                     zoom,
-                                       QPointF                    panOffset,
-                                       int                        marchingOffset) {
-  if (!mask.hasSelection()) return;
+void SelectionOverlayRenderer::render(QPainter&                   painter,
+                                       const core::SelectionMask*  mask,
+                                       double                      zoom,
+                                       QPointF                     panOffset,
+                                       int                         marchingOffset) {
+  if (mask == nullptr) return;
+  if (!mask->hasSelection()) return;
 
-  const int w = mask.width();
-  const int h = mask.height();
+  const int w = mask->width();
+  const int h = mask->height();
   if (w <= 0 || h <= 0) return;
 
-  const auto boundsOpt = mask.boundingRect();
+  const auto boundsOpt = mask->boundingRect();
   if (!boundsOpt.has_value()) return;
 
   constexpr int kDashLen = 4;          // canvas pixels per half-cycle
@@ -46,7 +47,7 @@ void SelectionOverlayRenderer::render(QPainter&                  painter,
   // inside() clamps out-of-bounds to "unselected"
   auto inside = [&](int x, int y) -> bool {
     if (x < 0 || y < 0 || x >= w || y >= h) return false;
-    return mask.maskValue(x, y) != 0;
+    return mask->maskValue(x, y) >= 128;
   };
 
   QPainterPath blackPath, whitePath;
