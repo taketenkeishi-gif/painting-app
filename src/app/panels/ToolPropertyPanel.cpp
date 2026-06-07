@@ -101,6 +101,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_fillGapCloseLabel(new QLabel("隙間閉じ", this)),
       m_selectionModeLabel(new QLabel("選択モード", this)),
       m_autoSelectThresholdLabel(new QLabel("自動選択しきい値", this)),
+      m_aiGranularityLabel(new QLabel("AI 選択粒度", this)),
       m_colorButton(new QPushButton("色を選択", this)),
       m_sizeSpin(new QSpinBox(this)),
       m_sizeSlider(new QSlider(Qt::Horizontal, this)),
@@ -135,6 +136,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_autoSelectThresholdSpin(new QSpinBox(this)),
       m_autoSelectContiguousCheck(new QCheckBox("連結領域のみ", this)),
       m_autoSelectReferAllLayersCheck(new QCheckBox("全レイヤーを参照", this)),
+      m_aiGranularityCombo(new QComboBox(this)),
       m_selectionFeatherSlider(new QSlider(Qt::Horizontal, this)),
       m_selectionFeatherSpin(new QSpinBox(this)),
       m_selectionAntiAliasCheck(new QCheckBox("アンチエイリアス", this)),
@@ -219,6 +221,14 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   m_fillGapCloseSpin->setRange(0, 8);
   m_autoSelectThresholdSlider->setRange(0, 255);
   m_autoSelectThresholdSpin->setRange(0, 255);
+  m_aiGranularityCombo->addItem("0: 細部 (髪・線)",  0);
+  m_aiGranularityCombo->addItem("1: 中 (部位)",      1);
+  m_aiGranularityCombo->addItem("2: オブジェクト",   2);
+  m_aiGranularityCombo->addItem("3: 被写体全体",     3);
+  m_aiGranularityCombo->setCurrentIndex(1);
+  m_aiGranularityCombo->setToolTip(
+      "SAM2 が出力する 4 段階のマスクから選ぶ。\n"
+      "0=最小(髪など細部) / 3=最大(キャラ全体)");
   m_selectionFeatherSlider->setRange(0, 100);
   m_selectionFeatherSpin->setRange(0, 100);
   m_selectionExpandSpin->setRange(0, 100);
@@ -608,6 +618,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   selectionLayout->addLayout(autoSelectThresholdRow);
   selectionLayout->addWidget(m_autoSelectContiguousCheck);
   selectionLayout->addWidget(m_autoSelectReferAllLayersCheck);
+  selectionLayout->addWidget(m_aiGranularityLabel);
+  selectionLayout->addWidget(m_aiGranularityCombo);
   selectionLayout->addWidget(m_selectionFeatherLabel);
   selectionLayout->addLayout(featherRow);
   selectionLayout->addWidget(m_selectionAntiAliasCheck);
@@ -690,6 +702,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       &QCheckBox::toggled,
       this,
       &ToolPropertyPanel::onAutoSelectReferAllLayersToggled);
+  connect(m_aiGranularityCombo, qOverload<int>(&QComboBox::currentIndexChanged),
+          this, &ToolPropertyPanel::onAiGranularityChanged);
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onBlendModeChanged);
   connect(m_buildupModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onBuildupModeToggled);
   connect(m_eraseModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onEraseModeToggled);
@@ -1060,6 +1074,18 @@ void ToolPropertyPanel::refreshFromController() {
   m_autoSelectThresholdSpin->setVisible(supportsAutoSelectThreshold);
   m_autoSelectContiguousCheck->setVisible(supportsAutoSelectContiguous);
   m_autoSelectReferAllLayersCheck->setVisible(supportsAutoSelectReferAllLayers);
+
+  // AI 選択粒度 (AiSelectTool 専用)
+  const bool isAiSelect = (m_controller->currentTool() == core::ToolKind::AiSelect);
+  if (m_aiGranularityLabel != nullptr) m_aiGranularityLabel->setVisible(isAiSelect);
+  if (m_aiGranularityCombo != nullptr) {
+    m_aiGranularityCombo->setVisible(isAiSelect);
+    if (isAiSelect) {
+      const QSignalBlocker blocker(m_aiGranularityCombo);
+      m_aiGranularityCombo->setCurrentIndex(m_controller->aiSelectGranularity());
+    }
+  }
+
   const bool supportsSelectionFeather = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionFeather);
   const bool supportsSelectionAA      = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionAntiAlias);
   if (m_selectionFeatherLabel != nullptr) m_selectionFeatherLabel->setVisible(supportsSelectionFeather);
@@ -1602,6 +1628,12 @@ void ToolPropertyPanel::onAutoSelectReferAllLayersToggled(bool checked) {
     return;
   }
   m_controller->setAutoSelectReferAllLayers(checked);
+}
+
+void ToolPropertyPanel::onAiGranularityChanged(int index) {
+  if (m_controller == nullptr || m_aiGranularityCombo == nullptr) return;
+  const int granularity = m_aiGranularityCombo->itemData(index).toInt();
+  m_controller->setAiSelectGranularity(granularity);
 }
 
 void ToolPropertyPanel::onSelectionFeatherSliderChanged(int value) {

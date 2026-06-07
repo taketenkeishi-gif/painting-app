@@ -24,6 +24,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/GradientTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FreeTransformTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/GenerativeFillEngine.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/OnnxSegEngine.cpp
 )
 
 add_library(paint_core STATIC ${CORE_SOURCES})
@@ -32,6 +33,10 @@ set_target_properties(paint_core PROPERTIES
 )
 target_include_directories(paint_core PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(paint_core PUBLIC Qt6::Core)
+if(PAINT_USE_ONNX)
+  target_compile_definitions(paint_core PUBLIC PAINT_USE_ONNX)
+  target_link_libraries(paint_core PUBLIC onnxruntime::onnxruntime)
+endif()
 if(MSVC)
   target_compile_options(paint_core PUBLIC /utf-8)
 endif()

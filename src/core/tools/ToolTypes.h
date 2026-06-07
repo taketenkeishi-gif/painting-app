@@ -98,13 +98,13 @@ struct BrushDynamics {
   BrushCurve pressureOpacityCurve;
 
   // ── Dab 散布 (CSP の「位置のばらし」相当) ────────────────────────────
-  // デフォルト ON で常に最高品質を提供（ユーザーは必要に応じて OFF に）
-  bool  scatter       {true};    // 有効化
+  // デフォルト OFF（ユーザーが必要に応じてスプレー効果として有効化）
+  bool  scatter       {false};
   float scatterAmount {0.3f};    ///< 程よい散布（0.3 = ブラシ半径の 30%）
 
   // ── 角度ジッター (CSP の「向きのばらし」相当) ────────────────────────
-  // デフォルト ON で自然な鉛筆・チョーク効果を実現
-  bool  angleJitter       {true};  // 有効化
+  // デフォルト OFF（ユーザーが必要に応じて有効化）
+  bool  angleJitter       {false};
   float angleJitterAmount {45.0f}; ///< 自然な回転量（度）
 
   // ── 1 スタンプあたりの Dab 数 ────────────────────────────────────────

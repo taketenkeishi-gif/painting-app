@@ -77,6 +77,7 @@ private slots:
   void onAutoSelectThresholdSpinChanged(int value);
   void onAutoSelectContiguousToggled(bool checked);
   void onAutoSelectReferAllLayersToggled(bool checked);
+  void onAiGranularityChanged(int index);
   void onSelectionFeatherSliderChanged(int value);
   void onSelectionFeatherSpinChanged(int value);
   void onSelectionAntiAliasToggled(bool checked);
@@ -163,6 +164,7 @@ private:
   QLabel* m_fillGapCloseLabel {nullptr};
   QLabel* m_selectionModeLabel {nullptr};
   QLabel* m_autoSelectThresholdLabel {nullptr};
+  QLabel* m_aiGranularityLabel {nullptr};
   QLabel* m_selectionFeatherLabel {nullptr};
   QPushButton* m_colorButton {nullptr};
   QSpinBox* m_sizeSpin {nullptr};
@@ -205,6 +207,7 @@ private:
   QSpinBox* m_autoSelectThresholdSpin {nullptr};
   QCheckBox* m_autoSelectContiguousCheck {nullptr};
   QCheckBox* m_autoSelectReferAllLayersCheck {nullptr};
+  QComboBox* m_aiGranularityCombo {nullptr};
   QSlider*   m_selectionFeatherSlider {nullptr};
   QSpinBox*  m_selectionFeatherSpin {nullptr};
   QCheckBox* m_selectionAntiAliasCheck {nullptr};

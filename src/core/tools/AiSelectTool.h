@@ -24,11 +24,13 @@ namespace core {
 class AiSelectTool : public ITool {
 public:
   struct Settings {
-    int  threshold       {24};   ///< 色許容範囲 0–255
+    int  threshold       {24};   ///< 色許容範囲 0–255（スタブ使用時）
     bool referAllLayers  {true}; ///< 合成レイヤーを参照
     bool antiAlias       {true}; ///< エッジをぼかして滑らかに
     bool addMode         {false};///< 既存選択に追加（OR）
     bool subtractMode    {false};///< 既存選択から削除（AND NOT）
+    // SAM2 granularity: 0=最小領域(髪など) 1=中 2=オブジェクト 3=被写体全体
+    int  granularity     {1};
   };
 
   /// AppController から ComfyUI 推論コールバックを注入するための型
@@ -54,6 +56,7 @@ public:
   void setAntiAlias      (bool v) noexcept { m_settings.antiAlias      = v; }
   void setAddMode        (bool v) noexcept { m_settings.addMode        = v; }
   void setSubtractMode   (bool v) noexcept { m_settings.subtractMode   = v; }
+  void setGranularity    (int v)  noexcept { m_settings.granularity    = std::clamp(v, 0, 3); }
   const Settings& settings() const noexcept { return m_settings; }
 
   /// ComfyUI 推論コールバックを注入（nullptr = stub only）

@@ -11,12 +11,16 @@
 #include <vector>
 
 #include <QBuffer>
+#include <QFile>
 #include <QImage>
 #include <QPainter>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QCoreApplication>
+#include <QProcess>
+#include <QTimer>
+#include <QTcpSocket>
 #include <QRandomGenerator>
 #include <QSettings>
 #include <QString>
@@ -302,6 +306,14 @@ AppController::AppController(QObject* parent)
   rerender();
 
   connect(this, &AppController::documentChanged, this, [this]() { setDirty(true); });
+
+  // ── ONNX モデルを自動検索して読み込む ────────────────────────────────
+  const QString exeDir = QCoreApplication::applicationDirPath();
+  const QString encPath = exeDir + "/models/sam2_encoder.onnx";
+  const QString decPath = exeDir + "/models/sam2_decoder.onnx";
+  if (QFile::exists(encPath) && QFile::exists(decPath)) {
+    initOnnxEngine(encPath, decPath);
+  }
 }
 
 CanvasOverlayViewModel AppController::canvasOverlay() const {
@@ -3183,16 +3195,16 @@ void AppController::connectComfyUi(const QString& urlStr) {
       const bool ok = (s == ComfyUiClient::State::Connected);
       emit comfyUiStateChanged(ok);
 
-      // \u63A5\u7D9A\u6642\u306B AiSelectTool \u306B ComfyUI \u63A8\u8AD6\u30B3\u30FC\u30EB\u30D0\u30C3\u30AF\u3092\u6CE8\u5165
-      if (m_aiSelectTool != nullptr) {
+      // ONNX \u304C\u30ED\u30FC\u30C9\u6E08\u307F\u306E\u5834\u5408\u306F ComfyUI \u30B3\u30FC\u30EB\u30D0\u30C3\u30AF\u3092\u4E0A\u66F8\u304D\u3057\u306A\u3044
+      if (m_aiSelectTool != nullptr && !isOnnxLoaded()) {
         if (ok) {
           m_aiSelectTool->setInferenceCallback(
               [this](const core::PixelBuffer& composited,
                      const std::vector<core::Point>& posPoints,
-                     const std::vector<core::Point>& /*negPoints*/) {
+                     const std::vector<core::Point>& negPoints) {
                 if (posPoints.empty() || m_comfyUiClient == nullptr) return;
 
-                // \u753B\u50CF\u3092 PNG base64 \u306B\u5909\u63DB\u3057\u3066\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9
+                // \u5168\u30DD\u30A4\u30F3\u30C8\u3092 SAM \u30EA\u30AF\u30A8\u30B9\u30C8\u306B\u542B\u3081\u308B\uFF08ComfyUI \u5074\u304C\u5BFE\u5FDC\u3057\u3066\u3044\u308C\u3070\uFF09
                 const QImage img = platform::qt::QtImageConverter::toQImage(composited);
                 QByteArray pngBytes;
                 QBuffer buf(&pngBytes);
@@ -3200,12 +3212,12 @@ void AppController::connectComfyUi(const QString& urlStr) {
                 img.save(&buf, "PNG");
                 const QString b64 = QString::fromLatin1(pngBytes.toBase64());
 
-                // SAM \u30EF\u30FC\u30AF\u30D5\u30ED\u30FC\u3092\u69CB\u7BC9\u3057\u3066\u30AD\u30E5\u30FC\u306B\u8FFD\u52A0
                 ComfyUiClient::SamRequest req;
                 req.imageBase64   = b64;
                 req.pointX        = posPoints.front().x;
                 req.pointY        = posPoints.front().y;
                 req.positivePoint = true;
+                (void)negPoints;
 
                 const QJsonObject wf = ComfyUiClient::buildSamWorkflow(req);
                 m_currentAiOp = AiOpType::SamSelect;
@@ -3316,21 +3328,154 @@ void AppController::connectComfyUi(const QString& urlStr) {
     });
   }
 
-  m_comfyUiClient->connectToServer(QUrl(urlStr));
+  const QUrl serverUrl(urlStr);
+  ensureComfyUiRunning(serverUrl);
+  m_comfyUiClient->connectToServer(serverUrl);
 }
 
 bool AppController::isComfyUiConnected() const noexcept {
   return m_comfyUiClient != nullptr && m_comfyUiClient->isConnected();
 }
 
+void AppController::ensureComfyUiRunning(const QUrl& serverUrl) {
+  const QString host = serverUrl.host().isEmpty() ? "localhost" : serverUrl.host();
+  const int port = (serverUrl.port() > 0) ? serverUrl.port() : 8188;
+
+  // ローカルホストの場合のみ自動起動
+  if (host != "localhost" && host != "127.0.0.1") {
+    return;
+  }
+
+  // ポート疎通確認
+  QTcpSocket testSocket;
+  testSocket.connectToHost(host, static_cast<quint16>(port));
+  if (testSocket.waitForConnected(1000)) {
+    return;  // サーバーが既に起動している
+  }
+
+  // サーバーが起動していなければ起動
+  if (m_comfyUiServerProcess == nullptr) {
+    m_comfyUiServerProcess = new QProcess(this);
+
+    // ComfyUI フォルダパス
+    const QString comfyPath = QStringLiteral(
+        "C:/Users/Keishi/AI_tools/ComfyUI-Portable/ComfyUI_windows_portable/ComfyUI");
+
+    // 起動パラメータ
+    QStringList args;
+
+    // サーバープロセスが終了したときのクリーンアップ
+    connect(m_comfyUiServerProcess,
+            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this]() {
+      if (m_comfyUiServerProcess != nullptr) {
+        m_comfyUiServerProcess->deleteLater();
+        m_comfyUiServerProcess = nullptr;
+      }
+    });
+  }
+
+  // 既に起動中なら何もしない
+  if (m_comfyUiServerProcess->state() == QProcess::Running) {
+    return;
+  }
+
+  // ComfyUI を起動
+  const QString comfyPath = QStringLiteral(
+      "C:/Users/Keishi/AI_tools/ComfyUI-Portable/ComfyUI_windows_portable/ComfyUI");
+  m_comfyUiServerProcess->setWorkingDirectory(comfyPath);
+  m_comfyUiServerProcess->start(
+      QStringLiteral("python"), QStringList() << QStringLiteral("main.py"),
+      QIODevice::NotOpen);
+
+  // サーバー起動待機 (タイムアウト 30秒)
+  if (m_comfyUiStartupTimer == nullptr) {
+    m_comfyUiStartupTimer = new QTimer(this);
+    connect(m_comfyUiStartupTimer, &QTimer::timeout,
+            this, &AppController::onComfyUiServerStartupTimeout);
+  }
+  m_comfyUiStartupRetries = 0;
+  m_comfyUiStartupTimer->start(500);  // 500ms ごとに疎通確認
+}
+
+void AppController::onComfyUiServerStartupTimeout() {
+  if (m_comfyUiStartupTimer == nullptr) return;
+
+  ++m_comfyUiStartupRetries;
+  const int maxRetries = 60;  // 最大30秒
+
+  // ポート疎通確認
+  QTcpSocket testSocket;
+  testSocket.connectToHost("localhost", 8188);
+  if (testSocket.waitForConnected(500)) {
+    m_comfyUiStartupTimer->stop();
+    return;  // サーバーが起動した
+  }
+
+  // タイムアウト
+  if (m_comfyUiStartupRetries >= maxRetries) {
+    m_comfyUiStartupTimer->stop();
+  }
+}
+
 void AppController::applyAiSelectResult(core::SelectionMask mask) {
-  // Undo \u7528\u306B\u5909\u66F4\u524D\u306E\u9078\u629E\u3092\u8A18\u9332\u3057\u3066\u304B\u3089\u9069\u7528
   const core::SelectionMask before = m_document.selection();
   m_document.selection() = std::move(mask);
-  pushSelectionHistoryIfChanged(before, u8"AI\u9078\u629E\u7CBE\u8907");  // "AI\u9078\u629E\u7CBE\u8907"
+  pushSelectionHistoryIfChanged(before, u8"AI\u9078\u629E\u7CBE\u78BA");
   emit documentChanged();
   emit layersChanged();
   emit aiSelectionRefined();
+}
+
+// \u2500\u2500 ONNX \u30ED\u30FC\u30AB\u30EB\u63A8\u8AD6 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+bool AppController::isOnnxLoaded() const noexcept {
+  return m_onnxSegEngine && m_onnxSegEngine->isLoaded();
+}
+
+bool AppController::initOnnxEngine(const QString& encoderPath, const QString& decoderPath) {
+  core::ai::OnnxSegEngine::Config cfg;
+  cfg.encoderModelPath = encoderPath.toStdString();
+  cfg.decoderModelPath = decoderPath.toStdString();
+
+  m_onnxSegEngine = std::make_unique<core::ai::OnnxSegEngine>(cfg);
+  if (!m_onnxSegEngine->isLoaded()) {
+    m_onnxSegEngine.reset();
+    return false;
+  }
+
+  // ONNX \u304C\u5229\u7528\u53EF\u80FD\u306A\u3089\u3001\u5373\u6642\u30B3\u30FC\u30EB\u30D0\u30C3\u30AF\u3092\u5DEE\u3057\u8FBC\u3080
+  setupOnnxInferenceCallback();
+  return true;
+}
+
+void AppController::setAiSelectGranularity(int granularity) {
+  m_onnxGranularity = std::clamp(granularity, 0, 3);
+  if (m_aiSelectTool) m_aiSelectTool->setGranularity(m_onnxGranularity);
+}
+
+// ONNX \u30A8\u30F3\u30B8\u30F3\u3092\u4F7F\u3046 InferenceCallback \u3092 AiSelectTool \u306B\u8A2D\u5B9A\u3059\u308B
+void AppController::setupOnnxInferenceCallback() {
+  if (!m_aiSelectTool || !m_onnxSegEngine) return;
+
+  m_aiSelectTool->setInferenceCallback(
+      [this](const core::PixelBuffer& composited,
+             const std::vector<core::Point>& posPoints,
+             const std::vector<core::Point>& negPoints) {
+        if (!m_onnxSegEngine || !m_onnxSegEngine->isLoaded()) return;
+
+        // \u753B\u50CF\u304C\u5909\u308F\u3063\u305F\uFF08\u518D\u63CF\u753B revision \u304C\u9032\u3093\u3060\uFF09\u3068\u304D\u3060\u3051\u518D\u30A8\u30F3\u30B3\u30FC\u30C9
+        if (m_compositeRevision != m_onnxLastEncodedRevision) {
+          if (!m_onnxSegEngine->encodeImage(composited)) return;
+          m_onnxLastEncodedRevision = m_compositeRevision;
+        }
+
+        const int W = composited.width();
+        const int H = composited.height();
+        auto result = m_onnxSegEngine->decode(posPoints, negPoints, W, H, m_onnxGranularity);
+        if (!result.valid) return;
+
+        applyAiSelectResult(std::move(result.mask));
+      });
 }
 
 bool AppController::isSubToolCompatibleWithLayerKind(
@@ -3555,6 +3700,8 @@ void AppController::applyUiStateToTools() {
 
 void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescriptor& subTool) {
   const app::ui::ToolBehaviorProfile& profile = subTool.profile;
+  const app::ui::BrushPreset& preset = subTool.preset;
+
   m_uiState.subToolId = subTool.id;
   m_uiState.size = std::max(1, profile.stroke.size);
   m_uiState.opacity = clampPercent(profile.stroke.opacity);
@@ -3587,13 +3734,31 @@ void AppController::resetToolStateFromDescriptor(const app::ui::SubToolDescripto
   m_uiState.velocityBasedCorrection = profile.stabilizer.velocityBasedCorrection;
   m_uiState.shapeType = profile.shape.shapeType;
   m_uiState.blendMode = profile.blendMode;
-  m_uiState.buildupMode = subTool.preset.buildupMode;
+  m_uiState.buildupMode = preset.buildupMode;
   m_uiState.eraseMode = profile.eraseMode;
   m_uiState.lockAlphaRespect = profile.lockAlphaRespect;
   m_uiState.vectorEraseMode = profile.vectorEraseMode;
   m_uiState.vectorTrimOutside = profile.vectorTrimOutside;
-  m_uiState.gradientType = subTool.preset.gradientType;
-  m_uiState.gradientFill = subTool.preset.gradientFill;
+  m_uiState.gradientType = preset.gradientType;
+  m_uiState.gradientFill = preset.gradientFill;
+
+  // ── 詳細パラメータ（サブツール個別） ───────────────────────────────────
+  m_uiState.velocitySize       = preset.velocitySize;
+  m_uiState.velocitySizeMin    = std::clamp(preset.velocitySizeMin, 0, 100);
+  m_uiState.velocityOpacity    = preset.velocityOpacity;
+  m_uiState.velocityOpacityMin = std::clamp(preset.velocityOpacityMin, 0, 100);
+  m_uiState.textureGrain       = preset.textureGrain;
+  m_uiState.textureStrength    = std::clamp(preset.textureStrength, 0, 100);
+  m_uiState.textureScale       = std::clamp(preset.textureScale, 10, 400);
+  m_uiState.wetMix             = preset.wetMix;
+  m_uiState.wetMixRate         = std::clamp(preset.wetMixRate, 0, 100);
+  m_uiState.smear              = preset.smear;
+  m_uiState.smearRate          = std::clamp(preset.smearRate, 0, 100);
+  m_uiState.scatter            = preset.scatter;
+  m_uiState.scatterAmount      = std::clamp(preset.scatterAmount, 0, 400);
+  m_uiState.angleJitter        = preset.angleJitter;
+  m_uiState.angleJitterAmount  = std::clamp(preset.angleJitterAmount, 0, 180);
+  m_uiState.dabCount           = std::clamp(preset.dabCount, 1, 64);
 }
 
 void AppController::syncCurrentSubToolFromUiState() {
@@ -4137,7 +4302,11 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
 
 // ── AI: テキストから画像生成 ─────────────────────────────────────────────
 void AppController::runTextToImage(const Txt2ImgParams& params, int batchCount) {
-  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
+  if (m_comfyUiClient == nullptr) {
+    emit aiGenerationError("ComfyUI クライアントが初期化されていません");
+    return;
+  }
+  if (!m_comfyUiClient->isConnected()) {
     emit aiGenerationError("ComfyUI に接続されていません");
     return;
   }

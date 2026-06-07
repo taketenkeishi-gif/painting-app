@@ -2,21 +2,24 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
-#include <functional>
-
 #include <QImage>
 #include <QList>
 #include <QObject>
 #include <QPixmap>
+#include <QProcess>
+#include <QTimer>
 
 #include "app/ui/ToolDescriptor.h"
 #include "app/ui/UiState.h"
+#include "core/ai/OnnxSegEngine.h"
 #include "core/common/FPoint.h"
 #include "core/common/Point.h"
 #include "core/common/Rect.h"
@@ -410,6 +413,12 @@ public:
   void applyAiSelectResult(core::SelectionMask mask);
   void fetchAiModels();
 
+  // ── ONNX ローカル推論 ─────────────────────────────────────────────────
+  bool isOnnxLoaded() const noexcept;
+  bool initOnnxEngine(const QString& encoderPath, const QString& decoderPath);
+  void setAiSelectGranularity(int granularity);
+  int  aiSelectGranularity() const noexcept { return m_onnxGranularity; }
+
   struct InpaintParams {
     QString prompt;
     QString negativePrompt;
@@ -561,6 +570,19 @@ private:
   std::optional<TransformSession> m_transformSession;
   platform::qt::HighQualityTransform::InterpolationMethod m_transformInterpolation {
       platform::qt::HighQualityTransform::InterpolationMethod::Bicubic };
+
+  // ── ONNX セグメンテーションエンジン ──────────────────────────────────
+  std::unique_ptr<core::ai::OnnxSegEngine> m_onnxSegEngine;
+  std::uint64_t m_onnxLastEncodedRevision {static_cast<std::uint64_t>(-1)};
+  int           m_onnxGranularity         {1};
+  void setupOnnxInferenceCallback();
+
+  // ── ComfyUI サーバー管理 ────────────────────────────────────────────
+  void ensureComfyUiRunning(const QUrl& serverUrl);
+  void onComfyUiServerStartupTimeout();
+  QProcess*    m_comfyUiServerProcess    {nullptr};
+  QTimer*      m_comfyUiStartupTimer     {nullptr};
+  int          m_comfyUiStartupRetries   {0};
 
   ComfyUiClient*           m_comfyUiClient      {nullptr};
   enum class AiOpType { None, SamSelect, Inpaint, TextToImage, CustomWorkflow };

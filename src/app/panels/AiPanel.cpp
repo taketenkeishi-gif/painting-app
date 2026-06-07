@@ -414,7 +414,14 @@ void AiPanel::onConnectClicked() {
 }
 
 void AiPanel::onGenerateClicked() {
-  if (m_controller == nullptr || !m_controller->isComfyUiConnected()) return;
+  if (m_controller == nullptr) {
+    m_resultLabel->setText(QStringLiteral("❌ エラー: コントローラが未初期化"));
+    return;
+  }
+  if (!m_controller->isComfyUiConnected()) {
+    m_resultLabel->setText(QStringLiteral("❌ エラー: ComfyUI に接続されていません"));
+    return;
+  }
   m_resultLabel->setText(QString());
   clearCandidates();
   setGenerating(true);
@@ -423,7 +430,6 @@ void AiPanel::onGenerateClicked() {
   const QJsonObject wf = currentWorkflow();
 
   if (wf.isEmpty()) {
-    // 内蔵 txt2img ワークフロー
     app::bridge::AppController::Txt2ImgParams p;
     p.prompt         = m_promptEdit->toPlainText().trimmed();
     p.negativePrompt = m_negEdit->toPlainText().trimmed();
@@ -433,9 +439,10 @@ void AiPanel::onGenerateClicked() {
     p.seed           = m_seedSpinShared->value();
     p.width          = m_widthSpin->value();
     p.height         = m_heightSpin->value();
+    m_resultLabel->setText(QStringLiteral("⏳ txt2img を送信中..."));
     m_controller->runTextToImage(p, bc);
   } else {
-    // カスタムワークフロー
+    m_resultLabel->setText(QStringLiteral("⏳ カスタムワークフローを送信中..."));
     m_controller->runWorkflow(
         wf,
         m_promptEdit->toPlainText().trimmed(),

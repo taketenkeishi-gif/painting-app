@@ -44,6 +44,15 @@ MSVC: Visual Studio 2022 Community (v14.44)
 ### VectorPath float 化
 - 全ツールの VectorPath::points を FPoint に移行
 
+### SAM2 ONNX AI選択ツール基盤（2026-06）
+- `src/core/ai/OnnxSegEngine.h/.cpp` — SAM2 ONNX ラッパー（Qt フリー PIMPL）
+- `PAINT_USE_ONNX=OFF` 時はスタブ（既存ビルド互換）、ON 時に実推論
+- `AiSelectTool::Settings::granularity` (0〜3) — 細部→被写体全体を制御
+- `AppController::initOnnxEngine` — `<exe>/models/*.onnx` を自動検出
+- `AppController::setupOnnxInferenceCallback` — ONNX > ComfyUI > スタブの優先順
+- `ToolPropertyPanel` に「AI 選択粒度」コンボボックスを追加
+- セットアップ手順: `scripts\download_sam2.ps1` → vcpkg onnxruntime → cmake -DPAINT_USE_ONNX=ON
+
 ### task-002: FillTool SelectionMask 対応（2026-06）
 - SelectionMask がアクティブなとき塗りつぶしを選択範囲内のみに限定
 - 選択なし時は従来どおり contiguous/non-contiguous fill が動作
@@ -71,6 +80,13 @@ MSVC: Visual Studio 2022 Community (v14.44)
 ---
 
 ## 次のタスク（優先順）
+
+### SAM2 ONNX モデルのセットアップ（AI選択ツール実用化）
+- [ ] `scripts\download_sam2.ps1` を実行してモデルをエクスポート
+- [ ] vcpkg で `onnxruntime:x64-windows` をインストール
+- [ ] `cmake -DPAINT_USE_ONNX=ON -DCMAKE_TOOLCHAIN_FILE=...` でリビルド
+- モデル配置先: `build\Release\models\sam2_encoder.onnx` + `sam2_decoder.onnx`
+- 自動検出: アプリ起動時に `<exe>/models/` にモデルがあれば自動ロード
 
 ### ベクター編集（CSP レベルへ）
 - [ ] ストローク選択ツール（描いたストロークをクリックで選択）

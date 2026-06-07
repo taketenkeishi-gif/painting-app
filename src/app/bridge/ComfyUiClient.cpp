@@ -231,6 +231,7 @@ void ComfyUiClient::queuePrompt(const QJsonObject& workflow,
   connect(reply, &QNetworkReply::finished, this, [this, reply, onQueued]() {
     reply->deleteLater();
     if (reply->error() != QNetworkReply::NoError) {
+      qWarning() << "ComfyUI /prompt POST failed:" << reply->errorString();
       if (onQueued) onQueued({});
       return;
     }
