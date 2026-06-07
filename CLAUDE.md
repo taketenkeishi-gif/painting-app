@@ -84,12 +84,37 @@ tests/          core_tests / app_smoke_tests
 
 ---
 
+## 開発方針：OSS 吸収ファースト
+
+新機能を実装する前に、まず実績ある OSS ライブラリ・アルゴリズムの採用を検討する。
+
+**基本姿勢:**
+- スクラッチ実装より OSS 取り込みを優先し、開発速度と品質を同時に確保する
+- ライセンス（MIT / BSD / Apache 2.0 を優先）を確認してから採用する
+- OSS を採用した場合はラッパー層を薄く保ち、将来の差し替えを妨げない設計にする
+- 採用候補は実装前にここか HANDOFF.md に記載して認識合わせする
+
+**主な採用候補領域:**
+
+| 領域 | 候補 OSS |
+|---|---|
+| 2D レンダリング | Skia（既採用・デフォルト OFF）|
+| ベクターパス | nanosvg / Blend2D |
+| 色管理 | Little CMS 2 (lcms2) |
+| 画像 I/O | libpng / libjpeg-turbo / OpenEXR / libwebp |
+| ファイル形式 | libzip（PSD 解析は検討中）|
+| AI 推論 | ONNX Runtime（将来フェーズ）|
+| テスト | GoogleTest（既採用）|
+
+---
+
 ## コーディング規約
 
 - C++17、`#pragma once`
 - コメントは「なぜ」だけ（何をするかはコードで自明）
 - `core::` 名前空間は Qt 非依存を維持
 - `TargetLayerKind` は JSON から読まない（カタログ定義が正）
+- OSS ラッパーは `src/platform/` 以下に配置し `core::` から直接 OSS API を呼ばない
 
 ---
 <!-- AUTO-SYNC: Stop フックにより更新 -->
