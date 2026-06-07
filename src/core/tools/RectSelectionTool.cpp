@@ -51,6 +51,74 @@ void RectSelectionTool::cancelPolygon() noexcept {
   m_polyPoints.clear();
 }
 
+// ── ハンドルヒットテスト ──────────────────────────────────────────────────
+int RectSelectionTool::hitTestHandle(const SelectionMask& sel, const Point& pt, int tolerance) const noexcept {
+  if (!sel.hasSelection()) return -1;
+
+  const auto boundsOpt = sel.boundingRect();
+  if (!boundsOpt.has_value()) return -1;
+
+  const Rect r = boundsOpt.value();
+  const int x1 = r.x, y1 = r.y;
+  const int x2 = r.x + r.width - 1, y2 = r.y + r.height - 1;
+  const int mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+
+  const int dx = std::abs(pt.x);
+  const int dy = std::abs(pt.y);
+
+  // ハンドル候補: TL, TC, TR, ML, MR, BL, BC, BR
+  const Point handles[8] = {
+    {x1, y1}, {mx, y1}, {x2, y1},  // TL, TC, TR
+    {x1, my},           {x2, my},  // ML,     MR
+    {x1, y2}, {mx, y2}, {x2, y2}   // BL, BC, BR
+  };
+
+  for (int i = 0; i < 8; ++i) {
+    const int hdx = pt.x - handles[i].x;
+    const int hdy = pt.y - handles[i].y;
+    if (hdx * hdx + hdy * hdy <= tolerance * tolerance) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+// ── 矩形リサイズ（ハンドル別） ────────────────────────────────────────────
+Rect RectSelectionTool::resizeRectByHandle(const Rect& origRect, int handleIdx,
+                                           const Point& delta, bool constrainAspect) const noexcept {
+  int x1 = origRect.x, y1 = origRect.y;
+  int x2 = origRect.x + origRect.width - 1;
+  int y2 = origRect.y + origRect.height - 1;
+
+  // ハンドルインデックス: 0=TL, 1=TC, 2=TR, 3=ML, 4=MR, 5=BL, 6=BC, 7=BR
+  if (handleIdx == 0 || handleIdx == 1 || handleIdx == 2) x1 += delta.x;  // Top edge
+  if (handleIdx == 3 || handleIdx == 4)                    x1 += delta.x;  // Left/Right (ML/MR)
+  if (handleIdx == 5 || handleIdx == 6 || handleIdx == 7) x1 += delta.x;  // Bottom edge
+
+  if (handleIdx == 0 || handleIdx == 3 || handleIdx == 5) y1 += delta.y;  // Left edge
+  if (handleIdx == 1 || handleIdx == 6)                    y1 += delta.y;  // Top/Bottom (TC/BC)
+  if (handleIdx == 2 || handleIdx == 4 || handleIdx == 7) y2 += delta.y;  // Right edge
+
+  // 矯正: x1 < x2, y1 < y2 を保持
+  if (x1 > x2) std::swap(x1, x2);
+  if (y1 > y2) std::swap(y1, y2);
+
+  // 縦横比制約 (origRect の比率を保持)
+  if (constrainAspect && origRect.width > 0 && origRect.height > 0) {
+    const float aspect = static_cast<float>(origRect.width) / origRect.height;
+    const int w = x2 - x1 + 1;
+    const int h = y2 - y1 + 1;
+    if (w > h * aspect) {
+      x2 = x1 + static_cast<int>(h * aspect) - 1;
+    } else {
+      y2 = y1 + static_cast<int>(w / aspect) - 1;
+    }
+  }
+
+  return Rect{x1, y1, std::max(1, x2 - x1 + 1), std::max(1, y2 - y1 + 1)};
+}
+
 // ── PointerPress ──────────────────────────────────────────────────────────
 ToolResult RectSelectionTool::onPointerPress(ToolContext& context, const ToolPointerEvent& event) {
   const SelectionOp op = opFromEvent(event);
@@ -119,6 +187,20 @@ ToolResult RectSelectionTool::onPointerPress(ToolContext& context, const ToolPoi
   // ── 矩形 / フリーハンドラッソ: 選択範囲移動チェック ──────────────────────
   const bool hasSelection = context.document.selection().hasSelection();
   const bool insideSel    = hasSelection && isInsideSelection(context.document.selection(), event.point);
+
+  // ハンドルドラッグの優先度を高くする
+  if (hasSelection && op == SelectionOp::New) {
+    const int handleIdx = hitTestHandle(context.document.selection(), event.point, 5);
+    if (handleIdx >= 0) {
+      // ハンドルをドラッグしている
+      m_resizingHandle = true;
+      m_activeHandle = handleIdx;
+      m_savedHandleRect = context.document.selection().boundingRect().value_or(Rect{});
+      result.viewportChanged = true;
+      return result;
+    }
+  }
+
   if (hasSelection && insideSel && op == SelectionOp::New) {
     // 選択マーキーを移動するモード
     m_movingMarquee = true;
@@ -176,6 +258,20 @@ ToolResult RectSelectionTool::onPointerMove(ToolContext& context, const ToolPoin
     return result;
   }
 
+  // ── ハンドルドラッグ（選択範囲リサイズ） ───────────────────────────────────
+  if (m_resizingHandle && m_activeHandle >= 0) {
+    const Point delta {
+      event.point.x - m_savedHandleRect.x - m_savedHandleRect.width / 2,
+      event.point.y - m_savedHandleRect.y - m_savedHandleRect.height / 2
+    };
+    const Rect newRect = resizeRectByHandle(m_savedHandleRect, m_activeHandle, delta, event.shift);
+    SelectionMask& sel = context.document.selection();
+    sel.clear();
+    sel.setRect(newRect);
+    result.selectionChanged = true;
+    return result;
+  }
+
   // ── 多角形ラッソ: マウス追従 ──────────────────────────────────────────────
   if (m_mode == Mode::PolygonLasso) {
     m_polyMouse = event.point;
@@ -209,6 +305,15 @@ ToolResult RectSelectionTool::onPointerMove(ToolContext& context, const ToolPoin
 // ── PointerRelease ────────────────────────────────────────────────────────
 ToolResult RectSelectionTool::onPointerRelease(ToolContext& context, const ToolPointerEvent& event) {
   ToolResult result;
+
+  // ── ハンドルドラッグ完了 ──────────────────────────────────────────────────
+  if (m_resizingHandle) {
+    m_resizingHandle = false;
+    m_activeHandle = -1;
+    result.selectionChanged = true;
+    result.viewportChanged = true;
+    return result;
+  }
 
   // ── 選択マーキー移動完了 ──────────────────────────────────────────────────
   if (m_movingMarquee) {

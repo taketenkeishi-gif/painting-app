@@ -66,6 +66,11 @@ private:
 
   static bool isInsideSelection(const SelectionMask& sel, const Point& pt) noexcept;
 
+  // ハンドルヒットテスト（8方向: 0-7 = TL/TC/TR/ML/MR/BL/BC/BR, -1 = なし）
+  int hitTestHandle(const SelectionMask& sel, const Point& pt, int tolerance = 4) const noexcept;
+  // 矩形リサイズ: ハンドルindex → 新矩形を計算
+  Rect resizeRectByHandle(const Rect& origRect, int handleIdx, const Point& delta, bool constrainAspect) const noexcept;
+
   // ── モード ────────────────────────────────────────────────────────────────
   Mode         m_mode {Mode::Rectangle};
 
