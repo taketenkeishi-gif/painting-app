@@ -34,12 +34,14 @@
 #include "core/tools/GradientTool.h"
 #include "core/tools/HandTool.h"
 #include "core/tools/LineTool.h"
+#include "core/tools/CurveTool.h"
 #include "core/tools/FreeTransformTool.h"
 #include "core/tools/MoveLayerTool.h"
 #include "core/tools/RectSelectionTool.h"
 #include "core/tools/ToolManager.h"
 #include "core/selection/SelectionEngine.h"
 #include "core/tools/ZoomTool.h"
+#include "platform/qt/HighQualityTransform.h"
 
 namespace app::bridge {
 class ComfyUiClient;
@@ -119,6 +121,12 @@ struct ToolStateViewModel {
   int  wetMixRate{50};
   bool smear     {false};
   int  smearRate {90};
+  // Dab 散布 / 角度ジッター / 粒子数
+  bool scatter           {false};
+  int  scatterAmount     {50};   ///< 0-400 (÷100 = 0.0-4.0)
+  bool angleJitter       {false};
+  int  angleJitterAmount {180};  ///< 0-180 度
+  int  dabCount          {1};    ///< 1-64
   // グラデーション
   int  gradientType {0};  ///< 0=Linear, 1=Radial
   int  gradientFill {0};  ///< 0=FgToBg, 1=FgToTransparent
@@ -303,6 +311,9 @@ public:
   bool cancelTransformSession();
   bool isInTransformMode() const noexcept;
   void setCanvasZoom(double zoom);
+  void setTransformInterpolation(platform::qt::HighQualityTransform::InterpolationMethod method) noexcept {
+    m_transformInterpolation = method;
+  }
 
   bool undo();
   bool redo();
@@ -367,6 +378,12 @@ public:
   void setWetMixRate(int value);
   void setSmear(bool v);
   void setSmearRate(int value);
+  // Dab 散布 / 角度ジッター / 粒子数 (OSS 吸収改善)
+  void setScatter(bool v);
+  void setScatterAmount(float v);
+  void setAngleJitter(bool v);
+  void setAngleJitterAmount(float v);
+  void setDabCount(int v);
 
   // ── グラデーション ──────────────────────────────────────────────────────────
   void setSecondaryColor(const core::Color& color);
@@ -522,6 +539,7 @@ private:
   core::BrushTool*         m_brushTool         {nullptr};
   core::EraserTool*        m_eraserTool         {nullptr};
   core::LineTool*          m_lineTool           {nullptr};
+  core::CurveTool*         m_curveTool          {nullptr};
   core::RectSelectionTool* m_rectSelectionTool  {nullptr};
   core::FillTool*          m_fillTool           {nullptr};
   core::GradientTool*      m_gradientTool       {nullptr};
@@ -535,6 +553,9 @@ private:
     QImage                     floatingImage;
   };
   std::optional<TransformSession> m_transformSession;
+  platform::qt::HighQualityTransform::InterpolationMethod m_transformInterpolation {
+      platform::qt::HighQualityTransform::InterpolationMethod::Bicubic };
+
   ComfyUiClient*           m_comfyUiClient      {nullptr};
   enum class AiOpType { None, SamSelect, Inpaint, TextToImage, CustomWorkflow };
   AiOpType                 m_currentAiOp        {AiOpType::None};

@@ -16,6 +16,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/HandTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/ZoomTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/LineTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/CurveTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/RectSelectionTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FillTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/MoveLayerTool.cpp
@@ -38,6 +39,7 @@ endif()
 if(PAINT_BUILD_QT_PLATFORM)
   add_library(paint_qt_platform STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/qt/QtImageConverter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/qt/HighQualityTransform.cpp
   )
   set_target_properties(paint_qt_platform PROPERTIES
     AUTOMOC ON

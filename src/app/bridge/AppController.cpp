@@ -247,6 +247,11 @@ AppController::AppController(QObject* parent)
   auto line = std::make_unique<core::LineTool>();
   m_lineTool = line.get();
   m_toolManager.registerTool(std::move(line));
+
+  auto curve = std::make_unique<core::CurveTool>();
+  m_curveTool = curve.get();
+  m_toolManager.registerTool(std::move(curve));
+
   auto rectSelection = std::make_unique<core::RectSelectionTool>();
   m_rectSelectionTool = rectSelection.get();
   m_toolManager.registerTool(std::move(rectSelection));
@@ -438,6 +443,12 @@ ToolStateViewModel AppController::toolState() const noexcept {
       static_cast<int>(m_uiState.wetMixRate * 100.0f + 0.5f),
       m_uiState.smear,
       static_cast<int>(m_uiState.smearRate  * 100.0f + 0.5f),
+      // Dab 散布 / 角度ジッター / 粒子数
+      m_uiState.scatter,
+      static_cast<int>(m_uiState.scatterAmount * 100.0f + 0.5f),
+      m_uiState.angleJitter,
+      static_cast<int>(m_uiState.angleJitterAmount + 0.5f),
+      m_uiState.dabCount,
       // グラデーション
       m_uiState.gradientType,
       m_uiState.gradientFill,
@@ -2680,6 +2691,36 @@ void AppController::setSmearRate(int value) {
   applyUiStateToTools(); emit toolStateChanged();
 }
 
+// Dab 散布 / 角度ジッター / 粒子数
+void AppController::setScatter(bool v) {
+  if (m_uiState.scatter == v) return;
+  m_uiState.scatter = v;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setScatterAmount(float v) {
+  const float f = std::clamp(v, 0.0f, 4.0f);
+  if (std::abs(m_uiState.scatterAmount - f) < 0.001f) return;
+  m_uiState.scatterAmount = f;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setAngleJitter(bool v) {
+  if (m_uiState.angleJitter == v) return;
+  m_uiState.angleJitter = v;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setAngleJitterAmount(float v) {
+  const float f = std::clamp(v, 0.0f, 180.0f);
+  if (std::abs(m_uiState.angleJitterAmount - f) < 0.001f) return;
+  m_uiState.angleJitterAmount = f;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+void AppController::setDabCount(int v) {
+  const int i = std::clamp(v, 1, 64);
+  if (m_uiState.dabCount == i) return;
+  m_uiState.dabCount = i;
+  applyUiStateToTools(); emit toolStateChanged();
+}
+
 // ── グラデーション / 背景色 ─────────────────────────────────────────────────
 
 void AppController::setSecondaryColor(const core::Color& color) {
@@ -2999,20 +3040,25 @@ bool AppController::commitTransformSession() {
   const float hw   = m_freeTransformTool->halfW();
   const float hh   = m_freeTransformTool->halfH();
 
-  // \u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u753B\u50CF\u3092\u30AD\u30E3\u30F3\u30D0\u30B9\u30B5\u30A4\u30BA\u306EQImage\u306B\u5408\u6210\uFF08QPainter\u5909\u63DB\uFF09
+  // \u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u753B\u50CF\u3092\u30AD\u30E3\u30F3\u30D0\u30B9\u30B5\u30A4\u30BA\u306EQImage\u306B\u5408\u6210\uFF08\u9AD8\u54C1\u8CEA\u88DC\u9593\uFF09
+  QTransform transform;
+  transform.translate(static_cast<double>(cx), static_cast<double>(cy));
+  transform.rotate(static_cast<double>(rotDeg));
+  transform.scale(static_cast<double>(sx), static_cast<double>(sy));
+  transform.translate(-static_cast<double>(hw), -static_cast<double>(hh));
+
+  const QImage transformed = platform::qt::HighQualityTransform::transform(
+      m_transformSession->floatingImage, transform, m_transformInterpolation, Qt::transparent);
+
   QImage canvas(canvasW, canvasH, QImage::Format_RGBA8888);
   canvas.fill(Qt::transparent);
   {
     QPainter p(&canvas);
-    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    p.setRenderHint(QPainter::Antialiasing, false);
-    p.translate(static_cast<double>(cx), static_cast<double>(cy));
-    p.rotate(static_cast<double>(rotDeg));
-    p.scale(static_cast<double>(sx), static_cast<double>(sy));
-    p.drawImage(
-        QRectF(-static_cast<double>(hw), -static_cast<double>(hh),
-               static_cast<double>(hw) * 2.0, static_cast<double>(hh) * 2.0),
-        m_transformSession->floatingImage);
+    // transformed \u306F\u65E2\u306B\u5909\u63DB\u3055\u308C\u3066\u3044\u308B\u306E\u3067\u3001bounding box \u306E\u5DE6\u4E0A\u306B\u63CF\u753B
+    const QRect bounds = transform.mapToPolygon(
+        QRect(0, 0, m_transformSession->floatingImage.width(),
+              m_transformSession->floatingImage.height())).boundingRect();
+    p.drawImage(bounds.topLeft(), transformed);
     p.end();
   }
 
@@ -3381,6 +3427,12 @@ void AppController::applyUiStateToTools() {
     m_brushTool->setWetMixRate   (m_uiState.wetMixRate);
     m_brushTool->setSmearEnabled (m_uiState.smear);
     m_brushTool->setSmearRate    (m_uiState.smearRate);
+    // Dab 散布 / 角度ジッター / 粒子数
+    m_brushTool->setScatterEnabled(m_uiState.scatter);
+    m_brushTool->setScatterAmount(m_uiState.scatterAmount);
+    m_brushTool->setAngleJitterEnabled(m_uiState.angleJitter);
+    m_brushTool->setAngleJitterAmount(m_uiState.angleJitterAmount);
+    m_brushTool->setDabCount(m_uiState.dabCount);
   }
 
   if (m_eraserTool != nullptr) {
@@ -3417,6 +3469,12 @@ void AppController::applyUiStateToTools() {
   if (m_lineTool != nullptr) {
     m_lineTool->setSnapAngleDegrees(m_uiState.snapAngle);
   }
+
+  if (m_curveTool != nullptr) {
+    m_curveTool->setSnapAngleDegrees(m_uiState.snapAngle);
+    m_curveTool->setSimplifyLevel(m_uiState.simplifyLevel);
+  }
+
   if (m_fillTool != nullptr) {
     m_fillTool->setThreshold(m_uiState.fillThreshold);
     m_fillTool->setContiguous(m_uiState.fillContiguous);
