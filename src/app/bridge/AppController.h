@@ -229,6 +229,8 @@ public:
   bool selectAll();
   bool deselect();
   bool invertSelection();
+  bool expandSelection(int radiusPixels);
+  bool contractSelection(int radiusPixels);
   bool fillSelectionOrCanvas();
   bool deleteSelectionPixels();
   core::PixelBuffer exportSelectionOrCanvasFromComposite() const;

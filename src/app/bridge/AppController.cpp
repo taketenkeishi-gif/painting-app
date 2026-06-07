@@ -1232,6 +1232,32 @@ bool AppController::invertSelection() {
   return true;
 }
 
+bool AppController::expandSelection(int radiusPixels) {
+  if (radiusPixels <= 0 || !m_document.selection().hasSelection()) {
+    return false;
+  }
+  const core::SelectionMask before = m_document.selection();
+  if (!m_document.selection().expand(radiusPixels)) {
+    return false;
+  }
+  pushSelectionHistoryIfChanged(before, u8"選択範囲を拡張");
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::contractSelection(int radiusPixels) {
+  if (radiusPixels <= 0 || !m_document.selection().hasSelection()) {
+    return false;
+  }
+  const core::SelectionMask before = m_document.selection();
+  if (!m_document.selection().contract(radiusPixels)) {
+    return false;
+  }
+  pushSelectionHistoryIfChanged(before, u8"選択範囲を縮小");
+  emit documentChanged();
+  return true;
+}
+
 bool AppController::fillSelectionOrCanvas() {
   core::Layer* active = m_document.activeLayer();
   if (active == nullptr || active->kind() != core::LayerKind::Raster) {

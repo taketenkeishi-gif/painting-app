@@ -85,6 +85,11 @@ private:
   int   m_savedMaskW {0};
   int   m_savedMaskH {0};
 
+  // ── 選択範囲ハンドル（コーナー + エッジ中央） ────────────────────────────────
+  bool  m_resizingHandle {false};
+  int   m_activeHandle {-1};  // 0-7: TL/TC/TR/ML/MR/BL/BC/BR
+  Rect  m_savedHandleRect;    // ドラッグ開始時の矩形
+
   // ── 多角形ラッソ ───────────────────────────────────────────────────────────
   bool m_polyInProgress {false};
   std::vector<Point> m_polyPoints;  // 確定頂点
