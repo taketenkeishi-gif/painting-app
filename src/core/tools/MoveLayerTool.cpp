@@ -109,8 +109,14 @@ ToolResult MoveLayerTool::onPointerRelease(ToolContext& context, const ToolPoint
   }
 
   source = moved;
+
+  if (hasSelection) {
+    context.document.selection().translate(dx, dy);
+  }
+
   ToolResult result;
   result.pixelsChanged = true;
+  result.selectionChanged = hasSelection;
   result.viewportChanged = true;
   result.dirtyRect = Rect {0, 0, source.width(), source.height()};
   return result;

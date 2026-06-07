@@ -2046,7 +2046,8 @@ bool AppController::undo() {
   StrokeHistoryEntry entry = std::move(m_undoHistory.back());
   m_undoHistory.pop_back();
 
-  if ((entry.kind == HistoryKind::Stroke || entry.kind == HistoryKind::LayerVisibility) &&
+  if ((entry.kind == HistoryKind::Stroke || entry.kind == HistoryKind::LayerVisibility ||
+       entry.kind == HistoryKind::StrokeWithSelection) &&
       entry.layerIndex >= m_document.layerCount()) {
     clearStrokeHistory();
     return false;
@@ -2079,6 +2080,14 @@ bool AppController::undo() {
     case HistoryKind::Selection:
       m_document.selection() = entry.beforeSelection;
       break;
+    case HistoryKind::StrokeWithSelection:
+      if (!entry.beforeLayer.has_value()) {
+        clearStrokeHistory();
+        return false;
+      }
+      m_document.layerAt(entry.layerIndex) = *entry.beforeLayer;
+      m_document.selection() = entry.beforeSelection;
+      break;
     default:
       break;
   }
@@ -2107,7 +2116,8 @@ bool AppController::redo() {
   StrokeHistoryEntry entry = std::move(m_redoHistory.back());
   m_redoHistory.pop_back();
 
-  if ((entry.kind == HistoryKind::Stroke || entry.kind == HistoryKind::LayerVisibility) &&
+  if ((entry.kind == HistoryKind::Stroke || entry.kind == HistoryKind::LayerVisibility ||
+       entry.kind == HistoryKind::StrokeWithSelection) &&
       entry.layerIndex >= m_document.layerCount()) {
     clearStrokeHistory();
     return false;
@@ -2128,6 +2138,14 @@ bool AppController::redo() {
       m_document.moveLayer(entry.beforeIndex, entry.afterIndex);
       break;
     case HistoryKind::Selection:
+      m_document.selection() = entry.afterSelection;
+      break;
+    case HistoryKind::StrokeWithSelection:
+      if (!entry.afterLayer.has_value()) {
+        clearStrokeHistory();
+        return false;
+      }
+      m_document.layerAt(entry.layerIndex) = *entry.afterLayer;
       m_document.selection() = entry.afterSelection;
       break;
     default:
@@ -2815,7 +2833,8 @@ bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
 
 bool AppController::toolWritesSelection(core::ToolKind kind) noexcept {
   return kind == core::ToolKind::RectSelection
-      || kind == core::ToolKind::AiSelect;
+      || kind == core::ToolKind::AiSelect
+      || kind == core::ToolKind::MoveLayer;
 }
 
 std::string AppController::actionNameForTool(core::ToolKind kind) {
@@ -3569,6 +3588,30 @@ void AppController::finishPendingStrokeHistory() {
 
   const PendingStrokeState pending = *m_pendingStroke;
   m_pendingStroke.reset();
+
+  // ── ピクセル＋選択範囲の複合変更（MoveLayerTool + 選択範囲）───────────────
+  if (pending.trackPixels && pending.trackSelection) {
+    const std::size_t layerIndex = pending.layerIndex;
+    if (layerIndex >= m_document.layerCount() || !pending.beforeLayer.has_value()) {
+      return;
+    }
+    const core::Layer after = m_document.layerAt(layerIndex);
+    const core::SelectionMask afterSelection = m_document.selection();
+    const bool pixelsChanged = !layersEqual(*pending.beforeLayer, after);
+    const bool selectionChanged = (pending.beforeSelection != afterSelection);
+    if (pixelsChanged || selectionChanged) {
+      StrokeHistoryEntry entry;
+      entry.kind = HistoryKind::StrokeWithSelection;
+      entry.actionName = pending.actionName;
+      entry.layerIndex = layerIndex;
+      entry.beforeLayer = *pending.beforeLayer;
+      entry.afterLayer = after;
+      entry.beforeSelection = pending.beforeSelection;
+      entry.afterSelection = afterSelection;
+      pushHistoryEntry(std::move(entry));
+    }
+    return;
+  }
 
   if (pending.trackPixels) {
     const std::size_t layerIndex = pending.layerIndex;

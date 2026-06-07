@@ -434,7 +434,8 @@ private:
     Stroke,
     LayerVisibility,
     LayerOrder,
-    Selection
+    Selection,
+    StrokeWithSelection,  ///< ピクセル移動＋選択範囲移動を一括アンドゥするための複合エントリ
   };
 
   struct StrokeHistoryEntry {
