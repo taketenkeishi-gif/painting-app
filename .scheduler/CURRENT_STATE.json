@@ -1,0 +1,25 @@
+{
+  "mode": "stopped",
+  "scheduler_alive": false,
+  "worker": "",
+  "worker_label": "",
+  "task_id": "",
+  "task_title": "",
+  "phase": "",
+  "current_action": "",
+  "current_file": "",
+  "last_response_seconds": null,
+  "started_at": null,
+  "files_changed": [],
+  "insertions": 0,
+  "deletions": 0,
+  "manager": {
+    "status": "completed",
+    "generated_total": 0
+  },
+  "rate_limit": {
+    "active": true,
+    "resume_at": "2026-06-07T00:00:00.0000000+00:00"
+  },
+  "updated_at": "2026-06-07T08:56:19.8091232+09:00"
+}

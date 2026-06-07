@@ -1,0 +1,267 @@
+﻿{
+    "task":  "task-22",
+    "task_title":  "`MainWindow.cpp` ?E?E?E??E?E?E??E?E?E??E?E?E?E?B?E?E?E??E?E?E??E?E?E?h?E?E?E?E?E?E?E?^?E?E?E?C?E?E?E?g?E?E?E??E?E?E??E?E?E?i?E?E?E?t?E?E?E?@?E?E?E?C?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?Edirty ?E?E?E??E?E?E??j?E?E?E??E?E?E??E?E?E?X?E?E?E?V?E?E?E??E?E?E??E?E?E??E?E?E?R?E?E?E?[?E?E?E?h?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E????E?E?E??U?E?E?E????E?E?E????E?E?E??E?E?E?B`updateWindowTitle()` ?E?E?E?v?E?E?E??E?E?E??E?E?E?C?E?E?E?x?E?E?E?[?E?E?E?g?E?E?E?X?E?E?E??E?E?E??E?E?E?b?E?E?E?g?E?E?E??W?E?E?E???A?E?E?E?h?E?E?E?L?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?g?E?E?E??X?E?E?E?V?E?E?E?O?E?E?E?i?E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E????E?E?E??E?E?E??E?E?E??E?E?E?`?E?E?E????E?E?E??E?E?E??E?E?E??E?E?E??E?E?E??E?E?E?B",
+    "keywords":  [
+                     "updateWindowTitle",
+                     "MainWindow",
+                     "markClean",
+                     "cpp",
+                     "src",
+                     "app",
+                     "attempt",
+                     "role",
+                     "Release",
+                     "worker",
+                     "AEppController",
+                     "powershell",
+                     "config",
+                     "category",
+                     "BsaveImageFile",
+                     "summary",
+                     "BopenImageFile",
+                     "pending",
+                     "medium",
+                     "Edirty",
+                     "refactor",
+                     "onNewFromClipboardTriggered",
+                     "BdocumentChanged",
+                     "layersChanged",
+                     "status",
+                     "onNewCanvas",
+                     "completed_by",
+                     "priority",
+                     "developer"
+                 ],
+    "likely_files":  [
+                         "src/app/mainwindow/MainWindow.cpp",
+                         "src/app/mainwindow/MainWindow.h",
+                         "src/core/tools/RectSelectionTool.h",
+                         "src/app/bridge/AppController.h",
+                         "src/core/tools/AiSelectTool.h",
+                         "src/app/panels/LayerPanel.h",
+                         "src/app/canvasview/CanvasWidget.h",
+                         "src/app/panels/AiPanel.h",
+                         "src/core/render/Renderer.cpp",
+                         "src/app/panels/SubToolPanel.cpp"
+                     ],
+    "related_symbols":  [
+                            "qt_meta_stringdata_CLASSappSCOPEpanelsSCOPEAiPanelENDCLASS_t",
+                            "applyUiStateToTools",
+                            "layersChanged",
+                            "AppController",
+                            "markClean",
+                            "updateZoomStatusLabel",
+                            "mouseReleaseEvent",
+                            "keyReleaseEvent",
+                            "app",
+                            "applyTabStyle",
+                            "QMainWindow",
+                            "MainWindow",
+                            "onNewCanvas",
+                            "onNewFromClipboardTriggered",
+                            "updateConnectionStatus",
+                            "onApplyCandidate",
+                            "applyResponsiveMode",
+                            "applyButtonCompactMode",
+                            "m_summaryLabel",
+                            "applyResponsiveLayout",
+                            "m_pinConfigButton",
+                            "applyHSLAdjust",
+                            "applyAdjustment",
+                            "applyLayerMask",
+                            "applyPixels",
+                            "applyRect",
+                            "applyRefinement",
+                            "src",
+                            "applyEdgeSnap",
+                            "apply",
+                            "onPointerRelease",
+                            "applyInferenceResult",
+                            "hasPendingResult",
+                            "takePendingResult",
+                            "strokeDirtyRect",
+                            "appendSlice",
+                            "applyStabilization",
+                            "applyBlend",
+                            "applyGradient",
+                            "snappedPoint",
+                            "applyAutoSelect",
+                            "applyObjectSelect",
+                            "applyLasso",
+                            "applyPolygon",
+                            "applyFeather",
+                            "pointerRelease",
+                            "AnnotateRWLockReleased",
+                            "IteratorCategory",
+                            "Cpp20ForwardZipIterator",
+                            "UnscaledCycleClockWrapperForGetCurrentTime",
+                            "UnscaledCycleClockWrapperForInitializeFrequency",
+                            "FlatHashMapPolicy",
+                            "ApplyWithoutDefaultSuffix",
+                            "mapped",
+                            "HashtableDebugProbeSummary",
+                            "GetHashtableDebugProbeSummary",
+                            "SetHashtablezConfigListener",
+                            "HeapPtrs",
+                            "SwapPropagatingCountingAlloc",
+                            "Wrapped",
+                            "NodeHashMapPolicy",
+                            "RegisterFileMappingHint",
+                            "GetFileMappingHint",
+                            "AbslInternalGetFileMappingHint",
+                            "ABSL_FLAG_IMPL_DECLARE_DEF_VAL_WRAPPER",
+                            "ABSL_FLAG_IMPL_DECLARE_HELP_WRAPPER",
+                            "FlagDefaultSrc",
+                            "ApplyMask",
+                            "FlagsUsageConfig",
+                            "SetFlagsUsageConfig",
+                            "GetUsageConfig",
+                            "UnwrapStdReferenceWrapperImpl",
+                            "Apply",
+                            "AppendTruncated",
+                            "Status",
+                            "StatusOr",
+                            "UnprintableWrapper",
+                            "StringifyToStreamWrapper",
+                            "AsStatus",
+                            "Append",
+                            "IsSwappable",
+                            "IsNothrowSwappable",
+                            "MappingProto",
+                            "AddCurrentMappings",
+                            "AddMapping",
+                            "UniformDistributionWrapper",
+                            "StatusRep",
+                            "StatusCode",
+                            "StatusIsMatcherCommonImpl",
+                            "MonoStatusIsMatcherImpl",
+                            "StatusIsMatcher",
+                            "GetStatus",
+                            "HasConversionOperatorToStatusOr",
+                            "StatusOrData",
+                            "HandleInvalidStatusCtorArg",
+                            "MakeStatus",
+                            "AssignStatus",
+                            "StatusCodeToString",
+                            "StatusCodeToStringView",
+                            "OkStatus"
+                        ],
+    "recent_commits":  [
+                           "12b51a0 task-22: 繧ｿ繧､繝医Ν繝舌・dirty繝輔Λ繧ｰ陦ｨ遉ｺ - updateWindowTitle()螳溯｣・",
+                           "8337cd4 task-35: MainWindow setupStatusBar() 繧呈歓蜃ｺ - createMenus() 蜀・・statusBar繝ｩ繝吶Ν逕滓・繝ｻ逋ｻ骭ｲ繧ｳ繝ｼ繝峨ｒ繝励Λ繧､繝吶・繝医Γ繧ｽ繝・ラ縺ｫ蛻・屬 (worker: worker-b)",
+                           "2bd0255 task-32: MainWindow Ctrl+0=fitToScreen, Ctrl+1=resetZoom(100%) 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ螟画峩 (worker: worker-b)",
+                           "12b51a0 task-22: 繧ｿ繧､繝医Ν繝舌・dirty繝輔Λ繧ｰ陦ｨ遉ｺ - updateWindowTitle()螳溯｣・033b1e5 task-21: 譁ｰ隕・繝輔ぃ繧､繝ｫ繧ｪ繝ｼ繝励Φ譎ゅ・譛ｪ菫晏ｭ倡｢ｺ隱阪ム繧､繧｢繝ｭ繧ｰ繧定ｿｽ蜉",
+                           "d4ec7f7 task-27: ToolPropertyPanel createLabeledSlider/appendLabeledRow 繝ｪ繝輔ぃ繧ｯ繧ｿ繝ｪ繝ｳ繧ｰ (worker: worker-a)",
+                           "58a10b4 task-26: ColorWheelWidget 縺ｫ #RRGGBB hex蜈･蜉・QLineEdit 繧定ｿｽ蜉 (worker: worker-a)",
+                           "cfcfd29 task-24: 繝・・繝ｫ繝懊ち繝ｳ縺ｮ繝・・繝ｫ繝√ャ繝励↓繧ｷ繝ｧ繝ｼ繝医き繝・ヨ陦ｨ遉ｺ繧定ｿｽ蜉 (worker: worker-a)",
+                           "3c4cca8 chore: project cleanup + HANDOFF update",
+                           "f4aca90 task-29: ToolPropertyPanel Flow 繧ｹ繝ｩ繧､繝繝ｼ繧・BrushTool 驕ｸ謚樊凾縺ｮ縺ｿ陦ｨ遉ｺ (worker: worker-b)",
+                           "12b51a0 task-22: 繧ｿ繧､繝医Ν繝舌・dirty繝輔Λ繧ｰ陦ｨ遉ｺ - updateWindowTitle()螳溯｣・3c4cca8 chore: project cleanup + HANDOFF update"
+                       ],
+    "previous_changes":  [
+                             {
+                                 "task_id":  "task-20",
+                                 "files_changed":  [
+                                                       5
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-21",
+                                 "files_changed":  [
+                                                       5
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-24",
+                                 "files_changed":  [
+                                                       5
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-27",
+                                 "files_changed":  [
+                                                       1
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-28",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-29",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-30",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-31",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-32",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-34",
+                                 "files_changed":  [
+                                                       2
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-35",
+                                 "files_changed":  [
+                                                       2
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-36",
+                                 "files_changed":  [
+                                                       2
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-9",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-17",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-18",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-20",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-21",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             }
+                         ],
+    "brain_ready":  true,
+    "generated_at":  "2026-06-07T08:54:11.1681314+09:00"
+}

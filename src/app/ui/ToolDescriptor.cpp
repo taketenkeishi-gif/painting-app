@@ -356,22 +356,29 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
           {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
           "選択範囲を作成します。",
           "R"},
-      ToolDescriptor {
-          core::ToolKind::MoveLayer,
-          "move_layer",
-          "Move Layer",
-          {makeSubTool("move_layer_default", "Pixel/Vector Offset", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Hand}, {}, "Drag to offset active layer content.")},
-          {},
-          "Move active layer pixels or vector paths.",
-          "M"},
-      ToolDescriptor {
-          core::ToolKind::Hand,
-          "hand",
-          "Hand",
-          {makeSubTool("hand_default", "Pan View", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Hand}, {}, "Drag to pan viewport.")},
-          {},
-          "Pan viewport.",
-          "H"},
+      // ── 移動カテゴリ: レイヤー移動 + 手のひら（CSP 互換） ──────────────────
+      [&]() {
+        ToolDescriptor moveDesc;
+        moveDesc.kind = core::ToolKind::MoveLayer;
+        moveDesc.id = "move";
+        moveDesc.displayName = "移動";
+        moveDesc.guide = "Move active layer pixels or pan viewport.";
+        moveDesc.shortcut = "M";
+
+        SubToolDescriptor moveSub = makeSubTool(
+            "move_layer_default", "レイヤー移動",
+            BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Hand},
+            {}, "Drag to offset active layer content.");
+
+        SubToolDescriptor handSub = makeSubTool(
+            "hand_default", "手のひら移動",
+            BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Hand},
+            {}, "Drag to pan viewport.");
+        handSub.targetToolKind = core::ToolKind::Hand;
+
+        moveDesc.subTools = {std::move(moveSub), std::move(handSub)};
+        return moveDesc;
+      }(),
       ToolDescriptor {
           core::ToolKind::Zoom,
           "zoom",

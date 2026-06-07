@@ -492,7 +492,7 @@ void ToolPanel::refreshFromController() {
     return;
   }
 
-  const core::ToolKind current = m_controller->currentTool();
+  const core::ToolKind current = m_controller->currentToolCategoryKind();
   const QString layerKind = QString::fromStdString(m_controller->activeLayerKindDisplayName());
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
@@ -640,7 +640,6 @@ void ToolPanel::rebuildButtons() {
       core::ToolKind::Line,
       core::ToolKind::RectSelection,
       core::ToolKind::MoveLayer,
-      core::ToolKind::Hand,
       core::ToolKind::Zoom};
   const auto available = m_controller->availableTools();
 

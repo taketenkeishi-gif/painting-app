@@ -484,7 +484,7 @@ void SubToolPanel::refreshFromController() {
 
   const QSignalBlocker blocker(m_subToolList);
   m_refreshing = true;
-  m_toolNameLabel->setText(QString::fromUtf8(u8"ツール: %1").arg(toolNameJa(m_controller->currentTool())));
+  m_toolNameLabel->setText(QString::fromUtf8(u8"ツール: %1").arg(toolNameJa(m_controller->currentToolCategoryKind())));
   const QString currentSubToolName = subToolNameJa(
       QString::fromStdString(m_controller->currentSubToolId()),
       QString::fromStdString(m_controller->currentSubToolDisplayName()));

@@ -10,6 +10,104 @@
 namespace {
   constexpr float kPi = 3.14159265358979f;
 
+  // ── Catmull-Rom スプライン ────────────────────────────────────────────────
+  // p1→p2 間を t∈[0,1] で補間。p0/p3 は曲率を決める外側の制御点。
+  // CSP/Krita の「ストローク補正」と同じアルゴリズム。
+  inline core::FPoint catmullRomPos(
+      const core::FPoint& p0, const core::FPoint& p1,
+      const core::FPoint& p2, const core::FPoint& p3, float t) noexcept
+  {
+    const float t2 = t * t;
+    const float t3 = t2 * t;
+    return {
+      0.5f * ((2.0f * p1.x)
+              + (-p0.x + p2.x) * t
+              + (2.0f*p0.x - 5.0f*p1.x + 4.0f*p2.x - p3.x) * t2
+              + (-p0.x + 3.0f*p1.x - 3.0f*p2.x + p3.x) * t3),
+      0.5f * ((2.0f * p1.y)
+              + (-p0.y + p2.y) * t
+              + (2.0f*p0.y - 5.0f*p1.y + 4.0f*p2.y - p3.y) * t2
+              + (-p0.y + 3.0f*p1.y - 3.0f*p2.y + p3.y) * t3)
+    };
+  }
+
+  // ── LCG 疑似乱数（散布・角度ジッター用） ─────────────────────────────────
+  // Krita / CSP と同様のアプローチ: ストローク内で決定論的シーケンスを生成する。
+  inline uint32_t lcgNext(uint32_t& seed) noexcept {
+    seed = seed * 1664525u + 1013904223u;
+    return seed;
+  }
+  // [0, 1) の float を返す
+  inline float lcgFloat(uint32_t& seed) noexcept {
+    return static_cast<float>(lcgNext(seed) >> 8) / static_cast<float>(0x00FFFFFFu);
+  }
+
+  // ── HSV ↔ RGB 変換（ウェットミックスの「泥色」防止） ─────────────────────
+  // RGB 空間での直線補間は中間色が暗くなる（gray mud）。
+  // HSV 空間で最短角補間することで鮮やかさを保つ。
+  // 参考: Krita の KoColor::mix / CSP のカラーミキサー
+  struct HSV { float h, s, v; };
+
+  inline HSV rgbToHsv(float r, float g, float b) noexcept {
+    const float cmax = std::max({r, g, b});
+    const float cmin = std::min({r, g, b});
+    const float delta = cmax - cmin;
+    HSV out;
+    out.v = cmax;
+    out.s = cmax > 0.0001f ? delta / cmax : 0.0f;
+    if (delta < 0.0001f) { out.h = 0.0f; return out; }
+    if (cmax == r)      out.h = (g - b) / delta + (g < b ? 6.0f : 0.0f);
+    else if (cmax == g) out.h = (b - r) / delta + 2.0f;
+    else                out.h = (r - g) / delta + 4.0f;
+    out.h /= 6.0f;
+    return out;
+  }
+
+  inline void hsvToRgb(float h, float s, float v, float& r, float& g, float& b) noexcept {
+    if (s < 0.0001f) { r = g = b = v; return; }
+    const float hh = h * 6.0f;
+    const int   i  = static_cast<int>(hh) % 6;
+    const float f  = hh - std::floor(hh);
+    const float p  = v * (1.0f - s);
+    const float q  = v * (1.0f - s * f);
+    const float t2 = v * (1.0f - s * (1.0f - f));
+    switch (i) {
+      case 0: r=v; g=t2; b=p; break;
+      case 1: r=q; g=v;  b=p; break;
+      case 2: r=p; g=v;  b=t2; break;
+      case 3: r=p; g=q;  b=v; break;
+      case 4: r=t2; g=p; b=v; break;
+      default: r=v; g=p; b=q; break;
+    }
+  }
+
+  // HSV 空間で 2 色を混合（色相は最短経路で補間）
+  inline core::Color mixColorHSV(const core::Color& a, const core::Color& b, float t) noexcept {
+    const float aR = a.r / 255.0f, aG = a.g / 255.0f, aB = a.b / 255.0f;
+    const float bR = b.r / 255.0f, bG = b.g / 255.0f, bB = b.b / 255.0f;
+    const HSV ha = rgbToHsv(aR, aG, aB);
+    const HSV hb = rgbToHsv(bR, bG, bB);
+
+    // 色相: 最短経路補間
+    float dh = hb.h - ha.h;
+    if (dh >  0.5f) dh -= 1.0f;
+    if (dh < -0.5f) dh += 1.0f;
+
+    const float rh = ha.h + dh * t;
+    const float rs = ha.s + (hb.s - ha.s) * t;
+    const float rv = ha.v + (hb.v - ha.v) * t;
+
+    float r, g, bl;
+    hsvToRgb(rh < 0.0f ? rh + 1.0f : (rh >= 1.0f ? rh - 1.0f : rh), rs, rv, r, g, bl);
+    const float ra = (a.a / 255.0f) + (b.a / 255.0f - a.a / 255.0f) * t;
+    return core::Color {
+      static_cast<uint8_t>(std::lround(std::clamp(r,  0.0f, 1.0f) * 255.0f)),
+      static_cast<uint8_t>(std::lround(std::clamp(g,  0.0f, 1.0f) * 255.0f)),
+      static_cast<uint8_t>(std::lround(std::clamp(bl, 0.0f, 1.0f) * 255.0f)),
+      static_cast<uint8_t>(std::lround(std::clamp(ra, 0.0f, 1.0f) * 255.0f))
+    };
+  }
+
   // ── HSL ヘルパー ─────────────────────────────────────────────────────────
   inline float hslLuminance(float r, float g, float b) noexcept {
     return 0.299f * r + 0.587f * g + 0.114f * b;
@@ -132,14 +230,23 @@ Rect strokeDirtyRect(const FPoint& from, const FPoint& to, float size) {
 } // namespace
 
 // ---------------------------------------------------------------
-// 筆圧→サイズ変換（リニアカーブ）
+// 筆圧→サイズ変換（ガンマカーブ対応）
+// CSP/Krita の「入力/出力カーブ」に相当。
+// gamma < 1.0: 軽いタッチでほぼ最大サイズ（柔らかいブラシ向き）
+// gamma > 1.0: 強く押さないと大きくならない（硬いブラシ向き）
 // ---------------------------------------------------------------
+// BrushCurve (libmypaint-style) で筆圧をマッピング。
+// カーブがリニアの場合は evaluate() をスキップして高速パスを通る。
 float BrushTool::computePressureSize(float pressure) const {
   if (!m_settings.dynamics.pressureSize) {
     return 1.0f;
   }
   const float minRatio = m_settings.dynamics.pressureSizeMin;
-  return minRatio + (1.0f - minRatio) * pressure;
+  const auto& curve    = m_settings.dynamics.pressureSizeCurve;
+  const float p = curve.isLinear()
+      ? std::clamp(pressure, 0.0f, 1.0f)
+      : curve.evaluate(pressure);
+  return minRatio + (1.0f - minRatio) * p;
 }
 
 float BrushTool::computePressureOpacity(float pressure) const {
@@ -147,7 +254,11 @@ float BrushTool::computePressureOpacity(float pressure) const {
     return 1.0f;
   }
   const float minRatio = m_settings.dynamics.pressureOpacityMin;
-  return minRatio + (1.0f - minRatio) * pressure;
+  const auto& curve    = m_settings.dynamics.pressureOpacityCurve;
+  const float p = curve.isLinear()
+      ? std::clamp(pressure, 0.0f, 1.0f)
+      : curve.evaluate(pressure);
+  return minRatio + (1.0f - minRatio) * p;
 }
 
 // ---------------------------------------------------------------
@@ -455,19 +566,19 @@ void BrushTool::blendPixel(
 
 // ---------------------------------------------------------------
 // スタンプ：float座標で高精度描画
-// radius はブラシ半径、strength は opacity * flow
-// composited: ウェットミックス/スメアで参照する合成済みバッファ
+// angleDegrees: m_settings.angle に加算する追加回転（角度ジッター用）
 // ---------------------------------------------------------------
 void BrushTool::stampAt(
     PixelBuffer& buffer, const PixelBuffer& composited,
     const FPoint& center, float radius,
-    float strength, bool lockAlpha) const {
+    float strength, bool lockAlpha,
+    float angleDegrees) const {
   if (radius <= 0.0f || strength <= 0.0f) {
     return;
   }
 
   const auto& dyn = m_settings.dynamics;
-  const float angleRad = m_settings.angle * (kPi / 180.0f);
+  const float angleRad = (m_settings.angle + angleDegrees) * (kPi / 180.0f);
   const float cosA = std::cos(angleRad);
   const float sinA = std::sin(angleRad);
   const float invRoundness = (m_settings.roundness > 0.001f) ? (1.0f / m_settings.roundness) : 1.0f;
@@ -535,9 +646,10 @@ void BrushTool::stampAt(
         // スメア: キャンバス色を押し広げる（ブラシ色を使わない）
         drawColor = m_smearColor;
       } else if (dyn.wetMix && composited.inBounds(px, py)) {
-        // ウェットミックス: ブラシ色 と キャンバス色 を混ぜる
+        // ウェットミックス: HSV 空間で混合（RGB lerp の「泥色」を防ぐ）
+        // CSP のカラーミキサーと同様のアプローチ
         const Color canvasCol = composited.pixel(px, py);
-        drawColor = lerpColor(m_settings.color, canvasCol, dyn.wetMixRate);
+        drawColor = mixColorHSV(m_settings.color, canvasCol, dyn.wetMixRate);
       }
 
       // ── buildup=false のとき、ストロークバッファで積み重ねを制御 ───────────
@@ -582,6 +694,40 @@ void BrushTool::stampAt(
 }
 
 // ---------------------------------------------------------------
+// scatter / angleJitter / dabCount を考慮してスタンプを配置する
+// CSP の「位置のばらし」「向きのばらし」「粒子数」に相当する機能
+// ---------------------------------------------------------------
+void BrushTool::stampDabsAt(
+    PixelBuffer& buffer, const PixelBuffer& composited,
+    const FPoint& center, float radius,
+    float strength, bool lockAlpha) const
+{
+  const auto& dyn = m_settings.dynamics;
+  const int count = dyn.dabCount;
+
+  for (int d = 0; d < count; ++d) {
+    FPoint dabCenter = center;
+    float  dabAngle  = 0.0f;   // stampAt 内で m_settings.angle に加算される
+
+    if (dyn.scatter) {
+      // 円内一様分布: radius * scatterAmount の範囲に散布
+      // Box-Muller の代わりに rejection-free disk sampling を使用
+      const float r = radius * dyn.scatterAmount * std::sqrt(lcgFloat(m_dabRandSeed));
+      const float a = lcgFloat(m_dabRandSeed) * (2.0f * kPi);
+      dabCenter.x += r * std::cos(a);
+      dabCenter.y += r * std::sin(a);
+    }
+
+    if (dyn.angleJitter) {
+      // ±angleJitterAmount 度のランダム回転
+      dabAngle = (lcgFloat(m_dabRandSeed) * 2.0f - 1.0f) * dyn.angleJitterAmount;
+    }
+
+    stampAt(buffer, composited, dabCenter, radius, strength, lockAlpha, dabAngle);
+  }
+}
+
+// ---------------------------------------------------------------
 // ストロークセグメント描画
 // from→to の間にスタンプを等間隔で配置
 // ---------------------------------------------------------------
@@ -597,73 +743,129 @@ void BrushTool::strokeSegment(
   const auto& dyn = m_settings.dynamics;
 
   const float baseRadius = static_cast<float>(std::max(1, m_settings.size)) * 0.5f;
-  const float dx = to.x - from.x;
-  const float dy = to.y - from.y;
-  const float segLen = std::sqrt(dx * dx + dy * dy);
 
   // ── 速度係数を更新（指数スムージング） ──────────────────────────────────
   const auto now = Clock::now();
   const float dtMs = static_cast<float>(
       std::chrono::duration_cast<std::chrono::microseconds>(now - m_lastMoveTime).count()) / 1000.0f;
   m_lastMoveTime = now;
-  if (dtMs > 0.5f) {
-    const float rawVel = segLen / dtMs; // px/ms
-    m_currentVelocityPxMs = m_currentVelocityPxMs * 0.7f + rawVel * 0.3f;
+  {
+    const float dx0 = to.x - from.x;
+    const float dy0 = to.y - from.y;
+    const float rawSegLen = std::sqrt(dx0*dx0 + dy0*dy0);
+    if (dtMs > 0.5f) {
+      const float rawVel = rawSegLen / dtMs;
+      m_currentVelocityPxMs = m_currentVelocityPxMs * 0.7f + rawVel * 0.3f;
+    }
   }
-  // 速度係数: refSpeed = brushDiameter * 2 px/ms を「高速」とみなす
-  const float refSpeed = static_cast<float>(std::max(1, m_settings.size)) * 2.0f; // px/ms
-  const float velFactor = std::clamp(m_currentVelocityPxMs / refSpeed, 0.0f, 1.0f);
-
-  // 速度→サイズ比率 (1=通常, velocitySizeMin=最高速時)
+  const float refSpeed     = static_cast<float>(std::max(1, m_settings.size)) * 2.0f;
+  const float velFactor    = std::clamp(m_currentVelocityPxMs / refSpeed, 0.0f, 1.0f);
   const float velSizeScale = dyn.velocitySize
-      ? (1.0f - velFactor * (1.0f - dyn.velocitySizeMin))
-      : 1.0f;
-  // 速度→opacity比率
+      ? (1.0f - velFactor * (1.0f - dyn.velocitySizeMin)) : 1.0f;
   const float velOpacityScale = dyn.velocityOpacity
-      ? (1.0f - velFactor * (1.0f - dyn.velocityOpacityMin))
-      : 1.0f;
+      ? (1.0f - velFactor * (1.0f - dyn.velocityOpacityMin)) : 1.0f;
 
   // spacing はブラシ直径の比率
   const float spacingPx = std::max(0.5f, m_settings.spacing * baseRadius * 2.0f);
 
-  if (segLen < 0.001f) {
+  // ── Catmull-Rom 制御点を決定 ──────────────────────────────────────────────
+  // p0: 前セグメントの始点（なければ from の手前に ghost 点を置く）
+  // p3: 次の入力が来るまで to から外挿した ghost 点
+  // ghost 点は次フレームで正しい p0 に上書きされるので誤差は最小限。
+  const FPoint p0 = m_hasPrevPoint
+      ? m_prevPoint
+      : FPoint{from.x * 2.0f - to.x, from.y * 2.0f - to.y};
+  const FPoint p1 = from;
+  const FPoint p2 = to;
+  const FPoint p3 = FPoint{to.x * 2.0f - from.x, to.y * 2.0f - from.y};
+
+  // ── CR 弧長を推定（8 サンプル） ──────────────────────────────────────────
+  static constexpr int kArcSamples = 8;
+  float crArcLen = 0.0f;
+  {
+    FPoint prev = p1;
+    for (int i = 1; i <= kArcSamples; ++i) {
+      const FPoint curr = catmullRomPos(p0, p1, p2, p3,
+                                         static_cast<float>(i) / kArcSamples);
+      const float dx = curr.x - prev.x, dy = curr.y - prev.y;
+      crArcLen += std::sqrt(dx*dx + dy*dy);
+      prev = curr;
+    }
+  }
+
+  // 極短セグメント: 単発スタンプで済ませる
+  if (crArcLen < 0.001f) {
     const float radius   = baseRadius * computePressureSize(pressureFrom) * velSizeScale;
     const float opScale  = computePressureOpacity(pressureFrom) * velOpacityScale;
     const float strength = std::clamp(m_settings.opacity * m_settings.flow * opScale, 0.0f, 1.0f);
-    stampAt(buffer, composited, from, radius, strength, lockAlpha);
+    stampDabsAt(buffer, composited, from, radius, strength, lockAlpha);
+    m_prevPoint    = from;
+    m_hasPrevPoint = true;
     return;
   }
 
   float traveled = spacingPx - m_distanceAccum;
   if (traveled < 0.0f) traveled = 0.0f;
-  if (traveled > segLen) {
-    m_distanceAccum += segLen;
+  if (traveled > crArcLen) {
+    m_distanceAccum += crArcLen;
+    m_prevPoint    = from;
+    m_hasPrevPoint = true;
     return;
   }
 
-  while (traveled <= segLen + 0.001f) {
-    const float t       = std::clamp(traveled / segLen, 0.0f, 1.0f);
-    const FPoint pos    {from.x + dx * t, from.y + dy * t};
-    const float pressure = pressureFrom + (pressureTo - pressureFrom) * t;
-    const float radius   = baseRadius * computePressureSize(pressure) * velSizeScale;
-    const float opScale  = computePressureOpacity(pressure) * velOpacityScale;
+  // ── CR 曲線を細かく刻んでスタンプを配置 ──────────────────────────────────
+  // サブステップ数: 弧長 1px あたり 2 ステップ（最小 8、最大 400）
+  const int numSub = std::clamp(static_cast<int>(crArcLen * 2.0f), 8, 400);
+  FPoint walkPrev  = p1;
+  float  walkedLen = 0.0f;
 
-    float taperScale = 1.0f;
-    if (strokeLen > 0.0f) {
-      const float globalT = std::clamp((strokeT + traveled) / strokeLen, 0.0f, 1.0f);
-      taperScale = computeTaperStrength(globalT, m_settings.taperStart, m_settings.taperEnd);
+  for (int step = 1; step <= numSub; ++step) {
+    const float t        = static_cast<float>(step) / static_cast<float>(numSub);
+    const FPoint walkCurr = catmullRomPos(p0, p1, p2, p3, t);
+    const float dxS = walkCurr.x - walkPrev.x;
+    const float dyS = walkCurr.y - walkPrev.y;
+    const float stepLen = std::sqrt(dxS*dxS + dyS*dyS);
+    walkedLen += stepLen;
+
+    // このサブステップ内でスタンプが 1 個以上入る場合はまとめて処理
+    while (traveled <= walkedLen + 0.001f && traveled <= crArcLen + 0.001f) {
+      // サブステップ内の補間係数
+      const float alpha = (stepLen > 0.001f)
+          ? std::clamp((traveled - (walkedLen - stepLen)) / stepLen, 0.0f, 1.0f)
+          : 1.0f;
+      const FPoint pos {
+          walkPrev.x + (walkCurr.x - walkPrev.x) * alpha,
+          walkPrev.y + (walkCurr.y - walkPrev.y) * alpha
+      };
+
+      const float tNorm   = std::clamp(traveled / crArcLen, 0.0f, 1.0f);
+      const float pressure = pressureFrom + (pressureTo - pressureFrom) * tNorm;
+      const float radius   = baseRadius * computePressureSize(pressure) * velSizeScale;
+      const float opScale  = computePressureOpacity(pressure) * velOpacityScale;
+
+      float taperScale = 1.0f;
+      if (strokeLen > 0.0f) {
+        const float globalT = std::clamp((strokeT + traveled) / strokeLen, 0.0f, 1.0f);
+        taperScale = computeTaperStrength(globalT, m_settings.taperStart, m_settings.taperEnd);
+      }
+
+      const float strength = std::clamp(
+          m_settings.opacity * m_settings.flow * opScale * taperScale, 0.0f, 1.0f);
+      stampDabsAt(buffer, composited, pos, radius, strength, lockAlpha);
+
+      traveled += spacingPx;
     }
 
-    const float strength = std::clamp(m_settings.opacity * m_settings.flow * opScale * taperScale, 0.0f, 1.0f);
-    stampAt(buffer, composited, pos, radius, strength, lockAlpha);
-
-    traveled += spacingPx;
+    walkPrev = walkCurr;
   }
 
-  // traveled がループを抜けた時点で last stamp は (traveled - spacingPx) の位置にある。
-  // セグメント終端からその位置までの距離が次回の繰り越し量。
-  m_distanceAccum = segLen - (traveled - spacingPx);
+  // 次セグメントへの繰り越し距離
+  m_distanceAccum = crArcLen - (traveled - spacingPx);
   if (m_distanceAccum < 0.0f) m_distanceAccum = 0.0f;
+
+  // CR 用に現セグメント始点を記憶
+  m_prevPoint    = from;
+  m_hasPrevPoint = true;
 }
 
 // ---------------------------------------------------------------
@@ -686,6 +888,10 @@ ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEven
   m_strokeLength = 0.0f;
   m_currentVelocityPxMs = 0.0f;
   m_lastMoveTime = Clock::now();
+  // CR / scatter をストロークごとにリセット
+  m_hasPrevPoint = false;
+  m_dabRandSeed  = static_cast<uint32_t>(
+      static_cast<int>(event.fpoint.x * 17) + static_cast<int>(event.fpoint.y * 31));
   // スメア: ストローク開始点でキャンバス色を採取
   {
     const int cx = static_cast<int>(event.fpoint.x);
@@ -716,7 +922,7 @@ ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEven
   const float opacityScale = computePressureOpacity(event.pressure);
   const float strength = std::clamp(m_settings.opacity * m_settings.flow * opacityScale, 0.0f, 1.0f);
   const bool lockAlpha = m_settings.lockAlphaRespect || active->alphaLocked();
-  stampAt(active->buffer(), context.composited, m_lastPoint, radius, strength, lockAlpha);
+  stampDabsAt(active->buffer(), context.composited, m_lastPoint, radius, strength, lockAlpha);
 
   ToolResult result;
   result.pixelsChanged = true;
@@ -759,7 +965,12 @@ ToolResult BrushTool::onPointerMove(ToolContext& context, const ToolPointerEvent
                 m_lastPressure, event.pressure,
                 m_strokeLength - segLen, m_strokeLength);
 
-  const Rect dirty = strokeDirtyRect(m_lastPoint, stabilized, static_cast<float>(m_settings.size));
+  // scatter が有効な場合は dirty rect を散布半径分だけ拡張する
+  const float scatterExpand = m_settings.dynamics.scatter
+      ? m_settings.dynamics.scatterAmount : 0.0f;
+  const Rect dirty = strokeDirtyRect(
+      m_lastPoint, stabilized,
+      static_cast<float>(m_settings.size) * (1.0f + scatterExpand));
   m_lastPoint = stabilized;
   m_lastPressure = event.pressure;
 

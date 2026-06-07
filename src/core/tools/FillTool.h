@@ -34,8 +34,8 @@ public:
   const Settings& settings() const noexcept { return m_settings; }
 
 private:
-  static bool isSameColor(const Color& a, const Color& b) noexcept;
-  static int colorDistance(const Color& a, const Color& b) noexcept;
+  static bool  isSameColor(const Color& a, const Color& b) noexcept;
+  static float colorDistance(const Color& a, const Color& b) noexcept;  // 知覚的ユークリッド距離
   bool matchesTarget(const PixelBuffer& source, const Color& target, int x, int y) const noexcept;
   bool hasBridge(const PixelBuffer& source, const Color& target, int x, int y) const noexcept;
 

@@ -141,14 +141,7 @@ ToolResult MoveLayerTool::onWheel(ToolContext& context, int deltaSteps, const To
 }
 
 ToolOverlayState MoveLayerTool::overlay() const {
-  ToolOverlayState state;
-  if (!m_dragging) {
-    return state;
-  }
-  state.hasLine = true;
-  state.lineStart = m_start;
-  state.lineEnd = m_current;
-  return state;
+  return {};
 }
 
 } // namespace core

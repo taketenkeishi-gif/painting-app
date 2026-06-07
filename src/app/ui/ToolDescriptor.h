@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -195,6 +196,8 @@ struct SubToolDescriptor {
   ToolBehaviorProfile profile;
   std::vector<ToolPropertyKey> editableProperties;
   std::string guide;
+  // サブツール選択時に実際に起動する ToolKind。未設定なら親 ToolDescriptor::kind を使う。
+  std::optional<core::ToolKind> targetToolKind;
 };
 
 struct ToolDescriptor {

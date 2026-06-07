@@ -57,6 +57,25 @@ public:
   void setSmearEnabled(bool v)   noexcept { m_settings.dynamics.smear     = v; }
   void setSmearRate(float v)     noexcept { m_settings.dynamics.smearRate  = std::clamp(v, 0.0F, 1.0F); }
 
+  // 筆圧カーブ (libmypaint BrushCurve)
+  // 例: brush.setPressureSizeCurve(BrushCurve::soft())
+  void setPressureSizeCurve(const BrushCurve& c)    noexcept { m_settings.dynamics.pressureSizeCurve    = c; }
+  void setPressureOpacityCurve(const BrushCurve& c) noexcept { m_settings.dynamics.pressureOpacityCurve = c; }
+  // 後方互換: γ 値で設定するショートカット
+  void setPressureSizeGamma(float gamma)    noexcept { m_settings.dynamics.pressureSizeCurve    = BrushCurve::fromGamma(gamma); }
+  void setPressureOpacityGamma(float gamma) noexcept { m_settings.dynamics.pressureOpacityCurve = BrushCurve::fromGamma(gamma); }
+
+  // Dab 散布
+  void setScatterEnabled(bool v)   noexcept { m_settings.dynamics.scatter       = v; }
+  void setScatterAmount(float v)   noexcept { m_settings.dynamics.scatterAmount = std::clamp(v, 0.0F, 4.0F); }
+
+  // 角度ジッター
+  void setAngleJitterEnabled(bool v)  noexcept { m_settings.dynamics.angleJitter       = v; }
+  void setAngleJitterAmount(float v)  noexcept { m_settings.dynamics.angleJitterAmount = std::clamp(v, 0.0F, 180.0F); }
+
+  // 1 スタンプあたりの Dab 数（スプレー）
+  void setDabCount(int v) noexcept { m_settings.dynamics.dabCount = std::clamp(v, 1, 64); }
+
   const BrushSettings& settings() const noexcept { return m_settings; }
 
   ToolKind kind() const noexcept override { return ToolKind::Brush; }
@@ -81,9 +100,16 @@ protected:
                      float pressureFrom, float pressureTo,
                      float strokeT, float strokeLen);
 
+  // angleDegrees: m_settings.angle に加算するジッター角度（通常は 0）
   void stampAt(PixelBuffer& buffer, const PixelBuffer& composited,
                const FPoint& center, float radius,
-               float strength, bool lockAlpha) const;
+               float strength, bool lockAlpha,
+               float angleDegrees) const;
+
+  // scatter / dabCount を考慮して stampAt を 1〜N 回呼ぶ
+  void stampDabsAt(PixelBuffer& buffer, const PixelBuffer& composited,
+                   const FPoint& center, float radius,
+                   float strength, bool lockAlpha) const;
 
   void blendPixel(PixelBuffer& buffer, int x, int y,
                   const Color& src, float strength, bool lockAlpha) const;
@@ -108,6 +134,13 @@ protected:
 
   // スメア用: 前回の stamp 中心で採取した色
   mutable Color m_smearColor {0, 0, 0, 255};
+
+  // Catmull-Rom スプライン: 前セグメントの始点を保持
+  FPoint m_prevPoint    {0.0f, 0.0f};
+  bool   m_hasPrevPoint {false};
+
+  // scatter / angleJitter 用 LCG シード（ストロークごとにリセット）
+  mutable uint32_t m_dabRandSeed {0};
 };
 
 } // namespace core

@@ -1,0 +1,14 @@
+﻿{
+    "last_message":  "task-22 完了です。\n\n実装はすでに commit `12b51a0` で完了していました。今回は TASK_QUEUE.md を `review_required` に更新し HANDOFF_STATE.json を最終状態に整理してコミットしました。\n\n**実装確認済みの内容:**\n- `updateWindowTitle()` — dirty時 `*ファイル名 — Painting-a",
+    "updated_at":  "2026-06-07T08:56:14.9337678+09:00",
+    "started_at":  "2026-06-07T08:54:11.6569865+09:00",
+    "last_file_changed":  "STATUS_REPORT.md",
+    "current_action":  "",
+    "phase":  "completed",
+    "git_deleted_lines":  47,
+    "task":  "task-22",
+    "git_added_lines":  77,
+    "worker":  "worker-b-sonnet",
+    "status":  "completed",
+    "git_changed_files":  3
+}

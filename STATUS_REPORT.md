@@ -1,6 +1,6 @@
-﻿# STATUS REPORT
-Updated: 2026-06-07 03:24:23
-Phase: running
+# STATUS REPORT
+Updated: 2026-06-07 08:56:18
+Phase: idle
 
 ---
 
@@ -8,14 +8,14 @@ Phase: running
 
 | Key | Value |
 |-----|-------|
-| Worker | worker-b |
-| Task   | task-33 |
-| Phase  | running |
+| Worker | — |
+| Task   | task-22 |
+| Phase  | idle |
 
 ## Worker Reset Times
 
-- worker-b : available
-- worker-a : available
+- worker-b-sonnet : available
+- worker-a-sonnet : wait until 09:00 (4min remaining)
 
 ## Completed
 
@@ -27,11 +27,16 @@ Phase: running
 
 ## Review Required
 
-(none)
+- task-9
+- task-17
+- task-18
+- task-20
+- task-21
+- task-22
 
 ## Last Event
 
-worker-b が task-33 を開始
+task-22 NO_OP: Claude completed without observable action
 
 ---
-*Scheduler v6 - 2026-06-07 03:24:23*
+*Scheduler v6 - 2026-06-07 08:56:18*
