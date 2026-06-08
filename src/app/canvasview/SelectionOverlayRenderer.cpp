@@ -75,49 +75,6 @@ void SelectionOverlayRenderer::render(QPainter&                  painter,
     }
   }
 
-  // ── Canvas perimeter（反転選択用） ──────────────────────────────────────
-  // 選択がキャンバス周辺に接している場合、キャンバス周辺にもマーチングアンツを表示
-  const bool touchesLeft   = (bx == 0);
-  const bool touchesTop    = (by == 0);
-  const bool touchesRight  = (bx1 >= w);
-  const bool touchesBottom = (by1 >= h);
-
-  if (touchesLeft || touchesTop || touchesRight || touchesBottom) {
-    // キャンバス周辺に marching ants を描画（反転選択の外周）
-    if (touchesLeft) {
-      for (int y = 0; y < h; ++y) {
-        const int phase = ((y - marchingOffset) % kPeriod + kPeriod) % kPeriod;
-        QPainterPath& p = (phase < kDashLen) ? blackPath : whitePath;
-        p.moveTo(0, y);
-        p.lineTo(0, y + 1);
-      }
-    }
-    if (touchesTop) {
-      for (int x = 0; x < w; ++x) {
-        const int phase = ((x - marchingOffset) % kPeriod + kPeriod) % kPeriod;
-        QPainterPath& p = (phase < kDashLen) ? blackPath : whitePath;
-        p.moveTo(x, 0);
-        p.lineTo(x + 1, 0);
-      }
-    }
-    if (touchesRight) {
-      for (int y = 0; y < h; ++y) {
-        const int phase = ((y - marchingOffset) % kPeriod + kPeriod) % kPeriod;
-        QPainterPath& p = (phase < kDashLen) ? blackPath : whitePath;
-        p.moveTo(w, y);
-        p.lineTo(w, y + 1);
-      }
-    }
-    if (touchesBottom) {
-      for (int x = 0; x < w; ++x) {
-        const int phase = ((x - marchingOffset) % kPeriod + kPeriod) % kPeriod;
-        QPainterPath& p = (phase < kDashLen) ? blackPath : whitePath;
-        p.moveTo(x, h);
-        p.lineTo(x + 1, h);
-      }
-    }
-  }
-
   // ── Map canvas coordinates → widget coordinates ──────────────────────
   QTransform t;
   t.translate(panOffset.x(), panOffset.y());

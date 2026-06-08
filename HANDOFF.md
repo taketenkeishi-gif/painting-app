@@ -1,7 +1,34 @@
 # HANDOFF
-更新: 06/08/2026 10:50:00
+更新: 06/08/2026 11:00:00
 worker: worker-b-sonnet
-ctx: task-24 確認完了 → review_required
+ctx: task-25 完了 → review_required
+
+## 完了タスク: task-25
+SelectionOverlayRenderer.cpp マーチングアンツが端に触れると全端に描画されるバグ修正
+
+### バグの根本原因
+`SelectionOverlayRenderer.cpp` の「Canvas perimeter（反転選択用）」ブロックが
+バウンディングボックスの端（bx==0, by==0, bx1>=w, by1>=h）に触れるだけで
+キャンバス端全体にマーチングアンツを描画していた。
+
+例：左上3x3ピクセルの選択 → `touchesLeft=true, touchesTop=true` → キャンバス左端100px・上端100px全体にアンツが描画される（正しくは3px分のみ）
+
+### 修正内容
+`src/app/canvasview/SelectionOverlayRenderer.cpp` から行78-119の
+「Canvas perimeter（反転選択用）」ブロックを全削除。
+
+メインの水平・垂直境界ループが `inside()` ラムダの out-of-bounds=false 処理により
+キャンバス端の境界も正しく検出しているため、追加ループは不要だった。
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- 実装経路確認: inside() が (x<0||x>=w||y<0||y>=h) → false を返し端境界を正確に処理
+
+### 次のworkerへ
+- UIの変更あり（マーチングアンツ表示修正）→ `.\launch.bat` 起動し、キャンバス端に触れる矩形選択を作成してアンツが選択形状だけに沿って表示されることを目視確認
+- 特に左上隅への小さい選択でキャンバス端全体に流れないことを確認
+
+
 
 ## 完了タスク: task-24
 ToolPanel ツールボタンのツールチップにショートカットキー表示確認

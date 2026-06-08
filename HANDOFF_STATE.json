@@ -1,20 +1,55 @@
 ﻿{
-    "updated_at":  "2026-06-08T10:38:50.7490977+09:00",
+    "updated_at":  "2026-06-08T10:44:07.1196749+09:00",
     "next_steps":  [
                        "未コミット変更を確認・コミット実行"
                    ],
     "commands_run":  [
                          "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 cmake --build build --config Rele",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git add TASK_QUEUE.md HANDOFF.md ",
-                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git branch \u0026\u0026 git log --oneline -"
+                         "Test-Path \"C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json\""
                      ],
     "current_files":  [
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\ToolPanel.cpp",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\SelectionOverlayRenderer.cpp",
+                              "reason":  "修正"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\SelectionOverlayRenderer.h",
                               "reason":  "調査"
                           },
                           {
-                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\ui\\ToolDescriptor.h",
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\core\\selection\\SelectionMask.h",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "SelectionOverlayRenderer|selectionMask|selection.*render",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "selectionMask",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.h",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.cpp",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "task-25",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\core\\common\\Rect.h",
                               "reason":  "調査"
                           },
                           {
@@ -22,36 +57,55 @@
                               "reason":  "修正"
                           },
                           {
-                              "path":  "## task-24",
+                              "path":  "HANDOFF_STATE.json",
+                              "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
+                              "reason":  "修正"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\.claude\\HANDOFF.md",
                               "reason":  "調査"
                           },
                           {
                               "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF.md",
-                              "reason":  "修正"
+                              "reason":  "調査"
                           }
                       ],
     "decisions":  [
-
+                      "余分なペリメーターコードを完全削除: inside() ラムダが out-of-bounds を false として返すことでキャンバス端境界を既に正確に処理しており、追加ループは二重描画かつ誤った全端描画を引き起こしていた"
                   ],
     "investigated_files":  [
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\panels\\ToolPanel.cpp",
-                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\ui\\ToolDescriptor.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\SelectionOverlayRenderer.cpp",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\SelectionOverlayRenderer.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\core\\selection\\SelectionMask.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.h",
+                               "SelectionOverlayRenderer|selectionMask|selection.*render",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\canvasview\\CanvasWidget.cpp",
+                               "selectionMask",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.h",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\app\\bridge\\AppController.cpp",
+                               "task-25",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\src\\core\\common\\Rect.h",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
-                               "## task-24",
+                               "HANDOFF_STATE.json",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF_STATE.json",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\.claude\\HANDOFF.md",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF.md"
                            ],
-    "task_id":  "task-24",
+    "task_id":  "task-25",
     "last_worker":  "worker-b-sonnet",
-    "git_commit":  "14104042fb7322f7d83e0527cbfecf4ead8e9fb5",
-    "last_reasoning":  "`main`ブランチですが、直前のtask-23など全てのタスクコミットも`main`に入っているため、このプロジェクトの実際の作業ブランチが`main`になっています。問題ありません。\n\n---\n\n**task-24 完了まとめ:**\n\n- `ToolPanel.cpp` の `refreshFromController()` (行500-507) でworker-aが実装済みであることを確認\n  - `toolNameJa(kind)` + `toolShortcut(kind)` → `\"ブラシ (B)\"`, `\"消しゴム (E)\"` 形式\n  - 無効ツール時は `\"ツール名（レイヤー種別では使用不可）\"` を表示\n  - `button-\u003esetToolTip(tip)` で設定\n- `cmake --build Release`: エラー0件\n- `TASK_QUEUE.md`",
+    "git_commit":  "6fd533c2c000029b47a9a1b94328d3136d939ab2",
+    "last_reasoning":  "HANDOFF.md を更新してコミットします。",
     "completed":  [
+                      "Modified: SelectionOverlayRenderer.cpp",
                       "Modified: TASK_QUEUE.md",
-                      "Modified: HANDOFF.md",
-                      "Build: cmake --build 実行済み",
-                      "Commit: git commit 実行済み"
+                      "Modified: HANDOFF_STATE.json",
+                      "Build: cmake --build 実行済み"
                   ],
-    "git_diff_summary":  " .scheduler/CURRENT_STATE.json   |  18 +--\n .scheduler/daemon.log           |  16 +++\n .scheduler/worker_progress.json |  18 +--\n .scheduler/worker_runtime.json  |   8 +-\n .scheduler/worker_state.json    |   4 +-\n HANDOFF_STATE.json              |  63 ++++-------\n STATUS_REPORT.md                |  12 +-\n TASK_CONTEXT.json               | 236 ++++++++++++++++++++--------------------\n 8 files changed, 187 insertions(+), 188 deletions(-)",
+    "git_diff_summary":  " .scheduler/CURRENT_STATE.json                   |  26 +--\n .scheduler/daemon.log                           |  16 ++\n .scheduler/worker_progress.json                 |  22 +--\n .scheduler/worker_runtime.json                  |  10 +-\n .scheduler/worker_state.json                    |   4 +-\n HANDOFF_STATE.json                              |  92 ++++++++--\n STATUS_REPORT.md                                |  11 +-\n TASK_CONTEXT.json                               | 221 ++++++++++++------------\n TASK_QUEUE.md                                   |   5 +-\n src/app/canvasview/SelectionOverlayRenderer.cpp |  43 -----\n 10 files changed, 241 insertions(+), 209 deletions(-)",
     "objective":  "",
     "blocked_reason":  "",
-    "current_phase":  "committing"
+    "current_phase":  "analyzing"
 }

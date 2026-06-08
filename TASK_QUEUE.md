@@ -1,4 +1,4 @@
-﻿# TASK QUEUE ?EPainting-app ai-night-test
+# TASK QUEUE ?EPainting-app ai-night-test
 <!-- scheduler ??Estatus ??X?V?????E-->
 
 ## task-006
@@ -762,7 +762,8 @@ cmake --build build --config Release
 
 ---
 ## task-25
-status: pending
+status: review_required
+summary_jp: SelectionOverlayRenderer.cpp の誤ったキャンバスペリメーター描画ブロックを削除。バウンディングボックスが端に触れるだけで端全体にマーチングアンツを描画していたバグを修正。メインループが inside() のout-of-bounds=false で既に正しく端境界を処理しているため不要なコードを除去。
 attempt: 0
 priority: high
 role: developer
