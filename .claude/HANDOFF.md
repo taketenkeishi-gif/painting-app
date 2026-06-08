@@ -27,6 +27,11 @@ MSVC: Visual Studio 2022 Community (v14.44)
 
 ## 完了済み
 
+### task-23: LayerPanel opacity スライダー同期修正（commit 4a4beba）
+- `LayerPanel::refreshButtonState()` にレイヤーの `opacity()` を直接読んでスライダー・スピン・ラベルを同期する処理を追加
+- `AppController::setLayerOpacity()` / `setLayerBlendMode()` に `emit canvasChanged()` を追加してキャンバス再描画を保証
+- UIの変更あり（カーソル挙動なし、スライダー値変化） → `.\launch.bat` 起動して opacity スライダーの値同期を目視確認すること
+
 ### Phase 0-1: Skia バックエンド整備（commit ff2b231）
 - `src/platform/skia/` — SkiaPixelBuffer / SkiaRenderer / SkiaIntegration
 - `PAINT_USE_SKIA=OFF` デフォルト、ON 時は vcpkg 必要
