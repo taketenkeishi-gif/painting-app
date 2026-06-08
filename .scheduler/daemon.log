@@ -198,3 +198,20 @@
 [10:47:31][INFO] task-27 コンテキスト生成中...
 [10:47:33][INFO] worker-b-sonnet → task-27 worker 起動
 [10:53:31][WARN] task-27 未コミット変更を検出 (modified=8 untracked=0) → 自動コミット
+[10:53:31][INFO] task-27 自動コミット完了: auto-commit: task-27 (worker=worker-b-sonnet, uncommitted-at-exit)
+[10:53:31][DEBUG] worker-b-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_b
+[10:53:34][DEBUG] worker-b-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"579
+[10:53:34][INFO] worker-b-sonnet タスク後状態: allowed
+[10:53:34][INFO] task-27 supervisor 検証中...
+[10:53:34][INFO] task-27 supervisor → uncertain (Expected files (from TASK_CONTEXT) not in git diff; Files edited but not committed)
+[10:53:34][WARN] task-27 → supervisor UNCERTAIN (human_required) | Expected files (from TASK_CONTEXT) not in git diff; Files edited but not committed
+[10:53:37][INFO] 次タスク: task-28 [priority=high complexity=heavy role=developer]
+[10:53:37][DEBUG] worker-a-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[10:53:39][DEBUG] worker-a-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"687
+[10:53:39][INFO] worker-b-sonnet キャッシュ利用 (status=allowed age<5min)
+[10:53:39][DEBUG]   [score] worker-b-sonnet base=90 util=unknown bonus=+10 total=100
+[10:53:39][INFO] → 選択: worker-b-sonnet (score=110 role=match complexity=heavy)
+[10:53:39][INFO] worker-b-sonnet → task-28 実行開始
+[10:53:39][INFO] task-28 コンテキスト生成中...
+[10:53:41][INFO] worker-b-sonnet → task-28 worker 起動
+[10:59:07][WARN] task-28 未コミット変更を検出 (modified=8 untracked=0) → 自動コミット
