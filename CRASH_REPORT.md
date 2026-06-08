@@ -1,7 +1,7 @@
 # CRASH REPORT
-生成日時: 2026-06-08 11:07:23
+生成日時: 2026-06-08 18:30:37
 前回 Phase: running
-前回 Task:  task-30
+前回 Task:  task-31
 前回 Worker: worker-b-sonnet
 
 ## 復旧処理

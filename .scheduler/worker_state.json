@@ -1,14 +1,14 @@
 {
-  "worker-a-sonnet": {
-    "error_msg": null,
-    "status": "rate_limited",
-    "reset_at": "2026-06-08T02:30:00.0000000+00:00",
-    "checked_at": "2026-06-08T11:09:42.3821735+09:00"
-  },
   "worker-b-sonnet": {
     "error_msg": null,
-    "status": "working",
-    "reset_at": "2026-06-08T02:40:00.0000000+00:00",
-    "checked_at": "2026-06-08T11:09:35.8865668+09:00"
+    "reset_at": "2026-06-08T14:00:00.0000000+00:00",
+    "checked_at": "2026-06-08T18:30:33.5671299+09:00",
+    "status": "working"
+  },
+  "worker-a-sonnet": {
+    "error_msg": null,
+    "reset_at": "2026-06-10T19:00:00.0000000+00:00",
+    "checked_at": "2026-06-08T18:30:30.2790012+09:00",
+    "status": "allowed_warning"
   }
 }

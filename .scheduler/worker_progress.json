@@ -1,14 +1,14 @@
 ﻿{
-    "last_message":  "**task-31 完了。**\n\nCanvasWidget のミドルボタンパン機能を調査したところ、すでに完全実装済みであることを確認しました：\n\n- `mousePressEvent`：`Qt::MiddleButton` 検出 → `state.temporaryMiddlePan=true` + `Qt::ClosedHandCursor` 設定済み\n- `mouseMoveEvent`：ミ",
-    "updated_at":  "2026-06-08T11:14:19.0565602+09:00",
-    "started_at":  "2026-06-08T11:09:46.3160852+09:00",
+    "last_message":  "task-32が完了しました。\n\n**実施内容:**\n- `MainWindow.cpp` 行1246-1247でショートカットが既に正しく実装済みであることを確認:\n  - `Ctrl+0` → `fitToScreen`（画面に合わせる）\n  - `Ctrl+1` → `resetZoom 100%`\n- `cmake --build build --config Release` でエラー ",
+    "updated_at":  "2026-06-08T18:33:47.2201581+09:00",
+    "started_at":  "2026-06-08T18:30:40.4842740+09:00",
     "last_file_changed":  "TASK_CONTEXT.json",
     "current_action":  "",
     "phase":  "completed",
-    "git_deleted_lines":  112,
-    "task":  "task-31",
-    "git_added_lines":  133,
+    "git_deleted_lines":  157,
+    "task":  "task-32",
+    "git_added_lines":  195,
     "worker":  "worker-b-sonnet",
     "status":  "completed",
-    "git_changed_files":  8
+    "git_changed_files":  9
 }

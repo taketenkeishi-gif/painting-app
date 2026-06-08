@@ -1,5 +1,5 @@
 # STATUS REPORT
-Updated: 2026-06-08 11:09:44
+Updated: 2026-06-08 18:30:37
 Phase: running
 
 ---
@@ -9,13 +9,13 @@ Phase: running
 | Key | Value |
 |-----|-------|
 | Worker | worker-b-sonnet |
-| Task   | task-31 |
+| Task   | task-32 |
 | Phase  | running |
 
 ## Worker Reset Times
 
-- worker-a-sonnet : wait until 11:30 (20min remaining)
 - worker-b-sonnet : available
+- worker-a-sonnet : available
 
 ## Completed
 
@@ -27,18 +27,11 @@ Phase: running
 
 ## Review Required
 
-- task-23
-- task-24
-- task-25
-- task-26
-- task-27
-- task-28
-- task-29
-- task-30
+(none)
 
 ## Last Event
 
-worker-b-sonnet が task-31 を開始
+worker-b-sonnet が task-32 を開始
 
 ---
-*Scheduler v6 - 2026-06-08 11:09:44*
+*Scheduler v6 - 2026-06-08 18:30:37*

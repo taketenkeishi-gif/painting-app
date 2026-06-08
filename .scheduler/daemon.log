@@ -285,3 +285,33 @@
 [11:09:44][INFO] task-31 コンテキスト生成中...
 [11:09:45][INFO] worker-b-sonnet → task-31 worker 起動
 [11:14:19][WARN] task-31 未コミット変更を検出 (modified=8 untracked=0) → 自動コミット
+[18:30:30][INFO] ===== Scheduler v8 起動 =====
+[18:30:30][INFO] Project    : C:\Users\Keishi\Portfolio\Painting-app
+[18:30:30][INFO] SchedulerDir: C:\Users\Keishi\Portfolio\Painting-app\.scheduler
+[18:30:30][INFO] Workers    : worker-a-sonnet, worker-b-sonnet
+[18:30:30][INFO] worker-a-sonnet: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[18:30:30][INFO] worker-b-sonnet: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_b
+[18:30:30][INFO] worker-a-sonnet キャッシュ期限切れ → 起動時 health check で再確認
+[18:30:30][INFO] worker-b-sonnet キャッシュ期限切れ → 起動時 health check で再確認
+[18:30:30][INFO] 起動時 health check 開始...
+[18:30:30][INFO] worker-a-sonnet ping 実行中...
+[18:30:30][DEBUG] worker-a-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[18:30:33][DEBUG] worker-a-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"432
+[18:30:33][INFO] worker-a-sonnet → allowed_warning
+[18:30:33][INFO] worker-b-sonnet ping 実行中...
+[18:30:33][DEBUG] worker-b-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_b
+[18:30:37][DEBUG] worker-b-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"139
+[18:30:37][INFO] worker-b-sonnet → allowed
+[18:30:37][WARN] ===== Crash Recovery 開始 =====
+[18:30:37][WARN] 前回 Phase: running / Task: task-31 / Worker: worker-b-sonnet
+[18:30:37][WARN] ===== Crash Recovery 完了 =====
+[18:30:37][INFO] 次タスク: task-32 [priority=medium complexity=heavy role=developer]
+[18:30:37][INFO] worker-a-sonnet キャッシュ利用 (status=allowed_warning age<5min)
+[18:30:37][DEBUG]   [score] worker-a-sonnet base=50 util=unknown bonus=+10 total=60
+[18:30:37][INFO] worker-b-sonnet キャッシュ利用 (status=allowed age<5min)
+[18:30:37][DEBUG]   [score] worker-b-sonnet base=90 util=unknown bonus=+10 total=100
+[18:30:37][INFO] → 選択: worker-b-sonnet (score=130 role=match complexity=match/heavy)
+[18:30:37][INFO] worker-b-sonnet → task-32 実行開始
+[18:30:37][INFO] task-32 コンテキスト生成中...
+[18:30:39][INFO] worker-b-sonnet → task-32 worker 起動
+[18:33:47][WARN] task-32 未コミット変更を検出 (modified=9 untracked=4) → 自動コミット
