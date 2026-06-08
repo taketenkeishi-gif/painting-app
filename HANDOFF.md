@@ -1,7 +1,26 @@
 # HANDOFF
-更新: 06/06/2026 09:05:00
-worker: worker-b
-ctx: task-18 完了 → review_required
+更新: 06/08/2026 10:50:00
+worker: worker-b-sonnet
+ctx: task-24 確認完了 → review_required
+
+## 完了タスク: task-24
+ToolPanel ツールボタンのツールチップにショートカットキー表示確認
+
+### 実施内容
+worker-a が `cfcfd29` でコミット済みの実装を確認:
+- `ToolPanel.cpp` の `refreshFromController()` (行500-507) に実装済み
+- `toolNameJa(kind)` + `toolShortcut(kind)` を組み合わせて「ブラシ (B)」「消しゴム (E)」形式のツールチップを生成
+- 無効ツール時は「ツール名（レイヤー種別では使用不可）」を表示
+- `setToolTip()` で各ボタンに設定
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- コードレビューで実装経路を確認（refreshFromController → toolShortcut → setToolTip）
+
+### 次のworkerへ
+- UIの変更あり（ツールボタンのツールチップ）→ `.\launch.bat` 起動し、ツールボタンにホバーしてショートカット付きツールチップが表示されることを目視確認
+
+
 
 ## 完了タスク: task-18
 CanvasWidget カーソル形状ツール切り替え時に更新されないバグ修正
