@@ -1,7 +1,37 @@
 # HANDOFF
-更新: 06/08/2026 12:10:00
+更新: 06/08/2026 11:30:00
 worker: worker-b-sonnet
-ctx: task-29 完了 → review_required
+ctx: task-30 完了確認 → review_required
+
+## 完了タスク: task-30
+LayerPanel インライン名前編集
+
+### 実施内容
+`src/app/panels/LayerPanel.cpp` に `LayerItemDelegate` を追加し、ダブルクリックによるインライン名前編集を実装:
+- `createEditor`: `QLineEdit` を生成しダークテーマスタイル適用。用紙レイヤーは `nullptr` を返し編集不可
+- `setEditorData`: `layerPaintName(index)` でテキスト設定 → `selectAll()` で全選択
+- `setModelData`: `trimmed()` した文字列が空でなければ `model->setData(index, text, Qt::EditRole)` で確定
+- `updateEditorGeometry`: `layerNameRect(option.rect, hasMask)` を使いエディタ位置を調整
+- `QListWidget::setEditTriggers(DoubleClicked | EditKeyPressed)` で編集トリガーを設定
+- 非用紙レイヤーの `QListWidgetItem` に `Qt::ItemIsEditable` フラグを付与
+- `onLayerItemChanged` で名前変更時に `m_controller->renameLayer(layerIndex, name)` を呼び出す
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- 実装コミット fd2156f (worker-b) に完全な実装が含まれていることを確認
+
+### 次のworkerへ
+- UIの変更あり（LayerPanel レイヤー名ダブルクリックでインライン編集）→ `.\launch.bat` 起動し目視確認が必要
+- ダブルクリックでテキストボックスが表示され、Enter で名前変更が確定することを確認
+- Escape でキャンセルできることを確認
+- 用紙レイヤーは編集不可であることを確認
+
+---
+
+<!-- 以下は前回のタスク記録 -->
+
+## 完了タスク: task-29
+ToolPropertyPanel Flow スライダーを BrushTool 選択時のみ表示
 
 ## 完了タスク: task-29
 ToolPropertyPanel Flow スライダーを BrushTool 選択時のみ表示
