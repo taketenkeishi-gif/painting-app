@@ -1,64 +1,70 @@
 ﻿{
-    "task":  "task-36",
-    "task_title":  "AppController �E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�S�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�̂ɎU�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�݂��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E� `m_dirty = true` / `m_dirty = false` �E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�̒��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�ڑ��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E� private �E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�w�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�p�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�[ `setDirty(bool)` �E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�ɏW�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�񂷂�B",
+    "task":  "task-37",
+    "task_title":  "LayerPanel.cpp にレイヤー個別の不透明度スライダー（QSlider 0〜100）を追加する。選択レイヤー変更時に値を同期し、スライダー操作でレイヤーの opacity が変わること。",
     "keywords":  [
-                     "AppController",
-                     "m_dirty",
-                     "MainWindow",
-                     "src",
-                     "bridge",
-                     "cpp",
+                     "LayerPanel",
                      "app",
-                     "setDirty",
+                     "opacity",
+                     "cpp",
+                     "src",
+                     "panels",
+                     "heavy",
                      "category",
-                     "dirty",
-                     "config",
-                     "developer",
-                     "iisDirty",
-                     "status",
                      "role",
-                     "API",
-                     "summary_jp",
-                     "priority",
-                     "medium",
-                     "emit",
-                     "dirtyChanged",
-                     "Release",
+                     "status",
+                     "config",
                      "powershell",
-                     "refactor",
+                     "Release",
                      "pending",
-                     "Eattempt"
+                     "feature",
+                     "complexity",
+                     "priority",
+                     "QSlider",
+                     "high",
+                     "developer",
+                     "attempt"
                  ],
     "likely_files":  [
-                         "src/app/bridge/AppController.cpp",
+                         "src/app/panels/LayerPanel.cpp",
+                         "src/app/panels/LayerPanel.h",
+                         "src/core/tools/BrushTool.h",
                          "src/app/bridge/AppController.h",
                          "src/core/tools/RectSelectionTool.h",
-                         "src/app/mainwindow/MainWindow.cpp",
-                         "src/core/tools/AiSelectTool.h",
-                         "src/app/canvasview/CanvasWidget.h",
-                         "src/app/panels/LayerPanel.h",
-                         "src/app/panels/AiPanel.h",
+                         "src/app/panels/ToolPropertyPanel.h",
+                         "src/app/panels/ToolPropertyPanel.cpp",
+                         "src/core/tools/EraserTool.h",
                          "src/app/mainwindow/MainWindow.h",
-                         "src/core/render/Renderer.cpp"
+                         "src/app/panels/ToolPanel.h"
                      ],
     "related_symbols":  [
                             "qt_meta_stringdata_CLASSappSCOPEpanelsSCOPEAiPanelENDCLASS_t",
                             "applyUiStateToTools",
+                            "setLayerOpacity",
                             "AppController",
-                            "isDirty",
+                            "setActiveLayerOpacity",
+                            "activeLayerOpacity",
                             "updateZoomStatusLabel",
                             "mouseReleaseEvent",
                             "keyReleaseEvent",
                             "app",
                             "applyTabStyle",
-                            "QMainWindow",
-                            "MainWindow",
+                            "m_layerPanel",
+                            "QSlider",
+                            "LayerPanel",
                             "updateConnectionStatus",
                             "onApplyCandidate",
+                            "onOpacityChanged",
                             "applyResponsiveMode",
                             "applyButtonCompactMode",
                             "applyResponsiveLayout",
+                            "onOpacitySliderChanged",
                             "m_pinConfigButton",
+                            "m_opacityLabel",
+                            "m_opacitySlider",
+                            "m_opacitySpin",
+                            "onOpacitySpinChanged",
+                            "opacity",
+                            "setOpacity",
                             "applyHSLAdjust",
                             "applyAdjustment",
                             "applyLayerMask",
@@ -72,10 +78,12 @@
                             "applyInferenceResult",
                             "hasPendingResult",
                             "takePendingResult",
-                            "strokeDirtyRect",
+                            "setPressureOpacityEnabled",
+                            "setPressureOpacityMin",
+                            "setVelocityOpacityEnabled",
+                            "setVelocityOpacityMin",
                             "appendSlice",
                             "applyStabilization",
-                            "hasBridge",
                             "applyBlend",
                             "applyGradient",
                             "snappedPoint",
@@ -85,10 +93,12 @@
                             "applyPolygon",
                             "applyFeather",
                             "pointerRelease",
-                            "SkiaPixelBuffer",
+                            "opacityLayer",
+                            "fullOpacityLayer",
                             "AnnotateRWLockReleased",
                             "IteratorCategory",
                             "Cpp20ForwardZipIterator",
+                            "ABSL_HAVE_FEATURE",
                             "UnscaledCycleClockWrapperForGetCurrentTime",
                             "UnscaledCycleClockWrapperForInitializeFrequency",
                             "FlatHashMapPolicy",
@@ -97,7 +107,6 @@
                             "SetHashtablezConfigListener",
                             "HeapPtrs",
                             "SwapPropagatingCountingAlloc",
-                            "SwapImpl",
                             "Wrapped",
                             "NodeHashMapPolicy",
                             "RegisterFileMappingHint",
@@ -112,6 +121,7 @@
                             "GetUsageConfig",
                             "UnwrapStdReferenceWrapperImpl",
                             "Apply",
+                            "Uint128High64",
                             "AppendTruncated",
                             "Status",
                             "StatusOr",
@@ -121,46 +131,26 @@
                             "Append",
                             "IsSwappable",
                             "IsNothrowSwappable",
+                            "Int128High64",
                             "MappingProto",
                             "AddCurrentMappings",
                             "AddMapping",
                             "UniformDistributionWrapper",
-                            "StatusRep",
-                            "StatusCode",
-                            "StatusIsMatcherCommonImpl",
-                            "MonoStatusIsMatcherImpl",
-                            "StatusIsMatcher",
-                            "GetStatus",
-                            "HasConversionOperatorToStatusOr",
-                            "StatusOrData",
-                            "HandleInvalidStatusCtorArg",
-                            "MakeStatus",
-                            "AssignStatus",
-                            "StatusCodeToString",
-                            "StatusCodeToStringView",
-                            "OkStatus",
-                            "StatusIs",
-                            "SetStatusPayloadPrinter",
-                            "GetStatusPayloadPrinter"
+                            "StatusRep"
                         ],
     "recent_commits":  [
+                           "3fbc021 task-30: LayerPanel 繧､繝ｳ繝ｩ繧､繝ｳ蜷榊燕邱ｨ髮・螳御ｺ・｢ｺ隱阪・TASK_QUEUE譖ｴ譁ｰ (worker: worker-b-sonnet)",
                            "a68c7c0 task-28: LayerPanel (+)(-) 繝懊ち繝ｳ霑ｽ蜉 (worker: worker-b-sonnet)",
-                           "6d874f0 feat: SAM2 ONNX AI驕ｸ謚槭ヤ繝ｼ繝ｫ蝓ｺ逶､繝ｻFillTool SelectionMask蟇ｾ蠢懊・繝吶け繧ｿ繝ｼ繝ｬ繧､繝､繝ｼ蠑ｷ蛹・45c2846 feat: 繝・・繝ｫ諡｡蠑ｵ・域峇邱壹・蝗ｳ蠖｢・峨・UI 繝輔Ο繝ｼ謾ｹ蝟・e4f6c64 task-7: 驕ｸ謚樒ｯ・峇縺ｮ諡｡蠑ｵ繝ｻ邵ｮ蟆擾ｼ・xpand/contract・峨ｒ螳溯｣・bcf8283 task-3: 螟牙ｽ｢蜩∬ｳｪ謾ｹ蝟・窶・Bicubic/Lanczos3 陬憺俣螳溯｣・",
-                           "2473aaa task-36: AppController m_dirty逶ｴ謗･莉｣蜈･繧痴etDirty(bool)縺ｫ髮・ｴ・・dirtyChanged繧ｷ繧ｰ繝翫Ν霑ｽ蜉 (worker: worker-b)",
-                           "12b51a0 task-22: 繧ｿ繧､繝医Ν繝舌・dirty繝輔Λ繧ｰ陦ｨ遉ｺ - updateWindowTitle()螳溯｣・033b1e5 task-21: 譁ｰ隕・繝輔ぃ繧､繝ｫ繧ｪ繝ｼ繝励Φ譎ゅ・譛ｪ菫晏ｭ倡｢ｺ隱阪ム繧､繧｢繝ｭ繧ｰ繧定ｿｽ蜉",
+                           "171bbf8 task-33: LayerPanel refreshButtonState() hasSelection蛻､螳壹ｒcurrentItem()!=nullptr縺ｫ菫ｮ豁｣ (worker: worker-b)",
                            "54b353b task-32: MainWindow Ctrl+0=fitToScreen, Ctrl+1=resetZoom(100%) 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ螟画峩 (worker: worker-b-sonnet)",
-                           "45c2846 feat: 繝・・繝ｫ諡｡蠑ｵ・域峇邱壹・蝗ｳ蠖｢・峨・UI 繝輔Ο繝ｼ謾ｹ蝟・ebcea2a task-1+2: FreeTransformTool Ctrl+T 豁｣蠑丞ｮ溯｣・ｼ医ヵ繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ繝励Ξ繝薙Η繝ｼ莉倥″・・8337cd4 task-35: MainWindow setupStatusBar() 繧呈歓蜃ｺ - createMenus() 蜀・・statusBar繝ｩ繝吶Ν逕滓・繝ｻ逋ｻ骭ｲ繧ｳ繝ｼ繝峨ｒ繝励Λ繧､繝吶・繝医Γ繧ｽ繝・ラ縺ｫ蛻・屬 (worker: worker-b)",
-                           "2bd0255 task-32: MainWindow Ctrl+0=fitToScreen, Ctrl+1=resetZoom(100%) 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ螟画峩 (worker: worker-b)",
                            "51e1334 task-29: ToolPropertyPanel Flow 繧ｹ繝ｩ繧､繝繝ｼ繧・BrushTool 驕ｸ謚樊凾縺ｮ縺ｿ陦ｨ遉ｺ (worker: worker-b-sonnet)",
-                           "f8a86fe task-27: CanvasWidget 繝代せ繝・・繝ｼ繝臥ｧｻ蜍墓凾縺ｮ canvasPositionChanged emit 貍上ｌ菫ｮ豁｣ (worker: worker-b-sonnet)"
+                           "f8a86fe task-27: CanvasWidget 繝代せ繝・・繝ｼ繝臥ｧｻ蜍墓凾縺ｮ canvasPositionChanged emit 貍上ｌ菫ｮ豁｣ (worker: worker-b-sonnet)",
+                           "4a4beba task-23: LayerPanel opacity slider sync - refreshButtonState()縺ｫopacity蜷梧悄霑ｽ蜉縲《etLayerOpacity/setLayerBlendMode縺ｫcanvasChanged逋ｺ陦瑚ｿｽ蜉",
+                           "300ffdd UI: polish layer panel delegate, opacity slider, and controls",
+                           "b9034f1 UI: stabilize layer delegate and opacity slider",
+                           "db3a4e8 task-26: ColorWheelWidget 縺ｫ #RRGGBB hex蜈･蜉・QLineEdit 霑ｽ蜉 (worker: worker-b-sonnet)"
                        ],
     "previous_changes":  [
-                             {
-                                 "task_id":  "task-17",
-                                 "files_changed":  [
-                                                       3
-                                                   ]
-                             },
                              {
                                  "task_id":  "task-18",
                                  "files_changed":  [
@@ -282,9 +272,9 @@
                                                    ]
                              },
                              {
-                                 "task_id":  "task-37",
+                                 "task_id":  "task-36",
                                  "files_changed":  [
-                                                       10
+                                                       8
                                                    ]
                              },
                              {
@@ -318,12 +308,24 @@
                                                    ]
                              },
                              {
+                                 "task_id":  "task-36",
+                                 "files_changed":  [
+                                                       2
+                                                   ]
+                             },
+                             {
                                  "task_id":  "task-42",
+                                 "files_changed":  [
+                                                       9
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-36",
                                  "files_changed":  [
                                                        9
                                                    ]
                              }
                          ],
     "brain_ready":  true,
-    "generated_at":  "2026-06-08T20:26:57.1712036+09:00"
+    "generated_at":  "2026-06-08T20:31:02.5609732+09:00"
 }

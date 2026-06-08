@@ -1169,7 +1169,8 @@ cmake --build build --config Release
 ---
 
 ## task-37
-status: pending
+status: in_progress
+summary_jp: LayerPanel.cpp にレイヤー個別の不透明度スライダー（QSlider 0〜100）を追加する。選択レイヤー変更時に値を同期し、スライダー操作でレイヤ
 attempt: 0
 priority: high
 complexity: heavy

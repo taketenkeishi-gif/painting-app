@@ -1,7 +1,7 @@
 ﻿{
     "scheduler_alive":  true,
     "worker_label":  "Claude B · Sonnet",
-    "task_title":  "",
+    "task_title":  "LayerPanel.cpp にレイヤー個別の不透明度スライダー（QSlider 0〜100）を追加する。選択レイヤー変",
     "manager":  {
                     "status":  "completed",
                     "generated_total":  0
@@ -12,26 +12,27 @@
                    },
     "mode":  "working",
     "worker":  "worker-b-sonnet",
-    "task_id":  "task-36",
+    "task_id":  "task-37",
     "phase":  "completed",
     "current_action":  "",
-    "current_file":  "TASK_CONTEXT.json",
-    "started_at":  "2026-06-08T20:26:58.4018451+09:00",
-    "insertions":  131,
-    "deletions":  98,
-    "updated_at":  "2026-06-08T20:29:23.9677169+09:00",
-    "code_snippet":  "# HANDOFF\n更新: 06/08/2026 20:35:00\nworker: worker-b-sonnet\nctx: task-36 AppController m_dirty → setDirty(bool) リファクタリング確認 → review_required\n\n## 完了タスク: task-36\nAppController m_dirty 直接代入を setDirty(bool) プライベートメソッドに集約\n\n### 実施内容\n`src/app/bridge/AppController.h` / `.cpp` の実装を確認:\n- `AppController.h` 行483: `void dirtyChanged(bool dirty)` シグナル宣言済み\n- `AppController.h` 行486: `void setDirty(bool dirty) noexcept` プライベートメソッド宣言済み\n- `AppController.h` 行172: `markClean()` が `setDirty(false)` を呼び出す形に実装済み\n- `AppController.cpp` 行4460〜4463: `setDirty` 実装 — `m_dirty` が変化した場合のみ `emit dirtyChanged(m_dirty)` する冪等実装\n- `AppController.cpp` 内の `m_dirty = true/false` 直接代入は全て `setDirty()` 経由に置換済み（行308、480、1405、3162）\n\n### 確認済み\n- cmake --build build --config Release: エラー 0 件（コミット 2473aaa で確認済み）\n- 実装経路確認: setDirty → m_dirty 変更確認 → emit dirtyChanged\n\n### 次のworkerへ\n- UIの変更なし（内部リファクタリングのみ）→ 目視確認は不要\n- MainWindow の `dirtyChanged` 接続（updateWindowTitle）は既存コードで実装済みであることを確認推奨\n- 次タスクへ進む\n\n---\n\n\u003c!-- 以下は前回のタスク記録 --\u003e\n更新: 06/08/2026 19:00:00\nworker: worker-b-sonnet\nctx: task-35 setupStatusBar() リファクタリング確認 → review_required",
-    "code_snippet_label":  "Edit HANDOFF.md",
-    "last_response_seconds":  146,
+    "current_file":  "TASK_QUEUE.md",
+    "started_at":  "2026-06-08T20:31:03.0622396+09:00",
+    "insertions":  164,
+    "deletions":  149,
+    "updated_at":  "2026-06-08T20:31:26.5749660+09:00",
+    "code_snippet":  "#include \"app/panels/LayerPanel.h\"\n\n#include \u003calgorithm\u003e\n#include \u003ccmath\u003e\n\n#include \u003cQAbstractItemModel\u003e\n#include \u003cQAbstractItemView\u003e\n#include \u003cQColor\u003e\n#include \u003cQComboBox\u003e\n#include \u003cQFont\u003e\n#include \u003cQGridLayout\u003e\n#include \u003cQGroupBox\u003e\n#include \u003cQHBoxLayout\u003e\n#include \u003cQIcon\u003e\n#include \u003cQImage\u003e\n#include \u003cQItemDelegate\u003e\n#include \u003cQLabel\u003e\n#include \u003cQLineEdit\u003e\n#include \u003cQMenu\u003e\n#include \u003cQMouseEvent\u003e\n#include \u003cQPainter\u003e\n#include \u003cQPaintEvent\u003e\n#include \u003cQPixmap\u003e\n#include \u003cQStyledItemDelegate\u003e\n#include \u003cQStyleOptionSlider\u003e\n#include \u003cQVariant\u003e\n#include \u003cQResizeEvent\u003e\n#include \u003cQSignalBlocker\u003e\n#include \u003cQSizePolicy\u003e\n#include \u003cQSlider\u003e\n#include \u003cQSpinBox\u003e\n#include \u003cQStyle\u003e\n#include \u003cQTimer\u003e\n#include \u003cQVBoxLayout\u003e\n#include \u003cQListWidgetItem\u003e\n\n#include \"app/bridge/AppController.h\"\n#include \"app/ui/IconLoader.h\"\n\nnamespace app::panels {\n\nnamespace {\n\nconstexpr int kNameRole = Qt::UserRole + 1;\nconstexpr int kVisibilityRole = Qt::UserRole + 2;\nconstexpr int kKindRole = Qt::UserRole + 3;\nconstexpr int kLayerIndexRole = Qt::UserRole + 4;\nconstexpr int kClippedRole = Qt::UserRole + 5;\nconstexpr int kHasMaskRole = Qt::UserRole + 6;\nconstexpr int kMaskEnabledRole = Qt::UserRole + 7;",
+    "code_snippet_label":  "Reading LayerPanel.cpp:1-50",
+    "last_response_seconds":  24,
     "files_changed":  [
                           ".scheduler/CURRENT_STATE.json",
                           ".scheduler/daemon.log",
                           ".scheduler/worker_progress.json",
                           ".scheduler/worker_runtime.json",
                           ".scheduler/worker_state.json",
-                          "CRASH_REPORT.md",
                           "HANDOFF_STATE.json",
+                          "MANAGER_STATE.json",
                           "STATUS_REPORT.md",
-                          "TASK_CONTEXT.json"
+                          "TASK_CONTEXT.json",
+                          "TASK_QUEUE.md"
                       ]
 }
