@@ -1,0 +1,10 @@
+{
+  "reason": "All workers rate limited",
+  "sleeping_until_label": "11:35",
+  "sleeping_until": "2026-06-08T11:35:00.0000000+09:00",
+  "workers": {
+    "worker-b-sonnet": "2026-06-08T11:40:00+09:00",
+    "worker-a-sonnet": "2026-06-08T02:30:00.0000000+00:00"
+  },
+  "written_at": "2026-06-08T11:07:25.4262636+09:00"
+}

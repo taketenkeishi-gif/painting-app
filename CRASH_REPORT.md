@@ -1,12 +1,12 @@
-﻿# CRASH REPORT
-生成日時: 2026-06-06 19:28:04
+# CRASH REPORT
+生成日時: 2026-06-08 11:07:23
 前回 Phase: running
 前回 Task:  task-30
-前回 Worker: worker-b
+前回 Worker: worker-b-sonnet
 
 ## 復旧処理
 
-- task-30: in_progress → pending にリセット (attempt: 0 → 1)
+- TASK_QUEUE に in_progress タスクなし（起動直後クラッシュの可能性）
 
 ## 備考
 スケジューラー v7 が異常終了したため自動復旧しました。

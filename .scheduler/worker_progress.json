@@ -1,14 +1,14 @@
 ﻿{
-    "last_message":  "task-29 完了しました。\n\n**変更内容:**\n- `ToolPropertyPanel.cpp` の `refreshFromController()` に `isBrushTool` フラグを追加\n- `m_flowLabel / m_flowSlider / m_flowSpin` の表示を `supportsFlow \u0026\u0026 isBrushTool` に制限\n- `m_brushDyn",
-    "updated_at":  "2026-06-08T11:03:29.0911859+09:00",
-    "started_at":  "2026-06-08T10:59:20.4580261+09:00",
+    "last_message":  "コミット完了: `3fbc021`\n\ntask-30 の全作業が完了しました。実装済みコード（fd2156f）の確認、ビルド（0エラー）、TASK_QUEUE.md を `review_required` に更新、HANDOFF 更新、コミットまで完了しています。",
+    "updated_at":  "2026-06-08T11:09:35.3165426+09:00",
+    "started_at":  "2026-06-08T11:03:41.1877079+09:00",
     "last_file_changed":  "TASK_CONTEXT.json",
     "current_action":  "",
     "phase":  "completed",
-    "git_deleted_lines":  117,
-    "task":  "task-29",
-    "git_added_lines":  152,
+    "git_deleted_lines":  148,
+    "task":  "task-30",
+    "git_added_lines":  195,
     "worker":  "worker-b-sonnet",
     "status":  "completed",
-    "git_changed_files":  8
+    "git_changed_files":  10
 }

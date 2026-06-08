@@ -232,3 +232,39 @@
 [10:59:18][INFO] task-29 コンテキスト生成中...
 [10:59:20][INFO] worker-b-sonnet → task-29 worker 起動
 [11:03:29][WARN] task-29 未コミット変更を検出 (modified=8 untracked=0) → 自動コミット
+[11:03:29][INFO] task-29 自動コミット完了: auto-commit: task-29 (worker=worker-b-sonnet, uncommitted-at-exit)
+[11:03:29][DEBUG] worker-b-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_b
+[11:03:33][DEBUG] worker-b-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"e91
+[11:03:33][INFO] worker-b-sonnet タスク後状態: allowed
+[11:03:33][INFO] task-29 supervisor 検証中...
+[11:03:34][INFO] task-29 supervisor → uncertain (Expected files (from TASK_CONTEXT) not in git diff; Files edited but not committed)
+[11:03:34][WARN] task-29 → supervisor UNCERTAIN (human_required) | Expected files (from TASK_CONTEXT) not in git diff; Files edited but not committed
+[11:03:37][INFO] 次タスク: task-30 [priority=high complexity=heavy role=developer]
+[11:03:37][DEBUG] worker-a-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[11:03:38][DEBUG] worker-a-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"029
+[11:03:38][INFO] worker-b-sonnet キャッシュ利用 (status=allowed age<5min)
+[11:03:38][DEBUG]   [score] worker-b-sonnet base=90 util=unknown bonus=+10 total=100
+[11:03:38][INFO] → 選択: worker-b-sonnet (score=110 role=match complexity=heavy)
+[11:03:38][INFO] worker-b-sonnet → task-30 実行開始
+[11:03:38][INFO] task-30 コンテキスト生成中...
+[11:03:40][INFO] worker-b-sonnet → task-30 worker 起動
+[11:07:23][INFO] ===== Scheduler v8 起動 =====
+[11:07:23][INFO] Project    : C:\Users\Keishi\Portfolio\Painting-app
+[11:07:23][INFO] SchedulerDir: C:\Users\Keishi\Portfolio\Painting-app\.scheduler
+[11:07:23][INFO] Workers    : worker-a-sonnet, worker-b-sonnet
+[11:07:23][INFO] worker-a-sonnet: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[11:07:23][INFO] worker-b-sonnet: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_b
+[11:07:23][INFO] worker-a-sonnet 状態復元: rate_limited
+[11:07:23][INFO] worker-b-sonnet 状態復元: working
+[11:07:23][INFO] 起動時 health check 開始...
+[11:07:23][INFO] worker-a-sonnet キャッシュ有効: rate_limited
+[11:07:23][INFO] worker-b-sonnet キャッシュ有効: working
+[11:07:23][WARN] ===== Crash Recovery 開始 =====
+[11:07:23][WARN] 前回 Phase: running / Task: task-30 / Worker: worker-b-sonnet
+[11:07:23][WARN] ===== Crash Recovery 完了 =====
+[11:07:23][INFO] 次タスク: task-31 [priority=high complexity=heavy role=developer]
+[11:07:23][DEBUG] worker-a-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[11:07:25][DEBUG] worker-a-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"bec
+[11:07:25][INFO] worker-b-sonnet キャッシュ利用 (status=working age<5min)
+[11:07:25][WARN] All workers rate limited -- sleeping until 11:35 (1655 s)
+[11:09:35][WARN] task-30 未コミット変更を検出 (modified=10 untracked=1) → 自動コミット

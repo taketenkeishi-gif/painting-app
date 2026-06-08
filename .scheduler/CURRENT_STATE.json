@@ -1,6 +1,6 @@
 ﻿{
     "scheduler_alive":  true,
-    "worker_label":  "Claude B · Sonnet",
+    "worker_label":  "",
     "task_title":  "",
     "manager":  {
                     "status":  "completed",
@@ -8,27 +8,29 @@
                 },
     "rate_limit":  {
                        "active":  true,
-                       "resume_at":  "2026-06-08T02:30:00.0000000+00:00"
+                       "resume_at":  "06/08/2026 11:35:00"
                    },
     "mode":  "working",
     "worker":  "worker-b-sonnet",
-    "task_id":  "task-29",
+    "task_id":  "task-30",
     "phase":  "completed",
     "current_action":  "",
     "current_file":  "TASK_CONTEXT.json",
-    "started_at":  "2026-06-08T10:59:20.4580261+09:00",
-    "insertions":  152,
-    "deletions":  117,
-    "updated_at":  "2026-06-08T11:03:29.0911859+09:00",
-    "code_snippet":  "# HANDOFF\n更新: 06/08/2026 12:10:00\nworker: worker-b-sonnet\nctx: task-29 完了 → review_required\n\n## 完了タスク: task-29\nToolPropertyPanel Flow スライダーを BrushTool 選択時のみ表示\n\n### 実施内容\n`src/app/panels/ToolPropertyPanel.cpp` の `refreshFromController()` を修正：\n- `isBrushTool = (m_controller-\u003ecurrentTool() == core::ToolKind::Brush)` を追加\n- `m_flowLabel / m_flowSlider / m_flowSpin` の `setVisible(supportsFlow)` → `setVisible(supportsFlow \u0026\u0026 isBrushTool)` に変更\n- `m_brushDynamicsSection-\u003esetVisible(supportsFlow || ...)` → `(supportsFlow \u0026\u0026 isBrushTool) || ...` に変更\n- `showPressure = m_showDetails \u0026\u0026 supportsFlow \u0026\u0026 isBrushTool` に変更（圧力セクションも Brush 限定）\n- `onFlowSliderChanged` 内の `qDebug` デバッグ出力を削除\n\n### 確認済み\n- cmake --build Release: エラー 0 件\n- 実装経路確認: refreshFromController → isBrushTool \u0026\u0026 supportsFlow → setVisible\n\n### 次のworkerへ\n- UIの変更あり（ToolPropertyPanel Flow 表示制御）→ `.\\launch.bat` 起動し目視確認が必要\n- ブラシ選択時に Flow スライダーが表示されること\n- 消しゴム・直線ツール等に切り替えた際に Flow スライダーが非表示になること確認\n\n---\n\n\u003c!-- 以下は前回のタスク記録 --\u003e",
-    "code_snippet_label":  "Edit HANDOFF.md",
-    "last_response_seconds":  249,
+    "started_at":  "2026-06-08T11:03:41.1877079+09:00",
+    "insertions":  195,
+    "deletions":  148,
+    "updated_at":  "2026-06-08T11:09:35.3165426+09:00",
+    "code_snippet":  "## 完了タスク: task-29\nToolPropertyPanel Flow スライダーを BrushTool 選択時のみ表示\n\n### 実施内容\n`src/app/panels/ToolPropertyPanel.cpp` の `refreshFromController()` を修正：\n- `isBrushTool = (m_controller-\u003ecurrentTool() == core::ToolKind::Brush)` を追加\n- `m_flowLabel / m_flowSlider / m_flowSpin` の `setVisible(supportsFlow)` → `setVisible(supportsFlow \u0026\u0026 isBrushTool)` に変更\n- `m_brushDynamicsSection-\u003esetVisible(supportsFlow || ...)` → `(supportsFlow \u0026\u0026 isBrushTool) || ...` に変更\n- `showPressure = m_showDetails \u0026\u0026 supportsFlow \u0026\u0026 isBrushTool` に変更（圧力セクションも Brush 限定）\n- `onFlowSliderChanged` 内の `qDebug` デバッグ出力を削除",
+    "code_snippet_label":  "Reading HANDOFF.md:36-45",
+    "last_response_seconds":  354,
     "files_changed":  [
                           ".scheduler/CURRENT_STATE.json",
                           ".scheduler/daemon.log",
+                          ".scheduler/scheduler.pid",
                           ".scheduler/worker_progress.json",
                           ".scheduler/worker_runtime.json",
                           ".scheduler/worker_state.json",
+                          "CRASH_REPORT.md",
                           "HANDOFF_STATE.json",
                           "STATUS_REPORT.md",
                           "TASK_CONTEXT.json"
