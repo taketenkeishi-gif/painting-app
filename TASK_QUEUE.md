@@ -1167,3 +1167,332 @@ cmake --build build --config Release
 ```
 
 ---
+
+## task-37
+status: pending
+attempt: 0
+priority: high
+complexity: heavy
+role: developer
+category: feature
+
+### 目的
+LayerPanel.cpp にレイヤー個別の不透明度スライダー（QSlider 0〜100）を追加する。選択レイヤー変更時に値を同期し、スライダー操作でレイヤーの opacity が変わること。
+
+### 対象ファイル候補
+- src/app/panels/LayerPanel.cpp
+- src/app/panels/LayerPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- LayerPanel にスライダーが表示され、ドラッグで値が 0〜100 に変化する
+- レイヤー切替時にスライダー値が選択レイヤーの opacity に同期する
+
+### 時間見積もり
+45〜75 分
+
+### 禁止事項
+- 対象ファイル以外の変更
+- 新規クラスの作成
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-38
+status: pending
+attempt: 0
+priority: high
+complexity: heavy
+role: developer
+category: feature
+
+### 目的
+ToolPropertyPanel.cpp にブラシ不透明度（Opacity）スライダーを追加する。BrushTool 選択時のみ表示し、Flow スライダーと並べて配置する。
+
+### 対象ファイル候補
+- src/app/panels/ToolPropertyPanel.cpp
+- src/app/panels/ToolPropertyPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- BrushTool 選択時に Opacity スライダーが Flow スライダーの上または下に表示される
+- 他ツール選択時は Opacity スライダーが非表示になる
+
+### 時間見積もり
+30〜50 分
+
+### 禁止事項
+- 対象ファイル以外の変更
+- 新規クラスの作成
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-39
+status: pending
+attempt: 0
+priority: high
+complexity: heavy
+role: developer
+category: feature
+
+### 目的
+MainWindow.cpp に Ctrl+Z（Undo）/ Ctrl+Y（Redo）ショートカットを追加する。AppController に undoAction / redoAction を持たせ、QAction として MainWindow のメニューまたは直接 QShortcut で接続する。
+
+### 対象ファイル候補
+- src/app/mainwindow/MainWindow.cpp
+- src/app/mainwindow/MainWindow.h
+- src/app/bridge/AppController.cpp
+- src/app/bridge/AppController.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- Ctrl+Z / Ctrl+Y がキーイベントとして MainWindow に登録される（スロット接続確認はコードで）
+- ビルドエラーなし・実行時クラッシュなし
+
+### 時間見積もり
+60〜90 分
+
+### 禁止事項
+- QUndoStack の新規導入（既存実装に合わせること）
+- 対象ファイル以外のロジック変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-40
+status: pending
+attempt: 0
+priority: medium
+complexity: light
+role: developer
+category: feature
+
+### 目的
+SubToolPanel.cpp の各サブツールボタンに toolTip() を設定する。現状ツール名のみで説明がなく、初見ユーザーに機能が伝わらない。
+
+### 対象ファイル候補
+- src/app/panels/SubToolPanel.cpp
+
+### 成功条件
+- cmake --build でエラー 0 件
+- SubToolPanel の各ボタンにホバーでツールチップが表示される（文字列が設定されている）
+
+### 時間見積もり
+20〜35 分
+
+### 禁止事項
+- 対象ファイル以外の変更
+- UI レイアウトの変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-41
+status: pending
+attempt: 0
+priority: high
+complexity: heavy
+role: developer
+category: bug
+
+### 目的
+CanvasWidget.cpp の mousePressEvent / mouseMoveEvent / mouseReleaseEvent でキャンバスポインタや描画エンジンのnullチェックが不足している。描画中に nullptr デリファレンスでクラッシュする可能性があるため、各ハンドラの先頭にガード節を追加する。
+
+### 対象ファイル候補
+- src/app/canvasview/CanvasWidget.cpp
+
+### 成功条件
+- cmake --build でエラー 0 件
+- mousePress/Move/Release の各ハンドラに nullptr ガード節が追加されている（コードで確認）
+- launch.bat 起動後、キャンバスが null 状態でもクラッシュしない
+
+### 時間見積もり
+30〜50 分
+
+### 禁止事項
+- 対象ファイル以外の変更
+- 既存の描画ロジック変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-42
+status: pending
+attempt: 0
+priority: high
+complexity: heavy
+role: developer
+category: bug
+
+### 目的
+AppController.cpp のファイル保存（saveFile / saveFileAs）失敗時に QMessageBox::critical でエラーダイアログを表示する。現状は戻り値 false を返すだけでユーザーへのフィードバックがない。
+
+### 対象ファイル候補
+- src/app/bridge/AppController.cpp
+- src/app/bridge/AppController.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- saveFile / saveFileAs の失敗パスに QMessageBox::critical 呼び出しが追加されている
+- 正常パスの動作は変わらない
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- 対象ファイル以外の変更
+- 保存ロジックの書き換え
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-43
+status: pending
+attempt: 0
+priority: medium
+complexity: light
+role: developer
+category: refactor
+
+### 目的
+ToolPropertyPanel.cpp で Flow / Opacity など複数スライダーを同じパターンで生成しているコードを createLabeledSlider(QString label, int min, int max) ヘルパー関数に抽出し、重複を除去する。
+
+### 対象ファイル候補
+- src/app/panels/ToolPropertyPanel.cpp
+- src/app/panels/ToolPropertyPanel.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- スライダー生成が createLabeledSlider() 経由に統一されている
+- 既存の Flow スライダーの動作が変わらない
+
+### 時間見積もり
+30〜45 分
+
+### 禁止事項
+- スライダーの動作変更
+- 他パネルへの波及変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-44
+status: pending
+attempt: 0
+priority: medium
+complexity: light
+role: developer
+category: refactor
+
+### 目的
+LayerPanel.cpp の updateLayerList() 内で繰り返されているアイテム生成・アイコン設定パターンを createLayerItem(Layer*) ヘルパーに切り出し、可読性を上げる。
+
+### 対象ファイル候補
+- src/app/panels/LayerPanel.cpp
+
+### 成功条件
+- cmake --build でエラー 0 件
+- updateLayerList() の主ループが短くなり createLayerItem() が使われている
+- レイヤー一覧の表示・選択動作が変わらない
+
+### 時間見積もり
+25〜40 分
+
+### 禁止事項
+- LayerPanel.h のシグネチャ変更（privateに追加は可）
+- 対象ファイル以外の変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-45
+status: pending
+attempt: 0
+priority: medium
+complexity: heavy
+role: developer
+category: feature
+
+### 目的
+ColorWheelWidget.cpp に R / G / B 各値を個別に入力できる QSpinBox（0〜255）を追加する。既存の hex QLineEdit と双方向同期させ、カラーホイール操作でも値が更新されるようにする。
+
+### 対象ファイル候補
+- src/app/panels/ColorWheelWidget.cpp
+- src/app/panels/ColorWheelWidget.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- R/G/B の QSpinBox が表示され、値変更でカラーホイールと hex フィールドが同期する
+- カラーホイール操作でも R/G/B フィールドが正しく更新される
+
+### 時間見積もり
+50〜80 分
+
+### 禁止事項
+- 既存 hex QLineEdit の削除
+- 対象ファイル以外の変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
+## task-46
+status: pending
+attempt: 0
+priority: medium
+complexity: light
+role: developer
+category: bug
+
+### 目的
+MainWindow.cpp のウィンドウタイトルが未保存変更の有無を反映していない。setDirty(true) 呼び出し時にタイトルバーへ " *" サフィックスを付加し、保存後に除去する処理を追加する。
+
+### 対象ファイル候補
+- src/app/mainwindow/MainWindow.cpp
+- src/app/mainwindow/MainWindow.h
+
+### 成功条件
+- cmake --build でエラー 0 件
+- 描画操作後にウィンドウタイトルに " *" が付く
+- 保存後に " *" が消える
+
+### 時間見積もり
+25〜40 分
+
+### 禁止事項
+- AppController の dirty 管理ロジック変更
+- 対象ファイル以外の変更
+
+### 検証方法
+```powershell
+cmake --build build --config Release
+```
+
+---
