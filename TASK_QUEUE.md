@@ -1135,7 +1135,7 @@ cmake --build build --config Release
 
 ---
 ## task-36
-status: pending
+status: review_required
 summary_jp: AppControllerのm_dirty直接代入をsetDirty(bool)プライベ�EトメソチE��に雁E��E��、dirtyChangedシグナルを追加した、Eattempt: 0
 priority: medium
 role: developer

@@ -1,4 +1,31 @@
 # HANDOFF
+更新: 06/08/2026 20:35:00
+worker: worker-b-sonnet
+ctx: task-36 AppController m_dirty → setDirty(bool) リファクタリング確認 → review_required
+
+## 完了タスク: task-36
+AppController m_dirty 直接代入を setDirty(bool) プライベートメソッドに集約
+
+### 実施内容
+`src/app/bridge/AppController.h` / `.cpp` の実装を確認:
+- `AppController.h` 行483: `void dirtyChanged(bool dirty)` シグナル宣言済み
+- `AppController.h` 行486: `void setDirty(bool dirty) noexcept` プライベートメソッド宣言済み
+- `AppController.h` 行172: `markClean()` が `setDirty(false)` を呼び出す形に実装済み
+- `AppController.cpp` 行4460〜4463: `setDirty` 実装 — `m_dirty` が変化した場合のみ `emit dirtyChanged(m_dirty)` する冪等実装
+- `AppController.cpp` 内の `m_dirty = true/false` 直接代入は全て `setDirty()` 経由に置換済み（行308、480、1405、3162）
+
+### 確認済み
+- cmake --build build --config Release: エラー 0 件（コミット 2473aaa で確認済み）
+- 実装経路確認: setDirty → m_dirty 変更確認 → emit dirtyChanged
+
+### 次のworkerへ
+- UIの変更なし（内部リファクタリングのみ）→ 目視確認は不要
+- MainWindow の `dirtyChanged` 接続（updateWindowTitle）は既存コードで実装済みであることを確認推奨
+- 次タスクへ進む
+
+---
+
+<!-- 以下は前回のタスク記録 -->
 更新: 06/08/2026 19:00:00
 worker: worker-b-sonnet
 ctx: task-35 setupStatusBar() リファクタリング確認 → review_required
