@@ -12,17 +12,17 @@
                    },
     "mode":  "working",
     "worker":  "worker-b-sonnet",
-    "task_id":  "task-33",
+    "task_id":  "task-35",
     "phase":  "completed",
     "current_action":  "",
-    "current_file":  "TASK_QUEUE.md",
-    "started_at":  "2026-06-08T18:33:57.3272308+09:00",
-    "insertions":  153,
-    "deletions":  179,
-    "updated_at":  "2026-06-08T18:34:14.8387908+09:00",
-    "code_snippet":  "#include \"app/panels/LayerPanel.h\"\n\n#include \u003calgorithm\u003e\n#include \u003ccmath\u003e\n\n#include \u003cQAbstractItemModel\u003e\n#include \u003cQAbstractItemView\u003e\n#include \u003cQColor\u003e\n#include \u003cQComboBox\u003e\n#include \u003cQFont\u003e\n#include \u003cQGridLayout\u003e\n#include \u003cQGroupBox\u003e\n#include \u003cQHBoxLayout\u003e\n#include \u003cQIcon\u003e\n#include \u003cQImage\u003e\n#include \u003cQItemDelegate\u003e\n#include \u003cQLabel\u003e\n#include \u003cQLineEdit\u003e\n#include \u003cQMenu\u003e\n#include \u003cQMouseEvent\u003e\n#include \u003cQPainter\u003e\n#include \u003cQPaintEvent\u003e\n#include \u003cQPixmap\u003e\n#include \u003cQStyledItemDelegate\u003e\n#include \u003cQStyleOptionSlider\u003e\n#include \u003cQVariant\u003e\n#include \u003cQResizeEvent\u003e\n#include \u003cQSignalBlocker\u003e\n#include \u003cQSizePolicy\u003e\n#include \u003cQSlider\u003e\n#include \u003cQSpinBox\u003e\n#include \u003cQStyle\u003e\n#include \u003cQTimer\u003e\n#include \u003cQVBoxLayout\u003e\n#include \u003cQListWidgetItem\u003e\n\n#include \"app/bridge/AppController.h\"\n#include \"app/ui/IconLoader.h\"\n\nnamespace app::panels {\n\nnamespace {\n\nconstexpr int kNameRole = Qt::UserRole + 1;\nconstexpr int kVisibilityRole = Qt::UserRole + 2;\nconstexpr int kKindRole = Qt::UserRole + 3;\nconstexpr int kLayerIndexRole = Qt::UserRole + 4;\nconstexpr int kClippedRole = Qt::UserRole + 5;\nconstexpr int kHasMaskRole = Qt::UserRole + 6;\nconstexpr int kMaskEnabledRole = Qt::UserRole + 7;",
-    "code_snippet_label":  "Reading LayerPanel.cpp:1-50",
-    "last_response_seconds":  18,
+    "current_file":  "TASK_CONTEXT.json",
+    "started_at":  "2026-06-08T18:34:21.4150300+09:00",
+    "insertions":  112,
+    "deletions":  108,
+    "updated_at":  "2026-06-08T18:36:32.3655937+09:00",
+    "code_snippet":  "# HANDOFF\n更新: 06/08/2026 19:00:00\nworker: worker-b-sonnet\nctx: task-35 setupStatusBar() リファクタリング確認 → review_required\n\n## 完了タスク: task-35\nMainWindow setupStatusBar() プライベートメソッドへの抽出\n\n### 実施内容\n`src/app/mainwindow/MainWindow.cpp` の statusBar 関連コードを確認:\n- `MainWindow.h` 行153: `void setupStatusBar()` をプライベートメソッドとして宣言済み\n- `MainWindow.cpp` 行1920〜1954: `setupStatusBar()` の実装 — ToolStatusLabel / SubToolStatusLabel / ZoomStatusLabel 等 10 個のラベル生成・`statusBar()-\u003eaddWidget()` 登録コードを集約\n- `MainWindow.cpp` 行1751: `createMenus()` 内から `setupStatusBar()` を呼び出す形に分割済み\n\n### 確認済み\n- cmake --build build --config Release: エラー 0 件\n- リファクタリングは前コミット `8337cd4` で実装済みであることを確認\n\n### 次のworkerへ\n- UI の変更なし（コード整理のみ）→ 目視確認は任意\n- 次タスクへ進む\n\n---\n\n\u003c!-- 以下は前回のタスク記録 --\u003e",
+    "code_snippet_label":  "Edit HANDOFF.md",
+    "last_response_seconds":  131,
     "files_changed":  [
                           ".scheduler/CURRENT_STATE.json",
                           ".scheduler/daemon.log",
@@ -31,7 +31,6 @@
                           ".scheduler/worker_state.json",
                           "HANDOFF_STATE.json",
                           "STATUS_REPORT.md",
-                          "TASK_CONTEXT.json",
-                          "TASK_QUEUE.md"
+                          "TASK_CONTEXT.json"
                       ]
 }
