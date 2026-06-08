@@ -705,6 +705,7 @@ MainWindow::MainWindow(QWidget* parent)
 
   connectController(m_controller);
   connectCanvasSignals(m_canvasWidget);
+  connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, &MainWindow::updateWindowTitle);
 
   onToolStateChanged();
   updateUndoRedoState();
@@ -2608,7 +2609,8 @@ void MainWindow::updateWindowTitle() {
   const QString name = m_currentFilePath.isEmpty()
       ? QString::fromUtf8(u8"無題")
       : QFileInfo(m_currentFilePath).fileName();
-  setWindowTitle(QString("%1%2 — Painting-app").arg(dirty ? "*" : "", name));
+  const int zoom = m_canvasWidget ? m_canvasWidget->zoomPercent() : 100;
+  setWindowTitle(QString("%1%2 — Painting-app — %3%").arg(dirty ? "*" : "", name).arg(zoom));
   // アクティブドキュメントタブのタイトルを更新
   if (m_activeDocIndex >= 0 && m_activeDocIndex < (int)m_documents.size()) {
     const QString label = tabLabelForDocument(m_activeDocIndex);
