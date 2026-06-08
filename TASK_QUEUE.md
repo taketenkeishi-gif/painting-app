@@ -967,7 +967,8 @@ cmake --build build --config Release
 LayerItemDelegate に createEditor/setEditorData/setModelData/updateEditorGeometry を追加、EダブルクリチE�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�で layerNameRect エリアに QLineEdit 出現、Enter で renameLayer 呼び出し、Escape で自動復允E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�E��E�E�E�E�E�E�E�E�E�E�E�E�E�E�E�Ecmake --build Release エラー0件、E
 ---
 ## task-31
-status: pending
+status: review_required
+summary_jp: CanvasWidget ミドルボタンパン機能を確認。m_isPanning・m_panStartPos・Qt::MiddleButton の mousePressEvent/Move/Release ハンドリングが完全実装済みであることを確認。
 attempt: 1
 priority: high
 role: developer

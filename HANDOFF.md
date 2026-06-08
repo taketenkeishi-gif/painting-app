@@ -1,9 +1,33 @@
 # HANDOFF
-更新: 06/08/2026 11:30:00
+更新: 06/08/2026 12:00:00
 worker: worker-b-sonnet
-ctx: task-30 完了確認 → review_required
+ctx: task-31 実装確認 → review_required
 
-## 完了タスク: task-30
+## 完了タスク: task-31
+CanvasWidget ミドルボタンパン機能の確認
+
+### 実施内容
+`src/app/canvasview/CanvasWidget.cpp` のミドルボタンパン実装を調査・確認:
+- `mousePressEvent`: Qt::MiddleButton で `state.panning=true`, `state.temporaryMiddlePan=true`, `setCursor(ClosedHandCursor)` を設定済み
+- `mouseMoveEvent`: `state.panning && state.temporaryMiddlePan && (buttons & Qt::MiddleButton)` 条件でパンオフセット更新・`viewTransformChanged` emit を実装済み
+- `mouseReleaseEvent`: `Qt::MiddleButton` release で `panning/temporaryMiddlePan/m_isPanning` をリセット済み
+- `updateCursorForState`: `state.temporaryMiddlePan` 時に `Qt::ClosedHandCursor` を設定済み
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- ミドルボタンパン機能は前コミットで既に完全実装済みであることを確認
+
+### 次のworkerへ
+- UIの変更なし（実装確認のみ）
+- `.\launch.bat` 起動してミドルボタンドラッグでキャンバスがパンできることを目視確認推奨
+- ミドルボタン押下中に `Qt::ClosedHandCursor`、リリース後に通常ツールカーソルに戻ることを確認
+
+---
+
+<!-- 以下は前回のタスク記録 -->
+
+
+## 完了タスク: task-30 (前回)
 LayerPanel インライン名前編集
 
 ### 実施内容
