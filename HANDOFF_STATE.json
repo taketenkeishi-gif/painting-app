@@ -1,5 +1,5 @@
 ﻿{
-    "updated_at":  "2026-06-08T11:02:55.5046168+09:00",
+    "updated_at":  "2026-06-08T11:03:29.0551853+09:00",
     "next_steps":  [
                        "未コミット変更を確認・コミット実行"
                    ],
@@ -8,7 +8,8 @@
                          "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 cmake --build build --config Rele",
                          "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 powershell -Command \"\n(Get-Conten",
                          "python3 -c \"\nimport re\n\npath = r\u0027C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUE",
-                         "python3 -c \"\npath = r\u0027C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md\u0027\nwith"
+                         "python3 -c \"\npath = r\u0027C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md\u0027\nwith",
+                         "cd \"C:\\Users\\Keishi\\Portfolio\\Painting-app\" \u0026\u0026 git add src/app/panels/ToolProper"
                      ],
     "current_files":  [
                           {
@@ -38,6 +39,10 @@
                           {
                               "path":  "*.md",
                               "reason":  "調査"
+                          },
+                          {
+                              "path":  "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF.md",
+                              "reason":  "修正"
                           }
                       ],
     "decisions":  [
@@ -51,19 +56,22 @@
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\TASK_QUEUE.md",
                                "## task-29",
                                "C:\\Users\\Keishi\\Portfolio\\Painting-app\\.claude\\HANDOFF.md",
-                               "*.md"
+                               "*.md",
+                               "C:\\Users\\Keishi\\Portfolio\\Painting-app\\HANDOFF.md"
                            ],
     "task_id":  "task-29",
     "last_worker":  "worker-b-sonnet",
-    "git_commit":  "23c30df48f77cbaea5ac671fe5818957ee70b3bd",
-    "last_reasoning":  "HANDOFF.md を更新してコミットします。",
+    "git_commit":  "51e1334b72b77caeeebc1d6fb86cd45f1fec51b0",
+    "last_reasoning":  "task-29 完了しました。\n\n**変更内容:**\n- `ToolPropertyPanel.cpp` の `refreshFromController()` に `isBrushTool` フラグを追加\n- `m_flowLabel / m_flowSlider / m_flowSpin` の表示を `supportsFlow \u0026\u0026 isBrushTool` に制限\n- `m_brushDynamicsSection` と `showPressure` の表示条件も同様に更新\n- `onFlowSliderChanged` 内の不要な `qDebug` 出力を削除\n- ビルドエラー 0 件確認、コミット完了\n\n**次のworkerへ:** UIの変更あり → `.\\launch.bat` 起動後、ブラシ選択時にFlowが表示され、消しゴム/直線ツール切替時に非表示になることを目視確認し",
     "completed":  [
                       "Modified: ToolPropertyPanel.cpp",
                       "Modified: HANDOFF_STATE.json",
-                      "Build: cmake --build 実行済み"
+                      "Modified: HANDOFF.md",
+                      "Build: cmake --build 実行済み",
+                      "Commit: git commit 実行済み"
                   ],
-    "git_diff_summary":  " .scheduler/CURRENT_STATE.json        |  26 +++---\n .scheduler/daemon.log                |  16 ++++\n .scheduler/worker_progress.json      |  22 ++---\n .scheduler/worker_runtime.json       |  10 +--\n .scheduler/worker_state.json         |   4 +-\n HANDOFF_STATE.json                   |  66 +++++++-------\n STATUS_REPORT.md                     |  11 +--\n TASK_CONTEXT.json                    | 170 ++++++++++++++++++-----------------\n TASK_QUEUE.md                        |   3 +-\n src/app/panels/ToolPropertyPanel.cpp |  12 +--\n 10 files changed, 187 insertions(+), 153 deletions(-)",
+    "git_diff_summary":  " .scheduler/CURRENT_STATE.json   |  18 ++---\n .scheduler/daemon.log           |  16 ++++\n .scheduler/worker_progress.json |  18 ++---\n .scheduler/worker_runtime.json  |   8 +-\n .scheduler/worker_state.json    |   4 +-\n HANDOFF_STATE.json              |  24 ++++--\n STATUS_REPORT.md                |  11 +--\n TASK_CONTEXT.json               | 170 +++++++++++++++++++++-------------------\n 8 files changed, 152 insertions(+), 117 deletions(-)",
     "objective":  "",
     "blocked_reason":  "",
-    "current_phase":  "analyzing"
+    "current_phase":  "committing"
 }

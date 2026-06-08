@@ -3,12 +3,12 @@
     "error_msg": null,
     "status": "rate_limited",
     "reset_at": "2026-06-08T02:30:00.0000000+00:00",
-    "checked_at": "2026-06-08T10:53:37.5276726+09:00"
+    "checked_at": "2026-06-08T10:59:16.4486787+09:00"
   },
   "worker-b-sonnet": {
     "error_msg": null,
     "status": "working",
     "reset_at": "2026-06-08T02:40:00.0000000+00:00",
-    "checked_at": "2026-06-08T10:53:31.3249666+09:00"
+    "checked_at": "2026-06-08T10:59:08.0813740+09:00"
   }
 }
