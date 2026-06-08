@@ -860,7 +860,8 @@ Fix task-20 -- supervisor detected fake success: No files modified despite succe
 30-60 min
 
 ## task-28
-status: pending
+status: review_required
+summary_jp: LayerPanel の下部に QHBoxLayout で (+) と (-) ボタンを追加し、(+) は addLayer()、(-) は removeLayer() に接続。選択なし・用紙選択時は (-) を disabled にする refreshButtonState() 処理も実装済み。
 attempt: 1
 priority: high
 role: developer

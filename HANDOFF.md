@@ -1,7 +1,36 @@
 # HANDOFF
-更新: 06/08/2026 11:45:00
+更新: 06/08/2026 11:55:00
 worker: worker-b-sonnet
-ctx: task-27 完了 → review_required
+ctx: task-28 完了 → review_required
+
+## 完了タスク: task-28
+LayerPanel (+)(-) クイックボタン追加
+
+### 実施内容
+`src/app/panels/LayerPanel.cpp` / `.h` に (+)(-) ボタンを実装済み確認:
+- `m_quickAddButton('+')` / `m_quickRemoveButton('-')` をコンストラクタで生成・スタイル適用
+- `styleQuickButton` ラムダで両ボタンにダークテーマ統一スタイル適用
+- `QHBoxLayout quickButtonRow` に両ボタンを配置、メイン VBoxLayout の末尾に追加
+- `onQuickAddClicked`: `m_controller->addLayer()` 呼び出し（ラスタレイヤーデフォルト追加）
+- `onQuickRemoveClicked`: `currentItem` の `layerIndex` を取得して `removeLayer()` 呼び出し
+- `refreshButtonState()`: `m_quickRemoveButton->setEnabled(hasSelection && !paperSelected && canDelete)`
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- 実装経路確認: constructor → connect → onQuickAddClicked/onQuickRemoveClicked → AppController
+- 用紙レイヤー選択時・未選択時に (-) が disabled になる条件確認済み
+
+### 次のworkerへ
+- UIの変更あり（LayerPanel 下部に (+)(-) ボタン）→ `.\launch.bat` 起動し目視確認が必要
+- (+) クリックでラスターレイヤーが追加されることを確認
+- (-) クリックで選択中レイヤーが削除されることを確認
+- レイヤー未選択時・用紙選択時に (-) が disabled になることを確認
+
+---
+
+<!-- 以下は前回のタスク記録 -->
+
+
 
 ## 完了タスク: task-27
 CanvasWidget パステボード移動時の canvasPositionChanged emit 漏れバグ修正
