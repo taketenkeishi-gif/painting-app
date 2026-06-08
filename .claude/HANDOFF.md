@@ -27,6 +27,12 @@ MSVC: Visual Studio 2022 Community (v14.44)
 
 ## 完了済み
 
+### task-32: MainWindow Ctrl+0=fitToScreen, Ctrl+1=resetZoom(100%) ショートカット確認
+- `MainWindow.cpp` 行1246-1247: `m_resetZoomAction->setShortcut(Qt::CTRL | Qt::Key_1)` / `m_fitToScreenAction->setShortcut(Qt::CTRL | Qt::Key_0)` を確認
+- CanvasWidget の `resetZoom()` / `fitToScreen()` に正しく接続されていることを確認
+- cmake --build Release エラー 0 件
+- UIの変更あり（ショートカット割り当て変更） → `.\launch.bat` 起動して Ctrl+0/Ctrl+1 を目視確認すること
+
 ### task-23: LayerPanel opacity スライダー同期修正（commit 4a4beba）
 - `LayerPanel::refreshButtonState()` にレイヤーの `opacity()` を直接読んでスライダー・スピン・ラベルを同期する処理を追加
 - `AppController::setLayerOpacity()` / `setLayerBlendMode()` に `emit canvasChanged()` を追加してキャンバス再描画を保証
