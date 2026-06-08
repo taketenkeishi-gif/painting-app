@@ -1,7 +1,31 @@
 # HANDOFF
-更新: 06/08/2026 11:55:00
+更新: 06/08/2026 12:10:00
 worker: worker-b-sonnet
-ctx: task-28 完了 → review_required
+ctx: task-29 完了 → review_required
+
+## 完了タスク: task-29
+ToolPropertyPanel Flow スライダーを BrushTool 選択時のみ表示
+
+### 実施内容
+`src/app/panels/ToolPropertyPanel.cpp` の `refreshFromController()` を修正：
+- `isBrushTool = (m_controller->currentTool() == core::ToolKind::Brush)` を追加
+- `m_flowLabel / m_flowSlider / m_flowSpin` の `setVisible(supportsFlow)` → `setVisible(supportsFlow && isBrushTool)` に変更
+- `m_brushDynamicsSection->setVisible(supportsFlow || ...)` → `(supportsFlow && isBrushTool) || ...` に変更
+- `showPressure = m_showDetails && supportsFlow && isBrushTool` に変更（圧力セクションも Brush 限定）
+- `onFlowSliderChanged` 内の `qDebug` デバッグ出力を削除
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- 実装経路確認: refreshFromController → isBrushTool && supportsFlow → setVisible
+
+### 次のworkerへ
+- UIの変更あり（ToolPropertyPanel Flow 表示制御）→ `.\launch.bat` 起動し目視確認が必要
+- ブラシ選択時に Flow スライダーが表示されること
+- 消しゴム・直線ツール等に切り替えた際に Flow スライダーが非表示になること確認
+
+---
+
+<!-- 以下は前回のタスク記録 -->
 
 ## 完了タスク: task-28
 LayerPanel (+)(-) クイックボタン追加

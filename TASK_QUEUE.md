@@ -895,8 +895,9 @@ cmake --build build --config Release
 
 ---
 ## task-29
-status: pending
+status: review_required
 attempt: 1
+summary_jp: ToolPropertyPanel の Flow スライダーを BrushTool 選択時のみ表示するよう変更。appendLabeledRow() は既存実装を維持し、isBrushTool フラグを追加。qDebug デバッグ出力も削除。
 result: appendLabeledRow() を使用ぁEm_flowSlider めEBrushTool 選択時のみ表示するよう変更。cmake --build エラー 0 件、Epriority: high
 role: developer
 category: feature

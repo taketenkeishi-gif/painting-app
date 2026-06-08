@@ -952,6 +952,7 @@ void ToolPropertyPanel::refreshFromController() {
   const bool supportsOpacity = m_controller->currentToolSupportsOpacity();
   const bool supportsHardness = m_controller->currentToolSupportsHardness();
   const bool supportsFlow = m_controller->currentToolSupportsFlow();
+  const bool isBrushTool = (m_controller->currentTool() == core::ToolKind::Brush);
   const bool supportsSpacing = m_controller->currentToolSupportsSpacing();
   const bool supportsAntiAlias = m_controller->currentToolSupportsAntiAlias();
   const bool supportsStabilization = m_controller->currentToolSupportsStabilization();
@@ -1003,13 +1004,13 @@ void ToolPropertyPanel::refreshFromController() {
   m_hardnessLabel->setVisible(showHardness);
   m_hardnessSlider->setVisible(showHardness);
   m_hardnessSpin->setVisible(showHardness);
-  m_flowLabel->setVisible(supportsFlow);
-  m_flowSlider->setVisible(supportsFlow);
-  m_flowSpin->setVisible(supportsFlow);
+  m_flowLabel->setVisible(supportsFlow && isBrushTool);
+  m_flowSlider->setVisible(supportsFlow && isBrushTool);
+  m_flowSpin->setVisible(supportsFlow && isBrushTool);
   m_spacingLabel->setVisible(m_showDetails && supportsSpacing);
   m_spacingSlider->setVisible(m_showDetails && supportsSpacing);
   m_spacingSpin->setVisible(m_showDetails && supportsSpacing);
-  m_brushDynamicsSection->setVisible(supportsFlow || (m_showDetails && supportsSpacing));
+  m_brushDynamicsSection->setVisible((supportsFlow && isBrushTool) || (m_showDetails && supportsSpacing));
   m_antiAliasCheck->setVisible(showAntiAlias);
   m_stabilizationLabel->setVisible(showStabilization);
   m_stabilizationSlider->setVisible(showStabilization);
@@ -1018,7 +1019,7 @@ void ToolPropertyPanel::refreshFromController() {
   m_velocityCorrectionCheck->setVisible(m_showDetails && supportsVelocityCorrection);
   m_correctionSection->setVisible(
       showAntiAlias || showStabilization || (m_showDetails && (supportsPostCorrection || supportsVelocityCorrection)));
-  const bool showPressure = m_showDetails && supportsFlow;
+  const bool showPressure = m_showDetails && supportsFlow && isBrushTool;
   m_pressureSection->setVisible(showPressure);
   m_pressureSizeCheck->setVisible(showPressure);
   m_pressureSizeMinSlider->setVisible(showPressure);
@@ -1328,7 +1329,6 @@ void ToolPropertyPanel::onFlowSliderChanged(int value) {
   if (m_controller == nullptr || !m_controller->currentToolSupportsFlow()) {
     return;
   }
-  qDebug() << "[ToolPropertyPanel] Flow slider changed:" << value;
   const QSignalBlocker blocker(m_flowSpin);
   m_flowSpin->setValue(value);
   m_controller->setBrushFlow(value);
