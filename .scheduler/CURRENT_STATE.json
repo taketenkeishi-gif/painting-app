@@ -1,25 +1,36 @@
-{
-  "mode": "stopped",
-  "scheduler_alive": false,
-  "worker": "",
-  "worker_label": "",
-  "task_id": "",
-  "task_title": "",
-  "phase": "",
-  "current_action": "",
-  "current_file": "",
-  "last_response_seconds": null,
-  "started_at": null,
-  "files_changed": [],
-  "insertions": 0,
-  "deletions": 0,
-  "manager": {
-    "status": "completed",
-    "generated_total": 0
-  },
-  "rate_limit": {
-    "active": true,
-    "resume_at": "2026-06-07T00:00:00.0000000+00:00"
-  },
-  "updated_at": "2026-06-07T08:56:19.8091232+09:00"
+﻿{
+    "scheduler_alive":  true,
+    "worker_label":  "Claude B · Sonnet",
+    "task_title":  "",
+    "manager":  {
+                    "status":  "completed",
+                    "generated_total":  0
+                },
+    "rate_limit":  {
+                       "active":  true,
+                       "resume_at":  "2026-06-08T02:30:00.0000000+00:00"
+                   },
+    "mode":  "working",
+    "worker":  "worker-b-sonnet",
+    "task_id":  "task-23",
+    "phase":  "completed",
+    "current_action":  "",
+    "current_file":  "TASK_CONTEXT.json",
+    "started_at":  "2026-06-08T10:34:36.5038904+09:00",
+    "insertions":  240,
+    "deletions":  179,
+    "updated_at":  "2026-06-08T10:36:36.8731112+09:00",
+    "code_snippet":  "## 完了済み\n\n### task-23: LayerPanel opacity スライダー同期修正（commit 4a4beba）\n- `LayerPanel::refreshButtonState()` にレイヤーの `opacity()` を直接読んでスライダー・スピン・ラベルを同期する処理を追加\n- `AppController::setLayerOpacity()` / `setLayerBlendMode()` に `emit canvasChanged()` を追加してキャンバス再描画を保証\n- UIの変更あり（カーソル挙動なし、スライダー値変化） → `.\\launch.bat` 起動して opacity スライダーの値同期を目視確認すること\n\n### Phase 0-1: Skia バックエンド整備（commit ff2b231）",
+    "code_snippet_label":  "Edit HANDOFF.md",
+    "last_response_seconds":  120,
+    "files_changed":  [
+                          ".scheduler/CURRENT_STATE.json",
+                          ".scheduler/daemon.log",
+                          ".scheduler/worker_progress.json",
+                          ".scheduler/worker_runtime.json",
+                          ".scheduler/worker_state.json",
+                          "HANDOFF_STATE.json",
+                          "STATUS_REPORT.md",
+                          "TASK_CONTEXT.json"
+                      ]
 }
