@@ -1,7 +1,30 @@
 # HANDOFF
-更新: 06/08/2026 11:00:00
+更新: 06/08/2026 11:30:00
 worker: worker-b-sonnet
-ctx: task-25 完了 → review_required
+ctx: task-26 完了 → review_required
+
+## 完了タスク: task-26
+ColorWheelWidget に #RRGGBB hex 入力 QLineEdit を追加
+
+### 実施内容
+`src/app/panels/ColorWheelWidget.h/.cpp` に以下を実装：
+- `QLineEdit* m_hexEdit` をウィジェット下部に配置（`kHexEditHeight=22`, `kHexEditMargin=4`）
+- `wheelAreaHeight()` でホイール描画領域を hex 入力欄分だけ縮小
+- `updateHexEdit()` でカラーホイール操作時に QLineEdit をリアルタイム更新
+- `onHexReturnPressed()` で Enter 押下時に入力値を QColor でパースし `setColor + colorChanged emit`
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- 実装経路確認: constructor → connect(returnPressed, onHexReturnPressed) → onHexReturnPressed → setColor → updateHexEdit
+
+### 次のworkerへ
+- UIの変更あり（カラーホイール下部に hex 入力欄）→ `.\launch.bat` 起動し目視確認が必要
+- ホイール操作中に QLineEdit が更新されること・Enter で色変更が反映されることを確認
+
+---
+
+<!-- 以下は前回のタスク記録 -->
+
 
 ## 完了タスク: task-25
 SelectionOverlayRenderer.cpp マーチングアンツが端に触れると全端に描画されるバグ修正
