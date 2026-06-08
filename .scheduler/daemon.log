@@ -347,3 +347,33 @@
 [18:34:19][INFO] task-35 コンテキスト生成中...
 [18:34:20][INFO] worker-b-sonnet → task-35 worker 起動
 [18:36:32][WARN] task-35 未コミット変更を検出 (modified=8 untracked=0) → 自動コミット
+[20:26:47][INFO] ===== Scheduler v8 起動 =====
+[20:26:47][INFO] Project    : C:\Users\Keishi\Portfolio\Painting-app
+[20:26:47][INFO] SchedulerDir: C:\Users\Keishi\Portfolio\Painting-app\.scheduler
+[20:26:47][INFO] Workers    : worker-a-sonnet, worker-b-sonnet
+[20:26:47][INFO] worker-a-sonnet: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[20:26:47][INFO] worker-b-sonnet: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_b
+[20:26:47][INFO] worker-a-sonnet キャッシュ期限切れ → 起動時 health check で再確認
+[20:26:47][INFO] worker-b-sonnet キャッシュ期限切れ → 起動時 health check で再確認
+[20:26:47][INFO] 起動時 health check 開始...
+[20:26:47][INFO] worker-a-sonnet ping 実行中...
+[20:26:47][DEBUG] worker-a-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[20:26:50][DEBUG] worker-a-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"b4e
+[20:26:50][INFO] worker-a-sonnet → rate_limited
+[20:26:50][INFO] worker-b-sonnet ping 実行中...
+[20:26:50][DEBUG] worker-b-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_b
+[20:26:53][DEBUG] worker-b-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"58d
+[20:26:53][INFO] worker-b-sonnet → allowed_warning
+[20:26:53][WARN] ===== Crash Recovery 開始 =====
+[20:26:53][WARN] 前回 Phase: running / Task: task-35 / Worker: worker-b-sonnet
+[20:26:53][WARN] ===== Crash Recovery 完了 =====
+[20:26:53][INFO] 次タスク: task-36 [priority=medium complexity=heavy role=developer]
+[20:26:53][DEBUG] worker-a-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_a
+[20:26:55][DEBUG] worker-a-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"03a
+[20:26:55][INFO] worker-b-sonnet キャッシュ利用 (status=allowed_warning age<5min)
+[20:26:55][DEBUG]   [score] worker-b-sonnet base=50 util=unknown bonus=+10 total=60
+[20:26:55][INFO] → 選択: worker-b-sonnet (score=90 role=match complexity=match/heavy)
+[20:26:55][INFO] worker-b-sonnet → task-36 実行開始
+[20:26:55][INFO] task-36 コンテキスト生成中...
+[20:26:57][INFO] worker-b-sonnet → task-36 worker 起動
+[20:29:24][WARN] task-36 未コミット変更を検出 (modified=9 untracked=0) → 自動コミット

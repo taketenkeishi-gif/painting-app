@@ -1,9 +1,9 @@
 ﻿{
-    "started_at":  "2026-06-08T18:34:21.4150300+09:00",
+    "started_at":  "2026-06-08T20:26:58.4018451+09:00",
     "kill_reason":  "",
     "last_event_type":  "result",
-    "last_output_at":  "2026-06-08T18:36:32.0959570+09:00",
+    "last_output_at":  "2026-06-08T20:29:23.6946233+09:00",
     "worker":  "worker-b-sonnet",
     "status":  "completed",
-    "task":  "task-35"
+    "task":  "task-36"
 }

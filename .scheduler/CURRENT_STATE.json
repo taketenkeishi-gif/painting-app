@@ -7,28 +7,29 @@
                     "generated_total":  0
                 },
     "rate_limit":  {
-                       "active":  false,
-                       "resume_at":  null
+                       "active":  true,
+                       "resume_at":  "2026-06-10T19:00:00.0000000+00:00"
                    },
     "mode":  "working",
     "worker":  "worker-b-sonnet",
-    "task_id":  "task-35",
+    "task_id":  "task-36",
     "phase":  "completed",
     "current_action":  "",
     "current_file":  "TASK_CONTEXT.json",
-    "started_at":  "2026-06-08T18:34:21.4150300+09:00",
-    "insertions":  112,
-    "deletions":  108,
-    "updated_at":  "2026-06-08T18:36:32.3655937+09:00",
-    "code_snippet":  "# HANDOFF\n更新: 06/08/2026 19:00:00\nworker: worker-b-sonnet\nctx: task-35 setupStatusBar() リファクタリング確認 → review_required\n\n## 完了タスク: task-35\nMainWindow setupStatusBar() プライベートメソッドへの抽出\n\n### 実施内容\n`src/app/mainwindow/MainWindow.cpp` の statusBar 関連コードを確認:\n- `MainWindow.h` 行153: `void setupStatusBar()` をプライベートメソッドとして宣言済み\n- `MainWindow.cpp` 行1920〜1954: `setupStatusBar()` の実装 — ToolStatusLabel / SubToolStatusLabel / ZoomStatusLabel 等 10 個のラベル生成・`statusBar()-\u003eaddWidget()` 登録コードを集約\n- `MainWindow.cpp` 行1751: `createMenus()` 内から `setupStatusBar()` を呼び出す形に分割済み\n\n### 確認済み\n- cmake --build build --config Release: エラー 0 件\n- リファクタリングは前コミット `8337cd4` で実装済みであることを確認\n\n### 次のworkerへ\n- UI の変更なし（コード整理のみ）→ 目視確認は任意\n- 次タスクへ進む\n\n---\n\n\u003c!-- 以下は前回のタスク記録 --\u003e",
+    "started_at":  "2026-06-08T20:26:58.4018451+09:00",
+    "insertions":  131,
+    "deletions":  98,
+    "updated_at":  "2026-06-08T20:29:23.9677169+09:00",
+    "code_snippet":  "# HANDOFF\n更新: 06/08/2026 20:35:00\nworker: worker-b-sonnet\nctx: task-36 AppController m_dirty → setDirty(bool) リファクタリング確認 → review_required\n\n## 完了タスク: task-36\nAppController m_dirty 直接代入を setDirty(bool) プライベートメソッドに集約\n\n### 実施内容\n`src/app/bridge/AppController.h` / `.cpp` の実装を確認:\n- `AppController.h` 行483: `void dirtyChanged(bool dirty)` シグナル宣言済み\n- `AppController.h` 行486: `void setDirty(bool dirty) noexcept` プライベートメソッド宣言済み\n- `AppController.h` 行172: `markClean()` が `setDirty(false)` を呼び出す形に実装済み\n- `AppController.cpp` 行4460〜4463: `setDirty` 実装 — `m_dirty` が変化した場合のみ `emit dirtyChanged(m_dirty)` する冪等実装\n- `AppController.cpp` 内の `m_dirty = true/false` 直接代入は全て `setDirty()` 経由に置換済み（行308、480、1405、3162）\n\n### 確認済み\n- cmake --build build --config Release: エラー 0 件（コミット 2473aaa で確認済み）\n- 実装経路確認: setDirty → m_dirty 変更確認 → emit dirtyChanged\n\n### 次のworkerへ\n- UIの変更なし（内部リファクタリングのみ）→ 目視確認は不要\n- MainWindow の `dirtyChanged` 接続（updateWindowTitle）は既存コードで実装済みであることを確認推奨\n- 次タスクへ進む\n\n---\n\n\u003c!-- 以下は前回のタスク記録 --\u003e\n更新: 06/08/2026 19:00:00\nworker: worker-b-sonnet\nctx: task-35 setupStatusBar() リファクタリング確認 → review_required",
     "code_snippet_label":  "Edit HANDOFF.md",
-    "last_response_seconds":  131,
+    "last_response_seconds":  146,
     "files_changed":  [
                           ".scheduler/CURRENT_STATE.json",
                           ".scheduler/daemon.log",
                           ".scheduler/worker_progress.json",
                           ".scheduler/worker_runtime.json",
                           ".scheduler/worker_state.json",
+                          "CRASH_REPORT.md",
                           "HANDOFF_STATE.json",
                           "STATUS_REPORT.md",
                           "TASK_CONTEXT.json"

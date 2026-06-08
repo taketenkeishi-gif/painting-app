@@ -1,14 +1,14 @@
 ﻿{
-    "last_message":  "**task-35 完了です。**\n\n実装内容の確認結果：\n- `setupStatusBar()` は前コミット `8337cd4` で既に完全実装済み\n  - `MainWindow.h` 行153: プライベートメソッド宣言\n  - `MainWindow.cpp` 行1920〜1954: 全 statusBar ラベル（10個）の生成・登録コードを分離\n  - `MainWindow.cp",
-    "updated_at":  "2026-06-08T18:36:32.3655937+09:00",
-    "started_at":  "2026-06-08T18:34:21.4150300+09:00",
+    "last_message":  "task-36 の作業を完了しました。\n\n**確認内容:**\n- `AppController.h` に `setDirty(bool)` プライベートメソッドと `dirtyChanged(bool)` シグナルが既に宣言済み（コミット `2473aaa`）\n- `AppController.cpp` で全ての `m_dirty = true/false` 直接代入が `setDirty(tru",
+    "updated_at":  "2026-06-08T20:29:23.9677169+09:00",
+    "started_at":  "2026-06-08T20:26:58.4018451+09:00",
     "last_file_changed":  "TASK_CONTEXT.json",
     "current_action":  "",
     "phase":  "completed",
-    "git_deleted_lines":  108,
-    "task":  "task-35",
-    "git_added_lines":  112,
+    "git_deleted_lines":  98,
+    "task":  "task-36",
+    "git_added_lines":  131,
     "worker":  "worker-b-sonnet",
     "status":  "completed",
-    "git_changed_files":  8
+    "git_changed_files":  9
 }
