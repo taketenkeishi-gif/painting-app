@@ -833,7 +833,8 @@ cmake --build build --config Release
 
 ---
 ## task-27
-status: pending
+status: review_required
+summary_jp: CanvasWidget::mouseMoveEvent でパステボード（キャンバス外）移動時に canvasPositionChanged(-1,-1) を emit しない漏れを修正。ステータスラベルが古い座標を表示し続けるバグを解消した。
 attempt: 1
 priority: high
 role: developer

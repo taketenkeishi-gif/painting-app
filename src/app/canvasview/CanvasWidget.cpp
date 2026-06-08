@@ -655,6 +655,8 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   updateCursorForState(canvasPoint);
   if (canvasPoint.has_value()) {
     emit canvasPositionChanged(canvasPoint->x, canvasPoint->y);
+  } else {
+    emit canvasPositionChanged(-1, -1);
   }
 
   // Ctrl+Space drag → zoom

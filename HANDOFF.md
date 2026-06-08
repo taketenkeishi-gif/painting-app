@@ -1,7 +1,29 @@
 # HANDOFF
-更新: 06/08/2026 11:30:00
+更新: 06/08/2026 11:45:00
 worker: worker-b-sonnet
-ctx: task-26 完了 → review_required
+ctx: task-27 完了 → review_required
+
+## 完了タスク: task-27
+CanvasWidget パステボード移動時の canvasPositionChanged emit 漏れバグ修正
+
+### 実施内容
+`src/app/canvasview/CanvasWidget.cpp` の `mouseMoveEvent` を修正：
+- `canvasPoint.has_value()` が false（パステボード上）の場合に `emit canvasPositionChanged(-1, -1)` が抜けていた
+- `else { emit canvasPositionChanged(-1, -1); }` を追加して、パステボード移動時もステータスラベルが "X: -  Y: -" にリセットされるよう修正
+
+### 確認済み
+- cmake --build Release: エラー 0 件
+- 実装経路確認: mouseMoveEvent → canvasPoint nullopt → emit(-1,-1) → MainWindow slot → m_cursorPosStatusLabel->setText("X: -  Y: -")
+
+### 次のworkerへ
+- UIの変更あり（ステータスバー座標表示）→ `.\launch.bat` 起動し、マウスをキャンバスからパステボードへ移動してステータスバーの座標が "X: -  Y: -" に切り替わることを目視確認
+- leaveEvent での(-1,-1) emit は既存実装済み。今回は mouseMoveEvent の pasteboard case を補完
+
+---
+
+<!-- 以下は前回のタスク記録 -->
+
+
 
 ## 完了タスク: task-26
 ColorWheelWidget に #RRGGBB hex 入力 QLineEdit を追加
