@@ -1,14 +1,14 @@
 ﻿{
-    "last_message":  "task-32が完了しました。\n\n**実施内容:**\n- `MainWindow.cpp` 行1246-1247でショートカットが既に正しく実装済みであることを確認:\n  - `Ctrl+0` → `fitToScreen`（画面に合わせる）\n  - `Ctrl+1` → `resetZoom 100%`\n- `cmake --build build --config Release` でエラー ",
-    "updated_at":  "2026-06-08T18:33:47.2201581+09:00",
-    "started_at":  "2026-06-08T18:30:40.4842740+09:00",
-    "last_file_changed":  "TASK_CONTEXT.json",
+    "last_message":  "Prompt is too long",
+    "updated_at":  "2026-06-08T18:34:14.8387908+09:00",
+    "started_at":  "2026-06-08T18:33:57.3272308+09:00",
+    "last_file_changed":  "TASK_QUEUE.md",
     "current_action":  "",
     "phase":  "completed",
-    "git_deleted_lines":  157,
-    "task":  "task-32",
-    "git_added_lines":  195,
+    "git_deleted_lines":  179,
+    "task":  "task-33",
+    "git_added_lines":  153,
     "worker":  "worker-b-sonnet",
     "status":  "completed",
-    "git_changed_files":  9
+    "git_changed_files":  8
 }

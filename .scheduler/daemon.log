@@ -315,3 +315,20 @@
 [18:30:37][INFO] task-32 コンテキスト生成中...
 [18:30:39][INFO] worker-b-sonnet → task-32 worker 起動
 [18:33:47][WARN] task-32 未コミット変更を検出 (modified=9 untracked=4) → 自動コミット
+[18:33:47][INFO] task-32 自動コミット完了: auto-commit: task-32 (worker=worker-b-sonnet, uncommitted-at-exit)
+[18:33:47][DEBUG] worker-b-sonnet health-ping: ConfigDir=C:\Users\Keishi\Portfolio\Claude_WorkSpace\scheduler_v6\.claude_b
+[18:33:51][DEBUG] worker-b-sonnet first-json: {"type":"system","subtype":"init","cwd":"C:\\Users\\Keishi\\Portfolio\\Claude_WorkSpace\\scheduler_v6","session_id":"2db
+[18:33:51][INFO] worker-b-sonnet タスク後状態: allowed
+[18:33:51][INFO] task-32 supervisor 検証中...
+[18:33:51][INFO] task-32 supervisor → uncertain (Expected files (from TASK_CONTEXT) not in git diff; Files edited but not committed)
+[18:33:51][WARN] task-32 → supervisor UNCERTAIN (human_required) | Expected files (from TASK_CONTEXT) not in git diff; Files edited but not committed
+[18:33:54][INFO] 次タスク: task-33 [priority=high complexity=heavy role=developer]
+[18:33:54][INFO] worker-a-sonnet キャッシュ利用 (status=allowed_warning age<5min)
+[18:33:54][DEBUG]   [score] worker-a-sonnet base=50 util=unknown bonus=+10 total=60
+[18:33:54][INFO] worker-b-sonnet キャッシュ利用 (status=allowed age<5min)
+[18:33:54][DEBUG]   [score] worker-b-sonnet base=90 util=unknown bonus=+10 total=100
+[18:33:54][INFO] → 選択: worker-b-sonnet (score=130 role=match complexity=match/heavy)
+[18:33:54][INFO] worker-b-sonnet → task-33 実行開始
+[18:33:54][INFO] task-33 コンテキスト生成中...
+[18:33:56][INFO] worker-b-sonnet → task-33 worker 起動
+[18:34:15][WARN] task-33 未コミット変更を検出 (modified=9 untracked=0) → 自動コミット
