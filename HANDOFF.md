@@ -1,7 +1,28 @@
 # HANDOFF
-更新: 06/08/2026 12:00:00
+更新: 06/08/2026 19:00:00
 worker: worker-b-sonnet
-ctx: task-31 実装確認 → review_required
+ctx: task-35 setupStatusBar() リファクタリング確認 → review_required
+
+## 完了タスク: task-35
+MainWindow setupStatusBar() プライベートメソッドへの抽出
+
+### 実施内容
+`src/app/mainwindow/MainWindow.cpp` の statusBar 関連コードを確認:
+- `MainWindow.h` 行153: `void setupStatusBar()` をプライベートメソッドとして宣言済み
+- `MainWindow.cpp` 行1920〜1954: `setupStatusBar()` の実装 — ToolStatusLabel / SubToolStatusLabel / ZoomStatusLabel 等 10 個のラベル生成・`statusBar()->addWidget()` 登録コードを集約
+- `MainWindow.cpp` 行1751: `createMenus()` 内から `setupStatusBar()` を呼び出す形に分割済み
+
+### 確認済み
+- cmake --build build --config Release: エラー 0 件
+- リファクタリングは前コミット `8337cd4` で実装済みであることを確認
+
+### 次のworkerへ
+- UI の変更なし（コード整理のみ）→ 目視確認は任意
+- 次タスクへ進む
+
+---
+
+<!-- 以下は前回のタスク記録 -->
 
 ## 完了タスク: task-31
 CanvasWidget ミドルボタンパン機能の確認

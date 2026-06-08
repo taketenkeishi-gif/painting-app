@@ -1039,7 +1039,7 @@ cmake --build build --config Release
 
 ---
 ## task-33
-status: in_progress
+status: review_required
 summary_jp: 実装完了
 attempt: 1
 priority: high
@@ -1103,7 +1103,7 @@ cmake --build build --config Release
 
 ---
 ## task-35
-status: pending
+status: review_required
 attempt: 1
 priority: medium
 role: developer
