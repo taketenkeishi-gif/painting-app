@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <QImage>
@@ -39,6 +40,7 @@
 #include "core/tools/ShapeTool.h"
 #include "core/tools/FreeTransformTool.h"
 #include "core/tools/MoveLayerTool.h"
+#include "core/tools/VectorEditTool.h"
 #include "core/tools/RectSelectionTool.h"
 #include "core/tools/ToolManager.h"
 #include "core/selection/SelectionEngine.h"
@@ -62,6 +64,9 @@ struct LayerViewModel {
   bool locked {false};
   bool alphaLocked {false};
   bool positionLocked {false};
+  uint32_t layerId  {0};   ///< 安定ID（0 = 用紙/未採番）
+  uint32_t parentId {0};   ///< 親フォルダID（0 = ルート）
+  bool selected {false};   ///< マルチ選択セットに含まれているか
 };
 
 struct SubToolViewModel {
@@ -173,6 +178,14 @@ public:
   CanvasOverlayViewModel canvasOverlay() const;
 
   std::vector<LayerViewModel> layerViewModels() const;
+
+  // ── マルチレイヤー選択 ────────────────────────────────────────────────────
+  /// 現在の複数選択セットを置き換える。アクティブレイヤーは変更しない。
+  void setSelectedLayerIds(const std::unordered_set<uint32_t>& ids);
+  /// 現在の複数選択セット（layerId の集合）を返す。
+  const std::unordered_set<uint32_t>& selectedLayerIds() const noexcept { return m_selectedLayerIds; }
+  /// 複数の layerId に対応するレイヤーをまとめて削除する（フォルダは子ごと削除）。
+  bool removeLayersByIds(const std::vector<uint32_t>& ids);
   std::vector<SubToolViewModel> subToolViewModels() const;
   ToolStateViewModel toolState() const noexcept;
 
@@ -184,6 +197,7 @@ public:
   void addRasterLayer();
   void addVectorLayer();
   void addFolderLayer();
+  bool setLayerParent(std::size_t layerIndex, uint32_t newParentId);
   bool duplicateLayer(std::size_t index);
   bool duplicateActiveLayer();
   bool removeLayer(std::size_t index);
@@ -319,6 +333,8 @@ public:
   bool commitTransformSession();
   bool cancelTransformSession();
   bool isInTransformMode() const noexcept;
+  /// VectorEdit ツールで選択中の制御点を削除してアンドゥを記録する。
+  bool deleteSelectedVectorPoints();
   void setCanvasZoom(double zoom);
   void setTransformInterpolation(platform::qt::HighQualityTransform::InterpolationMethod method) noexcept {
     m_transformInterpolation = method;
@@ -496,6 +512,9 @@ private:
     HistoryKind kind {HistoryKind::Stroke};
     std::string actionName {"Stroke"};
     std::size_t layerIndex {0};
+    /// 安定レイヤーID。0 = 未設定（後方互換エントリ）。
+    /// undo/redo 時に ID でレイヤーを検索し、現インデックスを補正する。
+    uint32_t layerId {0};
     std::optional<core::Layer> beforeLayer;
     std::optional<core::Layer> afterLayer;
     bool beforeVisible {true};
@@ -511,9 +530,18 @@ private:
     bool trackSelection {false};
     std::string actionName {"Stroke"};
     std::size_t layerIndex {0};
+    uint32_t layerId {0};  ///< ストローク開始時のレイヤー ID
     std::optional<core::Layer> beforeLayer;
     core::SelectionMask beforeSelection;
   };
+
+  /// 安定ID でレイヤーを検索し、現在のフラット配列インデックスを返す。
+  /// 見つからない場合は std::nullopt。
+  std::optional<std::size_t> findLayerIndexById(uint32_t id) const noexcept;
+
+  /// candidateId が ancestorId の子孫（直接・間接）かどうかを判定する。
+  /// parentId チェーンを辿り、循環は layerCount() でキャップして安全に停止する。
+  bool isDescendantOf(uint32_t candidateId, uint32_t ancestorId) const noexcept;
 
   static bool toolWritesPixels(core::ToolKind kind) noexcept;
   static bool toolWritesSelection(core::ToolKind kind) noexcept;
@@ -560,6 +588,7 @@ private:
   core::GradientTool*      m_gradientTool       {nullptr};
   core::AiSelectTool*      m_aiSelectTool       {nullptr};
   core::FreeTransformTool* m_freeTransformTool  {nullptr};
+  core::VectorEditTool*    m_vectorEditTool     {nullptr};
 
   struct TransformSession {
     std::optional<core::Layer> savedLayer;
@@ -611,6 +640,8 @@ private:
   bool m_shiftModifier {false};
   bool m_ctrlModifier {false};
   bool m_altModifier {false};
+
+  std::unordered_set<uint32_t> m_selectedLayerIds;  ///< マルチ選択中の layerId セット
 
   std::vector<StrokeHistoryEntry> m_undoHistory;
   std::vector<StrokeHistoryEntry> m_redoHistory;

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <unordered_set>
 
 #include <QListWidget>
 #include <QPushButton>
@@ -58,6 +60,8 @@ private slots:
   void onLayerContextMenuRequested(const QPoint& pos);
   void onQuickAddClicked();
   void onQuickRemoveClicked();
+  /// QListWidget の選択セットが変わったとき（Ctrl/Shift クリック含む）
+  void onLayerItemSelectionChanged();
 
 private:
   std::size_t layerIndexFromRow(int row) const;

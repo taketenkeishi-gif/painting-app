@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -142,6 +143,8 @@ QString toolKindSettingsKey(core::ToolKind kind) {
       return QStringLiteral("gradient");
     case core::ToolKind::FreeTransform:
       return QStringLiteral("free_transform");
+    case core::ToolKind::VectorEdit:
+      return QStringLiteral("vector_edit");
     default:
       return QStringLiteral("tool");
   }
@@ -269,6 +272,10 @@ AppController::AppController(QObject* parent)
   m_freeTransformTool = freeTransform.get();
   m_toolManager.registerTool(std::move(freeTransform));
 
+  auto vectorEdit = std::make_unique<core::VectorEditTool>();
+  m_vectorEditTool = vectorEdit.get();
+  m_toolManager.registerTool(std::move(vectorEdit));
+
   // SelectionEngine を ClassicProvider で初期化
   m_selectionEngine.setDocument(&m_document);
   m_selectionEngine.setProvider(std::make_unique<core::ClassicProvider>());
@@ -352,7 +359,9 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
       false,
       true,
       false,
-      true});
+      true,
+      0,    // layerId（用紙は ID なし）
+      0});  // parentId
   for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
     const core::Layer& layer = m_document.layerAt(i);
     models.push_back(LayerViewModel {
@@ -368,9 +377,75 @@ std::vector<LayerViewModel> AppController::layerViewModels() const {
         layer.maskEnabled(),
         layer.locked(),
         layer.alphaLocked(),
-        layer.positionLocked()});
+        layer.positionLocked(),
+        layer.id(),         // layerId
+        layer.parentId()}); // parentId
+    // マルチ選択セットに含まれているかを反映
+    models.back().selected = m_selectedLayerIds.count(layer.id()) > 0;
   }
   return models;
+}
+
+void AppController::setSelectedLayerIds(const std::unordered_set<uint32_t>& ids) {
+  m_selectedLayerIds = ids;
+}
+
+bool AppController::removeLayersByIds(const std::vector<uint32_t>& ids) {
+  if (ids.empty()) {
+    return false;
+  }
+
+  // ── フォルダを選択した場合は子孫も展開する（removeLayer と同じロジック）──
+  std::unordered_set<uint32_t> toDelete(ids.begin(), ids.end());
+  bool expanded = true;
+  while (expanded) {
+    expanded = false;
+    for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
+      const core::Layer& l = m_document.layerAt(i);
+      if (l.isPaperLayer() || l.id() == 0) {
+        continue;
+      }
+      if (toDelete.count(l.parentId()) > 0 && toDelete.count(l.id()) == 0) {
+        toDelete.insert(l.id());
+        expanded = true;
+      }
+    }
+  }
+
+  // ── 現在のインデックスを収集して降順ソート（高インデックスから削除して不変性を保つ）──
+  std::vector<std::size_t> indices;
+  indices.reserve(toDelete.size());
+  for (uint32_t id : toDelete) {
+    const auto opt = findLayerIndexById(id);
+    if (opt.has_value()) {
+      indices.push_back(*opt);
+    }
+  }
+  if (indices.empty()) {
+    return false;
+  }
+
+  std::sort(indices.begin(), indices.end(), std::greater<std::size_t>());
+  // 重複除去（念のため）
+  indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+
+  for (const std::size_t idx : indices) {
+    m_document.removeLayer(idx);
+  }
+
+  // 削除されたIDを選択セットからも除去
+  for (const uint32_t id : toDelete) {
+    m_selectedLayerIds.erase(id);
+  }
+
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  ensureCurrentSubToolCompatibility();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
 }
 
 std::vector<SubToolViewModel> AppController::subToolViewModels() const {
@@ -499,7 +574,15 @@ void AppController::addLayer() {
 
 void AppController::addRasterLayer() {
   ++m_layerCounter;
-  m_document.addRasterLayer("Layer " + std::to_string(m_layerCounter));
+  // アクティブレイヤーがフォルダなら子として配置、そうでなければ兄弟として同じグループに配置
+  uint32_t inheritParentId = 0;
+  if (const core::Layer* prev = m_document.activeLayer()) {
+    inheritParentId = prev->isFolder() ? prev->id() : prev->parentId();
+  }
+  const std::size_t newIdx = m_document.addRasterLayer("Layer " + std::to_string(m_layerCounter));
+  if (inheritParentId != 0) {
+    m_document.layerAt(newIdx).setParentId(inheritParentId);
+  }
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
@@ -510,7 +593,14 @@ void AppController::addRasterLayer() {
 
 void AppController::addVectorLayer() {
   ++m_layerCounter;
-  m_document.addVectorLayer("Vector " + std::to_string(m_layerCounter));
+  uint32_t inheritParentId = 0;
+  if (const core::Layer* prev = m_document.activeLayer()) {
+    inheritParentId = prev->isFolder() ? prev->id() : prev->parentId();
+  }
+  const std::size_t newIdx = m_document.addVectorLayer("Vector " + std::to_string(m_layerCounter));
+  if (inheritParentId != 0) {
+    m_document.layerAt(newIdx).setParentId(inheritParentId);
+  }
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
@@ -521,13 +611,52 @@ void AppController::addVectorLayer() {
 
 void AppController::addFolderLayer() {
   ++m_layerCounter;
-  m_document.addFolderLayer("Folder " + std::to_string(m_layerCounter));
+  // フォルダもアクティブレイヤーのグループに属させる
+  uint32_t inheritParentId = 0;
+  if (const core::Layer* prev = m_document.activeLayer()) {
+    inheritParentId = prev->isFolder() ? prev->id() : prev->parentId();
+  }
+  const std::size_t newIdx = m_document.addFolderLayer("Folder " + std::to_string(m_layerCounter));
+  if (inheritParentId != 0) {
+    m_document.layerAt(newIdx).setParentId(inheritParentId);
+  }
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
   rerender();
   emit layersChanged();
   emit documentChanged();
+}
+
+bool AppController::setLayerParent(std::size_t layerIndex, uint32_t newParentId) {
+  if (layerIndex >= m_document.layerCount()) {
+    return false;
+  }
+  core::Layer& layer = m_document.layerAt(layerIndex);
+  if (layer.parentId() == newParentId) {
+    return false;  // 変更なし
+  }
+  // 循環防止: newParentId が layer の子孫（直接・間接）であれば拒否
+  // （自己参照 layer.id()==newParentId も isDescendantOf で検出される）
+  if (newParentId != 0 && isDescendantOf(newParentId, layer.id())) {
+    return false;
+  }
+
+  const core::Layer before = layer;
+  layer.setParentId(newParentId);
+
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "親フォルダ変更";
+  entry.layerIndex = layerIndex;
+  entry.layerId = layer.id();
+  entry.beforeLayer = before;
+  entry.afterLayer = layer;
+  pushHistoryEntry(std::move(entry));
+
+  emit layersChanged();
+  emit documentChanged();
+  return true;
 }
 
 bool AppController::duplicateLayer(std::size_t index) {
@@ -641,9 +770,50 @@ bool AppController::rasterizeActiveLayer() {
 }
 
 bool AppController::removeLayer(std::size_t index) {
-  if (!m_document.removeLayer(index)) {
+  if (index >= m_document.layerCount()) {
     return false;
   }
+
+  // フォルダを削除する場合は子孫レイヤーも全て削除する（孤立 parentId を残さない）
+  if (m_document.layerAt(index).kind() == core::LayerKind::Folder) {
+    const uint32_t folderId = m_document.layerAt(index).id();
+
+    // 全子孫の ID を収集（BFS: toDelete セットに parentId が含まれていれば追加）
+    std::unordered_set<uint32_t> toDelete;
+    toDelete.insert(folderId);
+    bool added = true;
+    while (added) {
+      added = false;
+      for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
+        const core::Layer& l = m_document.layerAt(i);
+        if (l.isPaperLayer() || l.id() == 0) {
+          continue;
+        }
+        if (toDelete.count(l.parentId()) && !toDelete.count(l.id())) {
+          toDelete.insert(l.id());
+          added = true;
+        }
+      }
+    }
+
+    // インデックスを収集してインデックスの降順で削除（後ろから消すことでシフトを回避）
+    std::vector<std::size_t> indices;
+    indices.reserve(toDelete.size());
+    for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
+      if (toDelete.count(m_document.layerAt(i).id())) {
+        indices.push_back(i);
+      }
+    }
+    std::sort(indices.begin(), indices.end(), std::greater<std::size_t>());
+    for (std::size_t idx : indices) {
+      m_document.removeLayer(idx);
+    }
+  } else {
+    if (!m_document.removeLayer(index)) {
+      return false;
+    }
+  }
+
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
@@ -1919,6 +2089,7 @@ void AppController::beginStroke(int x, int y) {
     }
     pending.trackPixels = true;
     pending.layerIndex = m_document.activeLayerIndex();
+    pending.layerId    = activeLayer->id();  // 安定ID を記録
     pending.beforeLayer = *activeLayer;
   }
   if (toolWritesSelection(activeKind)) {
@@ -2005,6 +2176,7 @@ void AppController::beginStrokeF(float x, float y, float pressure, float tiltX, 
     }
     pending.trackPixels = true;
     pending.layerIndex = m_document.activeLayerIndex();
+    pending.layerId    = activeLayer->id();  // 安定ID を記録
     pending.beforeLayer = *activeLayer;
   }
   if (toolWritesSelection(activeKind)) {
@@ -2139,14 +2311,25 @@ bool AppController::undo() {
   StrokeHistoryEntry entry = std::move(m_undoHistory.back());
   m_undoHistory.pop_back();
 
+  // ── ID ベースのレイヤーインデックス補正 ──────────────────────────────────
+  // layerId != 0 のエントリ（新方式）は ID で現在のインデックスを検索する。
+  // layerId == 0 のエントリ（旧方式）は layerIndex をそのまま使う（後方互換）。
+  if (entry.layerId != 0 &&
+      (entry.kind == HistoryKind::Stroke ||
+       entry.kind == HistoryKind::LayerVisibility ||
+       entry.kind == HistoryKind::StrokeWithSelection)) {
+    const auto foundIndex = findLayerIndexById(entry.layerId);
+    if (!foundIndex.has_value()) {
+      // レイヤーが削除されており復元不能 → 履歴をクリア
+      clearStrokeHistory();
+      return false;
+    }
+    entry.layerIndex = *foundIndex;
+  }
+
   if ((entry.kind == HistoryKind::Stroke || entry.kind == HistoryKind::LayerVisibility ||
        entry.kind == HistoryKind::StrokeWithSelection) &&
       entry.layerIndex >= m_document.layerCount()) {
-    clearStrokeHistory();
-    return false;
-  }
-  if (entry.kind == HistoryKind::LayerOrder &&
-      (entry.beforeIndex >= m_document.layerCount() || entry.afterIndex >= m_document.layerCount())) {
     clearStrokeHistory();
     return false;
   }
@@ -2208,6 +2391,19 @@ bool AppController::redo() {
 
   StrokeHistoryEntry entry = std::move(m_redoHistory.back());
   m_redoHistory.pop_back();
+
+  // ── ID ベースのレイヤーインデックス補正 ──────────────────────────────────
+  if (entry.layerId != 0 &&
+      (entry.kind == HistoryKind::Stroke ||
+       entry.kind == HistoryKind::LayerVisibility ||
+       entry.kind == HistoryKind::StrokeWithSelection)) {
+    const auto foundIndex = findLayerIndexById(entry.layerId);
+    if (!foundIndex.has_value()) {
+      clearStrokeHistory();
+      return false;
+    }
+    entry.layerIndex = *foundIndex;
+  }
 
   if ((entry.kind == HistoryKind::Stroke || entry.kind == HistoryKind::LayerVisibility ||
        entry.kind == HistoryKind::StrokeWithSelection) &&
@@ -2948,6 +3144,7 @@ bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
     case core::ToolKind::Fill:
     case core::ToolKind::Gradient:
     case core::ToolKind::MoveLayer:
+    case core::ToolKind::VectorEdit:
       return true;
     default:
       return false;
@@ -2986,6 +3183,8 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
       return u8"\u30B0\u30E9\u30C7\u30FC\u30B7\u30E7\u30F3";
     case core::ToolKind::FreeTransform:
       return u8"\u5909\u5F62";  // "\u5909\u5F62"
+    case core::ToolKind::VectorEdit:
+      return u8"\u30D9\u30AF\u30BF\u30FC\u7DE8\u96C6";  // "\u30D9\u30AF\u30BF\u30FC\u7DE8\u96C6"
     default:
       return u8"\u64CD\u4F5C";
   }
@@ -2995,6 +3194,42 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
 
 bool AppController::isInTransformMode() const noexcept {
   return m_freeTransformTool != nullptr && m_freeTransformTool->isActive();
+}
+
+bool AppController::deleteSelectedVectorPoints() {
+  if (m_vectorEditTool == nullptr || !m_vectorEditTool->hasSelection()) {
+    return false;
+  }
+
+  core::Layer* activeLayer = m_document.activeLayer();
+  if (activeLayer == nullptr || activeLayer->kind() != core::LayerKind::Vector) {
+    return false;
+  }
+
+  const std::size_t layerIdx = m_document.activeLayerIndex();
+  const uint32_t layerId = activeLayer->id();
+
+  // アンドゥ用スナップショット（削除前）
+  const core::Layer beforeLayer = *activeLayer;
+
+  if (!m_vectorEditTool->deleteSelectedPoints(m_document)) {
+    return false;
+  }
+
+  // アンドゥ履歴に登録
+  StrokeHistoryEntry entry;
+  entry.kind        = HistoryKind::Stroke;
+  entry.actionName  = u8"ベクター点削除";
+  entry.layerIndex  = layerIdx;
+  entry.layerId     = layerId;
+  entry.beforeLayer = beforeLayer;
+  entry.afterLayer  = *activeLayer;
+  pushHistoryEntry(std::move(entry));
+
+  m_pendingStroke.reset();
+  rerender();
+  emit layersChanged();
+  return true;
 }
 
 void AppController::setCanvasZoom(double zoom) {
@@ -3008,10 +3243,98 @@ bool AppController::beginTransformSession() {
     return false;  // \u65E2\u306B\u30BB\u30C3\u30B7\u30E7\u30F3\u4E2D
   }
   core::Layer* active = m_document.activeLayer();
-  if (active == nullptr || active->kind() != core::LayerKind::Raster) {
+  if (active == nullptr) {
+    return false;
+  }
+  if (active->kind() != core::LayerKind::Raster && active->kind() != core::LayerKind::Vector) {
     return false;
   }
 
+  // \u2500\u2500 \u30D9\u30AF\u30BF\u30FC\u30EC\u30A4\u30E4\u30FC\u5909\u5F62 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  if (active->kind() == core::LayerKind::Vector) {
+    const auto& paths = active->vectorPaths();
+    if (paths.empty()) {
+      return false;
+    }
+
+    const core::Size cs = m_document.canvasSize();
+    const int canvasW = cs.width;
+    const int canvasH = cs.height;
+
+    // \u30D9\u30AF\u30BF\u30FC\u70B9\u7FA4\u306E bbox \u3092\u8A08\u7B97
+    float minX = static_cast<float>(canvasW), minY = static_cast<float>(canvasH);
+    float maxX = 0.f, maxY = 0.f;
+    for (const auto& path : paths) {
+      for (const auto& pt : path.points) {
+        if (pt.x < minX) { minX = pt.x; }
+        if (pt.y < minY) { minY = pt.y; }
+        if (pt.x > maxX) { maxX = pt.x; }
+        if (pt.y > maxY) { maxY = pt.y; }
+      }
+    }
+    if (maxX < minX || maxY < minY) {
+      return false;  // \u7A7A\u306E\u70B9\u7FA4
+    }
+
+    // \u5C11\u3057\u30D1\u30C7\u30A3\u30F3\u30B0\u3092\u52A0\u3048\u3066 bbox \u77E9\u5F62\u3092\u78BA\u5B9A
+    constexpr float kPad = 4.f;
+    const int offX  = static_cast<int>(std::floor(minX - kPad));
+    const int offY  = static_cast<int>(std::floor(minY - kPad));
+    const int regW  = static_cast<int>(std::ceil(maxX - minX + kPad * 2.f + 1.f));
+    const int regH  = static_cast<int>(std::ceil(maxY - minY + kPad * 2.f + 1.f));
+    const int clampedOffX = std::max(0, std::min(offX, canvasW - 1));
+    const int clampedOffY = std::max(0, std::min(offY, canvasH - 1));
+    const int clampedW    = std::max(1, std::min(regW, canvasW - clampedOffX));
+    const int clampedH    = std::max(1, std::min(regH, canvasH - clampedOffY));
+
+    // \u30D9\u30AF\u30BF\u30FC\u5185\u5BB9\u3092 QImage \u306B\u30E9\u30B9\u30BF\u30E9\u30A4\u30BA\uFF08\u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u30D7\u30EC\u30D3\u30E5\u30FC\u7528\uFF09
+    QImage floatImg(clampedW, clampedH, QImage::Format_RGBA8888);
+    floatImg.fill(Qt::transparent);
+    {
+      QPainter p(&floatImg);
+      p.setRenderHint(QPainter::Antialiasing, true);
+      for (const auto& path : paths) {
+        if (path.points.size() < 2) { continue; }
+        const int a = static_cast<int>(static_cast<float>(path.color.a) * path.opacity);
+        QPen pen(QColor(path.color.r, path.color.g, path.color.b, a),
+                 static_cast<double>(path.width),
+                 Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        QPolygonF poly;
+        poly.reserve(static_cast<int>(path.points.size()));
+        for (const auto& pt : path.points) {
+          poly << QPointF(static_cast<double>(pt.x - clampedOffX),
+                          static_cast<double>(pt.y - clampedOffY));
+        }
+        p.drawPolyline(poly);
+      }
+      p.end();
+    }
+
+    // \u30BB\u30C3\u30B7\u30E7\u30F3\u4FDD\u5B58\uFF08\u30D9\u30AF\u30BF\u30FC paths \u306F savedLayer \u306B\u4FDD\u6301\uFF09
+    TransformSession session;
+    session.savedLayer      = *active;
+    session.savedSelection  = m_document.selection();
+    session.layerIndex      = m_document.activeLayerIndex();
+    session.floatingImage   = std::move(floatImg);
+    m_transformSession      = std::move(session);
+
+    // \u30D9\u30AF\u30BF\u30FC paths \u3092\u4E00\u6642\u6D88\u53BB\uFF08\u5909\u5F62\u4E2D\u306F\u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u3067\u8868\u793A\uFF09
+    active->clearVectorPaths();
+
+    // FreeTransformTool \u8D77\u52D5\uFF08bbox \u30B5\u30A4\u30BA\u306E dummy PixelBuffer\uFF09
+    core::PixelBuffer dummyBuf(clampedW, clampedH, core::Color::Transparent());
+    m_freeTransformTool->beginSession(std::move(dummyBuf), clampedOffX, clampedOffY, canvasW, canvasH);
+    m_toolManager.setActiveTool(core::ToolKind::FreeTransform);
+
+    rerender();
+    emit canvasChanged();
+    emit overlayChanged();
+    return true;
+  }
+
+  // \u2500\u2500 \u30E9\u30B9\u30BF\u30FC\u30EC\u30A4\u30E4\u30FC\u5909\u5F62\uFF08\u65E2\u5B58\u30ED\u30B8\u30C3\u30AF\uFF09\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const core::SelectionMask& sel = m_document.selection();
   const bool hasSelection = sel.hasSelection();
 
@@ -3111,9 +3434,51 @@ bool AppController::commitTransformSession() {
     p.end();
   }
 
+  // \u2500\u2500 \u30D9\u30AF\u30BF\u30FC\u30EC\u30A4\u30E4\u30FC\u306E\u30B3\u30DF\u30C3\u30C8 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  core::Layer* active = m_document.activeLayer();
+  if (active != nullptr && m_transformSession->savedLayer.has_value() &&
+      m_transformSession->savedLayer->kind() == core::LayerKind::Vector) {
+
+    // \u4FDD\u5B58\u3055\u308C\u3066\u3044\u305F\u5143 paths \u306B\u5909\u63DB\u3092\u9069\u7528
+    const std::vector<core::VectorPath>& origPaths = m_transformSession->savedLayer->vectorPaths();
+    std::vector<core::VectorPath> newPaths;
+    newPaths.reserve(origPaths.size());
+    for (const auto& path : origPaths) {
+      core::VectorPath np;
+      np.color   = path.color;
+      np.width   = path.width;
+      np.opacity = path.opacity;
+      np.points.reserve(path.points.size());
+      for (const auto& pt : path.points) {
+        np.points.push_back(m_freeTransformTool->transformPoint(pt));
+      }
+      newPaths.push_back(std::move(np));
+    }
+    active->vectorPaths() = std::move(newPaths);
+
+    // \u30A2\u30F3\u30C9\u30A5\u5C65\u6B74
+    StrokeHistoryEntry entry;
+    entry.kind        = HistoryKind::Stroke;
+    entry.actionName  = u8"\u5909\u5F62";
+    entry.layerIndex  = m_transformSession->layerIndex;
+    entry.layerId     = active->id();
+    entry.beforeLayer = m_transformSession->savedLayer;
+    entry.afterLayer  = *active;
+    pushHistoryEntry(std::move(entry));
+
+    m_freeTransformTool->cancelSession();
+    m_transformSession.reset();
+    m_toolManager.setActiveTool(m_activeCategoryKind);
+
+    rerender();
+    emit canvasChanged();
+    emit overlayChanged();
+    setDirty(true);
+    return true;
+  }
+
   // \u30A2\u30AF\u30C6\u30A3\u30D6\u30EC\u30A4\u30E4\u30FC\u306B\u5408\u6210\u7D50\u679C\u3092\u30D6\u30EA\u30C3\u30C8
   core::PixelBuffer resultBuf = platform::qt::QtImageConverter::fromQImage(canvas);
-  core::Layer* active = m_document.activeLayer();
   if (active != nullptr && active->kind() == core::LayerKind::Raster) {
     core::PixelBuffer& layerBuf = active->buffer();
     for (int y = 0; y < canvasH; ++y) {
@@ -4084,6 +4449,7 @@ void AppController::finishPendingStrokeHistory() {
       entry.kind = HistoryKind::StrokeWithSelection;
       entry.actionName = pending.actionName;
       entry.layerIndex = layerIndex;
+      entry.layerId    = pending.layerId;
       entry.beforeLayer = *pending.beforeLayer;
       entry.afterLayer = after;
       entry.beforeSelection = pending.beforeSelection;
@@ -4108,6 +4474,7 @@ void AppController::finishPendingStrokeHistory() {
       entry.kind = HistoryKind::Stroke;
       entry.actionName = pending.actionName;
       entry.layerIndex = layerIndex;
+      entry.layerId    = pending.layerId;
       entry.beforeLayer = *pending.beforeLayer;
       entry.afterLayer = after;
       pushHistoryEntry(std::move(entry));
@@ -4131,10 +4498,25 @@ void AppController::finishPendingStrokeHistory() {
 }
 
 void AppController::pushHistoryEntry(StrokeHistoryEntry entry) {
+  // ── layerId の自動補完 ───────────────────────────────────────────────────
+  // layerId が未設定（0）で、かつレイヤー参照を持つエントリには
+  // layerIndex から ID を補完する。LayerOrder / Selection はレイヤー特定不要。
+  if (entry.layerId == 0 &&
+      entry.kind != HistoryKind::LayerOrder &&
+      entry.kind != HistoryKind::Selection &&
+      entry.layerIndex < m_document.layerCount()) {
+    entry.layerId = m_document.layerAt(entry.layerIndex).id();
+  }
+
   if (entry.kind == HistoryKind::LayerVisibility && !m_undoHistory.empty()) {
     StrokeHistoryEntry& last = m_undoHistory.back();
+    // 同一レイヤーへの連続 visibility トグルを 1 エントリに統合する。
+    // layerId が両方設定されていれば ID で比較、そうでなければ index で比較。
+    const bool sameLayer = (entry.layerId != 0 && last.layerId != 0)
+        ? (last.layerId == entry.layerId)
+        : (last.layerIndex == entry.layerIndex);
     if (last.kind == HistoryKind::LayerVisibility &&
-        last.layerIndex == entry.layerIndex &&
+        sameLayer &&
         last.afterVisible == entry.beforeVisible) {
       last.afterVisible = entry.afterVisible;
       if (last.beforeVisible == last.afterVisible) {
@@ -4150,6 +4532,44 @@ void AppController::pushHistoryEntry(StrokeHistoryEntry entry) {
   }
   m_undoHistory.push_back(std::move(entry));
   m_redoHistory.clear();
+}
+
+std::optional<std::size_t> AppController::findLayerIndexById(uint32_t id) const noexcept {
+  if (id == 0) {
+    return std::nullopt;  // 0 は未採番の番兵値
+  }
+  const std::size_t count = m_document.layerCount();
+  for (std::size_t i = 0; i < count; ++i) {
+    if (m_document.layerAt(i).id() == id) {
+      return i;
+    }
+  }
+  return std::nullopt;
+}
+
+bool AppController::isDescendantOf(uint32_t candidateId, uint32_t ancestorId) const noexcept {
+  // candidateId の parentId チェーンを辿り ancestorId が現れたら true を返す。
+  // layerCount() + 1 回でキャップするため循環があっても安全に停止する。
+  if (candidateId == 0 || ancestorId == 0) {
+    return false;
+  }
+  const std::size_t maxIter = m_document.layerCount() + 1;
+  uint32_t cur = candidateId;
+  for (std::size_t iter = 0; iter < maxIter; ++iter) {
+    if (cur == 0) {
+      return false;  // root に到達
+    }
+    if (cur == ancestorId) {
+      return true;
+    }
+    // cur の parentId を取得
+    const auto idx = findLayerIndexById(cur);
+    if (!idx.has_value()) {
+      return false;  // 存在しないレイヤー
+    }
+    cur = m_document.layerAt(*idx).parentId();
+  }
+  return false;  // サイクルガード到達（循環あり）
 }
 
 void AppController::pushSelectionHistoryIfChanged(const core::SelectionMask& before, const std::string& actionName) {

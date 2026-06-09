@@ -93,6 +93,8 @@ Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
       return dragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor;
     case core::ToolKind::Zoom:
       return Qt::SizeVerCursor;
+    case core::ToolKind::VectorEdit:
+      return dragging ? Qt::SizeAllCursor : Qt::ArrowCursor;
     default:
       return Qt::ArrowCursor;
   }
@@ -506,6 +508,55 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.setPen(QPen(QColor(0, 0, 0, 220), 1.5));
       painter.setBrush(rotActive ? QColor(72, 195, 255) : QColor(200, 230, 255));
       painter.drawEllipse(rotPt, 5.5, 5.5);
+    }
+
+    // ── VectorEdit 制御点オーバーレイ ────────────────────────────────────────
+    if (overlay.toolOverlay.hasVectorEdit && !overlay.toolOverlay.vectorEditPoints.empty()) {
+      const auto& pts   = overlay.toolOverlay.vectorEditPoints;
+      const auto& paths = overlay.toolOverlay.vectorEditPointPath;
+      const auto& sel   = overlay.toolOverlay.vectorEditPointSelected;
+      const int   n     = static_cast<int>(pts.size());
+
+      auto toScreen = [&](const core::FPoint& fp) -> QPointF {
+        return QPointF(target.x() + static_cast<double>(fp.x) * state.zoom,
+                       target.y() + static_cast<double>(fp.y) * state.zoom);
+      };
+
+      // パスごとにポリラインを描画（接続線）
+      int pathCount = 0;
+      for (int i = 0; i < n; ++i) {
+        if (paths[i] > pathCount) { pathCount = paths[i]; }
+      }
+      ++pathCount;
+
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      for (int pi = 0; pi < pathCount; ++pi) {
+        QPolygonF poly;
+        for (int i = 0; i < n; ++i) {
+          if (paths[i] == pi) {
+            poly << toScreen(pts[i]);
+          }
+        }
+        if (poly.size() < 2) { continue; }
+        // 影
+        painter.setPen(QPen(QColor(0, 0, 0, 80), 2.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawPolyline(poly);
+        // 前景
+        painter.setPen(QPen(QColor(100, 200, 255, 180), 1.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawPolyline(poly);
+      }
+
+      // 制御点ハンドル（正方形）
+      painter.setRenderHint(QPainter::Antialiasing, false);
+      for (int i = 0; i < n; ++i) {
+        const QPointF pt = toScreen(pts[i]);
+        const bool selected = (i < static_cast<int>(sel.size())) && sel[i];
+        // 影枠
+        painter.setPen(QPen(QColor(0, 0, 0, 200), 1.5));
+        painter.setBrush(selected ? QColor(72, 195, 255) : QColor(240, 240, 255));
+        painter.drawRect(QRectF(pt.x() - 4.0, pt.y() - 4.0, 8.0, 8.0));
+      }
     }
 
   }
@@ -931,6 +982,15 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
       m_spacePressed = true;
       updateCursorForState(stateFor(this).hasMousePos ? mapToCanvas(stateFor(this).lastMousePos) : std::optional<core::Point> {});
     }
+    update();
+    event->accept();
+    return;
+  }
+  // VectorEdit: Delete/Backspace で選択制御点を削除
+  if (m_controller != nullptr
+      && m_controller->currentTool() == core::ToolKind::VectorEdit
+      && (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)) {
+    m_controller->deleteSelectedVectorPoints();
     update();
     event->accept();
     return;

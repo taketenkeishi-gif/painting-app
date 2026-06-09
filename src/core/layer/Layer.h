@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -117,6 +118,16 @@ public:
   const AdjustmentParams& adjustmentParams() const noexcept { return m_adjParams; }
   void setAdjustmentParams(const AdjustmentParams& p) noexcept { m_adjParams = p; }
 
+  // ── 安定ID / 階層 ─────────────────────────────────────────────────────────
+  /// レイヤー固有の安定ID。Document が採番し、生存中は不変。0 = 未採番。
+  uint32_t id() const noexcept { return m_id; }
+  void setId(uint32_t id) noexcept { m_id = id; }
+
+  /// 親フォルダレイヤーの ID。0 = ルート（親なし）。
+  /// フォルダ階層実装まで使用しないが、フィールドとして確保しておく。
+  uint32_t parentId() const noexcept { return m_parentId; }
+  void setParentId(uint32_t parentId) noexcept { m_parentId = parentId; }
+
 private:
   std::string m_name;
   LayerKind m_kind {LayerKind::Raster};
@@ -134,6 +145,8 @@ private:
   PixelBuffer m_maskBuffer;
   std::vector<VectorPath> m_vectorPaths;
   AdjustmentParams m_adjParams;
+  uint32_t m_id     {0};  ///< 安定ID（Document::addLayer が採番）
+  uint32_t m_parentId {0}; ///< 親フォルダ ID（0 = ルート）
 };
 
 } // namespace core

@@ -15,6 +15,7 @@ enum class ToolKind {
   AiSelect,      ///< AI オブジェクト選択（SAM2 / スマートフラッドフィル）
   Gradient,      ///< グラデーション塗りつぶし
   FreeTransform, ///< 自由変形（Ctrl+T モーダルセッション）
+  VectorEdit,    ///< ベクター制御点編集（選択・移動・削除）
 };
 
 const char* toolKindDisplayName(ToolKind kind) noexcept;

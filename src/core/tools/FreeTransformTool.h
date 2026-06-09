@@ -57,6 +57,11 @@ public:
   float tx()          const noexcept { return m_tx; }
   float ty()          const noexcept { return m_ty; }
   float rot()         const noexcept { return m_rot; }
+  float originX()     const noexcept { return m_originX; }
+  float originY()     const noexcept { return m_originY; }
+
+  /// キャンバス座標 p をアフィン変換して返す（ベクター点のコミット用）。
+  FPoint transformPoint(FPoint p) const noexcept;
 
   /// 元バッファ（プレビュー / コミット用）
   const PixelBuffer& originalBuffer() const noexcept { return m_origBuf; }

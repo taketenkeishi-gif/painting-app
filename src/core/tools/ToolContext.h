@@ -58,6 +58,12 @@ struct ToolOverlayState {
   Color vectorPreviewColor {0, 0, 0, 255};
   float vectorPreviewWidth {2.0f};
 
+  // ベクター制御点編集オーバーレイ（VectorEditTool使用中）
+  bool hasVectorEdit {false};
+  std::vector<FPoint> vectorEditPoints;        ///< 全制御点（パス順に平坦化）
+  std::vector<int>    vectorEditPointPath;     ///< 各点が属するパスインデックス
+  std::vector<bool>   vectorEditPointSelected; ///< 各点の選択状態
+
   OverlayCursorHint cursorHint {OverlayCursorHint::Default};
 
   // FreeTransformTool 変形ボックス

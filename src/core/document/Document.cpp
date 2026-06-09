@@ -56,6 +56,7 @@ std::size_t Document::addLayer(const std::string& name, LayerKind kind) {
   m_layers.emplace_back(finalName, m_canvasSize.width, m_canvasSize.height, kind);
   m_layers.back().setPaperLayer(false);
   m_layers.back().setBlendMode(BlendMode::Normal);
+  m_layers.back().setId(m_nextLayerId++);  // 安定ID を採番
   m_activeLayerIndex = m_layers.size() - 1;
   return m_activeLayerIndex;
 }
@@ -85,6 +86,7 @@ std::size_t Document::duplicateLayer(std::size_t index) {
 
   Layer duplicated = m_layers[index];
   duplicated.setName(duplicated.name() + " Copy");
+  duplicated.setId(m_nextLayerId++);  // 複製レイヤーは新しい ID を得る（元と別物）
   const auto insertPos = m_layers.begin() + static_cast<std::ptrdiff_t>(index + 1);
   m_layers.insert(insertPos, duplicated);
   m_activeLayerIndex = index + 1;

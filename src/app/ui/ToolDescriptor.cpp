@@ -469,7 +469,25 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
                   "ドラッグで放射グラデーションを描画色→透明で適用。")},
           {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
-          "ドラッグでグラデーションをアクティブレイヤーに適用。"}};
+          "ドラッグでグラデーションをアクティブレイヤーに適用。"},
+      ToolDescriptor {
+          core::ToolKind::VectorEdit,
+          "vector_edit",
+          "ベクター編集",
+          {makeSubTool(
+              "vector_edit_default",
+              "制御点編集",
+              []() {
+                BrushPreset p {};
+                p.targetLayerKind = TargetLayerKind::Vector;
+                p.cursorStyle     = CursorStyle::Default;
+                return p;
+              }(),
+              {},
+              "制御点をクリックして選択し、ドラッグで移動。Shift+クリックで複数選択。Delete で削除。")},
+          {},
+          "ベクターレイヤーの制御点を選択・移動・削除します。",
+          "A"}};
 
 }
 

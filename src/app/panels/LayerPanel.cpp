@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
@@ -55,6 +56,10 @@ constexpr int kBlendModeRole = Qt::UserRole + 11;
 constexpr int kPaperRole = Qt::UserRole + 12;
 constexpr int kActiveRole = Qt::UserRole + 13;
 constexpr int kEditTargetRole = Qt::UserRole + 14;  ///< 0=Image, 1=Mask
+constexpr int kLayerIdRole    = Qt::UserRole + 15;  ///< レイヤーの安定ID
+constexpr int kParentIdRole   = Qt::UserRole + 16;  ///< 親フォルダの安定ID（0=ルート）
+constexpr int kDepthRole      = Qt::UserRole + 17;  ///< 階層の深さ（0=ルート）
+constexpr int kIndentWidth    = 16;                 ///< 深さ1段あたりのインデント幅（px）
 
 constexpr int kLayerRowHeight = 36;
 constexpr int kLayerThumbWidth = 34;
@@ -412,8 +417,12 @@ QString layerPaintName(const QModelIndex& index) {
     const bool visible = index.data(kVisibilityRole).toBool();
 
     QColor background = QColor(Qt::transparent);
-    if (selected || active) {
+    if (active) {
+      // アクティブレイヤー（描画対象）: 明るい青
       background = QColor(0x1e, 0x5b, 0x94);
+    } else if (selected) {
+      // マルチ選択中（非アクティブ）: やや暗い青
+      background = QColor(0x15, 0x38, 0x60);
     } else if (option.features.testFlag(QStyleOptionViewItem::Alternate)) {
       background = QColor(0x22, 0x22, 0x22);
     }
@@ -425,17 +434,21 @@ QString layerPaintName(const QModelIndex& index) {
     painter->setPen(QPen(QColor(0x1e, 0x1e, 0x1e), 1));
     painter->drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
 
-    const QRect eyeRect = layerVisibilityRect(rect);
+    // 階層の深さに応じてコンテンツ領域をインデント
+    const int depth = index.data(kDepthRole).toInt();
+    const QRect contentRect = depth > 0 ? rect.adjusted(depth * kIndentWidth, 0, 0, 0) : rect;
+
+    const QRect eyeRect = layerVisibilityRect(contentRect);
     const QIcon eyeIcon = visible ? app::ui::icon(QStringLiteral("visibility"))
                                   : app::ui::icon(QStringLiteral("visibility_off"));
     eyeIcon.paint(painter, eyeRect, Qt::AlignCenter, QIcon::Normal);
 
-    const QRect activeRect = layerActiveRect(rect);
+    const QRect activeRect = layerActiveRect(contentRect);
     if (active) {
       app::ui::icon(QStringLiteral("pen_active")).paint(painter, activeRect, Qt::AlignCenter, QIcon::Normal);
     }
 
-    const QRect thumbRect = layerThumbnailRect(rect);
+    const QRect thumbRect = layerThumbnailRect(contentRect);
     const bool hasMask = index.data(kHasMaskRole).toBool();
     const int editTarget = index.data(kEditTargetRole).toInt();
     const bool editingMask = hasMask && (editTarget == 1);
@@ -454,7 +467,7 @@ QString layerPaintName(const QModelIndex& index) {
     painter->drawRect(thumbRect.adjusted(0, 0, -1, -1));
 
     // Mask thumbnail
-    const QRect maskThumbRect = layerMaskThumbnailRect(rect);
+    const QRect maskThumbRect = layerMaskThumbnailRect(contentRect);
     if (hasMask) {
       const QPixmap maskPm = qvariant_cast<QPixmap>(index.data(Qt::UserRole + 100));
       painter->drawPixmap(maskThumbRect, maskPm);
@@ -478,7 +491,7 @@ QString layerPaintName(const QModelIndex& index) {
     nameFont.setBold(active);
     painter->setFont(nameFont);
     painter->setPen(visible ? QColor(0xd4, 0xd4, 0xd4) : QColor(0x78, 0x78, 0x78));
-    painter->drawText(layerNameRect(rect, hasMask), Qt::AlignVCenter | Qt::AlignLeft, layerPaintName(index));
+    painter->drawText(layerNameRect(contentRect, hasMask), Qt::AlignVCenter | Qt::AlignLeft, layerPaintName(index));
 
     painter->restore();
   }
@@ -610,7 +623,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_filterEdit->setClearButtonEnabled(true);
 
   m_layerList->setAlternatingRowColors(true);
-  m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
+  m_layerList->setSelectionMode(QAbstractItemView::ExtendedSelection);
   m_layerList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
   m_layerList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   m_layerList->setUniformItemSizes(true);
@@ -694,6 +707,11 @@ LayerPanel::LayerPanel(QWidget* parent)
   initButton(m_lockButton, QStringLiteral("lock"), QStringLiteral("ロック"));
   initButton(m_lockAlphaButton, QStringLiteral("lock_alpha"), QStringLiteral("透明保護"));
   initButton(m_lockPositionButton, QStringLiteral("lock_position"), QStringLiteral("位置固定"));
+  // トグルボタンは checkable にして ON/OFF 状態を視覚的に表示する
+  m_clipButton->setCheckable(true);
+  m_lockButton->setCheckable(true);
+  m_lockAlphaButton->setCheckable(true);
+  m_lockPositionButton->setCheckable(true);
   m_upButton->setToolTip(QStringLiteral("選択中レイヤーを上（前面）へ移動"));
   m_downButton->setToolTip(QStringLiteral("選択中レイヤーを下（背面）へ移動"));
 
@@ -866,6 +884,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_quickRemoveButton, &QPushButton::clicked, this, &LayerPanel::onQuickRemoveClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
+  connect(m_layerList, &QListWidget::itemSelectionChanged, this, &LayerPanel::onLayerItemSelectionChanged);
   auto* layerThumbnailRefreshTimer = new QTimer(this);
   layerThumbnailRefreshTimer->setObjectName(QStringLiteral("layerThumbnailRefreshTimer"));
   layerThumbnailRefreshTimer->setSingleShot(true);
@@ -1031,6 +1050,70 @@ void LayerPanel::refreshLayers() {
       return;
     }
   }
+  // 各レイヤーの深さを計算（parentId チェーンを逆向きに辿る、順序非依存、循環安全）
+  //
+  // アルゴリズム:
+  //   1. parentId の高速ルックアップマップを構築
+  //   2. 各レイヤーについて root または計算済みノードに到達するまでチェーンを収集
+  //   3. チェーンの末尾（root 側）から深さを埋めてメモ化
+  //   4. 循環は「チェーン長が全レイヤー数を超えたら停止して 0 にフォールバック」で安全処理
+  //
+  // これにより Document 内のフォルダ/子の並び順に依存しない。
+  std::unordered_map<uint32_t, uint32_t> parentOf;  // layerId → parentId
+  parentOf.reserve(models.size());
+  for (const auto& m : models) {
+    if (!m.paperLayer && m.layerId != 0) {
+      parentOf[m.layerId] = m.parentId;
+    }
+  }
+
+  std::unordered_map<uint32_t, int> idToDepth;
+  idToDepth.reserve(models.size());
+
+  const int kCycleGuard = static_cast<int>(models.size()) + 1;
+
+  for (const auto& m : models) {
+    if (m.paperLayer || m.layerId == 0) {
+      continue;
+    }
+    if (idToDepth.count(m.layerId)) {
+      continue;  // 既に計算済み（別レイヤーのチェーン処理で埋まっている場合）
+    }
+
+    // root または計算済みノードに到達するまでチェーンを積む
+    std::vector<uint32_t> chain;
+    uint32_t cur = m.layerId;
+
+    while (cur != 0 && !idToDepth.count(cur)) {
+      if (static_cast<int>(chain.size()) >= kCycleGuard) {
+        // 循環ガード発動: チェーン内を全て depth=0 に設定してスキップ
+        for (const uint32_t cid : chain) {
+          idToDepth.emplace(cid, 0);
+        }
+        chain.clear();
+        break;
+      }
+      chain.push_back(cur);
+      const auto pit = parentOf.find(cur);
+      cur = (pit != parentOf.end()) ? pit->second : 0;
+    }
+
+    if (chain.empty()) {
+      continue;
+    }
+
+    // チェーンの末尾が接続するノードの深さを決定
+    // cur == 0 の場合は root に到達 → baseDepth = -1（chain.back() の深さは 0）
+    // cur が計算済みの場合 → chain.back() の深さは idToDepth[cur] + 1
+    const int baseDepth = idToDepth.count(cur) ? idToDepth.at(cur) : -1;
+
+    // chain[i] の深さ = baseDepth + 1 + (chain.size() - 1 - i)
+    for (int i = static_cast<int>(chain.size()) - 1; i >= 0; --i) {
+      idToDepth[chain[static_cast<std::size_t>(i)]] =
+          baseDepth + 1 + (static_cast<int>(chain.size()) - 1 - i);
+    }
+  }
+
   for (std::size_t layerIndex = models.size(); layerIndex-- > 0;) {
     const auto& model = models[layerIndex];
     if (hasFilter) {
@@ -1077,6 +1160,17 @@ void LayerPanel::refreshLayers() {
     item->setData(kPaperRole, model.paperLayer);
     item->setData(kActiveRole, model.active);
 
+    // 階層表示用ロール
+    const int itemDepth = (!model.paperLayer && model.layerId != 0)
+        ? [&]() -> int {
+            const auto it = idToDepth.find(model.layerId);
+            return it != idToDepth.end() ? it->second : 0;
+          }()
+        : 0;
+    item->setData(kLayerIdRole,  static_cast<uint>(model.layerId));
+    item->setData(kParentIdRole, static_cast<uint>(model.parentId));
+    item->setData(kDepthRole,    itemDepth);
+
     const QString stateSummary = QStringLiteral("表示:%1  クリップ:%2  マスク:%3  ロック:%4")
                                      .arg(model.visible ? QStringLiteral("ON") : QStringLiteral("OFF"))
                                      .arg(model.clippedToBelow ? QStringLiteral("ON") : QStringLiteral("OFF"))
@@ -1104,6 +1198,24 @@ void LayerPanel::refreshLayers() {
       const int blendIndex = m_blendModeCombo->findData(static_cast<int>(model.blendMode));
       if (blendIndex >= 0) {
         m_blendModeCombo->setCurrentIndex(blendIndex);
+      }
+    }
+  }
+
+  // QSignalBlocker はまだ有効 — setSelected はシグナルを発しない
+  // コントローラの選択セットに基づいてアイテムの選択状態を復元する
+  if (m_controller != nullptr) {
+    const auto& selectedIds = m_controller->selectedLayerIds();
+    if (!selectedIds.empty()) {
+      for (int r = 0; r < m_layerList->count(); ++r) {
+        QListWidgetItem* rowItem = m_layerList->item(r);
+        if (rowItem == nullptr) {
+          continue;
+        }
+        const auto lid = static_cast<uint32_t>(rowItem->data(kLayerIdRole).toUInt());
+        if (lid != 0 && selectedIds.count(lid) > 0) {
+          rowItem->setSelected(true);
+        }
       }
     }
   }
@@ -1152,6 +1264,29 @@ void LayerPanel::onDeleteLayerClicked() {
   if (m_controller == nullptr) {
     return;
   }
+
+  const QList<QListWidgetItem*> selectedItems = m_layerList->selectedItems();
+
+  // マルチ選択時: layerId を収集して一括削除（1回の rerender + layersChanged）
+  if (selectedItems.size() > 1) {
+    std::vector<uint32_t> idsToDelete;
+    idsToDelete.reserve(static_cast<std::size_t>(selectedItems.size()));
+    for (QListWidgetItem* selItem : selectedItems) {
+      if (selItem->data(kPaperRole).toBool()) {
+        continue;
+      }
+      const auto lid = static_cast<uint32_t>(selItem->data(kLayerIdRole).toUInt());
+      if (lid != 0) {
+        idsToDelete.push_back(lid);
+      }
+    }
+    if (!idsToDelete.empty()) {
+      m_controller->removeLayersByIds(idsToDelete);
+    }
+    return;
+  }
+
+  // シングル選択: 従来の動作を維持
   QListWidgetItem* currentItem = m_layerList->currentItem();
   if (currentItem == nullptr) {
     return;
@@ -1248,6 +1383,27 @@ void LayerPanel::onQuickRemoveClicked() {
   if (m_controller == nullptr) {
     return;
   }
+
+  const QList<QListWidgetItem*> selectedItems = m_layerList->selectedItems();
+
+  if (selectedItems.size() > 1) {
+    std::vector<uint32_t> idsToDelete;
+    idsToDelete.reserve(static_cast<std::size_t>(selectedItems.size()));
+    for (QListWidgetItem* selItem : selectedItems) {
+      if (selItem->data(kPaperRole).toBool()) {
+        continue;
+      }
+      const auto lid = static_cast<uint32_t>(selItem->data(kLayerIdRole).toUInt());
+      if (lid != 0) {
+        idsToDelete.push_back(lid);
+      }
+    }
+    if (!idsToDelete.empty()) {
+      m_controller->removeLayersByIds(idsToDelete);
+    }
+    return;
+  }
+
   QListWidgetItem* currentItem = m_layerList->currentItem();
   if (currentItem == nullptr) {
     return;
@@ -1383,6 +1539,30 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
   QAction* toggleLockAction = menu.addAction(app::ui::icon(QStringLiteral("lock")), QStringLiteral("ロック切替"));
   QAction* mergeDownAction = menu.addAction(QStringLiteral("下のレイヤーと結合"));
   QAction* rasterizeAction = menu.addAction(QStringLiteral("ラスタライズ"));
+  menu.addSeparator();
+  // フォルダに移動サブメニュー（フォルダレイヤーが存在する場合のみ有効）
+  QMenu* moveToFolderMenu = menu.addMenu(app::ui::icon(QStringLiteral("folder")), QStringLiteral("フォルダに移動"));
+  {
+    const auto allModels = m_controller->layerViewModels();
+    bool hasFolders = false;
+    for (std::size_t mi = 0; mi < allModels.size(); ++mi) {
+      const auto& fm = allModels[mi];
+      if (!fm.paperLayer && fm.kind == core::LayerKind::Folder) {
+        hasFolders = true;
+        QAction* folderAction = moveToFolderMenu->addAction(
+            app::ui::icon(QStringLiteral("folder")),
+            QString::fromStdString(fm.name));
+        folderAction->setData(static_cast<uint>(fm.layerId));
+      }
+    }
+    if (hasFolders) {
+      moveToFolderMenu->addSeparator();
+    }
+    // 「フォルダから外す」選択肢（ルートに移動）
+    QAction* removeFromFolderAction = moveToFolderMenu->addAction(QStringLiteral("フォルダから外す（ルートへ）"));
+    removeFromFolderAction->setData(static_cast<uint>(0));
+    moveToFolderMenu->setEnabled(canEditLayer);
+  }
 
   renameAction->setEnabled(canEditLayer);
   duplicateAction->setEnabled(canEditLayer);
@@ -1436,9 +1616,21 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
     onMoveLayerDownClicked();
     return;
   }
-  if (selected == toggleVisibleAction && hasSelection && m_layerList->currentItem() != nullptr) {
-    QListWidgetItem* current = m_layerList->currentItem();
-    current->setCheckState(current->checkState() == Qt::Checked ? Qt::Unchecked : Qt::Checked);
+  if (selected == toggleVisibleAction && hasSelection) {
+    const QList<QListWidgetItem*> visItems = m_layerList->selectedItems();
+    if (visItems.size() > 1) {
+      // マルチ選択: 全選択アイテムの表示を切り替える
+      for (QListWidgetItem* vi : visItems) {
+        const int idx = vi->data(kLayerIndexRole).toInt();
+        if (idx >= 0) {
+          const bool nowVisible = vi->data(kVisibilityRole).toBool();
+          m_controller->setLayerVisible(static_cast<std::size_t>(idx), !nowVisible);
+        }
+      }
+    } else if (m_layerList->currentItem() != nullptr) {
+      QListWidgetItem* current = m_layerList->currentItem();
+      current->setCheckState(current->checkState() == Qt::Checked ? Qt::Unchecked : Qt::Checked);
+    }
     return;
   }
   if (selected == toggleClipAction) {
@@ -1460,6 +1652,15 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
     const int layerIndex = m_layerList->currentItem()->data(kLayerIndexRole).toInt();
     if (layerIndex >= 0) {
       m_controller->rasterizeLayer(static_cast<std::size_t>(layerIndex));
+    }
+    return;
+  }
+  // フォルダに移動サブメニューのアクション
+  if (moveToFolderMenu->actions().contains(selected) && m_layerList->currentItem() != nullptr) {
+    const int layerIndex = m_layerList->currentItem()->data(kLayerIndexRole).toInt();
+    if (layerIndex >= 0) {
+      const uint32_t newParentId = static_cast<uint32_t>(selected->data().toUInt());
+      m_controller->setLayerParent(static_cast<std::size_t>(layerIndex), newParentId);
     }
     return;
   }
@@ -1534,6 +1735,22 @@ int LayerPanel::rowFromLayerIndex(std::size_t layerIndex) const {
   }
   const std::size_t clamped = std::min(layerIndex, count - 1);
   return static_cast<int>(count - 1 - clamped);
+}
+
+void LayerPanel::onLayerItemSelectionChanged() {
+  if (m_controller == nullptr || m_isRefreshing) {
+    return;
+  }
+  // 現在の視覚的選択セットを layerId に変換して AppController に同期する
+  std::unordered_set<uint32_t> ids;
+  for (QListWidgetItem* selItem : m_layerList->selectedItems()) {
+    const auto lid = static_cast<uint32_t>(selItem->data(kLayerIdRole).toUInt());
+    if (lid != 0) {
+      ids.insert(lid);
+    }
+  }
+  m_controller->setSelectedLayerIds(ids);
+  refreshButtonState();
 }
 
 void LayerPanel::refreshButtonState() {
@@ -1625,6 +1842,18 @@ void LayerPanel::refreshButtonState() {
   m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
   m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
   m_quickRemoveButton->setEnabled(hasSelection && !paperSelected && canDelete);
+
+  // トグル状態をボタンの checked 状態に反映（setChecked は clicked を emit しない）
+  {
+    const QSignalBlocker b1(m_clipButton);
+    const QSignalBlocker b2(m_lockButton);
+    const QSignalBlocker b3(m_lockAlphaButton);
+    const QSignalBlocker b4(m_lockPositionButton);
+    m_clipButton->setChecked(clipped);
+    m_lockButton->setChecked(locked);
+    m_lockAlphaButton->setChecked(alphaLocked);
+    m_lockPositionButton->setChecked(positionLocked);
+  }
 
 }
 

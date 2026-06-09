@@ -108,6 +108,14 @@ void FreeTransformTool::cancelSession() {
   m_activeHandle = -1;
 }
 
+FPoint FreeTransformTool::transformPoint(FPoint p) const noexcept {
+  const float lx = p.x - m_originX;
+  const float ly = p.y - m_originY;
+  float cx, cy;
+  toCanvas(lx, ly, cx, cy);
+  return {cx, cy};
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ITool — ポインターイベント
 // ─────────────────────────────────────────────────────────────────────────────

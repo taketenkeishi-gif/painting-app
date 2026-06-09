@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -62,6 +63,7 @@ private:
   int  m_dpi {72};
   std::vector<Layer> m_layers;
   std::size_t m_activeLayerIndex {0};
+  uint32_t m_nextLayerId {1};  ///< 次に採番するレイヤー ID（1始まり、0 = 未採番の番兵値）
   SelectionMask m_selection;
   bool m_paperVisible {true};
   Color m_paperColor {255, 255, 255, 255};
