@@ -16,6 +16,7 @@ enum class ToolKind {
   Gradient,      ///< グラデーション塗りつぶし
   FreeTransform, ///< 自由変形（Ctrl+T モーダルセッション）
   VectorEdit,    ///< ベクター制御点編集（選択・移動・削除）
+  Text,          ///< テキストツール（クリックで文字入力）
 };
 
 const char* toolKindDisplayName(ToolKind kind) noexcept;

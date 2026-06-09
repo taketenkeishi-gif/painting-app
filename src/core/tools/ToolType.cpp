@@ -28,6 +28,10 @@ const char* toolKindDisplayName(ToolKind kind) noexcept {
       return "Gradient";
     case ToolKind::FreeTransform:
       return "Free Transform";
+    case ToolKind::VectorEdit:
+      return "Vector Edit";
+    case ToolKind::Text:
+      return "Text";
     default:
       return "Unknown";
   }

@@ -23,6 +23,7 @@ core::LayerKind kindFromString(const QString& s) noexcept {
     if (s == QStringLiteral("vector"))     return core::LayerKind::Vector;
     if (s == QStringLiteral("folder"))     return core::LayerKind::Folder;
     if (s == QStringLiteral("adjustment")) return core::LayerKind::Adjustment;
+    if (s == QStringLiteral("text"))       return core::LayerKind::Text;
     return core::LayerKind::Raster;
 }
 
@@ -200,6 +201,24 @@ LoadResult loadLpa(const std::string& pathStr) {
         if (kind == core::LayerKind::Adjustment) {
             layer.setAdjustmentParams(
                 deserializeAdjustment(lj["adjustment"].toObject()));
+        }
+
+        // テキストレイヤーデータ
+        if (kind == core::LayerKind::Text) {
+            const QJsonObject tj = lj["textData"].toObject();
+            core::TextData td;
+            td.text       = tj["text"].toString().toStdString();
+            td.fontFamily = tj["fontFamily"].toString(QStringLiteral("Arial")).toStdString();
+            td.fontSize   = tj["fontSize"].toInt(24);
+            td.bold       = tj["bold"].toBool(false);
+            td.italic     = tj["italic"].toBool(false);
+            td.colorR     = tj["colorR"].toInt(0);
+            td.colorG     = tj["colorG"].toInt(0);
+            td.colorB     = tj["colorB"].toInt(0);
+            td.colorA     = tj["colorA"].toInt(255);
+            td.originX    = tj["originX"].toInt(0);
+            td.originY    = tj["originY"].toInt(0);
+            layer.setTextData(td);
         }
 
         doc->insertLoadedLayer(std::move(layer));

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "core/buffer/PixelBuffer.h"
@@ -63,6 +64,11 @@ struct ToolOverlayState {
   std::vector<FPoint> vectorEditPoints;        ///< 全制御点（パス順に平坦化）
   std::vector<int>    vectorEditPointPath;     ///< 各点が属するパスインデックス
   std::vector<bool>   vectorEditPointSelected; ///< 各点の選択状態
+
+  // テキストツール編集オーバーレイ
+  bool        hasTextEdit      {false};
+  Point       textEditOrigin   {0, 0};  ///< 配置原点（キャンバス座標）
+  std::string textEditContent;          ///< 現在入力中のテキスト
 
   OverlayCursorHint cursorHint {OverlayCursorHint::Default};
 

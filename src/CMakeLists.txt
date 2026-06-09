@@ -24,6 +24,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/GradientTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/FreeTransformTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/VectorEditTool.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/TextTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/GenerativeFillEngine.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/OnnxSegEngine.cpp
 )

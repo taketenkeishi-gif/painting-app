@@ -25,6 +25,7 @@ QString kindToString(core::LayerKind k) noexcept {
         case core::LayerKind::Vector:     return QStringLiteral("vector");
         case core::LayerKind::Folder:     return QStringLiteral("folder");
         case core::LayerKind::Adjustment: return QStringLiteral("adjustment");
+        case core::LayerKind::Text:       return QStringLiteral("text");
     }
     return QStringLiteral("raster");
 }
@@ -180,6 +181,24 @@ SaveResult saveLpa(const core::Document& doc, const std::string& pathStr) {
             // 調整レイヤーパラメータ
             if (layer.isAdjustment()) {
                 lj["adjustment"] = serializeAdjustment(layer.adjustmentParams());
+            }
+
+            // テキストレイヤーデータ
+            if (layer.isText()) {
+                const core::TextData& td = layer.textData();
+                QJsonObject tj;
+                tj["text"]       = QString::fromStdString(td.text);
+                tj["fontFamily"] = QString::fromStdString(td.fontFamily);
+                tj["fontSize"]   = td.fontSize;
+                tj["bold"]       = td.bold;
+                tj["italic"]     = td.italic;
+                tj["colorR"]     = td.colorR;
+                tj["colorG"]     = td.colorG;
+                tj["colorB"]     = td.colorB;
+                tj["colorA"]     = td.colorA;
+                tj["originX"]    = td.originX;
+                tj["originY"]    = td.originY;
+                lj["textData"]   = tj;
             }
 
             layersArr.append(lj);

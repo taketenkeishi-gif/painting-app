@@ -487,7 +487,25 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
               "制御点をクリックして選択し、ドラッグで移動。Shift+クリックで複数選択。Delete で削除。")},
           {},
           "ベクターレイヤーの制御点を選択・移動・削除します。",
-          "A"}};
+          "A"},
+      ToolDescriptor {
+          core::ToolKind::Text,
+          "text",
+          "テキスト",
+          {makeSubTool(
+              "text_default",
+              "テキスト入力",
+              []() {
+                BrushPreset p {};
+                p.targetLayerKind = TargetLayerKind::Both;  // 任意レイヤー上で使用可（テキストは独自レイヤーを作成）
+                p.cursorStyle     = CursorStyle::Default;
+                return p;
+              }(),
+              {},
+              "キャンバスをクリックして文字を入力。Enter で改行、Ctrl+Enter / Escape で確定。")},
+          {},
+          "テキストをキャンバスに配置します。",
+          "T"}};
 
 }
 

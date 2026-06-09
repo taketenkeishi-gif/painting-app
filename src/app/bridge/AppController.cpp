@@ -145,6 +145,8 @@ QString toolKindSettingsKey(core::ToolKind kind) {
       return QStringLiteral("free_transform");
     case core::ToolKind::VectorEdit:
       return QStringLiteral("vector_edit");
+    case core::ToolKind::Text:
+      return QStringLiteral("text");
     default:
       return QStringLiteral("tool");
   }
@@ -275,6 +277,77 @@ AppController::AppController(QObject* parent)
   auto vectorEdit = std::make_unique<core::VectorEditTool>();
   m_vectorEditTool = vectorEdit.get();
   m_toolManager.registerTool(std::move(vectorEdit));
+
+  auto textTool = std::make_unique<core::TextTool>();
+  m_textTool = textTool.get();
+  m_textTool->setCommitCallback([this](const std::string& text, core::Point origin, const core::TextTool::TextSettings& settings) {
+    // テキストレイヤーを新規作成してラスタライズ
+    const int docW = m_document.canvasSize().width;
+    const int docH = m_document.canvasSize().height;
+    core::Layer layer(text.empty() ? "Text" : text.substr(0, 20), docW, docH, core::LayerKind::Text);
+    layer.setId(m_document.nextLayerId());
+    m_document.setNextLayerId(m_document.nextLayerId() + 1);
+
+    core::TextData td;
+    td.text       = text;
+    td.fontFamily = settings.fontFamily;
+    td.fontSize   = settings.fontSize;
+    td.bold       = settings.bold;
+    td.italic     = settings.italic;
+    td.colorR     = static_cast<int>(settings.color.r);
+    td.colorG     = static_cast<int>(settings.color.g);
+    td.colorB     = static_cast<int>(settings.color.b);
+    td.colorA     = static_cast<int>(settings.color.a);
+    td.originX    = origin.x;
+    td.originY    = origin.y;
+    layer.setTextData(td);
+
+    // PixelBuffer にラスタライズ（表示用）
+    QImage img(docW, docH, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::transparent);
+    QPainter p(&img);
+    QFont font(QString::fromStdString(settings.fontFamily), settings.fontSize);
+    font.setBold(settings.bold);
+    font.setItalic(settings.italic);
+    font.setStyleStrategy(QFont::PreferAntialias);
+    p.setFont(font);
+    p.setPen(QColor(td.colorR, td.colorG, td.colorB, td.colorA));
+    // 改行を考慮した描画
+    const QString qtext = QString::fromStdString(text);
+    const QFontMetrics fm(font);
+    const int lineH = fm.lineSpacing();
+    int y = origin.y + fm.ascent();
+    for (const QString& line : qtext.split('\n')) {
+      p.drawText(origin.x, y, line);
+      y += lineH;
+    }
+    p.end();
+
+    auto& buf = layer.buffer();
+    for (int row = 0; row < docH; ++row) {
+      const QRgb* src = reinterpret_cast<const QRgb*>(img.constScanLine(row));
+      for (int col = 0; col < docW; ++col) {
+        const QRgb px = src[col];
+        buf.setPixel(col, row, core::Color{
+            static_cast<uint8_t>(qRed(px)),
+            static_cast<uint8_t>(qGreen(px)),
+            static_cast<uint8_t>(qBlue(px)),
+            static_cast<uint8_t>(qAlpha(px))});
+      }
+    }
+
+    const std::size_t insertIdx = m_document.activeLayerIndex() + 1;
+    // Document::addLayer が採番するため insertLoadedLayer は使わない
+    // 直接レイヤーを末尾追加してアクティブ変更
+    m_document.insertLoadedLayer(std::move(layer));
+    m_document.setActiveLayer(m_document.layerCount() - 1);
+    setDirty(true);
+    rerender();
+    emit layersChanged();
+    emit toolStateChanged();
+    static_cast<void>(insertIdx);
+  });
+  m_toolManager.registerTool(std::move(textTool));
 
   // SelectionEngine を ClassicProvider で初期化
   m_selectionEngine.setDocument(&m_document);
@@ -3160,6 +3233,8 @@ bool AppController::toolWritesPixels(core::ToolKind kind) noexcept {
     case core::ToolKind::MoveLayer:
     case core::ToolKind::VectorEdit:
       return true;
+    case core::ToolKind::Text:
+      return false;  // テキストツールはストロークでピクセルを書かない（コミット時にレイヤー生成）
     default:
       return false;
   }
@@ -3199,6 +3274,8 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
       return u8"\u5909\u5F62";  // "\u5909\u5F62"
     case core::ToolKind::VectorEdit:
       return u8"\u30D9\u30AF\u30BF\u30FC\u7DE8\u96C6";  // "\u30D9\u30AF\u30BF\u30FC\u7DE8\u96C6"
+    case core::ToolKind::Text:
+      return u8"\u30C6\u30AD\u30B9\u30C8";  // "\u30C6\u30AD\u30B9\u30C8"
     default:
       return u8"\u64CD\u4F5C";
   }
@@ -3208,6 +3285,43 @@ std::string AppController::actionNameForTool(core::ToolKind kind) {
 
 bool AppController::isInTransformMode() const noexcept {
   return m_freeTransformTool != nullptr && m_freeTransformTool->isActive();
+}
+
+bool AppController::isInTextEditMode() const noexcept {
+  return m_textTool != nullptr && m_textTool->isEditing();
+}
+
+void AppController::dispatchTextInput(const std::string& text) {
+  if (m_textTool != nullptr) {
+    m_textTool->inputText(text);
+    rerender();
+    emit toolStateChanged();
+  }
+}
+
+void AppController::dispatchTextBackspace() {
+  if (m_textTool != nullptr) {
+    m_textTool->inputBackspace();
+    rerender();
+    emit toolStateChanged();
+  }
+}
+
+void AppController::dispatchTextNewline() {
+  if (m_textTool != nullptr) {
+    m_textTool->inputNewline();
+    rerender();
+    emit toolStateChanged();
+  }
+}
+
+void AppController::commitTextEdit() {
+  if (m_textTool != nullptr && m_textTool->isEditing()) {
+    core::ToolContext ctx = makeToolContext();
+    m_textTool->commitText(ctx);
+    rerender();
+    emit toolStateChanged();
+  }
 }
 
 bool AppController::deleteSelectedVectorPoints() {
@@ -3869,7 +3983,8 @@ bool AppController::isSubToolCompatibleWithLayerKind(
     return true;
   }
   if (target == app::ui::TargetLayerKind::Raster) {
-    return layerKind == core::LayerKind::Raster;
+    // Text レイヤーはラスタバッファを持つのでラスタ互換とみなす
+    return layerKind == core::LayerKind::Raster || layerKind == core::LayerKind::Text;
   }
   return layerKind == core::LayerKind::Vector;
 }

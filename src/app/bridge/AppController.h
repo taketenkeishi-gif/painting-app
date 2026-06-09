@@ -40,6 +40,7 @@
 #include "core/tools/ShapeTool.h"
 #include "core/tools/FreeTransformTool.h"
 #include "core/tools/MoveLayerTool.h"
+#include "core/tools/TextTool.h"
 #include "core/tools/VectorEditTool.h"
 #include "core/tools/RectSelectionTool.h"
 #include "core/tools/ToolManager.h"
@@ -337,6 +338,14 @@ public:
   bool isInTransformMode() const noexcept;
   /// VectorEdit ツールで選択中の制御点を削除してアンドゥを記録する。
   bool deleteSelectedVectorPoints();
+  /// テキストツール: 入力中かどうか。
+  bool isInTextEditMode() const noexcept;
+  /// テキストツール: 文字入力を転送する。
+  void dispatchTextInput(const std::string& text);
+  void dispatchTextBackspace();
+  void dispatchTextNewline();
+  /// テキストツール: 確定して文字レイヤーを作成する。
+  void commitTextEdit();
   void setCanvasZoom(double zoom);
   void setTransformInterpolation(platform::qt::HighQualityTransform::InterpolationMethod method) noexcept {
     m_transformInterpolation = method;
@@ -591,6 +600,7 @@ private:
   core::AiSelectTool*      m_aiSelectTool       {nullptr};
   core::FreeTransformTool* m_freeTransformTool  {nullptr};
   core::VectorEditTool*    m_vectorEditTool     {nullptr};
+  core::TextTool*          m_textTool           {nullptr};
 
   struct TransformSession {
     std::optional<core::Layer> savedLayer;

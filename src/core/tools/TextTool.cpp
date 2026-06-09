@@ -70,11 +70,9 @@ ToolOverlayState TextTool::overlay() const {
   ToolOverlayState state;
   if (!m_editing) return state;
 
-  // テキスト中はオーバーレイを通じてキャレット位置を通知
-  // 実際の描画は CanvasWidget が AppController の textToolState() を参照して行う
-  state.hasLine = true;
-  state.lineStart = m_origin;
-  state.lineEnd   = m_origin; // ダミー（CanvasWidget 側で特別処理）
+  state.hasTextEdit    = true;
+  state.textEditOrigin = m_origin;
+  state.textEditContent = m_text;
   return state;
 }
 

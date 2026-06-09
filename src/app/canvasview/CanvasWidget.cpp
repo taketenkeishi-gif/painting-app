@@ -559,6 +559,24 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       }
     }
 
+    // ── テキストツール 入力中オーバーレイ ──────────────────────────────────────
+    if (overlay.toolOverlay.hasTextEdit) {
+      const core::Point& orig = overlay.toolOverlay.textEditOrigin;
+      const QPointF screenOrig(
+          target.x() + static_cast<double>(orig.x) * state.zoom,
+          target.y() + static_cast<double>(orig.y) * state.zoom);
+
+      const QString displayText = QString::fromStdString(overlay.toolOverlay.textEditContent) + QStringLiteral("|");
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      QFont font;
+      font.setPointSizeF(std::max(8.0, 14.0 * state.zoom / 2.0));
+      painter.setFont(font);
+      painter.setPen(QColor(0, 0, 0, 160));
+      painter.drawText(screenOrig + QPointF(1.5, 1.5), displayText);
+      painter.setPen(QColor(255, 255, 255, 240));
+      painter.drawText(screenOrig, displayText);
+    }
+
   }
 
   if (m_showGrid && state.zoom >= 8.0) {
@@ -985,6 +1003,42 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
     update();
     event->accept();
     return;
+  }
+  // TextTool: テキスト入力中のキーイベントを転送
+  if (m_controller != nullptr && m_controller->isInTextEditMode()) {
+    const int key = event->key();
+    // Ctrl+Enter / Escape → 確定
+    if (key == Qt::Key_Escape
+        || (key == Qt::Key_Return && event->modifiers().testFlag(Qt::ControlModifier))
+        || (key == Qt::Key_Enter && event->modifiers().testFlag(Qt::ControlModifier))) {
+      m_controller->commitTextEdit();
+      update();
+      event->accept();
+      return;
+    }
+    // Enter → 改行
+    if (key == Qt::Key_Return || key == Qt::Key_Enter) {
+      m_controller->dispatchTextNewline();
+      update();
+      event->accept();
+      return;
+    }
+    // Backspace → 1文字削除
+    if (key == Qt::Key_Backspace) {
+      m_controller->dispatchTextBackspace();
+      update();
+      event->accept();
+      return;
+    }
+    // 印字可能文字 → 入力
+    const QString text = event->text();
+    if (!text.isEmpty() && text[0].isPrint()) {
+      m_controller->dispatchTextInput(text.toStdString());
+      update();
+      event->accept();
+      return;
+    }
+    // その他キーは通常フローへ
   }
   // VectorEdit: Delete/Backspace で選択制御点を削除
   if (m_controller != nullptr
