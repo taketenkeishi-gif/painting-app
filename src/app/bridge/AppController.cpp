@@ -555,6 +555,20 @@ void AppController::newDocument(int width, int height, int dpi) {
   setDirty(false);
 }
 
+void AppController::replaceDocument(core::Document doc) {
+  m_document = std::move(doc);
+  m_layerCounter = static_cast<int>(m_document.layerCount());
+  ensureCurrentSubToolCompatibility();
+  m_stroking = false;
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+  setDirty(false);
+}
+
 bool AppController::resizeCanvas(int newWidth, int newHeight, int offsetX, int offsetY) {
   if (!m_document.resizeCanvas(newWidth, newHeight, offsetX, offsetY)) {
     return false;

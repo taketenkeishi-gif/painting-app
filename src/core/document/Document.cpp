@@ -237,6 +237,16 @@ bool Document::resizeCanvas(int newWidth, int newHeight, int offsetX, int offset
   return true;
 }
 
+void Document::clearLayersForLoad() noexcept {
+  m_layers.clear();
+  m_activeLayerIndex = 0;
+}
+
+std::size_t Document::insertLoadedLayer(Layer layer) {
+  m_layers.push_back(std::move(layer));
+  return m_layers.size() - 1;
+}
+
 std::string Document::makeDefaultLayerName(std::size_t currentLayerCount) {
   return "Layer " + std::to_string(currentLayerCount + 1);
 }

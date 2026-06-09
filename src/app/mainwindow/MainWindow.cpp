@@ -64,6 +64,8 @@
 #include <QStandardPaths>
 
 #include "app/bridge/AppController.h"
+#include "app/bridge/LpaExporter.h"
+#include "app/bridge/LpaImporter.h"
 #include "app/canvasview/CanvasWidget.h"
 #include "app/panels/AiPanel.h"
 #include "app/ui/Theme.h"
@@ -2768,13 +2770,19 @@ void MainWindow::onOpenTriggered() {
   }
   const QString path = QFileDialog::getOpenFileName(
       this,
-      "画像を開く",
+      "プロジェクトを開く",
       m_currentFilePath.isEmpty() ? QString() : QFileInfo(m_currentFilePath).absolutePath(),
+      "全てのファイル (*.lpa *.png *.jpg *.jpeg *.bmp);;"
+      "LayeredPaintApp プロジェクト (*.lpa);;"
       "画像ファイル (*.png *.jpg *.jpeg *.bmp)");
   if (path.isEmpty()) {
     return;
   }
-  openImageFile(path);
+  if (path.endsWith(QStringLiteral(".lpa"), Qt::CaseInsensitive)) {
+    openLpaFile(path);
+  } else {
+    openImageFile(path);
+  }
 }
 
 void MainWindow::onNewFromClipboardTriggered() {
@@ -2832,7 +2840,13 @@ void MainWindow::onSaveTriggered() {
     onSaveAsTriggered();
     return;
   }
-  if (saveImageFile(m_currentFilePath)) {
+  bool ok = false;
+  if (m_currentFilePath.endsWith(QStringLiteral(".lpa"), Qt::CaseInsensitive)) {
+    ok = saveLpaFile(m_currentFilePath);
+  } else {
+    ok = saveImageFile(m_currentFilePath);
+  }
+  if (ok) {
     statusBar()->showMessage(QString("保存しました: %1").arg(m_currentFilePath), 2500);
   }
 }
@@ -2840,13 +2854,20 @@ void MainWindow::onSaveTriggered() {
 void MainWindow::onSaveAsTriggered() {
   const QString path = QFileDialog::getSaveFileName(
       this,
-      "画像を保存",
+      "プロジェクトを保存",
       m_currentFilePath,
+      "LayeredPaintApp プロジェクト (*.lpa);;"
       "PNG画像 (*.png);;JPEG画像 (*.jpg *.jpeg);;BMP画像 (*.bmp)");
   if (path.isEmpty()) {
     return;
   }
-  if (saveImageFile(path)) {
+  bool ok = false;
+  if (path.endsWith(QStringLiteral(".lpa"), Qt::CaseInsensitive)) {
+    ok = saveLpaFile(path);
+  } else {
+    ok = saveImageFile(path);
+  }
+  if (ok) {
     m_currentFilePath = path;
     pushRecentFile(path);
     statusBar()->showMessage(QString("保存しました: %1").arg(path), 2500);
@@ -3913,6 +3934,43 @@ bool MainWindow::saveImageFile(const QString& path) {
   return true;
 }
 
+bool MainWindow::saveLpaFile(const QString& path) {
+  if (path.isEmpty() || m_controller == nullptr) {
+    return false;
+  }
+  const app::lpa::SaveResult result =
+      app::lpa::saveLpa(m_controller->document(), path.toStdString());
+  if (!result.success) {
+    statusBar()->showMessage(
+        QString("保存に失敗しました: %1").arg(QString::fromStdString(result.error)), 2500);
+    return false;
+  }
+  m_controller->markClean();
+  updateWindowTitle();
+  return true;
+}
+
+bool MainWindow::openLpaFile(const QString& path) {
+  if (path.isEmpty() || m_controller == nullptr) {
+    return false;
+  }
+  app::lpa::LoadResult result = app::lpa::loadLpa(path.toStdString());
+  if (!result.success || result.document == nullptr) {
+    QMessageBox::warning(
+        this,
+        "読み込みエラー",
+        QString("プロジェクトを開けませんでした:\n%1")
+            .arg(QString::fromStdString(result.error)));
+    return false;
+  }
+  m_controller->replaceDocument(std::move(*result.document));
+  m_currentFilePath = path;
+  pushRecentFile(path);
+  statusBar()->showMessage(QString("開きました: %1").arg(path), 2500);
+  updateWindowTitle();
+  return true;
+}
+
 void MainWindow::pushRecentFile(const QString& path) {
   if (path.isEmpty()) {
     return;
@@ -3943,7 +4001,11 @@ void MainWindow::rebuildRecentFilesMenu() {
   for (const QString& path : m_recentFiles) {
     QAction* action = m_recentFilesMenu->addAction(path);
     connect(action, &QAction::triggered, this, [this, path]() {
-      openImageFile(path);
+      if (path.endsWith(QStringLiteral(".lpa"), Qt::CaseInsensitive)) {
+        openLpaFile(path);
+      } else {
+        openImageFile(path);
+      }
     });
   }
   if (m_clearRecentFilesAction != nullptr) {

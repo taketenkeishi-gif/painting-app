@@ -137,6 +137,8 @@ private:
   void relayoutColorHistoryGrid();
   bool openImageFile(const QString& path);
   bool saveImageFile(const QString& path);
+  bool openLpaFile(const QString& path);
+  bool saveLpaFile(const QString& path);
   void pushRecentFile(const QString& path);
   void rebuildRecentFilesMenu();
   void rebuildWorkspaceLayoutsMenu();

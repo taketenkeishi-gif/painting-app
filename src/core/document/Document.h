@@ -56,6 +56,14 @@ public:
   Color paperColor() const noexcept { return m_paperColor; }
   void setPaperColor(Color color) noexcept { m_paperColor = color; }
 
+  // ── プロジェクトロード専用 API ──────────────────────────────────────────
+  uint32_t nextLayerId() const noexcept { return m_nextLayerId; }
+  void setNextLayerId(uint32_t id) noexcept { m_nextLayerId = id; }
+  /// デフォルトレイヤーを消去してロード受け入れ状態にする
+  void clearLayersForLoad() noexcept;
+  /// ID を変更せずにレイヤーを末尾に追加（ロード専用）
+  std::size_t insertLoadedLayer(Layer layer);
+
 private:
   static std::string makeDefaultLayerName(std::size_t currentLayerCount);
 

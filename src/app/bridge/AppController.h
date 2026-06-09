@@ -190,6 +190,8 @@ public:
   ToolStateViewModel toolState() const noexcept;
 
   void newDocument(int width, int height, int dpi = 72);
+  /// ロード済み Document でアプリ状態を完全置換する（LpaImporter 用）
+  void replaceDocument(core::Document doc);
   bool resizeCanvas(int newWidth, int newHeight, int offsetX = 0, int offsetY = 0);
   int  documentDpi() const noexcept { return m_document.dpi(); }
   void setDocumentDpi(int dpi) noexcept { m_document.setDpi(dpi); emit documentChanged(); }

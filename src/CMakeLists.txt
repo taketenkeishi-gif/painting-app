@@ -73,6 +73,8 @@ endif()
 set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AppController.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/LpaExporter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/LpaImporter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/ToolDescriptor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/UiState.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/IconLoader.cpp
@@ -112,6 +114,7 @@ if(PAINT_BUILD_APP)
       paint_core
       paint_qt_platform
       Qt6::Core
+      Qt6::CorePrivate
       Qt6::Gui
       Qt6::Widgets
       Qt6::Network
