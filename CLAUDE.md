@@ -26,6 +26,56 @@ cmake --build build --config Release   # ビルド
 
 ---
 
+## ⚠️ Runtime Verification Rule（最優先）
+
+### 有効な実行ファイル
+
+```
+build\src\Release\LayeredPaintApp.exe  ← ONLY VALID
+```
+
+### 禁止パス
+
+```
+build_cv\src\Release\LayeredPaintApp.exe  ← 禁止
+build-tests\src\Release\LayeredPaintApp.exe  ← 禁止
+その他コピーされた exe  ← 禁止
+```
+
+### UX 検証前の必須確認フォーマット
+
+Claude は UX 検証を依頼する前に、必ず以下を出力すること:
+
+```
+BUILD:
+  path:      build\src\Release\LayeredPaintApp.exe
+  timestamp: YYYY-MM-DD HH:MM:SS
+
+RUNNING:
+  path:      <Get-Process で確認した実際のパス>
+  timestamp: YYYY-MM-DD HH:MM:SS
+
+MATCH: YES / NO
+```
+
+### MATCH = NO の場合
+
+コードデバッグ禁止。
+
+実行パスを正しい `build\src\Release\LayeredPaintApp.exe` に切り替えてから再確認する。
+
+### 確認コマンド
+
+```powershell
+# 実行中プロセスのパス確認
+Get-Process -Name "LayeredPaintApp" | Select-Object Path
+
+# ビルド出力のタイムスタンプ確認
+Get-Item "build\src\Release\LayeredPaintApp.exe" | Select-Object FullName, LastWriteTime
+```
+
+---
+
 ## ディレクトリ構成
 
 ```
