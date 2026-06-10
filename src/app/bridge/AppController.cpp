@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <QBuffer>
+#include <QDebug>
 #include <QFile>
 #include <QImage>
 #include <QPainter>
@@ -660,6 +661,7 @@ void AppController::addLayer() {
 }
 
 void AppController::addRasterLayer() {
+  const std::size_t prevActiveIndex = m_document.activeLayerIndex();
   ++m_layerCounter;
   // アクティブレイヤーがフォルダなら子として配置、そうでなければ兄弟として同じグループに配置
   uint32_t inheritParentId = 0;
@@ -670,15 +672,23 @@ void AppController::addRasterLayer() {
   if (inheritParentId != 0) {
     m_document.layerAt(newIdx).setParentId(inheritParentId);
   }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::LayerAdd;
+  entry.actionName = "レイヤー追加";
+  entry.layerIndex = newIdx;
+  entry.afterLayer = m_document.layerAt(newIdx);
+  entry.beforeIndex = prevActiveIndex;
+  entry.afterIndex = newIdx;
+  pushHistoryEntry(std::move(entry));
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
-  clearStrokeHistory();
   rerender();
   emit layersChanged();
   emit documentChanged();
 }
 
 void AppController::addVectorLayer() {
+  const std::size_t prevActiveIndex = m_document.activeLayerIndex();
   ++m_layerCounter;
   uint32_t inheritParentId = 0;
   if (const core::Layer* prev = m_document.activeLayer()) {
@@ -688,15 +698,23 @@ void AppController::addVectorLayer() {
   if (inheritParentId != 0) {
     m_document.layerAt(newIdx).setParentId(inheritParentId);
   }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::LayerAdd;
+  entry.actionName = "ベクターレイヤー追加";
+  entry.layerIndex = newIdx;
+  entry.afterLayer = m_document.layerAt(newIdx);
+  entry.beforeIndex = prevActiveIndex;
+  entry.afterIndex = newIdx;
+  pushHistoryEntry(std::move(entry));
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
-  clearStrokeHistory();
   rerender();
   emit layersChanged();
   emit documentChanged();
 }
 
 void AppController::addFolderLayer() {
+  const std::size_t prevActiveIndex = m_document.activeLayerIndex();
   ++m_layerCounter;
   // フォルダもアクティブレイヤーのグループに属させる
   uint32_t inheritParentId = 0;
@@ -707,9 +725,16 @@ void AppController::addFolderLayer() {
   if (inheritParentId != 0) {
     m_document.layerAt(newIdx).setParentId(inheritParentId);
   }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::LayerAdd;
+  entry.actionName = "フォルダ追加";
+  entry.layerIndex = newIdx;
+  entry.afterLayer = m_document.layerAt(newIdx);
+  entry.beforeIndex = prevActiveIndex;
+  entry.afterIndex = newIdx;
+  pushHistoryEntry(std::move(entry));
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
-  clearStrokeHistory();
   rerender();
   emit layersChanged();
   emit documentChanged();
@@ -750,10 +775,18 @@ bool AppController::duplicateLayer(std::size_t index) {
   if (index >= m_document.layerCount()) {
     return false;
   }
-  m_document.duplicateLayer(index);
+  const std::size_t prevActiveIndex = m_document.activeLayerIndex();
+  const std::size_t newIdx = m_document.duplicateLayer(index);
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::LayerAdd;
+  entry.actionName = "レイヤー複製";
+  entry.layerIndex = newIdx;
+  entry.afterLayer = m_document.layerAt(newIdx);
+  entry.beforeIndex = prevActiveIndex;
+  entry.afterIndex = newIdx;
+  pushHistoryEntry(std::move(entry));
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
-  clearStrokeHistory();
   rerender();
   emit layersChanged();
   emit documentChanged();
@@ -895,15 +928,29 @@ bool AppController::removeLayer(std::size_t index) {
     for (std::size_t idx : indices) {
       m_document.removeLayer(idx);
     }
+    // フォルダ削除（複数レイヤー一括削除）はアンドゥ対応外のため履歴をクリア
+    ensureCurrentSubToolCompatibility();
+    m_pendingStroke.reset();
+    clearStrokeHistory();
   } else {
+    // 単一レイヤー削除：アンドゥ履歴に記録する
+    const core::Layer removedLayer = m_document.layerAt(index);
     if (!m_document.removeLayer(index)) {
       return false;
     }
+    const std::size_t newActiveIndex = m_document.activeLayerIndex();
+    StrokeHistoryEntry entry;
+    entry.kind = HistoryKind::LayerRemove;
+    entry.actionName = "レイヤー削除";
+    entry.layerIndex = index;
+    entry.beforeLayer = removedLayer;
+    entry.beforeIndex = index;    // 削除前のアクティブ（= 削除対象）
+    entry.afterIndex = newActiveIndex;  // 削除後のアクティブ
+    pushHistoryEntry(std::move(entry));
+    ensureCurrentSubToolCompatibility();
+    m_pendingStroke.reset();
   }
 
-  ensureCurrentSubToolCompatibility();
-  m_pendingStroke.reset();
-  clearStrokeHistory();
   rerender();
   emit toolStateChanged();
   emit layersChanged();
@@ -912,9 +959,21 @@ bool AppController::removeLayer(std::size_t index) {
 }
 
 bool AppController::renameLayer(std::size_t index, const std::string& name) {
+  if (index >= m_document.layerCount()) {
+    return false;
+  }
+  const core::Layer before = m_document.layerAt(index);
   if (!m_document.renameLayer(index, name)) {
     return false;
   }
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "レイヤー名変更";
+  entry.layerIndex = index;
+  entry.layerId = m_document.layerAt(index).id();
+  entry.beforeLayer = before;
+  entry.afterLayer = m_document.layerAt(index);
+  pushHistoryEntry(std::move(entry));
   emit layersChanged();
   return true;
 }
@@ -1013,7 +1072,31 @@ void AppController::setLayerOpacity(std::size_t index, int opacityPercent) {
   if (std::abs(layer.opacity() - normalized) < 0.0001F) {
     return;
   }
+  // 直前が同レイヤーの不透明度変更なら afterLayer だけ更新（スライダードラッグで大量エントリ防止）
+  if (!m_undoHistory.empty()) {
+    StrokeHistoryEntry& last = m_undoHistory.back();
+    if (last.kind == HistoryKind::Stroke &&
+        last.actionName == "不透明度変更" &&
+        last.layerId == layer.id()) {
+      layer.setOpacity(normalized);
+      last.afterLayer = layer;
+      rerender();
+      emit canvasChanged();
+      emit layersChanged();
+      emit documentChanged();
+      return;
+    }
+  }
+  const core::Layer before = layer;
   layer.setOpacity(normalized);
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "不透明度変更";
+  entry.layerIndex = index;
+  entry.layerId = layer.id();
+  entry.beforeLayer = before;
+  entry.afterLayer = layer;
+  pushHistoryEntry(std::move(entry));
   rerender();
   emit canvasChanged();
   emit layersChanged();
@@ -1043,7 +1126,16 @@ void AppController::setLayerBlendMode(std::size_t index, core::BlendMode mode) {
   if (layer.blendMode() == mode) {
     return;
   }
+  const core::Layer before = layer;
   layer.setBlendMode(mode);
+  StrokeHistoryEntry entry;
+  entry.kind = HistoryKind::Stroke;
+  entry.actionName = "ブレンドモード変更";
+  entry.layerIndex = index;
+  entry.layerId = layer.id();
+  entry.beforeLayer = before;
+  entry.afterLayer = layer;
+  pushHistoryEntry(std::move(entry));
   rerender();
   emit canvasChanged();
   emit layersChanged();
@@ -1376,6 +1468,44 @@ std::size_t AppController::addAdjustmentLayerByKind(core::AdjustmentKind kind) {
   return idx;
 }
 
+void AppController::setActiveLayerAdjustmentParams(const core::AdjustmentParams& params) {
+  if (m_document.layerCount() == 0) return;
+  const std::size_t activeIndex = m_document.activeLayerIndex();
+  core::Layer& active = m_document.layerAt(activeIndex);
+  if (!active.isAdjustment()) return;
+
+  const core::Layer before = active;
+  active.setAdjustmentParams(params);
+  const core::Layer after = active;
+
+  // マージアンドゥ: 直前のエントリが同レイヤーの "調整パラメータ変更" なら after を更新
+  if (!m_undoHistory.empty()) {
+    StrokeHistoryEntry& last = m_undoHistory.back();
+    if (last.kind == HistoryKind::Stroke
+        && last.actionName == "調整パラメータ変更"
+        && last.layerId == active.id()) {
+      last.afterLayer = after;
+      rerender();
+      setDirty(true);
+      emit layersChanged();
+      return;
+    }
+  }
+
+  StrokeHistoryEntry entry;
+  entry.kind       = HistoryKind::Stroke;
+  entry.actionName = "調整パラメータ変更";
+  entry.layerIndex = activeIndex;
+  entry.layerId    = active.id();
+  entry.beforeLayer = before;
+  entry.afterLayer  = after;
+  pushHistoryEntry(std::move(entry));
+
+  rerender();
+  setDirty(true);
+  emit layersChanged();
+}
+
 bool AppController::toggleActiveLayerLock() {
   if (m_document.layerCount() == 0) {
     return false;
@@ -1686,6 +1816,79 @@ bool AppController::pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer,
   rerender();
   emit toolStateChanged();
   emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::pasteBufferAsNewRasterLayerAndTransform(
+    const core::PixelBuffer& buffer, const std::string& layerName) {
+  if (buffer.width() <= 0 || buffer.height() <= 0) {
+    return false;
+  }
+  // Cancel any in-progress transform session first.
+  if (isInTransformMode()) {
+    cancelTransformSession();
+  }
+
+  const int canvasW = m_document.canvasSize().width;
+  const int canvasH = m_document.canvasSize().height;
+
+  // ── 新規レイヤー作成（アンドゥ追跡付き）─────────────────────────────────
+  ++m_layerCounter;
+  const std::string name = layerName.empty() ? "貼り付けレイヤー" : layerName;
+  const std::size_t prevIdx = m_document.activeLayerIndex();
+  const std::size_t newIdx  = m_document.addRasterLayer(name);
+
+  core::Layer& layer = m_document.layerAt(newIdx);
+
+  // ── バッファをオリジナルサイズにリサイズ（キャンバスサイズに拡張しない）──
+  // addRasterLayer はキャンバスサイズのバッファを作成するため、
+  // ここで元画像サイズに変更して全ピクセルをコピーする。
+  layer.buffer().resize(buffer.width(), buffer.height(), core::Color::Transparent());
+  for (int y = 0; y < buffer.height(); ++y) {
+    for (int x = 0; x < buffer.width(); ++x) {
+      layer.buffer().setPixel(x, y, buffer.pixel(x, y));
+    }
+  }
+
+  // ── オフセットでキャンバス中央に配置（負値も有効 = 画像がキャンバスより大きい）──
+  layer.setOffset((canvasW - buffer.width()) / 2,
+                  (canvasH - buffer.height()) / 2);
+
+  // ── アンドゥ登録（レイヤー追加、オフセット・バッファ済み状態で記録）────────
+  StrokeHistoryEntry addEntry;
+  addEntry.kind        = HistoryKind::LayerAdd;
+  addEntry.actionName  = "レイヤー貼り付け";
+  addEntry.beforeIndex = prevIdx;
+  addEntry.afterIndex  = newIdx;
+  addEntry.afterLayer  = m_document.layerAt(newIdx);
+  pushHistoryEntry(std::move(addEntry));
+
+  m_document.setActiveLayer(newIdx);
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+
+  // 移動ツールに切り替えてすぐに位置調整できるようにする。
+  m_toolManager.setActiveTool(core::ToolKind::MoveLayer);
+
+  // [DEBUG] paste pipeline verification
+  {
+    const core::Layer& dbgLayer = m_document.layerAt(newIdx);
+    qDebug() << "[PASTE] clipboard source:"
+             << buffer.width() << "x" << buffer.height();
+    qDebug() << "[PASTE] layer buffer   :"
+             << dbgLayer.buffer().width() << "x" << dbgLayer.buffer().height();
+    qDebug() << "[PASTE] layer offset   : offsetX=" << dbgLayer.offsetX()
+             << " offsetY=" << dbgLayer.offsetY();
+    qDebug() << "[PASTE] canvas size    :"
+             << m_document.canvasSize().width << "x" << m_document.canvasSize().height;
+  }
+
+  setDirty(true);
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit canvasChanged();
   emit documentChanged();
   return true;
 }
@@ -2425,6 +2628,16 @@ bool AppController::undo() {
     clearStrokeHistory();
     return false;
   }
+  if (entry.kind == HistoryKind::LayerAdd &&
+      entry.layerIndex >= m_document.layerCount()) {
+    clearStrokeHistory();
+    return false;
+  }
+  if (entry.kind == HistoryKind::LayerRemove &&
+      entry.layerIndex > m_document.layerCount()) {
+    clearStrokeHistory();
+    return false;
+  }
 
   switch (entry.kind) {
     case HistoryKind::Stroke:
@@ -2451,6 +2664,22 @@ bool AppController::undo() {
       m_document.layerAt(entry.layerIndex) = *entry.beforeLayer;
       m_document.selection() = entry.beforeSelection;
       break;
+    case HistoryKind::LayerAdd:
+      // アンドゥ: 追加したレイヤーを削除し、操作前のアクティブレイヤーに戻す
+      m_document.removeLayer(entry.layerIndex);
+      m_document.setActiveLayer(
+          entry.beforeIndex < m_document.layerCount() ? entry.beforeIndex
+                                                       : m_document.layerCount() - 1);
+      break;
+    case HistoryKind::LayerRemove:
+      // アンドゥ: 削除したレイヤーを元のインデックスに再挿入してアクティブにする
+      if (!entry.beforeLayer.has_value()) {
+        clearStrokeHistory();
+        return false;
+      }
+      m_document.insertLayerAt(entry.layerIndex, *entry.beforeLayer);
+      m_document.setActiveLayer(entry.layerIndex);
+      break;
     default:
       break;
   }
@@ -2461,7 +2690,9 @@ bool AppController::undo() {
   m_redoHistory.push_back(std::move(entry));
   rerender();
   if (m_redoHistory.back().kind == HistoryKind::LayerVisibility ||
-      m_redoHistory.back().kind == HistoryKind::LayerOrder) {
+      m_redoHistory.back().kind == HistoryKind::LayerOrder ||
+      m_redoHistory.back().kind == HistoryKind::LayerAdd ||
+      m_redoHistory.back().kind == HistoryKind::LayerRemove) {
     emit layersChanged();
   }
   emit documentChanged();
@@ -2498,6 +2729,16 @@ bool AppController::redo() {
     clearStrokeHistory();
     return false;
   }
+  if (entry.kind == HistoryKind::LayerRemove &&
+      entry.layerIndex >= m_document.layerCount()) {
+    clearStrokeHistory();
+    return false;
+  }
+  if (entry.kind == HistoryKind::LayerAdd &&
+      entry.layerIndex > m_document.layerCount()) {
+    clearStrokeHistory();
+    return false;
+  }
 
   switch (entry.kind) {
     case HistoryKind::Stroke:
@@ -2524,6 +2765,22 @@ bool AppController::redo() {
       m_document.layerAt(entry.layerIndex) = *entry.afterLayer;
       m_document.selection() = entry.afterSelection;
       break;
+    case HistoryKind::LayerAdd:
+      // リドゥ: 追加レイヤーを同じインデックスに再挿入してアクティブにする
+      if (!entry.afterLayer.has_value()) {
+        clearStrokeHistory();
+        return false;
+      }
+      m_document.insertLayerAt(entry.layerIndex, *entry.afterLayer);
+      m_document.setActiveLayer(entry.layerIndex);
+      break;
+    case HistoryKind::LayerRemove:
+      // リドゥ: レイヤーを再削除し、削除後のアクティブレイヤーを復元する
+      m_document.removeLayer(entry.layerIndex);
+      m_document.setActiveLayer(
+          entry.afterIndex < m_document.layerCount() ? entry.afterIndex
+                                                      : m_document.layerCount() - 1);
+      break;
     default:
       break;
   }
@@ -2534,7 +2791,9 @@ bool AppController::redo() {
   m_undoHistory.push_back(std::move(entry));
   rerender();
   if (m_undoHistory.back().kind == HistoryKind::LayerVisibility ||
-      m_undoHistory.back().kind == HistoryKind::LayerOrder) {
+      m_undoHistory.back().kind == HistoryKind::LayerOrder ||
+      m_undoHistory.back().kind == HistoryKind::LayerAdd ||
+      m_undoHistory.back().kind == HistoryKind::LayerRemove) {
     emit layersChanged();
   }
   emit documentChanged();
@@ -3466,55 +3725,88 @@ bool AppController::beginTransformSession() {
   const core::SelectionMask& sel = m_document.selection();
   const bool hasSelection = sel.hasSelection();
 
-  // \u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u9818\u57DF\u306E\u62BD\u51FA\u7BC4\u56F2
-  core::PixelBuffer& buf = active->buffer();
-  const int canvasW = buf.width();
-  const int canvasH = buf.height();
+  // \u30AD\u30E3\u30F3\u30D0\u30B9\u30B5\u30A4\u30BA\u306F\u30C9\u30AD\u30E5\u30E1\u30F3\u30C8\u304B\u3089\u53D6\u5F97\uFF08\u30D0\u30C3\u30D5\u30A1\u30B5\u30A4\u30BA\u3068\u7570\u306A\u308B\u5834\u5408\u304C\u3042\u308B\uFF09
+  const core::Size cs = m_document.canvasSize();
+  const int canvasW = cs.width;
+  const int canvasH = cs.height;
 
-  int offX = 0, offY = 0, regW = canvasW, regH = canvasH;
+  core::PixelBuffer& buf = active->buffer();
+  const int bufW = buf.width();
+  const int bufH = buf.height();
+  // \u30EC\u30A4\u30E4\u30FC\u30AA\u30D5\u30BB\u30C3\u30C8\uFF1A\u30D0\u30C3\u30D5\u30A1\u30ED\u30FC\u30AB\u30EB\u5EA7\u6A19 \u2192 \u30AD\u30E3\u30F3\u30D0\u30B9\u5EA7\u6A19\u3078\u306E\u5909\u63DB\u91CF
+  const int layerOffX = active->offsetX();
+  const int layerOffY = active->offsetY();
+
+  // offX/Y \u306F\u30AD\u30E3\u30F3\u30D0\u30B9\u7A7A\u9593\u3067\u8868\u3059\uFF08beginSession \u306B\u6E21\u3059\u5024\uFF09
+  int offX = layerOffX, offY = layerOffY, regW = bufW, regH = bufH;
+
   if (hasSelection) {
-    // \u9078\u629E\u7BC4\u56F2\u306E\u30D0\u30A6\u30F3\u30C7\u30A3\u30F3\u30B0\u30DC\u30C3\u30AF\u30B9\u3092\u8A08\u7B97
+    // \u9078\u629E\u7BC4\u56F2\u306E\u30D0\u30A6\u30F3\u30C7\u30A3\u30F3\u30B0\u30DC\u30C3\u30AF\u30B9\u3092\u30AD\u30E3\u30F3\u30D0\u30B9\u5EA7\u6A19\u3067\u8A08\u7B97
+    // \u9078\u629E\u7BC4\u56F2\u306F\u30AD\u30E3\u30F3\u30D0\u30B9\u5EA7\u6A19\u7CFB\u306A\u306E\u3067\u3001\u30D0\u30C3\u30D5\u30A1\u9818\u57DF\u3068\u4EA4\u5DEE\u3059\u308B\u7BC4\u56F2\u306B\u7D5E\u308B
+    const int bx0 = layerOffX, by0 = layerOffY;
+    const int bx1 = layerOffX + bufW - 1, by1 = layerOffY + bufH - 1;
     int minX = canvasW, minY = canvasH, maxX = -1, maxY = -1;
-    for (int y = 0; y < canvasH; ++y) {
-      for (int x = 0; x < canvasW; ++x) {
-        if (sel.contains(x, y)) {
-          minX = std::min(minX, x);
-          minY = std::min(minY, y);
-          maxX = std::max(maxX, x);
-          maxY = std::max(maxY, y);
+    for (int cy2 = by0; cy2 <= by1; ++cy2) {
+      for (int cx2 = bx0; cx2 <= bx1; ++cx2) {
+        if (sel.contains(cx2, cy2)) {
+          if (cx2 < minX) minX = cx2;
+          if (cy2 < minY) minY = cy2;
+          if (cx2 > maxX) maxX = cx2;
+          if (cy2 > maxY) maxY = cy2;
         }
       }
     }
     if (maxX < 0) {
-      return false;  // \u9078\u629E\u7BC4\u56F2\u304C\u7A7A
+      return false;  // \u9078\u629E\u7BC4\u56F2\u304C\u30EC\u30A4\u30E4\u30FC\u5185\u306B\u5B58\u5728\u3057\u306A\u3044
     }
-    offX = minX;
+    offX = minX;  // \u30AD\u30E3\u30F3\u30D0\u30B9\u5EA7\u6A19
     offY = minY;
     regW = maxX - minX + 1;
     regH = maxY - minY + 1;
+  } else {
+    // \u9078\u629E\u7BC4\u56F2\u306A\u3057: \u30D0\u30C3\u30D5\u30A1\u5168\u4F53\u3092\u5909\u5F62\u5BFE\u8C61\u3068\u3059\u308B\uFF08CSP/Photoshop\u65B9\u5F0F\uFF09
+    // offset-layer \u30E2\u30C7\u30EB\u3067\u306F off-canvas pixel \u3082\u30D0\u30C3\u30D5\u30A1\u5185\u306B\u5B58\u5728\u3059\u308B\u305F\u3081
+    // tight bbox \u3067\u306F\u306A\u304F\u30D0\u30C3\u30D5\u30A1\u5168\u4F53\u3092 floatBuf \u306B\u6E21\u3059\u3002
+    offX = layerOffX;
+    offY = layerOffY;
+    regW = bufW;
+    regH = bufH;
   }
 
+  // \u30BB\u30C3\u30B7\u30E7\u30F3\u4FDD\u5B58: savedLayer \u306F pixel \u30AF\u30EA\u30A2\u306E\u524D\u306B\u30AD\u30E3\u30D7\u30C1\u30E3\u3059\u308B\uFF08undo/cancel \u306B\u5FC5\u8981\uFF09
+  TransformSession session;
+  session.savedLayer     = *active;
+  session.savedSelection = m_document.selection();
+  session.layerIndex     = m_document.activeLayerIndex();
+
   // \u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u30D0\u30C3\u30D5\u30A1\u62BD\u51FA
+  // offX/Y \u306F\u30AD\u30E3\u30F3\u30D0\u30B9\u5EA7\u6A19\u306A\u306E\u3067\u3001\u30D0\u30C3\u30D5\u30A1\u30ED\u30FC\u30AB\u30EB\u5EA7\u6A19\u306F (offX - layerOffX) \u304B\u3089\u59CB\u307E\u308B
+  const int bufLocalOffX = offX - layerOffX;
+  const int bufLocalOffY = offY - layerOffY;
   core::PixelBuffer floatBuf(regW, regH, core::Color::Transparent());
   for (int y = 0; y < regH; ++y) {
     for (int x = 0; x < regW; ++x) {
-      const int cx = offX + x, cy = offY + y;
-      if (!hasSelection || sel.contains(cx, cy)) {
-        floatBuf.setPixel(x, y, buf.pixel(cx, cy));
-        buf.setPixel(cx, cy, core::Color::Transparent());
+      const int bx = bufLocalOffX + x;
+      const int by = bufLocalOffY + y;
+      const int cx2 = offX + x;
+      const int cy2 = offY + y;
+      if (bx >= 0 && bx < bufW && by >= 0 && by < bufH) {
+        if (!hasSelection || sel.contains(cx2, cy2)) {
+          floatBuf.setPixel(x, y, buf.pixel(bx, by));
+          // 選択範囲ありの場合のみ元 pixel を消す（floating selection 方式）
+          // 選択範囲なし（レイヤー全体変形）では元 pixel を保持する
+          if (hasSelection) {
+            buf.setPixel(bx, by, core::Color::Transparent());
+          }
+        }
       }
     }
   }
 
-  // \u30BB\u30C3\u30B7\u30E7\u30F3\u4FDD\u5B58
-  TransformSession session;
-  session.savedLayer     = *active;  // optional<Layer> \u3078\u306E\u30B3\u30D4\u30FC
-  session.savedSelection = m_document.selection();
-  session.layerIndex     = m_document.activeLayerIndex();
   session.floatingImage  = platform::qt::QtImageConverter::toQImage(floatBuf);
   m_transformSession     = std::move(session);
 
-  // \u5909\u5F62\u30C4\u30FC\u30EB\u8D77\u52D5
+  // \u5909\u5F62\u30C4\u30FC\u30EB\u8D77\u52D5\uFF08offX/Y \u306F\u30AD\u30E3\u30F3\u30D0\u30B9\u7A7A\u9593\u306E\u539F\u70B9\uFF09
   m_freeTransformTool->beginSession(std::move(floatBuf), offX, offY, canvasW, canvasH);
   m_toolManager.setActiveTool(core::ToolKind::FreeTransform);
 
@@ -3550,15 +3842,21 @@ bool AppController::commitTransformSession() {
   const QImage transformed = platform::qt::HighQualityTransform::transform(
       m_transformSession->floatingImage, transform, m_transformInterpolation, Qt::transparent);
 
-  QImage canvas(canvasW, canvasH, QImage::Format_RGBA8888);
-  canvas.fill(Qt::transparent);
+  // 変換先バウンディングボックスをキャンバス座標で算出（off-canvas 領域も含む）
+  const QRect srcRect(0, 0, m_transformSession->floatingImage.width(),
+                      m_transformSession->floatingImage.height());
+  const QRect destBounds = transform.mapToPolygon(srcRect).boundingRect();
+  const int renderOffX = destBounds.left();
+  const int renderOffY = destBounds.top();
+  const int renderW    = std::max(1, destBounds.width());
+  const int renderH    = std::max(1, destBounds.height());
+
+  QImage renderImg(renderW, renderH, QImage::Format_RGBA8888);
+  renderImg.fill(Qt::transparent);
   {
-    QPainter p(&canvas);
-    // transformed \u306F\u65E2\u306B\u5909\u63DB\u3055\u308C\u3066\u3044\u308B\u306E\u3067\u3001bounding box \u306E\u5DE6\u4E0A\u306B\u63CF\u753B
-    const QRect bounds = transform.mapToPolygon(
-        QRect(0, 0, m_transformSession->floatingImage.width(),
-              m_transformSession->floatingImage.height())).boundingRect();
-    p.drawImage(bounds.topLeft(), transformed);
+    QPainter p(&renderImg);
+    // transformed \u306F destBounds \u539F\u70B9\u57FA\u6E96\u3067\u5909\u63DB\u6E08\u307F \u2192 (0,0) \u306B\u914D\u7F6E
+    p.drawImage(QPoint(0, 0), transformed);
     p.end();
   }
 
@@ -3605,31 +3903,44 @@ bool AppController::commitTransformSession() {
     return true;
   }
 
-  // \u30A2\u30AF\u30C6\u30A3\u30D6\u30EC\u30A4\u30E4\u30FC\u306B\u5408\u6210\u7D50\u679C\u3092\u30D6\u30EA\u30C3\u30C8
-  core::PixelBuffer resultBuf = platform::qt::QtImageConverter::fromQImage(canvas);
+  // \u30A2\u30AF\u30C6\u30A3\u30D6\u30EC\u30A4\u30E4\u30FC\u306B\u5408\u6210\u7D50\u679C\u3092\u66F8\u304D\u623B\u3059
+  // canvas \u306F canvasW x canvasH \u306E\u30AD\u30E3\u30F3\u30D0\u30B9\u7A7A\u9593\u753B\u50CF\u3002
+  // \u30EC\u30A4\u30E4\u30FC\u30D0\u30C3\u30D5\u30A1\u306F\u30AA\u30D5\u30BB\u30C3\u30C8\u4ED8\u304D\u306E image \u30B5\u30A4\u30BA\u30D0\u30C3\u30D5\u30A1\u306A\u306E\u3067\u3001
+  // \u5909\u63DB\u5F8C\u306E\u975E\u900F\u660E\u9818\u57DF\u306E tight bbox \u3092\u6C42\u3081\u3001\u30D0\u30C3\u30D5\u30A1\u3092\u30EA\u30B5\u30A4\u30BA\u3057\u3066\u30AA\u30D5\u30BB\u30C3\u30C8\u3092\u66F4\u65B0\u3059\u308B\u3002
+  // renderImg はローカル座標系（canvas座標 = local + renderOff）
+  core::PixelBuffer resultBuf = platform::qt::QtImageConverter::fromQImage(renderImg);
   if (active != nullptr && active->kind() == core::LayerKind::Raster) {
-    core::PixelBuffer& layerBuf = active->buffer();
-    for (int y = 0; y < canvasH; ++y) {
-      for (int x = 0; x < canvasW; ++x) {
-        const core::Color src = resultBuf.pixel(x, y);
-        if (src.a == 0) {
-          continue;
-        }
-        // Porter-Duff src-over
-        const core::Color dst = layerBuf.pixel(x, y);
-        const float sa = src.a / 255.f;
-        const float da = dst.a / 255.f * (1.f - sa);
-        const float oa = sa + da;
-        if (oa < 1e-6f) {
-          layerBuf.setPixel(x, y, core::Color::Transparent());
-        } else {
-          layerBuf.setPixel(x, y, core::Color {
-              static_cast<uint8_t>((src.r * sa + dst.r * da) / oa),
-              static_cast<uint8_t>((src.g * sa + dst.g * da) / oa),
-              static_cast<uint8_t>((src.b * sa + dst.b * da) / oa),
-              static_cast<uint8_t>(oa * 255.f)});
+
+    // \u5909\u63DB\u7D50\u679C\u306E tight bbox \u3092\u30AD\u30E3\u30F3\u30D0\u30B9\u5EA7\u6A19\u3067\u6C42\u3081\u308B
+    int minX = renderW, minY = renderH, maxX = -1, maxY = -1;
+    for (int y = 0; y < renderH; ++y) {
+      for (int x = 0; x < renderW; ++x) {
+        if (resultBuf.pixel(x, y).a > 0) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
         }
       }
+    }
+
+    if (maxX < 0) {
+      // \u5909\u63DB\u5F8C\u304C\u5B8C\u5168\u900F\u660E \u2014 \u30D0\u30C3\u30D5\u30A1\u3092\u7A7A\u306B\u3057\u3066\u30AA\u30D5\u30BB\u30C3\u30C8\u3092\u30EA\u30BB\u30C3\u30C8
+      active->buffer().resize(1, 1, core::Color::Transparent());
+      active->setOffset(0, 0);
+    } else {
+      // \u65B0\u30D0\u30C3\u30D5\u30A1\u3092 bbox \u30B5\u30A4\u30BA\u3067\u4F5C\u6210\u3057\u3066\u30D4\u30AF\u30BB\u30EB\u3092\u30B3\u30D4\u30FC
+      const int newW = maxX - minX + 1;
+      const int newH = maxY - minY + 1;
+      core::PixelBuffer newBuf(newW, newH, core::Color::Transparent());
+      for (int y = 0; y < newH; ++y) {
+        for (int x = 0; x < newW; ++x) {
+          newBuf.setPixel(x, y, resultBuf.pixel(minX + x, minY + y));
+        }
+      }
+      active->buffer() = std::move(newBuf);
+      // canvas\u5EA7\u6A19\u30AA\u30D5\u30BB\u30C3\u30C8 = \u30ED\u30FC\u30AB\u30EBbbox\u539F\u70B9 + renderOff
+      active->setOffset(renderOffX + minX, renderOffY + minY);
     }
   }
 
@@ -4633,6 +4944,8 @@ void AppController::pushHistoryEntry(StrokeHistoryEntry entry) {
   if (entry.layerId == 0 &&
       entry.kind != HistoryKind::LayerOrder &&
       entry.kind != HistoryKind::Selection &&
+      entry.kind != HistoryKind::LayerAdd &&
+      entry.kind != HistoryKind::LayerRemove &&
       entry.layerIndex < m_document.layerCount()) {
     entry.layerId = m_document.layerAt(entry.layerIndex).id();
   }
