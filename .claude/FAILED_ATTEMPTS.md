@@ -111,10 +111,44 @@ FreeTransform 側のデータモデル認識が更新されていなかった。
 
 **参考:** `GPT_DEVELOPMENT_MANAGER.md` → Architecture Mismatch Prevention Rule
 
+---
+
+## 2026-06-10
+
+### Build 成功なのに動作変化なし（実行バイナリ不一致）
+
+**試み:** FreeTransform の pixel クリア条件修正、offset 計算修正、commit パス修正を複数回実施
+
+**理由:** Build が通るため修正が反映されていると思い込んだ
+
+**失敗内容:**
+
+```
+build\src\Release\LayeredPaintApp.exe  → 13:19:26（最新ビルド）
+build_cv\src\Release\LayeredPaintApp.exe → 06-07 09:46（3日前）← 実際に起動中
+
+Get-Process で確認するまで気づかなかった
+```
+
+**原因:**
+
+- Qt Creator が `build_cv` をデフォルトの実行ディレクトリとして設定していた
+- `launch.bat` は `build\` を参照するが、別の手段で古い `build_cv\` を起動していた
+- Build と Run が別バイナリを指していた
+
+**学んだこと:**
+
+- 「Build 成功」と「修正済みバイナリが動作中」は別の確認ステップ
+- UX 変化なし・ログが出ない場合、コード修正前に `Get-Process` でパス確認が必須
+- 複数の `build*/` ディレクトリが存在するプロジェクトでは特に注意
+
+**参考:** `GPT_DEVELOPMENT_MANAGER.md` → Build Artifact Verification Rule
+
 ## インデックス
 
 | 日付 | 内容 | 原因 | 修正済 |
 |---|---|---|---|
 | 2026-06-08 | (例) Skia 色反転 | フォーマット誤解 | ✅ |
 | 2026-06-10 | FreeTransform / Layer Offset 不整合 | アーキテクチャ設計差分を後回しにした | ✅ |
+| 2026-06-10 | Build 成功なのに動作変化なし | 別ディレクトリの古いバイナリを起動していた | ✅ |
 
