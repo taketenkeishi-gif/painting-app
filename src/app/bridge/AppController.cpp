@@ -2449,6 +2449,10 @@ void AppController::endStroke() {
 }
 
 void AppController::beginStrokeF(float x, float y, float pressure, float tiltX, float tiltY) {
+  // --- OBSERVE LOG ---
+  qDebug() << "[BEGIN_STROKE_F] xy=(" << x << y << ") m_stroking=" << m_stroking
+           << "toolKind=" << static_cast<int>(m_toolManager.activeToolKind())
+           << "compat=" << isCurrentSubToolCompatibleWithActiveLayer();
   if (m_stroking) {
     return;
   }
@@ -3804,7 +3808,7 @@ bool AppController::beginTransformSession() {
   }
 
   session.floatingImage  = platform::qt::QtImageConverter::toQImage(floatBuf);
-  m_transformSession     = std::move(session);
+  session.floatingImage  = platform::qt::QtImageConverter::toQImage(floatBuf);
 
   // \u5909\u5F62\u30C4\u30FC\u30EB\u8D77\u52D5\uFF08offX/Y \u306F\u30AD\u30E3\u30F3\u30D0\u30B9\u7A7A\u9593\u306E\u539F\u70B9\uFF09
   m_freeTransformTool->beginSession(std::move(floatBuf), offX, offY, canvasW, canvasH);
@@ -3839,24 +3843,50 @@ bool AppController::commitTransformSession() {
   transform.scale(static_cast<double>(sx), static_cast<double>(sy));
   transform.translate(-static_cast<double>(hw), -static_cast<double>(hh));
 
-  const QImage transformed = platform::qt::HighQualityTransform::transform(
-      m_transformSession->floatingImage, transform, m_transformInterpolation, Qt::transparent);
+  // 高品質変換。result.offsetX/Y は result.image.pixel(0,0) が対応する変換後座標。
+  // Bicubic/Lanczos3 では off-canvas クリッピングが発生するため、
+  // destBounds.left/top ではなく result.offsetX/Y を layer origin として使う。
+  const platform::qt::HighQualityTransform::TransformResult result =
+      platform::qt::HighQualityTransform::transform(
+          m_transformSession->floatingImage, transform, m_transformInterpolation, Qt::transparent);
 
-  // 変換先バウンディングボックスをキャンバス座標で算出（off-canvas 領域も含む）
-  const QRect srcRect(0, 0, m_transformSession->floatingImage.width(),
-                      m_transformSession->floatingImage.height());
-  const QRect destBounds = transform.mapToPolygon(srcRect).boundingRect();
-  const int renderOffX = destBounds.left();
-  const int renderOffY = destBounds.top();
-  const int renderW    = std::max(1, destBounds.width());
-  const int renderH    = std::max(1, destBounds.height());
+  // result.image の左上が対応するキャンバス座標 = renderOff
+  const int renderOffX = result.offsetX;
+  const int renderOffY = result.offsetY;
+  const int renderW    = std::max(1, result.image.width());
+  const int renderH    = std::max(1, result.image.height());
 
+  // --- OBSERVE LOG ---
+  {
+    const QRect srcRect(0, 0, m_transformSession->floatingImage.width(),
+                        m_transformSession->floatingImage.height());
+    const QRect destBounds = transform.mapToPolygon(srcRect).boundingRect();
+    core::Layer* dbgLayer = m_document.activeLayer();
+    int layOffX = 0, layOffY = 0, layBufW = 0, layBufH = 0;
+    if (dbgLayer) {
+      layOffX = dbgLayer->offsetX();
+      layOffY = dbgLayer->offsetY();
+      layBufW = dbgLayer->buffer().width();
+      layBufH = dbgLayer->buffer().height();
+    }
+    qDebug() << "[COMMIT BEFORE]";
+    qDebug() << "  layer offsetX/Y :" << layOffX << layOffY;
+    qDebug() << "  layer buffer W/H:" << layBufW << layBufH;
+    qDebug() << "  transform scale :" << sx << sy;
+    qDebug() << "  transform rot   :" << rotDeg;
+    qDebug() << "  transform trans :" << cx << cy << "(center)";
+    qDebug() << "  source srcRect  :" << srcRect;
+    qDebug() << "  dest destBounds :" << destBounds;
+    qDebug() << "  result offsetX/Y:" << renderOffX << renderOffY;
+    qDebug() << "  render W/H      :" << renderW << renderH;
+  }
+
+  // renderImg は result.image と同サイズ。pixel(0,0) = canvas(renderOffX, renderOffY)
   QImage renderImg(renderW, renderH, QImage::Format_RGBA8888);
   renderImg.fill(Qt::transparent);
   {
     QPainter p(&renderImg);
-    // transformed \u306F destBounds \u539F\u70B9\u57FA\u6E96\u3067\u5909\u63DB\u6E08\u307F \u2192 (0,0) \u306B\u914D\u7F6E
-    p.drawImage(QPoint(0, 0), transformed);
+    p.drawImage(QPoint(0, 0), result.image);
     p.end();
   }
 
@@ -3941,6 +3971,9 @@ bool AppController::commitTransformSession() {
       active->buffer() = std::move(newBuf);
       // canvas\u5EA7\u6A19\u30AA\u30D5\u30BB\u30C3\u30C8 = \u30ED\u30FC\u30AB\u30EBbbox\u539F\u70B9 + renderOff
       active->setOffset(renderOffX + minX, renderOffY + minY);
+      qDebug() << "  bbox minX/Y     :" << minX << minY;
+      qDebug() << "  bbox maxX/Y     :" << maxX << maxY;
+      qDebug() << "  final offset    :" << (renderOffX + minX) << (renderOffY + minY);
     }
   }
 

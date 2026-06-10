@@ -87,31 +87,42 @@ Pixel samplePixel(const QImage& img, float x, float y,
   return result;
 }
 
-QImage transformWithKernel(const QImage& source, const QTransform& transform,
-                          KernelFunc kernel, int tapCount, float tapRadius,
-                          QColor fillColor) {
+HighQualityTransform::TransformResult
+transformWithKernel(const QImage& source, const QTransform& transform,
+                    KernelFunc kernel, int tapCount, float tapRadius,
+                    QColor fillColor) {
+  HighQualityTransform::TransformResult result;
   if (source.isNull()) {
-    return source;
+    return result;
   }
 
   const int srcW = source.width();
   const int srcH = source.height();
 
-  QRect boundingRect = transform.mapToPolygon(QRect(0, 0, srcW, srcH)).boundingRect();
-  boundingRect = boundingRect.intersected(
+  // raw bounding rect: 変換後の全域（負座標含む）
+  const QRect rawBounds = transform.mapToPolygon(QRect(0, 0, srcW, srcH)).boundingRect();
+  // clipping: 過大なメモリ消費を防ぐ（srcW*4 を上限）。負座標もクリップ。
+  // ただし clipping 後の left/top を TransformResult.offsetX/Y として保存し
+  // 呼び出し側が正しい canvas 位置を算出できるようにする。
+  const QRect clippedBounds = rawBounds.intersected(
       QRect(0, 0, std::max(1, srcW * 4), std::max(1, srcH * 4)));
 
-  const int dstW = std::max(1, boundingRect.width());
-  const int dstH = std::max(1, boundingRect.height());
+  // 返却 image の pixel(0,0) が対応する変換後座標
+  result.offsetX = clippedBounds.x();
+  result.offsetY = clippedBounds.y();
 
-  QImage result(dstW, dstH, QImage::Format_RGBA8888);
-  result.fill(fillColor);
+  const int dstW = std::max(1, clippedBounds.width());
+  const int dstH = std::max(1, clippedBounds.height());
+
+  result.image = QImage(dstW, dstH, QImage::Format_RGBA8888);
+  result.image.fill(fillColor);
 
   const QTransform invTransform = transform.inverted();
 
   for (int y = 0; y < dstH; ++y) {
     for (int x = 0; x < dstW; ++x) {
-      const QPointF dst(boundingRect.x() + x, boundingRect.y() + y);
+      // dst は変換後座標空間（clippedBounds 基準）
+      const QPointF dst(clippedBounds.x() + x, clippedBounds.y() + y);
       const QPointF src = invTransform.map(dst);
 
       if (src.x() < 0 || src.x() >= srcW || src.y() < 0 || src.y() >= srcH) {
@@ -128,7 +139,7 @@ QImage transformWithKernel(const QImage& source, const QTransform& transform,
           static_cast<int>(std::clamp(p.b, 0.f, 255.f)),
           static_cast<int>(std::clamp(p.a, 0.f, 255.f)));
 
-      result.setPixel(x, y, col.rgba());
+      result.image.setPixel(x, y, col.rgba());
     }
   }
 
@@ -137,23 +148,43 @@ QImage transformWithKernel(const QImage& source, const QTransform& transform,
 
 } // namespace
 
-QImage HighQualityTransform::transform(const QImage& source,
-                                       const QTransform& transform,
-                                       InterpolationMethod method,
-                                       QColor fillColor) {
+HighQualityTransform::TransformResult HighQualityTransform::transform(
+    const QImage& source,
+    const QTransform& transform,
+    InterpolationMethod method,
+    QColor fillColor) {
+
+  TransformResult result;
   if (source.isNull()) {
-    return source;
+    return result;
   }
 
-  // Qt 標準の変換で十分な場合（identity, 90度回転等）は高速パスを使う
+  // Qt 標準の変換で十分な場合（identity）は高速パスを使う
   if (transform.isIdentity()) {
-    return source;
+    result.image   = source;
+    result.offsetX = 0;
+    result.offsetY = 0;
+    return result;
   }
 
   switch (method) {
-    case InterpolationMethod::Bilinear:
-      // Qt の SmoothPixmapTransform は bilinear 相当なので、元々の方法でOK
-      return source.transformed(transform, Qt::SmoothTransformation);
+    case InterpolationMethod::Bilinear: {
+      // Qt の SmoothPixmapTransform は bilinear 相当。
+      // transformed() は origin を自動調整した画像を返す。
+      // trueMatrix() で返却画像の origin を取得して offsetX/Y に保存する。
+      const QTransform trueM = QTransform::fromTranslate(0, 0);  // 計算用ダミー
+      // Qt の QImage::transformed() は内部で trueMatrix を使い
+      // pixel(0,0) が変換後の bounding rect 左上に来るよう調整する。
+      // その左上座標を rawBounds.left/top で算出する。
+      const int srcW = source.width();
+      const int srcH = source.height();
+      const QRect rawBounds = transform.mapToPolygon(QRect(0,0,srcW,srcH)).boundingRect();
+      result.image   = source.transformed(transform, Qt::SmoothTransformation);
+      // transformed() は rawBounds の全域をカバーする（負座標も含む）
+      result.offsetX = rawBounds.left();
+      result.offsetY = rawBounds.top();
+      return result;
+    }
 
     case InterpolationMethod::Bicubic:
       return transformWithKernel(source, transform, bicubicKernel, 4, 2.f, fillColor);
@@ -162,7 +193,7 @@ QImage HighQualityTransform::transform(const QImage& source,
       return transformWithKernel(source, transform, lanczos3Kernel, 6, 3.f, fillColor);
   }
 
-  return source;
+  return result;
 }
 
 } // namespace platform::qt
