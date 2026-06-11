@@ -101,18 +101,15 @@ transformWithKernel(const QImage& source, const QTransform& transform,
 
   // raw bounding rect: 変換後の全域（負座標含む）
   const QRect rawBounds = transform.mapToPolygon(QRect(0, 0, srcW, srcH)).boundingRect();
-  // clipping: 過大なメモリ消費を防ぐ（srcW*4 を上限）。負座標もクリップ。
-  // ただし clipping 後の left/top を TransformResult.offsetX/Y として保存し
-  // 呼び出し側が正しい canvas 位置を算出できるようにする。
-  const QRect clippedBounds = rawBounds.intersected(
-      QRect(0, 0, std::max(1, srcW * 4), std::max(1, srcH * 4)));
 
-  // 返却 image の pixel(0,0) が対応する変換後座標
-  result.offsetX = clippedBounds.x();
-  result.offsetY = clippedBounds.y();
+  // メモリ保護: 出力サイズを srcW*4 × srcH*4 に制限するが、
+  // 負座標はクリップしない（off-canvas ピクセルを保持）
+  const int dstW = std::clamp(rawBounds.width(),  1, std::max(1, srcW * 4));
+  const int dstH = std::clamp(rawBounds.height(), 1, std::max(1, srcH * 4));
 
-  const int dstW = std::max(1, clippedBounds.width());
-  const int dstH = std::max(1, clippedBounds.height());
+  // pixel(0,0) が対応するキャンバス座標 = rawBounds の左上（負座標も保持）
+  result.offsetX = rawBounds.x();
+  result.offsetY = rawBounds.y();
 
   result.image = QImage(dstW, dstH, QImage::Format_RGBA8888);
   result.image.fill(fillColor);
@@ -121,8 +118,8 @@ transformWithKernel(const QImage& source, const QTransform& transform,
 
   for (int y = 0; y < dstH; ++y) {
     for (int x = 0; x < dstW; ++x) {
-      // dst は変換後座標空間（clippedBounds 基準）
-      const QPointF dst(clippedBounds.x() + x, clippedBounds.y() + y);
+      // dst は変換後座標空間（rawBounds 基準）
+      const QPointF dst(rawBounds.x() + x, rawBounds.y() + y);
       const QPointF src = invTransform.map(dst);
 
       if (src.x() < 0 || src.x() >= srcW || src.y() < 0 || src.y() >= srcH) {
