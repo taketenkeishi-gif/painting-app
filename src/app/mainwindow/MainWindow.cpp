@@ -67,6 +67,7 @@
 #include "app/bridge/LpaExporter.h"
 #include "app/bridge/LpaImporter.h"
 #include "app/canvasview/CanvasWidget.h"
+#include "app/panels/AdjustmentPropertyPanel.h"
 #include "app/panels/AiPanel.h"
 #include "app/ui/Theme.h"
 #include "app/panels/GenerativeFillDialog.h"
@@ -518,6 +519,7 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
       m_controller(new app::bridge::AppController(this)),
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
+      m_adjustmentPanel(new app::panels::AdjustmentPropertyPanel(this)),
       m_aiPanel(new app::panels::AiPanel(this)),
       m_layerPanel(new app::panels::LayerPanel(this)),
       m_toolPanel(new app::panels::ToolPanel(this)),
@@ -540,6 +542,7 @@ MainWindow::MainWindow(QWidget* parent)
   }
 
   m_canvasWidget->setController(m_controller);
+  m_adjustmentPanel->setController(m_controller);
   m_aiPanel->setController(m_controller);
   m_layerPanel->setController(m_controller);
   m_toolPanel->setController(m_controller);
@@ -1037,6 +1040,7 @@ void MainWindow::setupShellLayout() {
   m_colorHistoryDock = makeDock("カラーヒストリー", makeScrollable(historyWidget), "ColorHistoryDock");
   m_colorHistoryDock->setMinimumWidth(188);
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
+  m_adjustmentDock = makeDock("調整レイヤー", m_adjustmentPanel, "AdjustmentDock");
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
   // Native title bars are kept so Qt's dock drag/float/rearrange machinery works.
@@ -1065,8 +1069,10 @@ void MainWindow::setupShellLayout() {
   // All three panels tabified together — same pattern as MinimalDockTest.
   // No vertical split: splitDockWidget after tabifyDockWidget breaks drop-zone detection.
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
+  addDockWidget(Qt::RightDockWidgetArea, m_adjustmentDock);
   addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
   addDockWidget(Qt::RightDockWidgetArea, m_infoDock);
+  tabifyDockWidget(m_layerDock, m_adjustmentDock);
   tabifyDockWidget(m_layerDock, m_aiDock);
   tabifyDockWidget(m_layerDock, m_infoDock);
 
@@ -1078,7 +1084,7 @@ void MainWindow::setupShellLayout() {
   const QList<QDockWidget*> allDocks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_aiDock, m_infoDock
+      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock
   };
   for (auto* dock : allDocks) {
     if (!dock) continue;
@@ -1447,6 +1453,9 @@ void MainWindow::createMenus() {
   }
   if (m_layerDock != nullptr) {
     windowMenu->addAction(m_layerDock->toggleViewAction());
+  }
+  if (m_adjustmentDock != nullptr) {
+    windowMenu->addAction(m_adjustmentDock->toggleViewAction());
   }
   if (m_aiDock != nullptr) {
     windowMenu->addAction(m_aiDock->toggleViewAction());
@@ -1910,7 +1919,7 @@ void MainWindow::updateDockTitleBars() {
   const QList<QDockWidget*> docks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_aiDock, m_infoDock
+      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock
   };
   for (auto* dock : docks) {
     if (!dock) continue;
@@ -2932,8 +2941,15 @@ void MainWindow::onPasteTriggered() {
     return;
   }
   const core::PixelBuffer buffer = platform::qt::QtImageConverter::fromQImage(image);
-  if (m_controller->pasteBufferAsNewRasterLayer(buffer, "貼り付けレイヤー")) {
-    statusBar()->showMessage("新規ラスターレイヤーとして貼り付けました", 1500);
+  // オフセット配置で貼り付け: キャンバス外ピクセルも保持し、移動ツールで位置調整できる
+  if (m_controller->pasteBufferAsNewRasterLayerAndTransform(buffer, "貼り付けレイヤー")) {
+    const bool oversized = buffer.width()  > m_controller->document().canvasSize().width ||
+                           buffer.height() > m_controller->document().canvasSize().height;
+    const QString msg = oversized
+        ? "キャンバスより大きい画像を貼り付けました。移動ツールで位置を調整できます"
+        : "貼り付けました。移動ツールで位置を調整できます";
+    statusBar()->showMessage(msg, 3500);
+    updateUndoRedoState();
   }
 }
 

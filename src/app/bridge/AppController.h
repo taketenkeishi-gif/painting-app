@@ -243,6 +243,9 @@ public:
 
   // AdjustmentLayer
   std::size_t addAdjustmentLayerByKind(core::AdjustmentKind kind);
+  /// アクティブな調整レイヤーのパラメータを更新し、アンドゥに記録する。
+  /// アクティブレイヤーが調整レイヤーでない場合は何もしない。
+  void setActiveLayerAdjustmentParams(const core::AdjustmentParams& params);
 
   bool clearSelection();
   bool selectAll();
@@ -260,6 +263,9 @@ public:
   core::PixelBuffer exportSelectionOrCanvasFromComposite() const;
   void importFlattenedBuffer(const core::PixelBuffer& buffer, const std::string& layerName = "Imported");
   bool pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName = "Pasted Layer");
+  /// 貼り付けた画像をキャンバス外のピクセルも保持したまま変形モードで開く。
+  /// Ctrl+V 時に呼び出す。コミット時にキャンバスにラスタライズされる。
+  bool pasteBufferAsNewRasterLayerAndTransform(const core::PixelBuffer& buffer, const std::string& layerName = "貼り付けレイヤー");
   bool paperVisible() const noexcept;
   void setPaperVisible(bool visible);
   core::Color paperColor() const noexcept;
@@ -517,6 +523,8 @@ private:
     LayerOrder,
     Selection,
     StrokeWithSelection,  ///< ピクセル移動＋選択範囲移動を一括アンドゥするための複合エントリ
+    LayerAdd,             ///< レイヤー追加（afterLayer = 追加レイヤー、beforeIndex = 操作前アクティブ）
+    LayerRemove,          ///< レイヤー削除（beforeLayer = 削除レイヤー、afterIndex = 削除後アクティブ）
   };
 
   struct StrokeHistoryEntry {
