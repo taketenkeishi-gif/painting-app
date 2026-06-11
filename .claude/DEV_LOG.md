@@ -4,7 +4,43 @@
 
 ---
 
-## 2026-06-11 (最新) — Layer Offset Model 実装 (ADR-008 Phase 0-2)
+## 2026-06-12 (最新) — FreeTransform UX 修正（画質・コーナーアンカー）
+
+### 作業内容
+
+- Enter確定時の画質劣化（ガビガビ）を修正
+- コーナードラッグで対角コーナーを厳密固定する CSP 互換の挙動を実装
+
+### 変更ファイル
+
+- `src/app/bridge/AppController.h` — `m_transformInterpolation` を `Bicubic` → `Bilinear` に変更
+- `src/core/tools/FreeTransformTool.cpp` — コーナーハンドルの中心補正をアンカー逆算式に変更
+
+### 修正詳細
+
+**画質問題:**  
+コミット時の `Bicubic` カスタムカーネルとプレビュー（`QPainter::SmoothPixmapTransform`）の描画アルゴリズム差異が原因。  
+`Bilinear`（Qt `QImage::transformed()` + `Qt::SmoothTransformation`）に統一してプレビューと一致させた。
+
+**コーナー移動問題:**  
+縦横比固定時に `m_sx/m_sy` が補正されると `(cx + anchor) / 2` の中点式が崩れ、対角アンカーがずれていた。  
+アンカー逆算式 `center = anchor + R*(sxS*sx*halfW, syS*sy*halfH)` に変更し、sx/sy 変更後も対角コーナーを厳密固定。
+
+### 完了項目
+
+- ✅ Enter確定後の画質がプレビューと一致
+- ✅ コーナードラッグで対角コーナー固定（CSP互換）
+- ✅ Shiftフリースケールも同式で一貫動作
+- ✅ ユーザー確認済み（CSP公式挙動に近い）
+
+### 次のアクション
+
+- [ ] ベクター編集: ストローク選択・移動・削除（SPEC TODO 優先度 1）
+- [ ] フォルダレイヤーのネスト構造
+
+---
+
+## 2026-06-11 (前セッション) — Layer Offset Model 実装 (ADR-008 Phase 0-2)
 
 ### 作業内容
 

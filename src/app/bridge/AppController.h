@@ -618,7 +618,7 @@ private:
   };
   std::optional<TransformSession> m_transformSession;
   platform::qt::HighQualityTransform::InterpolationMethod m_transformInterpolation {
-      platform::qt::HighQualityTransform::InterpolationMethod::Bicubic };
+      platform::qt::HighQualityTransform::InterpolationMethod::Bilinear };
 
   // ── ONNX セグメンテーションエンジン ──────────────────────────────────
   std::unique_ptr<core::ai::OnnxSegEngine> m_onnxSegEngine;

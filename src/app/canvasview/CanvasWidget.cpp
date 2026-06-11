@@ -292,6 +292,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       const double fw = static_cast<double>(overlay.transformHalfW) * state.zoom;
       const double fh = static_cast<double>(overlay.transformHalfH) * state.zoom;
       painter.save();
+      painter.setClipRect(target);  // キャンバス外にピクセルを表示しない
       painter.translate(screenCX, screenCY);
       painter.rotate(static_cast<double>(overlay.transformRot) * (180.0 / 3.14159265358979323846));
       painter.scale(static_cast<double>(overlay.transformSx), static_cast<double>(overlay.transformSy));

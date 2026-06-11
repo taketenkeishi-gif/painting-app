@@ -219,21 +219,43 @@ ToolResult FreeTransformTool::onPointerMove(ToolContext& ctx, const ToolPointerE
       if (std::abs(newSy) > 0.01f) m_sy = newSy;
     }
 
-    // Shift: 縦横比固定
-    if (e.shift && sxS != 0 && syS != 0) {
-      const float aspect = m_halfW / (m_halfH == 0.f ? 1.f : m_halfH);
-      if (std::abs(m_sx) > std::abs(m_sy) * aspect)
-        m_sy = std::copysign(m_sx / aspect, m_sy);
+    // コーナーハンドルはデフォルトで縦横比固定（Shift で自由スケール解除）
+    // dragAspect: ドラッグ開始時の sx/sy 比を使う（初期は 1/1 = 1 → ジャンプなし）
+    if (sxS != 0 && syS != 0 && !e.shift) {
+      const float dragAspect = (m_dragSy0 == 0.f) ? 1.f : (m_dragSx0 / m_dragSy0);
+      if (std::abs(m_sx) > std::abs(m_sy) * dragAspect)
+        m_sy = std::copysign(m_sx / dragAspect, m_sy);
       else
-        m_sx = std::copysign(m_sy * aspect, m_sx);
+        m_sx = std::copysign(m_sy * dragAspect, m_sx);
     }
 
-    // アンカーが canvas 座標で固定されるよう中心を補正
-    // 新しい中心 = midpoint(anchorWorld, newHandleWorld)
-    // newHandleWorld ≈ anchorWorld + R*diag(newSx,newSy)*(handle_local - anchor_local)
-    // = anchor + (cx - anchor) = cx  → newCenter = (cx + anchorX)/2
-    m_tx = (cx + m_dragAnchorX) * 0.5f - m_originX;
-    m_ty = (cy + m_dragAnchorY) * 0.5f - m_originY;
+    // アンカーが canvas 座標で固定されるよう中心を補正。
+    if (sxS != 0 && syS != 0) {
+      // コーナー: 縦横比固定後の sx/sy で対角アンカーを厳密に固定。
+      // anchor = center + R * (-sxS*sx*halfW, -syS*sy*halfH)
+      // => center = anchor - R * (-sxS*sx*halfW, -syS*sy*halfH)
+      //           = anchor + R * ( sxS*sx*halfW,  syS*sy*halfH)
+      const float fsxS = static_cast<float>(sxS);
+      const float fsyS = static_cast<float>(syS);
+      m_tx = m_dragAnchorX - m_originX
+           + cosR * fsxS * m_sx * m_halfW
+           - sinR * fsyS * m_sy * m_halfH;
+      m_ty = m_dragAnchorY - m_originY
+           + sinR * fsxS * m_sx * m_halfW
+           + cosR * fsyS * m_sy * m_halfH;
+    } else {
+      // エッジハンドル: 対応しない軸を固定。
+      if (sxS != 0) {
+        m_tx = (cx + m_dragAnchorX) * 0.5f - m_originX;
+      } else {
+        m_tx = m_dragTx0;  // TC / BC: x 方向は固定
+      }
+      if (syS != 0) {
+        m_ty = (cy + m_dragAnchorY) * 0.5f - m_originY;
+      } else {
+        m_ty = m_dragTy0;  // ML / MR: y 方向は固定
+      }
+    }
   }
 
   updateHandles();

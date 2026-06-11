@@ -3797,11 +3797,9 @@ bool AppController::beginTransformSession() {
       if (bx >= 0 && bx < bufW && by >= 0 && by < bufH) {
         if (!hasSelection || sel.contains(cx2, cy2)) {
           floatBuf.setPixel(x, y, buf.pixel(bx, by));
-          // 選択範囲ありの場合のみ元 pixel を消す（floating selection 方式）
-          // 選択範囲なし（レイヤー全体変形）では元 pixel を保持する
-          if (hasSelection) {
-            buf.setPixel(bx, by, core::Color::Transparent());
-          }
+          // 元バッファをクリア: FT中は floatingImage overlay のみ表示し二重描画を防ぐ
+          // savedLayer がキャプチャ済みなので cancel/undo で完全復元できる
+          buf.setPixel(bx, by, core::Color::Transparent());
         }
       }
     }
@@ -3935,6 +3933,7 @@ bool AppController::commitTransformSession() {
 
     rerender();
     emit canvasChanged();
+    emit layersChanged();   // Undo \u30DC\u30BF\u30F3\u72B6\u614B\u3092\u66F4\u65B0\u3059\u308B\u305F\u3081\u306B\u5FC5\u8981
     emit overlayChanged();
     setDirty(true);
     return true;
@@ -4002,6 +4001,7 @@ bool AppController::commitTransformSession() {
 
   rerender();
   emit canvasChanged();
+  emit layersChanged();   // Undo ボタン状態を更新するために必要
   emit overlayChanged();
   setDirty(true);
   return true;
