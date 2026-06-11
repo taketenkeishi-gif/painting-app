@@ -47,6 +47,9 @@
 #include "core/selection/SelectionEngine.h"
 #include "core/tools/ZoomTool.h"
 #include "platform/qt/HighQualityTransform.h"
+#include "core/tools/MeshDeformTool.h"
+#include "core/mesh/GridMeshGenerator.h"
+#include "core/mesh/EdgeAdaptiveMeshGenerator.h"
 
 namespace app::bridge {
 class ComfyUiClient;
@@ -162,6 +165,12 @@ struct CanvasOverlayViewModel {
   float  transformRot         {0.f};  ///< ラジアン
   float  transformHalfW       {0.f};
   float  transformHalfH       {0.f};
+
+  // MeshDeformTool プレビュー
+  bool   hasMeshDeformPreview  {false};
+  QImage meshDeformPreviewImage;
+  int    meshDeformPreviewOffX {0};
+  int    meshDeformPreviewOffY {0};
 };
 
 class AppController : public QObject {
@@ -342,6 +351,25 @@ public:
   bool commitTransformSession();
   bool cancelTransformSession();
   bool isInTransformMode() const noexcept;
+
+  // ── Mesh deform session ─────────────────────────────────────────────────
+  bool beginMeshDeformSession();
+  bool commitMeshDeformSession();
+  bool cancelMeshDeformSession();
+  bool isInMeshDeformMode() const noexcept;
+
+  // Pin management (coordinates in canvas space)
+  int  meshDeformAddPin(float canvasX, float canvasY);
+  void meshDeformMovePin(int id, float canvasX, float canvasY);
+  void meshDeformRemovePin(int id);
+
+  // Settings
+  void meshDeformSetMode(core::mesh::DeformMode mode);
+  core::mesh::DeformMode meshDeformMode() const noexcept;
+  void meshDeformSetGridDensity(int rows, int cols);
+  void meshDeformSetGeneratorType(int type);  // 0=Grid, 1=EdgeAdaptive
+  void meshDeformRegenerateMesh();
+
   /// VectorEdit ツールで選択中の制御点を削除してアンドゥを記録する。
   bool deleteSelectedVectorPoints();
   /// テキストツール: 入力中かどうか。
@@ -619,6 +647,13 @@ private:
   std::optional<TransformSession> m_transformSession;
   platform::qt::HighQualityTransform::InterpolationMethod m_transformInterpolation {
       platform::qt::HighQualityTransform::InterpolationMethod::Bilinear };
+
+  // Mesh deform session
+  std::optional<core::MeshDeformTool> m_meshDeformTool;
+  core::mesh::MeshGenConfig m_meshGenConfig;
+  int m_meshGenType {0};  // 0=Grid, 1=EdgeAdaptive
+  core::mesh::GridMeshGenerator     m_gridMeshGen;
+  core::mesh::EdgeAdaptiveMeshGenerator m_edgeMeshGen;
 
   // ── ONNX セグメンテーションエンジン ──────────────────────────────────
   std::unique_ptr<core::ai::OnnxSegEngine> m_onnxSegEngine;

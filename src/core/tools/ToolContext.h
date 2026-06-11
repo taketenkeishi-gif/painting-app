@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <string>
 #include <vector>
@@ -77,6 +78,14 @@ struct ToolOverlayState {
   FPoint transformCorners[4]   {};   // TL TR BR BL (canvas px)
   FPoint transformHandles[9]   {};   // 0-7: スケール, 8: 回転
   int    transformActiveHandle {-1};
+
+  // MeshDeformTool ワイヤーフレームオーバーレイ
+  bool hasMeshDeform {false};
+  std::vector<core::FPoint> meshDeformVertices;      ///< deformed vertex positions
+  std::vector<std::array<int, 3>> meshDeformTris;    ///< triangle index triples
+  std::vector<core::FPoint> meshDeformPinCurrents;   ///< current pin positions
+  std::vector<core::FPoint> meshDeformPinOriginals;  ///< original pin positions
+  int meshDeformActivePin {-1};                      ///< highlighted pin index
 };
 
 struct ToolResult {

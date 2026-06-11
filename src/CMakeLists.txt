@@ -27,6 +27,12 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/TextTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/GenerativeFillEngine.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/OnnxSegEngine.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/mesh/MLSSolver.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/mesh/TriangulationBuilder.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/mesh/GridMeshGenerator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/mesh/EdgeAdaptiveMeshGenerator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/mesh/MeshRenderer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/MeshDeformTool.cpp
 )
 
 add_library(paint_core STATIC ${CORE_SOURCES})
@@ -93,6 +99,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/ComfyUiClient.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/MinimalWebSocket.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/MeshDeformPanel.cpp
 )
 
 

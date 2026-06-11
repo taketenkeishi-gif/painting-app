@@ -414,6 +414,16 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
     view.transformHalfH   = m_freeTransformTool->halfH();
   }
 
+    // Mesh deform preview
+    if (isInMeshDeformMode()) {
+        const auto& previewBuf = m_meshDeformTool->previewBuffer();
+        auto* layer = m_document.activeLayer();
+        view.hasMeshDeformPreview = true;
+        view.meshDeformPreviewImage = platform::qt::QtImageConverter::toQImage(previewBuf);
+        view.meshDeformPreviewOffX = layer ? layer->offsetX() : 0;
+        view.meshDeformPreviewOffY = layer ? layer->offsetY() : 0;
+    }
+
   return view;
 }
 
@@ -4027,6 +4037,133 @@ bool AppController::cancelTransformSession() {
   emit canvasChanged();
   emit overlayChanged();
   return true;
+}
+
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Mesh deform session
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+bool AppController::beginMeshDeformSession() {
+    if (m_meshDeformTool.has_value()) return false;
+    if (isInTransformMode()) return false;
+
+    auto* layer = m_document.activeLayer();
+    if (!layer || !layer->isRaster()) return false;
+
+    const core::PixelBuffer srcBuf = layer->buffer();
+    const core::SelectionMask& sel = m_document.selection();
+
+    m_meshDeformTool.emplace();
+
+    const core::mesh::IMeshGenerator* gen = (m_meshGenType == 1)
+        ? static_cast<const core::mesh::IMeshGenerator*>(&m_edgeMeshGen)
+        : static_cast<const core::mesh::IMeshGenerator*>(&m_gridMeshGen);
+
+    m_meshDeformTool->beginSession(srcBuf, sel, *gen, m_meshGenConfig);
+
+    emit overlayChanged();
+    return true;
+}
+
+bool AppController::commitMeshDeformSession() {
+    if (!m_meshDeformTool.has_value() || !m_meshDeformTool->isActive()) return false;
+
+    core::PixelBuffer result = m_meshDeformTool->renderFinal();
+
+    auto* layer = m_document.activeLayer();
+    if (!layer) { m_meshDeformTool.reset(); return false; }
+
+    // Push undo entry
+    StrokeHistoryEntry entry;
+    entry.kind        = HistoryKind::StrokeWithSelection;
+    entry.layerIndex  = m_document.activeLayerIndex();
+    entry.beforeLayer = *layer;
+    entry.beforeSelection = m_document.selection();
+
+    layer->buffer() = std::move(result);
+
+    entry.afterLayer     = *layer;
+    entry.afterSelection = m_document.selection();
+    pushHistoryEntry(std::move(entry));
+
+    m_meshDeformTool.reset();
+
+    rerender();
+    emit canvasChanged();
+    emit layersChanged();
+    emit overlayChanged();
+    setDirty(true);
+    return true;
+}
+
+bool AppController::cancelMeshDeformSession() {
+    if (!m_meshDeformTool.has_value()) return false;
+    m_meshDeformTool->cancelSession();
+    m_meshDeformTool.reset();
+    rerender();
+    emit canvasChanged();
+    emit overlayChanged();
+    return true;
+}
+
+bool AppController::isInMeshDeformMode() const noexcept {
+    return m_meshDeformTool.has_value() && m_meshDeformTool->isActive();
+}
+
+int AppController::meshDeformAddPin(float canvasX, float canvasY) {
+    if (!isInMeshDeformMode()) return -1;
+    auto* layer = m_document.activeLayer();
+    if (!layer) return -1;
+    // Convert canvas coords to buffer-local coords (subtract layer offset)
+    float lx = canvasX - static_cast<float>(layer->offsetX());
+    float ly = canvasY - static_cast<float>(layer->offsetY());
+    int id = m_meshDeformTool->addPin({lx, ly});
+    emit overlayChanged();
+    return id;
+}
+
+void AppController::meshDeformMovePin(int id, float canvasX, float canvasY) {
+    if (!isInMeshDeformMode()) return;
+    auto* layer = m_document.activeLayer();
+    if (!layer) return;
+    float lx = canvasX - static_cast<float>(layer->offsetX());
+    float ly = canvasY - static_cast<float>(layer->offsetY());
+    m_meshDeformTool->movePin(id, {lx, ly});
+    emit overlayChanged();
+}
+
+void AppController::meshDeformRemovePin(int id) {
+    if (!isInMeshDeformMode()) return;
+    m_meshDeformTool->removePin(id);
+    emit overlayChanged();
+}
+
+void AppController::meshDeformSetMode(core::mesh::DeformMode mode) {
+    m_meshDeformTool->setMode(mode);
+    if (isInMeshDeformMode()) emit overlayChanged();
+}
+
+core::mesh::DeformMode AppController::meshDeformMode() const noexcept {
+    if (!m_meshDeformTool.has_value()) return core::mesh::DeformMode::Similarity;
+    return m_meshDeformTool->mode();
+}
+
+void AppController::meshDeformSetGridDensity(int rows, int cols) {
+    m_meshGenConfig.gridRows = rows;
+    m_meshGenConfig.gridCols = cols;
+}
+
+void AppController::meshDeformSetGeneratorType(int type) {
+    m_meshGenType = type;
+}
+
+void AppController::meshDeformRegenerateMesh() {
+    if (!isInMeshDeformMode()) return;
+    const core::mesh::IMeshGenerator* gen = (m_meshGenType == 1)
+        ? static_cast<const core::mesh::IMeshGenerator*>(&m_edgeMeshGen)
+        : static_cast<const core::mesh::IMeshGenerator*>(&m_gridMeshGen);
+    m_meshDeformTool->regenerateMesh(*gen, m_meshGenConfig);
+    emit overlayChanged();
 }
 
 // \u2500\u2500 AI / ComfyUI API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
