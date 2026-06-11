@@ -247,6 +247,18 @@ std::size_t Document::insertLoadedLayer(Layer layer) {
   return m_layers.size() - 1;
 }
 
+void Document::insertLayerAt(std::size_t index, Layer layer) {
+  if (index > m_layers.size()) {
+    index = m_layers.size();
+  }
+  m_layers.insert(m_layers.begin() + static_cast<std::ptrdiff_t>(index), std::move(layer));
+  // activeLayerIndex をシフト（挿入位置以降にあるインデックスを +1）
+  if (m_activeLayerIndex >= index && m_layers.size() > 1) {
+    ++m_activeLayerIndex;
+  }
+  m_activeLayerIndex = std::min(m_activeLayerIndex, m_layers.size() - 1);
+}
+
 std::string Document::makeDefaultLayerName(std::size_t currentLayerCount) {
   return "Layer " + std::to_string(currentLayerCount + 1);
 }

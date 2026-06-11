@@ -23,6 +23,7 @@ Painting-app の重要な技術判断（フレームワーク選定、アーキ�
 | ADR-005 | LayerPanel の「行インデックス明示」設計 | ✅ IMPLEMENTED | 2026-05-xx |
 | ADR-006 | SAM2 ONNX を AI 選択ツール として採用 | ✅ IMPLEMENTED | 2026-06-xx |
 | ADR-007 | Dark Theme を「Color Token」ベース で実装 | ✅ IMPLEMENTED | 2026-06-xx |
+| [ADR-008](ADR-008-layer-offset-model.md) | レイヤーオフセットモデル（Canvas-Bound から Independent PixelBuffer へ） | 🟡 ACCEPTED | 2026-06-10 |
 
 ## ステータス
 

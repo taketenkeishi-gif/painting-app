@@ -63,6 +63,9 @@ public:
   void clearLayersForLoad() noexcept;
   /// ID を変更せずにレイヤーを末尾に追加（ロード専用）
   std::size_t insertLoadedLayer(Layer layer);
+  /// 指定インデックスにレイヤーを挿入（アンドゥ専用）。
+  /// index > layerCount() の場合は末尾に追加する。activeLayerIndex は変更しない。
+  void insertLayerAt(std::size_t index, Layer layer);
 
 private:
   static std::string makeDefaultLayerName(std::size_t currentLayerCount);

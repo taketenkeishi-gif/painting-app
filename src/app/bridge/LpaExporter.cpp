@@ -137,6 +137,8 @@ SaveResult saveLpa(const core::Document& doc, const std::string& pathStr) {
             lj["locked"]         = layer.locked();
             lj["alphaLocked"]    = layer.alphaLocked();
             lj["positionLocked"] = layer.positionLocked();
+            lj["offsetX"]        = layer.offsetX();
+            lj["offsetY"]        = layer.offsetY();
             lj["clippedToBelow"] = layer.clippedToBelow();
             lj["hasMask"]        = layer.hasMask();
             lj["maskEnabled"]    = layer.maskEnabled();

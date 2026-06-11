@@ -156,6 +156,8 @@ LoadResult loadLpa(const std::string& pathStr) {
         layer.setLocked(lj["locked"].toBool(false));
         layer.setAlphaLocked(lj["alphaLocked"].toBool(false));
         layer.setPositionLocked(lj["positionLocked"].toBool(false));
+        layer.setOffsetX(lj["offsetX"].toInt(0));
+        layer.setOffsetY(lj["offsetY"].toInt(0));
         layer.setClippedToBelow(lj["clippedToBelow"].toBool(false));
 
         // ラスターピクセルデータ

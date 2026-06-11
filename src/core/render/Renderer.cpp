@@ -421,11 +421,26 @@ static Color applyAdjustment(const AdjustmentParams& p, Color src) {
   };
 }
 
-Color applyLayerMask(const Layer& layer, int x, int y, Color src) {
+// ── オフセット対応ヘルパー ──────────────────────────────────────────────────
+
+/// バッファのローカル座標 (bx, by) で安全にピクセルを取得する。
+/// 範囲外の場合は Transparent を返す。
+inline Color sampleBuffer(const PixelBuffer& buf, int bx, int by) noexcept {
+  if (bx < 0 || by < 0 || bx >= buf.width() || by >= buf.height()) {
+    return Color::Transparent();
+  }
+  return buf.pixel(bx, by);
+}
+
+/// マスクをバッファローカル座標 (bx, by) で適用する。
+/// マスクなし → src をそのまま返す。
+/// マスクあり・範囲外 → 完全透明（Photoshop 互換: オフセット外はマスクされる）。
+Color applyLayerMask(const Layer& layer, int bx, int by, Color src) {
   if (!layer.hasMask() || !layer.maskEnabled()) {
     return src;
   }
-  const Color mask = layer.maskBuffer().pixel(x, y);
+  // マスクバッファの範囲外はアルファ=0（マスクが効いて透明）として扱う
+  const Color mask = sampleBuffer(layer.maskBuffer(), bx, by);
   const float maskAlpha = static_cast<float>(mask.a) / 255.0f;
   src.a = static_cast<std::uint8_t>(std::lround(static_cast<float>(src.a) * std::clamp(maskAlpha, 0.0f, 1.0f)));
   return src;
@@ -516,6 +531,12 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
           continue;
         }
 
+        // ── レイヤーローカル座標（オフセット変換）────────────────────────────
+        // キャンバス座標 (x, y) をバッファローカル座標 (bx, by) に変換する。
+        // offset = 0 のときは bx == x, by == y となり既存動作と完全に同一。
+        const int bx = x - layer.offsetX();
+        const int by = y - layer.offsetY();
+
         // ── フォルダ ─────────────────────────────────────────────────────────
         if (layer.kind() == LayerKind::Folder) {
           // 子を透明バッファに合成してグループ画像を作る
@@ -523,8 +544,8 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
           float groupBelow = 0.0f;
           (*this)(x, y, layer.id(), groupColor, groupBelow);
 
-          // フォルダ自身のマスクをグループ結果に適用
-          groupColor = applyLayerMask(layer, x, y, groupColor);
+          // フォルダ自身のマスクをグループ結果に適用（バッファローカル座標を使用）
+          groupColor = applyLayerMask(layer, bx, by, groupColor);
 
           if (layer.clippedToBelow() && belowAlpha <= 0.0001f) {
             continue;
@@ -540,8 +561,9 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
 
         // ── 調整レイヤー ──────────────────────────────────────────────────────
         if (layer.kind() == LayerKind::Adjustment) {
+          // マスクもバッファローカル座標で参照する。範囲外 = マスクなし扱い (alpha=0) → 適用なし
           const float maskAlpha = (layer.hasMask() && layer.maskEnabled())
-              ? static_cast<float>(layer.maskBuffer().pixel(x, y).a) / 255.0f
+              ? static_cast<float>(sampleBuffer(layer.maskBuffer(), bx, by).a) / 255.0f
               : 1.0f;
           const float t = std::clamp(layer.opacity() * maskAlpha, 0.0f, 1.0f);
           if (t > 0.0001f) {
@@ -556,12 +578,15 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
         }
 
         // ── ラスター / ベクター ───────────────────────────────────────────────
+        // ベクターレイヤーの vectorRasters はキャンバス絶対座標で描画済みだが、
+        // オフセット分だけシフトして読み取ることで視覚的な移動を実現する。
         const PixelBuffer* sourceBuffer = &layer.buffer();
         if (layer.kind() == LayerKind::Vector) {
           sourceBuffer = &vecRasters[idx];
         }
-        Color src = sourceBuffer->pixel(x, y);
-        src = applyLayerMask(layer, x, y, src);
+        // sampleBuffer: 範囲外 = Transparent（オフセットによりはみ出した領域は透明）
+        Color src = sampleBuffer(*sourceBuffer, bx, by);
+        src = applyLayerMask(layer, bx, by, src);
         if (layer.clippedToBelow() && belowAlpha <= 0.0001f) {
           continue;
         }

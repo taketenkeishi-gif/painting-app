@@ -139,6 +139,15 @@ public:
   const TextData& textData() const noexcept { return m_textData; }
   void setTextData(const TextData& d) noexcept { m_textData = d; }
 
+  // ── レイヤーオフセット ────────────────────────────────────────────────────
+  /// キャンバス原点に対するレイヤーバッファの描画オフセット（ピクセル単位）。
+  /// Phase 0: データ保持のみ。Renderer はまだ参照しない。デフォルト = (0, 0)。
+  int offsetX() const noexcept { return m_offsetX; }
+  int offsetY() const noexcept { return m_offsetY; }
+  void setOffsetX(int x) noexcept { m_offsetX = x; }
+  void setOffsetY(int y) noexcept { m_offsetY = y; }
+  void setOffset(int x, int y) noexcept { m_offsetX = x; m_offsetY = y; }
+
   // ── 安定ID / 階層 ─────────────────────────────────────────────────────────
   /// レイヤー固有の安定ID。Document が採番し、生存中は不変。0 = 未採番。
   uint32_t id() const noexcept { return m_id; }
@@ -167,6 +176,8 @@ private:
   std::vector<VectorPath> m_vectorPaths;
   AdjustmentParams m_adjParams;
   TextData         m_textData;
+  int      m_offsetX  {0}; ///< レイヤーオフセット X（ピクセル）
+  int      m_offsetY  {0}; ///< レイヤーオフセット Y（ピクセル）
   uint32_t m_id     {0};  ///< 安定ID（Document::addLayer が採番）
   uint32_t m_parentId {0}; ///< 親フォルダ ID（0 = ルート）
 };
