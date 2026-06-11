@@ -3808,7 +3808,9 @@ bool AppController::beginTransformSession() {
   }
 
   session.floatingImage  = platform::qt::QtImageConverter::toQImage(floatBuf);
-  session.floatingImage  = platform::qt::QtImageConverter::toQImage(floatBuf);
+
+  // \u2500\u2500 \u30BB\u30C3\u30B7\u30E7\u30F3\u78BA\u5B9A\uFF08commitTransformSession \u306E has_value() \u30AC\u30FC\u30C9\u306B\u5FC5\u8981\uFF09\u2500\u2500
+  m_transformSession = std::move(session);
 
   // \u5909\u5F62\u30C4\u30FC\u30EB\u8D77\u52D5\uFF08offX/Y \u306F\u30AD\u30E3\u30F3\u30D0\u30B9\u7A7A\u9593\u306E\u539F\u70B9\uFF09
   m_freeTransformTool->beginSession(std::move(floatBuf), offX, offY, canvasW, canvasH);

@@ -474,6 +474,20 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
         return QPointF(target.x() + static_cast<double>(fp.x) * state.zoom,
                        target.y() + static_cast<double>(fp.y) * state.zoom);
       };
+      // [OBSERVE LOG] ハンドル描画位置（widget論理座標）
+      {
+        const QPointF tcW = toScreen(overlay.toolOverlay.transformHandles[1]);
+        const QPointF brW = toScreen(overlay.toolOverlay.transformHandles[7]);
+        const QPoint globalOrigin = mapToGlobal(QPoint(0, 0));
+        qDebug() << "[HANDLE_WIDGET] target=" << target.x() << target.y()
+                 << "zoom=" << state.zoom
+                 << "TC_widget=" << tcW.x() << tcW.y()
+                 << "BR_widget=" << brW.x() << brW.y()
+                 << "widgetSize=" << width() << height()
+                 << "dpr=" << devicePixelRatio()
+                 << "widgetGlobal=" << globalOrigin.x() << globalOrigin.y()
+                 << "TC_global=" << (globalOrigin.x()+(int)tcW.x()) << (globalOrigin.y()+(int)tcW.y());
+      }
 
       // 外枠（4コーナーを繋ぐ破線）
       QPolygonF box;
@@ -612,6 +626,11 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
 }
 
 void CanvasWidget::mousePressEvent(QMouseEvent* event) {
+  // --- OBSERVE LOG ---
+  qDebug() << "[MOUSE_PRESS] pos=" << event->position().toPoint()
+           << "btn=" << event->button()
+           << "tabletActive=" << m_tabletActive
+           << "hasController=" << (m_controller != nullptr);
   if (m_tabletActive) {
     event->accept();
     return;
@@ -685,6 +704,10 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   }
 
   const auto point = mapToCanvas(event->position().toPoint());
+  // --- OBSERVE LOG ---
+  qDebug() << "[MOUSE_PRESS_CANVAS] point=" << (point.has_value() ? QPoint(point->x,point->y) : QPoint(-9999,-9999))
+           << "widgetPos=" << event->position().toPoint()
+           << "hasValue=" << point.has_value();
   if (!point.has_value()) {
     return;
   }
@@ -696,6 +719,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   {
     const auto fpt = mapToCanvasF(event->position());
     if (fpt.has_value()) {
+      qDebug() << "[MOUSE_PRESS_BEGIN] beginStrokeF canvas=(" << fpt->x << fpt->y << ")";
       m_controller->beginStrokeF(fpt->x, fpt->y, 1.0f, 0.0f, 0.0f);
     } else {
       m_controller->beginStroke(point->x, point->y);
@@ -963,6 +987,8 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
 }
 
 void CanvasWidget::keyPressEvent(QKeyEvent* event) {
+  qDebug() << "[KPE]" << event->key() << "autoRepeat=" << event->isAutoRepeat()
+           << "transformMode=" << (m_controller ? (int)m_controller->isInTransformMode() : -1);
   if (m_controller != nullptr) {
     const Qt::KeyboardModifiers modifiers = QApplication::keyboardModifiers();
     m_controller->setInputModifiers(
@@ -1180,21 +1206,17 @@ std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) co
   if (m_image.isNull()) {
     return std::nullopt;
   }
-  const QRect targetRect = canvasRect();
-  if (!targetRect.contains(widgetPos)) {
-    return std::nullopt;
-  }
-
   const auto& state = stateFor(this);
   if (state.zoom <= 0.0) {
     return std::nullopt;
   }
-
+  const QRect targetRect = canvasRect();
+  // キャンバス外の座標も返す。オフセットレイヤーのハンドル操作など、
+  // キャンバス範囲外のイベントが必要なツールが存在するため、
+  // 範囲制限はツール側に委ねる。
   const int cx = static_cast<int>(std::floor((widgetPos.x() - targetRect.x()) / state.zoom));
   const int cy = static_cast<int>(std::floor((widgetPos.y() - targetRect.y()) / state.zoom));
-  const int clampedX = std::clamp(cx, 0, m_image.width() - 1);
-  const int clampedY = std::clamp(cy, 0, m_image.height() - 1);
-  return core::Point {clampedX, clampedY};
+  return core::Point {cx, cy};
 }
 
 std::optional<core::FPoint> CanvasWidget::mapToCanvasF(const QPointF& widgetPos) const {
@@ -1206,12 +1228,11 @@ std::optional<core::FPoint> CanvasWidget::mapToCanvasF(const QPointF& widgetPos)
     return std::nullopt;
   }
   const QRect targetRect = canvasRect();
+  // キャンバス外の浮動小数点座標も返す。クランプはせず生のキャンバス座標を返す。
+  // 各ツール（FreeTransformTool 等）が必要に応じて境界チェックを行う。
   const float fx = static_cast<float>((widgetPos.x() - targetRect.x()) / state.zoom);
   const float fy = static_cast<float>((widgetPos.y() - targetRect.y()) / state.zoom);
-  // キャンバス外でも float は返す（ストロークが縁で止まらないように）
-  const float clampedX = std::clamp(fx, 0.0f, static_cast<float>(m_image.width() - 1));
-  const float clampedY = std::clamp(fy, 0.0f, static_cast<float>(m_image.height() - 1));
-  return core::FPoint {clampedX, clampedY};
+  return core::FPoint {fx, fy};
 }
 
 void CanvasWidget::tabletEvent(QTabletEvent* event) {
