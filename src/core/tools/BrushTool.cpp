@@ -316,6 +316,13 @@ void BrushTool::blendPixel(
     return;
   }
 
+  // 選択マスクによる強度スケール
+  if (m_selectionMask != nullptr) {
+    const uint8_t mv = m_selectionMask->maskValue(x, y);
+    if (mv == 0) return;
+    if (mv < 255) strength *= static_cast<float>(mv) / 255.0f;
+  }
+
   const Color dst = buffer.pixel(x, y);
   if (lockAlpha && dst.a == 0) {
     return;
@@ -881,6 +888,9 @@ ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEven
   if (m_maskEditMode && !active->hasMask()) {
     active->createMask();
   }
+  // ストローク中に使う選択マスクを取得
+  m_selectionMask = context.document.selection().hasSelection()
+                    ? &context.document.selection() : nullptr;
   m_drawing = true;
   m_lastPoint = event.fpoint;
   m_lastPressure = event.pressure;
@@ -986,6 +996,7 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
   }
 
   m_drawing = false;
+  m_selectionMask = nullptr;
   Layer* active = context.document.activeLayer();
   if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
     m_vectorPoints.clear();
@@ -1052,6 +1063,7 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
 ToolResult BrushTool::onCancel(ToolContext& context) {
   static_cast<void>(context);
   m_drawing = false;
+  m_selectionMask = nullptr;
   m_vectorPoints.clear();
   m_distanceAccum = 0.0f;
   m_strokeLength = 0.0f;

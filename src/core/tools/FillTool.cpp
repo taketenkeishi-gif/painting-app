@@ -143,7 +143,8 @@ static void applyFillWithAA(
     const std::vector<std::uint8_t>& mask,
     const Color& fillColor,
     bool alphaLocked,
-    bool eraseMode)
+    bool eraseMode,
+    const SelectionMask* selMask = nullptr)
 {
   const int W = buffer.width();
   const int H = buffer.height();
@@ -151,6 +152,14 @@ static void applyFillWithAA(
   for (int y = 0; y < H; ++y) {
     for (int x = 0; x < W; ++x) {
       if (!mask[y * W + x]) continue;
+
+      // 選択マスクによる部分アルファスケール
+      float selScale = 1.0f;
+      if (selMask != nullptr) {
+        const uint8_t mv = selMask->maskValue(x, y);
+        if (mv == 0) continue;
+        if (mv < 255) selScale = static_cast<float>(mv) / 255.0f;
+      }
 
       const Color dst = buffer.pixel(x, y);
 
@@ -166,7 +175,17 @@ static void applyFillWithAA(
       }
 
       if (eraseMode) {
-        buffer.setPixel(x, y, Color::Transparent());
+        // 選択マスクで消去強度をスケール
+        if (selScale >= 1.0f) {
+          buffer.setPixel(x, y, Color::Transparent());
+        } else {
+          const float keep = 1.0f - selScale;
+          buffer.setPixel(x, y, Color{
+              static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.r) * keep)),
+              static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.g) * keep)),
+              static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.b) * keep)),
+              static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))});
+        }
         continue;
       }
 
@@ -185,6 +204,10 @@ static void applyFillWithAA(
         out.a = static_cast<std::uint8_t>(
             std::lround(static_cast<float>(fillColor.a) * coverage));
       }
+
+      // 選択マスクでアルファをスケール
+      out.a = static_cast<std::uint8_t>(
+          std::lround(static_cast<float>(out.a) * selScale));
 
       if (alphaLocked) {
         if (dst.a == 0) continue;
@@ -261,7 +284,8 @@ ToolResult FillTool::onPointerPress(ToolContext& context, const ToolPointerEvent
 
   // ── AA エッジ付きで描画 ────────────────────────────────────────────────────
   applyFillWithAA(buffer, fillMask, replacement,
-                  active->alphaLocked() && !isErase, isErase);
+                  active->alphaLocked() && !isErase, isErase,
+                  hasSelection ? &selection : nullptr);
 
   ToolResult result;
   result.pixelsChanged = true;

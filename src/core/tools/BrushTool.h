@@ -9,6 +9,7 @@
 #include "core/common/FPoint.h"
 #include "core/common/Point.h"
 #include "core/layer/Layer.h"
+#include "core/selection/SelectionMask.h"
 #include "core/tools/ITool.h"
 #include "core/tools/ToolTypes.h"
 
@@ -141,6 +142,9 @@ protected:
 
   // scatter / angleJitter 用 LCG シード（ストロークごとにリセット）
   mutable uint32_t m_dabRandSeed {0};
+
+  /// ストローク中の選択マスク参照（hasSelection == false のとき nullptr）
+  mutable const SelectionMask* m_selectionMask {nullptr};
 };
 
 } // namespace core

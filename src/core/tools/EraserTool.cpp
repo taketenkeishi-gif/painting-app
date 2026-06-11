@@ -157,6 +157,8 @@ ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEve
   if (m_maskEditMode && !active->hasMask()) {
     active->createMask();
   }
+  m_selectionMask = context.document.selection().hasSelection()
+                    ? &context.document.selection() : nullptr;
   m_erasing = true;
   m_lastPoint = event.fpoint;
   m_lastPressure = event.pressure;
@@ -210,6 +212,7 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
   if (!m_erasing) return {};
 
   m_erasing = false;
+  m_selectionMask = nullptr;
   Layer* active = context.document.activeLayer();
   if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) return {};
   if (active->kind() == LayerKind::Raster && active->alphaLocked()) return {};
@@ -257,6 +260,7 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
 ToolResult EraserTool::onCancel(ToolContext& context) {
   static_cast<void>(context);
   m_erasing = false;
+  m_selectionMask = nullptr;
   m_distanceAccum = 0.0f;
   return {};
 }
@@ -549,6 +553,12 @@ void EraserTool::eraseSquare(PixelBuffer& buffer, FPoint center, float radius, f
 
 void EraserTool::erasePixel(PixelBuffer& buffer, int x, int y, float strength) const {
   if (!buffer.inBounds(x, y)) return;
+  // 選択マスクによる強度スケール
+  if (m_selectionMask != nullptr) {
+    const uint8_t mv = m_selectionMask->maskValue(x, y);
+    if (mv == 0) return;
+    if (mv < 255) strength *= static_cast<float>(mv) / 255.0f;
+  }
   const float s = std::clamp(strength, 0.0F, 1.0F);
   const Color dst = buffer.pixel(x, y);
   const float keep = 1.0F - s;

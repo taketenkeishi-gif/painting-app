@@ -6,6 +6,7 @@
 #include "core/common/FPoint.h"
 #include "core/common/Point.h"
 #include "core/layer/Layer.h"
+#include "core/selection/SelectionMask.h"
 #include "core/tools/ITool.h"
 #include "core/tools/ToolTypes.h"
 
@@ -70,6 +71,7 @@ private:
 
   bool m_erasing {false};
   bool m_maskEditMode {false};
+  mutable const SelectionMask* m_selectionMask {nullptr};
   FPoint m_lastPoint {0.0f, 0.0f};
   float m_lastPressure {1.0f};
   mutable float m_distanceAccum {0.0f};
