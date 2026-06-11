@@ -37,6 +37,7 @@ namespace app::panels {
 class AdjustmentPropertyPanel;
 class AiPanel;
 class LayerPanel;
+class MeshDeformPanel;
 class SubToolPanel;
 class ToolPanel;
 class ToolPropertyPanel;
@@ -158,7 +159,8 @@ private:
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
   app::panels::AdjustmentPropertyPanel* m_adjustmentPanel {nullptr};
-  app::panels::AiPanel*    m_aiPanel    {nullptr};
+  app::panels::AiPanel*         m_aiPanel         {nullptr};
+  app::panels::MeshDeformPanel* m_meshDeformPanel  {nullptr};
   app::panels::LayerPanel* m_layerPanel {nullptr};
   app::panels::ToolPanel* m_toolPanel {nullptr};
   app::panels::ToolPanel* m_quickSliderPanel {nullptr};
@@ -182,6 +184,7 @@ private:
   QDockWidget* m_aiDock    {nullptr};
   QDockWidget* m_layerDock {nullptr};
   QDockWidget* m_infoDock {nullptr};
+  QDockWidget* m_meshDeformDock {nullptr};
   QToolBar* m_quickToolBar {nullptr};
   QLabel* m_currentToolLabel {nullptr};
   QLabel* m_currentSubToolLabel {nullptr};
@@ -300,6 +303,7 @@ private:
   // 変形
   QAction* m_transformAction           {nullptr};
   QAction* m_freeTransformAction       {nullptr};
+  QAction* m_meshDeformAction          {nullptr};
   QMenu* m_recentFilesMenu {nullptr};
   QMenu* m_workspaceLayoutsMenu {nullptr};
   std::map<core::ToolKind, QAction*> m_toolActions;

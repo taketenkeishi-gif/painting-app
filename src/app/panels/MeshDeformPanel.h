@@ -27,6 +27,9 @@ public:
 public slots:
   /// コントローラの現在状態から UI を再同期する。
   void updateFromController();
+  /// コントローラを後から設定する（遅延初期化用）。
+  void setController(app::bridge::AppController* controller);
+
 
 private slots:
   void onConfirm();

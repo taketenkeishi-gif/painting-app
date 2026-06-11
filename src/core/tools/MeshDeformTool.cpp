@@ -148,15 +148,21 @@ core::PixelBuffer MeshDeformTool::renderFinal() const
 void MeshDeformTool::solveAndUpdatePreview()
 {
     if (m_mesh.pins.empty()) {
-        // No pins — preview is identical to the undeformed source
         m_preview = m_source;
+        // Cache identity positions
+        m_lastDeformedPositions.resize(m_mesh.vertices.size());
+        for (std::size_t i = 0; i < m_mesh.vertices.size(); ++i)
+            m_lastDeformedPositions[i] = m_mesh.vertices[i].original;
         return;
     }
 
-    // Solve on a copy so m_mesh retains the un-deformed vertex positions for
-    // subsequent solve passes (the solver writes into vertex.deformed).
     mesh::DeformMesh meshCopy = m_mesh;
     m_solver.solve(meshCopy);
+
+    // Cache solved deformed positions for wireframe overlay
+    m_lastDeformedPositions.resize(meshCopy.vertices.size());
+    for (std::size_t i = 0; i < meshCopy.vertices.size(); ++i)
+        m_lastDeformedPositions[i] = meshCopy.vertices[i].deformed;
 
     m_preview.resize(m_source.width(), m_source.height());
     m_previewRenderer.render(m_source, m_preview, m_selection, meshCopy);

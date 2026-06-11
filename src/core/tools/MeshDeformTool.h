@@ -65,17 +65,24 @@ public:
     const mesh::DeformMesh& mesh()      const noexcept { return m_mesh; }
     const core::SelectionMask& selection() const noexcept { return m_selection; }
 
+    /// Last solved deformed vertex positions (canvas-local coords).
+    /// Updated every time solveAndUpdatePreview() is called.
+    const std::vector<core::FPoint>& lastDeformedPositions() const noexcept {
+        return m_lastDeformedPositions;
+    }
+
 private:
     void solveAndUpdatePreview();
 
     bool                 m_active    {false};
-    core::PixelBuffer    m_source;       ///< original captured pixels
-    core::PixelBuffer    m_preview;      ///< live preview (updated after pin move)
+    core::PixelBuffer    m_source;
+    core::PixelBuffer    m_preview;
     core::SelectionMask  m_selection;
     mesh::DeformMesh     m_mesh;
     mesh::MLSSolver      m_solver;
-    mesh::MeshRenderer   m_previewRenderer {1};  ///< ssaa=1 for speed
-    mesh::MeshRenderer   m_finalRenderer   {2};  ///< ssaa=2 for quality
+    mesh::MeshRenderer   m_previewRenderer {1};
+    mesh::MeshRenderer   m_finalRenderer   {2};
+    std::vector<core::FPoint> m_lastDeformedPositions;
 };
 
 } // namespace core

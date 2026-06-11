@@ -574,6 +574,69 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       }
     }
 
+    // ── Mesh Deform プレビュー・ワイヤーフレーム・ピン ─────────────────────────
+    if (overlay.hasMeshDeformPreview && !overlay.meshDeformPreviewImage.isNull()) {
+      // プレビュー画像（変形済みレイヤー）をキャンバス上に描画
+      const double px = target.x() + static_cast<double>(overlay.meshDeformPreviewOffX) * state.zoom;
+      const double py = target.y() + static_cast<double>(overlay.meshDeformPreviewOffY) * state.zoom;
+      const double pw = overlay.meshDeformPreviewImage.width()  * state.zoom;
+      const double ph = overlay.meshDeformPreviewImage.height() * state.zoom;
+      painter.save();
+      painter.setClipRect(target);
+      painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 4.0);
+      painter.drawImage(QRectF(px, py, pw, ph), overlay.meshDeformPreviewImage);
+      painter.restore();
+      painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+
+      // ワイヤーフレーム（半透明シアン細線）
+      if (!overlay.meshDeformDeformedVerts.empty() && !overlay.meshDeformTriangles.empty()) {
+        auto toS = [&](const core::FPoint& p) -> QPointF {
+          return QPointF(target.x() + static_cast<double>(p.x) * state.zoom,
+                         target.y() + static_cast<double>(p.y) * state.zoom);
+        };
+        painter.setRenderHint(QPainter::Antialiasing, false);
+        painter.setPen(QPen(QColor(0, 200, 255, 60), 0.8));
+        for (const auto& tri : overlay.meshDeformTriangles) {
+          const QPointF a = toS(overlay.meshDeformDeformedVerts[tri[0]]);
+          const QPointF b = toS(overlay.meshDeformDeformedVerts[tri[1]]);
+          const QPointF c = toS(overlay.meshDeformDeformedVerts[tri[2]]);
+          painter.drawLine(a, b);
+          painter.drawLine(b, c);
+          painter.drawLine(c, a);
+        }
+      }
+
+      // ピン描画
+      if (!overlay.meshDeformPinCurrents.empty()) {
+        auto toS = [&](const core::FPoint& p) -> QPointF {
+          return QPointF(target.x() + static_cast<double>(p.x) * state.zoom,
+                         target.y() + static_cast<double>(p.y) * state.zoom);
+        };
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        const int n = static_cast<int>(overlay.meshDeformPinCurrents.size());
+        for (int i = 0; i < n; ++i) {
+          const QPointF cur  = toS(overlay.meshDeformPinCurrents[i]);
+          const QPointF orig = toS(overlay.meshDeformPinOriginals[i]);
+          // ピンの移動ベクトル線（暗い影 + 白）
+          if (std::hypot(cur.x() - orig.x(), cur.y() - orig.y()) > 1.5) {
+            painter.setPen(QPen(QColor(0, 0, 0, 120), 2.0, Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(orig, cur);
+            painter.setPen(QPen(QColor(255, 255, 100, 180), 1.2, Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(orig, cur);
+          }
+          // 元位置: 白抜き小円
+          painter.setPen(QPen(QColor(0, 0, 0, 180), 1.0));
+          painter.setBrush(QColor(255, 255, 255, 160));
+          painter.drawEllipse(orig, 4.0, 4.0);
+          // 現在位置: 塗り円（ドラッグ中は青、それ以外は橙）
+          const bool dragging = (m_meshDeformDragPinId == i);
+          painter.setPen(QPen(QColor(0, 0, 0, 200), 1.5));
+          painter.setBrush(dragging ? QColor(72, 195, 255) : QColor(255, 120, 40));
+          painter.drawEllipse(cur, 6.0, 6.0);
+        }
+      }
+    }
+
     // ── テキストツール 入力中オーバーレイ ──────────────────────────────────────
     if (overlay.toolOverlay.hasTextEdit) {
       const core::Point& orig = overlay.toolOverlay.textEditOrigin;
@@ -650,6 +713,26 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   auto& state = stateFor(this);
   state.lastMousePos = event->position().toPoint();
   state.hasMousePos = true;
+
+  // ── Mesh deform モード ──────────────────────────────────────────────────────
+  if (m_controller->isInMeshDeformMode()) {
+    const auto fpt = mapToCanvasF(event->position());
+    if (!fpt.has_value()) return;
+    if (event->button() == Qt::RightButton) {
+      // 右クリック: ピン削除
+      const int id = m_controller->meshDeformHitTestPin(fpt->x, fpt->y);
+      if (id >= 0) m_controller->meshDeformRemovePin(id);
+    } else if (event->button() == Qt::LeftButton) {
+      const int id = m_controller->meshDeformHitTestPin(fpt->x, fpt->y);
+      if (id >= 0) {
+        m_meshDeformDragPinId = id;   // 既存ピンをドラッグ開始
+      } else {
+        m_meshDeformDragPinId = m_controller->meshDeformAddPin(fpt->x, fpt->y);
+      }
+    }
+    update();
+    return;
+  }
 
   if (event->button() == Qt::RightButton) {
     const auto point = mapToCanvas(event->position().toPoint());
@@ -751,6 +834,17 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
     emit canvasPositionChanged(canvasPoint->x, canvasPoint->y);
   } else {
     emit canvasPositionChanged(-1, -1);
+  }
+
+  // ── Mesh deform ピンドラッグ ────────────────────────────────────────────────
+  if (m_controller->isInMeshDeformMode() && m_meshDeformDragPinId >= 0
+      && (event->buttons() & Qt::LeftButton)) {
+    const auto fpt = mapToCanvasF(event->position());
+    if (fpt.has_value()) {
+      m_controller->meshDeformMovePin(m_meshDeformDragPinId, fpt->x, fpt->y);
+      update();
+    }
+    return;
   }
 
   // Ctrl+Space drag → zoom
@@ -887,6 +981,13 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
     return;
   }
 
+  // Mesh deform ピンドラッグ終了
+  if (event->button() == Qt::LeftButton && m_meshDeformDragPinId >= 0) {
+    m_meshDeformDragPinId = -1;
+    update();
+    return;
+  }
+
   if (event->button() != Qt::LeftButton) {
     return;
   }
@@ -1000,6 +1101,21 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
   if (event->isAutoRepeat()) {
     QWidget::keyPressEvent(event);
     return;
+  }
+  // Mesh deform セッション: Enter → コミット, Escape → キャンセル
+  if (m_controller != nullptr && m_controller->isInMeshDeformMode()) {
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+      m_meshDeformDragPinId = -1;
+      m_controller->commitMeshDeformSession();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Escape) {
+      m_meshDeformDragPinId = -1;
+      m_controller->cancelMeshDeformSession();
+      event->accept();
+      return;
+    }
   }
   // 変形セッション: Enter → コミット, Escape → キャンセル
   if (m_controller != nullptr && m_controller->isInTransformMode()) {

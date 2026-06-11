@@ -171,6 +171,12 @@ struct CanvasOverlayViewModel {
   QImage meshDeformPreviewImage;
   int    meshDeformPreviewOffX {0};
   int    meshDeformPreviewOffY {0};
+
+  // Mesh deform ワイヤーフレーム（キャンバス座標）
+  std::vector<core::FPoint>         meshDeformDeformedVerts;
+  std::vector<std::array<int,3>>    meshDeformTriangles;
+  std::vector<core::FPoint>         meshDeformPinCurrents;
+  std::vector<core::FPoint>         meshDeformPinOriginals;
 };
 
 class AppController : public QObject {
@@ -362,6 +368,7 @@ public:
   int  meshDeformAddPin(float canvasX, float canvasY);
   void meshDeformMovePin(int id, float canvasX, float canvasY);
   void meshDeformRemovePin(int id);
+  int  meshDeformHitTestPin(float canvasX, float canvasY) const noexcept;
 
   // Settings
   void meshDeformSetMode(core::mesh::DeformMode mode);

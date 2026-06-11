@@ -129,6 +129,11 @@ MeshDeformPanel::MeshDeformPanel(app::bridge::AppController* controller,
 // Public slots
 // ---------------------------------------------------------------------------
 
+void MeshDeformPanel::setController(app::bridge::AppController* controller)
+{
+    m_controller = controller;
+}
+
 void MeshDeformPanel::updateFromController()
 {
     if (!m_controller) return;

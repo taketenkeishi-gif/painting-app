@@ -69,6 +69,7 @@
 #include "app/canvasview/CanvasWidget.h"
 #include "app/panels/AdjustmentPropertyPanel.h"
 #include "app/panels/AiPanel.h"
+#include "app/panels/MeshDeformPanel.h"
 #include "app/ui/Theme.h"
 #include "app/panels/GenerativeFillDialog.h"
 #include "app/panels/LayerPanel.h"
@@ -521,6 +522,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
       m_adjustmentPanel(new app::panels::AdjustmentPropertyPanel(this)),
       m_aiPanel(new app::panels::AiPanel(this)),
+      m_meshDeformPanel(new app::panels::MeshDeformPanel(nullptr, this)),
       m_layerPanel(new app::panels::LayerPanel(this)),
       m_toolPanel(new app::panels::ToolPanel(this)),
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
@@ -1043,6 +1045,8 @@ void MainWindow::setupShellLayout() {
   m_adjustmentDock = makeDock("調整レイヤー", m_adjustmentPanel, "AdjustmentDock");
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
+  m_meshDeformDock = makeDock(QString::fromUtf8(u8"メッシュ変形"), m_meshDeformPanel, "MeshDeformDock");
+  m_meshDeformDock->hide();
   // Native title bars are kept so Qt's dock drag/float/rearrange machinery works.
   // They are styled compact and dark via QSS in applyUiChrome().
   // Tabified docks can be floated by right-clicking the tab (Qt standard behavior).
@@ -1072,9 +1076,11 @@ void MainWindow::setupShellLayout() {
   addDockWidget(Qt::RightDockWidgetArea, m_adjustmentDock);
   addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
   addDockWidget(Qt::RightDockWidgetArea, m_infoDock);
+  addDockWidget(Qt::RightDockWidgetArea, m_meshDeformDock);
   tabifyDockWidget(m_layerDock, m_adjustmentDock);
   tabifyDockWidget(m_layerDock, m_aiDock);
   tabifyDockWidget(m_layerDock, m_infoDock);
+  tabifyDockWidget(m_layerDock, m_meshDeformDock);
 
   m_toolDock->raise();
   m_layerDock->raise();
@@ -1084,7 +1090,7 @@ void MainWindow::setupShellLayout() {
   const QList<QDockWidget*> allDocks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock
+      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock, m_meshDeformDock
   };
   for (auto* dock : allDocks) {
     if (!dock) continue;
@@ -1205,6 +1211,7 @@ void MainWindow::createMenus() {
   m_motionBlurAction          = new QAction(QString::fromUtf8(u8"モーションぼかし(&M)..."), this);
   m_transformAction           = new QAction(QString::fromUtf8(u8"変形(&T)"), this);
   m_freeTransformAction       = new QAction(QString::fromUtf8(u8"自由変形(&F)"), this);
+  m_meshDeformAction          = new QAction(QString::fromUtf8(u8"メッシュ変形(&M)"), this);
 
   m_recentFilesMenu = fileMenu->addMenu("最近使ったファイル");
 
@@ -1311,6 +1318,7 @@ void MainWindow::createMenus() {
     auto* transformSubMenu = editMenu->addMenu(QString::fromUtf8(u8"変形(&T)"));
     transformSubMenu->addAction(m_transformAction);
     transformSubMenu->addAction(m_freeTransformAction);
+    transformSubMenu->addAction(m_meshDeformAction);
   }
   editMenu->addSeparator();
   editMenu->addAction(m_brushSizeDownAction);
@@ -1716,6 +1724,18 @@ void MainWindow::createMenus() {
   connect(m_freeTransformAction, &QAction::triggered, this, [this]() {
     if (!m_controller->beginTransformSession()) {
       statusBar()->showMessage(QString::fromUtf8(u8"自由変形: ラスターレイヤーを選択してください"), 3000);
+    }
+  });
+  connect(m_meshDeformAction, &QAction::triggered, this, [this]() {
+    if (m_controller->beginMeshDeformSession()) {
+      m_meshDeformPanel->setController(m_controller);
+      m_meshDeformPanel->updateFromController();
+      if (m_meshDeformDock) {
+        m_meshDeformDock->show();
+        m_meshDeformDock->raise();
+      }
+    } else {
+      statusBar()->showMessage(QString::fromUtf8(u8"メッシュ変形: ラスターレイヤーを選択してください"), 3000);
     }
   });
   connect(m_gaussianBlurAction,  &QAction::triggered, this, [this]() {

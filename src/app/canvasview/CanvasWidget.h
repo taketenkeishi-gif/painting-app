@@ -73,6 +73,7 @@ private:
   bool m_showOverlay {true};
   bool m_spacePressed {false};
   bool m_transformConfirmPending {false};
+  int  m_meshDeformDragPinId {-1};  // -1 = not dragging
   bool m_tabletActive {false};
   double m_canvasRotationDeg {0.0};
   bool m_rotateKeyHeld {false};

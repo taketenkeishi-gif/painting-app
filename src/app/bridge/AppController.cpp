@@ -414,14 +414,38 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
     view.transformHalfH   = m_freeTransformTool->halfH();
   }
 
-    // Mesh deform preview
+    // Mesh deform preview + wireframe
     if (isInMeshDeformMode()) {
         const auto& previewBuf = m_meshDeformTool->previewBuffer();
         auto* layer = m_document.activeLayer();
+        const float offX = layer ? static_cast<float>(layer->offsetX()) : 0.f;
+        const float offY = layer ? static_cast<float>(layer->offsetY()) : 0.f;
+
         view.hasMeshDeformPreview = true;
         view.meshDeformPreviewImage = platform::qt::QtImageConverter::toQImage(previewBuf);
         view.meshDeformPreviewOffX = layer ? layer->offsetX() : 0;
         view.meshDeformPreviewOffY = layer ? layer->offsetY() : 0;
+
+        // Wireframe: deformed vertices in canvas coords
+        const auto& deformed = m_meshDeformTool->lastDeformedPositions();
+        view.meshDeformDeformedVerts.clear();
+        view.meshDeformDeformedVerts.reserve(deformed.size());
+        for (const auto& p : deformed)
+            view.meshDeformDeformedVerts.push_back({p.x + offX, p.y + offY});
+
+        const auto& mesh = m_meshDeformTool->mesh();
+        view.meshDeformTriangles.clear();
+        view.meshDeformTriangles.reserve(mesh.triangles.size());
+        for (const auto& t : mesh.triangles)
+            view.meshDeformTriangles.push_back({t.v[0], t.v[1], t.v[2]});
+
+        // Pins in canvas coords
+        view.meshDeformPinCurrents.clear();
+        view.meshDeformPinOriginals.clear();
+        for (const auto& pin : mesh.pins) {
+            view.meshDeformPinCurrents.push_back({pin.current.x + offX, pin.current.y + offY});
+            view.meshDeformPinOriginals.push_back({pin.original.x + offX, pin.original.y + offY});
+        }
     }
 
   return view;
@@ -4164,6 +4188,14 @@ void AppController::meshDeformRegenerateMesh() {
         : static_cast<const core::mesh::IMeshGenerator*>(&m_gridMeshGen);
     m_meshDeformTool->regenerateMesh(*gen, m_meshGenConfig);
     emit overlayChanged();
+}
+
+int AppController::meshDeformHitTestPin(float canvasX, float canvasY) const noexcept {
+    if (!isInMeshDeformMode()) return -1;
+    auto* layer = m_document.activeLayer();
+    float lx = canvasX - static_cast<float>(layer ? layer->offsetX() : 0);
+    float ly = canvasY - static_cast<float>(layer ? layer->offsetY() : 0);
+    return m_meshDeformTool->hitTestPin({lx, ly}, 10.f);
 }
 
 // \u2500\u2500 AI / ComfyUI API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
