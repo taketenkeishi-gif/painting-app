@@ -4,7 +4,55 @@
 
 ---
 
-## 2026-06-11 (最新) — FreeTransform コミット修正・完全検証
+## 2026-06-11 (最新) — Layer Offset Model 実装 (ADR-008 Phase 0-2)
+
+### 作業内容
+
+- Ctrl ドラッグ移動でキャンバス外ピクセルが失われる問題を修正
+- ADR-008 Phase 0-2 を実装（Layer offset fields / Renderer 変換 / MoveLayerTool 非破壊化）
+- BrushTool / EraserTool / FillTool 選択マスク対応
+- AdjustmentPropertyPanel 追加（レイヤーパネルにタブ追加）
+- FreeTransformTool デバッグログ削除
+
+### 変更ファイル
+
+- `src/core/layer/Layer.h` — `m_offsetX/Y` フィールド + accessor 追加（Phase 0）
+- `src/core/render/Renderer.cpp` — `sampleBuffer()` + オフセット座標変換（Phase 1）
+- `src/core/tools/MoveLayerTool.h/cpp` — ピクセルコピー→オフセット更新に置換（Phase 2）
+- `src/core/document/Document.h/cpp` — `insertLayerAt()` 追加（LayerAdd/Remove undo用）
+- `src/app/bridge/LpaExporter/Importer.cpp` — `offsetX/Y` 保存・読み込み（既存）
+- `src/core/tools/BrushTool.h/cpp` — `m_selectionMask` で選択範囲内のみ描画
+- `src/core/tools/EraserTool.h/cpp` — 同上（消しゴム）
+- `src/core/tools/FillTool.cpp` — 同上（塗りつぶし）
+- `src/app/panels/AdjustmentPropertyPanel.h/cpp` — 新規パネル
+- `src/app/bridge/AppController.h` — `setActiveLayerAdjustmentParams` / `pasteBufferAsNewRasterLayerAndTransform` 追加
+- `src/app/mainwindow/MainWindow.h/cpp` — AdjustmentDock 配線
+- `src/CMakeLists.txt` — AdjustmentPropertyPanel をビルドに追加
+- `docs/adr/ADR-008-layer-offset-model.md` — 新規 ADR 文書
+- `src/app/main.cpp` — 起動ログ（[STARTUP] Build/Exe 情報）
+
+### 完了項目
+
+- ✅ 実装: Layer Offset Model Phase 0, 1, 2
+- ✅ 実装: 選択マスク対応（Brush/Eraser/Fill）
+- ✅ 実装: AdjustmentPropertyPanel
+- ✅ ビルド: Release ビルド成功（コンパイルエラーなし）
+- ✅ デバッグログ削除: FreeTransformTool の `[FT_PRESS]` `[FT_MOVE]` `[OVERLAY]` ログ除去
+
+### 既知の未対応事項
+
+- ADR-008 Phase 3 (BrushTool buffer 動的拡張): オフセット != 0 レイヤーへの直接描画は未対応
+  → 回避策: 描画後に移動する順序で利用可能
+
+### ユーザー確認ポイント
+
+1. ラスターレイヤーを Ctrl ドラッグで半分キャンバス外へ移動 → 逆方向に戻す → 消えたピクセルが復活することを確認
+2. 選択範囲を作成してブラシで描画 → 選択外に描かれないことを確認
+3. 調整レイヤーを選択して「調整レイヤー」ドックが表示・動作することを確認
+
+---
+
+## 2026-06-11 — FreeTransform コミット修正・完全検証
 
 ### 作業内容
 

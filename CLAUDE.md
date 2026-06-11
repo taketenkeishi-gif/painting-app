@@ -76,6 +76,96 @@ Get-Item "build\src\Release\LayeredPaintApp.exe" | Select-Object FullName, LastW
 
 ---
 
+## 🚨 HARD GATE: Runtime Identity Check（強制ゲート）
+
+**このルールは省略不可。**
+
+### 完了条件
+
+コンパイル済みアプリケーションに対するタスクは、以下の identity chain が証明されるまで完了とみなさない:
+
+```
+SOURCE（リポジトリ）
+  ↓
+BUILD OUTPUT（生成された exe）
+  ↓
+RUNNING PROCESS（実際に動いているプロセス）
+```
+
+### 成功報告前の必須出力フォーマット
+
+Claude は「修正完了」「実装完了」を報告する前に、必ず以下を出力すること:
+
+```
+SOURCE:
+  path:   <リポジトリパス>
+  commit: <git commit hash>
+
+BUILD:
+  path:      <生成 exe の絶対パス>
+  timestamp: YYYY-MM-DD HH:MM:SS
+
+RUNTIME:
+  path:      <Get-Process で確認した実行中プロセスのパス>
+  timestamp: YYYY-MM-DD HH:MM:SS
+
+MATCH: YES / NO
+```
+
+### MATCH が確認できない場合
+
+ステータスは必ず以下を使うこと:
+
+```
+BUILD ONLY - NOT VERIFIED
+```
+
+以下の表現は禁止:
+- ❌ fixed
+- ❌ complete
+- ❌ verified
+
+### Repeated Failure Protection
+
+ユーザーが以下を発言した場合:
+- 「まだ直っていない」
+- 「変化がない」
+- 「前と同じ」
+
+Claude はコードを編集してはならない。
+
+最初の応答は必ず:
+
+> "Checking runtime identity."
+
+その後、artifact の identity を確認する。
+
+### Multiple Build Directory Rule
+
+複数のビルドフォルダが存在する場合（例: `build/` `build-debug/` `build_cv/` など）は HIGH RISK として扱う。
+
+デバッグ前に:
+1. 候補一覧を列挙する
+2. アクティブなものを特定する
+3. それ以外を deprecated としてマークする
+
+### Launch Shortcut Rule
+
+GUI アプリケーションでは、ショートカット・IDE の実行設定もランタイム artifact として扱う。
+
+以下を必ず確認:
+- `.lnk` ターゲット
+- IDE の実行ターゲット
+- launch スクリプト（`launch.bat` など）
+
+### Failure Condition
+
+runtime identity を証明せずにコードを 2 回変更した場合 = プロセス失敗。
+
+コード変更を停止し、環境の audit を行う。
+
+---
+
 ## ディレクトリ構成
 
 ```

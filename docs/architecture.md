@@ -30,10 +30,33 @@
   - `Raster`: pixel buffer-based painting
   - `Vector`: path list (`VectorPath`) rendered at composite time
   - `Folder`: non-rendering organizational placeholder layer (baseline)
+  - `Adjustment`: non-destructive color correction (BrightnessContrast, HueSaturation, Levels, Invert, Threshold, Vibrance)
+  - `Text`: editable text, rasterized to PixelBuffer on commit
 - Layer flags include `clippedToBelow` and optional mask (`hasMask/maskEnabled` + mask buffer), and renderer applies these during compositing.
 - `LineTool` writes vector paths on vector layers and raster pixels on raster layers.
 - `Renderer` rasterizes vector paths into a temporary buffer and composites it with standard alpha blending.
 - Layer order changes are centralized in `Document::moveLayer` and consumed by both button moves and LayerPanel drag/drop reorder.
+
+### ⚠️ Canvas-Bound Layer Model（現在の制約）
+
+現在 (`2026-06-10` 時点)、ラスターレイヤーはすべてキャンバスサイズに固定・原点(0,0)整列。
+`Layer` クラスに offset フィールドはなく、`PixelBuffer` は常にキャンバスサイズで生成される。
+
+- ペースト時にキャンバス外ピクセルが破棄される
+- レイヤー移動はピクセルの物理コピー（端が消失、不可逆）
+- CSP/Photoshop の「off-canvas ピクセル保持」動作が実現できない
+
+### 次期: Layer Offset Model（ADR-008 ACCEPTED）
+
+**[ADR-008](adr/ADR-008-layer-offset-model.md)** で `offsetX/offsetY` フィールド追加と
+独立サイズ `PixelBuffer` への移行が決定済み（未実装）。
+
+移行フェーズ:
+- **Phase 0:** `Layer` に `offsetX/offsetY` 追加（デフォルト 0 → 既存動作維持）
+- **Phase 1:** `Renderer` 全ピクセルアクセスに `(x - offsetX, y - offsetY)` 変換
+- **Phase 2:** `MoveLayerTool` をオフセット変更に置換。ペーストを元サイズ保持に変更
+- **Phase 3:** ブラシのバッファ動的拡張（最高リスク、十分なテスト必須）
+- **Phase 4:** LPA v2 フォーマット更新、PSD 完全対応
 
 ## History Scope
 

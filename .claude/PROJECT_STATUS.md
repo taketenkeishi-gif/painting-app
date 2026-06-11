@@ -1,8 +1,8 @@
 # プロジェクト状態 — Paint App
 
-**Last Updated:** 2026-06-08  
-**Latest Commit:** `c056203` (前回セッション)  
-**Current Phase:** Phase 0（描画エンジン根本再構築）
+**Last Updated:** 2026-06-11  
+**Latest Commit:** `b97c990` (fix: preserve off-canvas pixels during high quality transform)  
+**Current Phase:** Phase 1 実装中（Layer Offset Model Phase 0-2 完了）
 
 ---
 
@@ -92,6 +92,9 @@
 | task-32 | MainWindow Ctrl+0/Ctrl+1 ショートカット確認 | `c056203` | ✅ DONE |
 | task-23 | LayerPanel opacity スライダー同期修正 | `4a4beba` | ✅ DONE |
 | task-002 | FillTool SelectionMask 対応 | — | ✅ DONE |
+| ADR-008 P0-2 | Layer Offset Model (Move/Renderer/Layer) | — | ✅ DONE |
+| selection-paint | BrushTool/EraserTool 選択マスク対応 | — | ✅ DONE |
+| adj-panel | AdjustmentPropertyPanel 追加 | — | ✅ DONE |
 | SAM2 ONNX | AI 選択ツール基盤（PAINT_USE_ONNX） | — | ✅ DONE |
 | Vector Live Preview | ベクターレイヤー描画中プレビュー | — | ✅ DONE |
 | UI Theme Refresh | Dark theme redesign | — | ✅ DONE |
@@ -106,11 +109,37 @@
 
 ---
 
+## アーキテクチャ決定済み（未実装）
+
+### ADR-008: Layer Offset Model — ACCEPTED (2026-06-10)
+
+CSP/Photoshop 互換の「レイヤーオフセット + 独立 PixelBuffer」モデルへの移行が決定。
+詳細: [ADR-008](../docs/adr/ADR-008-layer-offset-model.md)
+
+移行フェーズ（実装順）:
+
+| Phase | 内容 | リスク | 状態 |
+|---|---|---|---|
+| **Phase 0** | `Layer` に `offsetX/offsetY` 追加（デフォルト 0） | 低 | ✅ 完了 |
+| **Phase 1** | `Renderer` 全ピクセルアクセスに座標変換追加 | 中 | ✅ 完了 |
+| **Phase 2** | `MoveLayerTool` をオフセット変更に置換。ペーストを元サイズ保持に | 中 | ✅ 完了 |
+| **Phase 3** | ブラシのバッファ動的拡張（全描画ツール） | **高** | ⬜ 未着手 |
+| **Phase 4** | LPA v2 フォーマット更新 / PSD 完全対応 | 低 | ⬜ 未着手 |
+
+**Phase 3 はオフセット ≠ 0 のレイヤーに描画する場合に必要。現在はオフセット 0 で描画→移動の順序で利用可能。**
+
+---
+
 ## 次のタスク（優先順）
 
 ### 🔴 高優先度
 
-1. **SAM2 ONNX モデルセットアップ** （AI 選択ツール実用化）
+1. **ADR-008 Phase 3** — オフセットレイヤーへの描画（BrushTool buffer動的拡張）
+   - 現在はオフセット 0 のレイヤーで描画→移動の順序が前提
+   - Phase 3 実装で「移動済みレイヤーに直接描画」が可能になる
+   - **HIGH RISK**: 全描画ツールに影響。ユニットテスト整備が前提条件
+
+2. **SAM2 ONNX モデルセットアップ** （AI 選択ツール実用化）
    - `scripts\download_sam2.ps1` で モデルをエクスポート
    - `vcpkg install onnxruntime:x64-windows`
    - `cmake -DPAINT_USE_ONNX=ON` でリビルド

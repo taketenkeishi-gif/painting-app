@@ -219,6 +219,46 @@ cmake -DPAINT_USE_ONNX=ON -B build
 
 ---
 
+---
+
+## レイヤーシステム設計
+
+### ADR-008: レイヤーオフセットモデル（Canvas-Bound → Independent PixelBuffer）
+
+**決定日:** 2026-06-10  
+**Status:** ACCEPTED（未実装）  
+**決定:** `Layer` クラスに `offsetX/offsetY` フィールドを追加し、`PixelBuffer` をキャンバスサイズに依存しない独立サイズで持てるようにする。
+
+**背景:**
+
+本番準備度レビュー（2026-06-10）により、現在のアーキテクチャが CSP/Photoshop ユーザーの期待する動作を構造上実現できないことが判明。具体的な制約:
+- ペースト時にキャンバス外ピクセルが即時破棄される
+- レイヤー移動でキャンバス端のピクセルが消失（不可逆）
+- `PsdExporter.cpp` で `layer.offsetX()` が呼ばれているがメソッドが存在しない（コンパイル不可）
+
+**検討した3案:**
+
+1. ❌ **Case A: Temporary Floating Transform のみ** — 現状維持。目標 UX を構造上実現不可能
+2. ✅ **Case B: Layer Offset + Independent PixelBuffer**（採用）— 業界標準。PSD 互換。段階移行安全
+3. ❌ **Case C: Full Transform Matrix per Layer** — 過剰。ブラシ描画と根本的に相性が悪い。工数 5〜10 倍
+
+**採用理由:**
+
+- CSP / Krita / Photoshop が採用する業界標準モデル
+- `offset = 0` をデフォルトにすることで既存動作を一切壊さずに段階的移行が可能
+- PSD フォーマットが同一モデルのため、インポート/エクスポートが構造的に正しくなる
+
+**移行リスク:**
+
+- Phase 0〜2 は低リスク（offset フィールド追加、Renderer 変換、MoveLayer 簡素化）
+- Phase 3（ブラシの動的バッファ拡張）が最高リスク。全描画ツールに波及するため十分なテスト必須
+
+**影響範囲:** `Layer.h`, `Renderer`, `BrushEngine` 全ツール, `MoveLayerTool`, `FreeTransformTool`, LPA フォーマット, PSD Exporter
+
+**詳細:** [ADR-008](../docs/adr/ADR-008-layer-offset-model.md)
+
+---
+
 ## 今後の重要判断ポイント
 
 ### 未決定項目
@@ -227,6 +267,7 @@ cmake -DPAINT_USE_ONNX=ON -B build
 |---|---|---|
 | ネイティブファイルフォーマット | 設計検討中 | Phase 1 終盤 |
 | ペンタブ API（Wintab vs Windows Ink） | 実装前 | Phase 1 中 |
+| Layer Offset Model 実装開始タイミング | ADR-008 ACCEPTED、実装待ち | Phase 1 中盤〜後半 |
 | クラウド連携 | オプション方針 | Phase 2 |
 | Plugin API | 将来 (JSON definition) | Phase 2+ |
 
