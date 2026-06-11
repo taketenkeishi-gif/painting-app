@@ -181,13 +181,39 @@ SelectionMask AiSelectTool::runStubSegmentation(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// RotoBrush helpers
+// ─────────────────────────────────────────────────────────────────────────────
+void AiSelectTool::clearRotoStrokes() noexcept {
+  m_rotoStrokes.clear();
+  m_activeStroke.clear();
+  m_positivePoints.clear();
+  m_negativePoints.clear();
+  m_strokeActive = false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ITool implementation
 // ─────────────────────────────────────────────────────────────────────────────
 ToolResult AiSelectTool::onPointerPress(ToolContext& ctx, const ToolPointerEvent& e) {
-  const PixelBuffer& source = m_settings.referAllLayers ? ctx.composited : ctx.composited;
+  // ── RotoBrush モード ─────────────────────────────────────────────────────
+  if (m_inputMode == InputMode::RotoBrush) {
+    if (e.ctrl) {
+      clearRotoStrokes();
+      ctx.document.selection().clear();
+      ToolResult r; r.selectionChanged = true; return r;
+    }
+    m_paintFg = !e.alt;  // Alt = 背景ブラシ
+    m_activeStroke.clear();
+    m_activeStroke.push_back(e.fpoint);
+    m_strokeActive = true;
+    ToolResult r; r.viewportChanged = true; return r;
+  }
 
-  const bool isNegative = e.shift;  // Shift = ネガティブポイント
-  const bool isClear    = e.ctrl;   // Ctrl  = クリア
+  // ── Click モード (元の実装) ───────────────────────────────────────────────
+  const PixelBuffer& source = ctx.composited;
+
+  const bool isNegative = e.shift;
+  const bool isClear    = e.ctrl;
 
   if (isClear) {
     m_positivePoints.clear();
@@ -206,13 +232,11 @@ ToolResult AiSelectTool::onPointerPress(ToolContext& ctx, const ToolPointerEvent
     m_positivePoints.push_back(e.point);
   }
 
-  // スタブ推論を即時実行してdocumentに適用
   const SelectionMask& currentSel = ctx.document.selection();
   SelectionMask newMask = runStubSegmentation(source, currentSel,
                                               m_positivePoints, m_negativePoints);
   ctx.document.selection() = std::move(newMask);
 
-  // ComfyUI 推論リクエスト（非同期）
   if (m_inferenceCallback) {
     m_inferenceCallback(ctx.composited, m_positivePoints, m_negativePoints);
   }
@@ -221,17 +245,68 @@ ToolResult AiSelectTool::onPointerPress(ToolContext& ctx, const ToolPointerEvent
 }
 
 ToolResult AiSelectTool::onPointerMove(ToolContext& ctx, const ToolPointerEvent& e) {
-  static_cast<void>(ctx); static_cast<void>(e); return {};
+  static_cast<void>(ctx);
+  if (m_inputMode == InputMode::RotoBrush && m_strokeActive) {
+    m_activeStroke.push_back(e.fpoint);
+    ToolResult r; r.viewportChanged = true; return r;
+  }
+  return {};
 }
 
 ToolResult AiSelectTool::onPointerRelease(ToolContext& ctx, const ToolPointerEvent& e) {
-  static_cast<void>(ctx); static_cast<void>(e); return {};
+  static_cast<void>(e);
+  if (m_inputMode == InputMode::RotoBrush && m_strokeActive) {
+    m_strokeActive = false;
+    if (m_activeStroke.empty()) return {};
+
+    // ── ストロークを確定 ─────────────────────────────────────────────────
+    ToolOverlayState::RotoStroke finished;
+    finished.isForeground = m_paintFg;
+    finished.points       = std::move(m_activeStroke);
+    m_activeStroke.clear();
+    m_rotoStrokes.push_back(std::move(finished));
+
+    // ── 全確定ストロークからプロンプト点をサンプリング ────────────────────
+    m_positivePoints.clear();
+    m_negativePoints.clear();
+    for (const auto& stroke : m_rotoStrokes) {
+      for (std::size_t i = 0; i < stroke.points.size(); i += 8) {
+        const FPoint& fp = stroke.points[i];
+        Point p {static_cast<int>(fp.x), static_cast<int>(fp.y)};
+        (stroke.isForeground ? m_positivePoints : m_negativePoints).push_back(p);
+      }
+      if (!stroke.points.empty()) {
+        const FPoint& fp = stroke.points.back();
+        Point p {static_cast<int>(fp.x), static_cast<int>(fp.y)};
+        (stroke.isForeground ? m_positivePoints : m_negativePoints).push_back(p);
+      }
+    }
+
+    if (m_positivePoints.empty()) return {};
+
+    // スタブ推論で即時フィードバック
+    const SelectionMask& currentSel = ctx.document.selection();
+    SelectionMask newMask = runStubSegmentation(
+        ctx.composited, currentSel, m_positivePoints, m_negativePoints);
+    ctx.document.selection() = std::move(newMask);
+
+    // ONNX 推論（非同期）
+    if (m_inferenceCallback) {
+      m_inferenceCallback(ctx.composited, m_positivePoints, m_negativePoints);
+    }
+
+    ToolResult r; r.selectionChanged = true; return r;
+  }
+  return {};
 }
 
 ToolResult AiSelectTool::onCancel(ToolContext& ctx) {
   static_cast<void>(ctx);
   m_positivePoints.clear();
   m_negativePoints.clear();
+  if (m_inputMode == InputMode::RotoBrush) {
+    clearRotoStrokes();
+  }
   return {};
 }
 
@@ -241,10 +316,20 @@ ToolResult AiSelectTool::onWheel(ToolContext& ctx, int deltaSteps, const ToolPoi
 
 ToolOverlayState AiSelectTool::overlay() const {
   ToolOverlayState state;
-  if (!m_positivePoints.empty()) {
-    state.hasPolygon    = true;
-    state.polygonClosed = false;
-    state.polygonPoints = m_positivePoints;
+  if (m_inputMode == InputMode::RotoBrush) {
+    if (!m_rotoStrokes.empty() || m_strokeActive) {
+      state.hasRotoStrokes   = true;
+      state.rotoStrokes      = m_rotoStrokes;
+      state.rotoActiveStroke = m_activeStroke;
+      state.rotoActiveFg     = m_paintFg;
+      state.rotoBrushRadius  = m_brushRadius;
+    }
+  } else {
+    if (!m_positivePoints.empty()) {
+      state.hasPolygon    = true;
+      state.polygonClosed = false;
+      state.polygonPoints = m_positivePoints;
+    }
   }
   return state;
 }

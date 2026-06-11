@@ -51,6 +51,10 @@
 #include "core/mesh/GridMeshGenerator.h"
 #include "core/mesh/EdgeAdaptiveMeshGenerator.h"
 
+namespace app::panels {
+class RotoBrushPanel;
+}
+
 namespace app::bridge {
 class ComfyUiClient;
 
@@ -165,6 +169,9 @@ struct CanvasOverlayViewModel {
   float  transformRot         {0.f};  ///< ラジアン
   float  transformHalfW       {0.f};
   float  transformHalfH       {0.f};
+  // Distort（透視変換）モード
+  bool        transformIsDistort    {false};
+  core::FPoint transformDistortCorners[4] {};  ///< TL TR BR BL（キャンバス座標）
 
   // MeshDeformTool プレビュー
   bool   hasMeshDeformPreview  {false};
@@ -487,6 +494,16 @@ public:
   void setAiSelectGranularity(int granularity);
   int  aiSelectGranularity() const noexcept { return m_onnxGranularity; }
 
+  // ── Roto ブラシ ───────────────────────────────────────────────────────
+  /// 前景/背景ブラシモードを切り替える（RotoBrushPanel → AiSelectTool）
+  void setRotoBrushForeground(bool isFg);
+  /// ブラシ表示半径を設定する
+  void setRotoBrushRadius(float radiusPx);
+  /// 全ストロークとプロンプト点をクリアし選択をリセットする
+  void clearRotoStrokes();
+  /// RotoBrushPanel を後から接続する（MainWindow の遅延初期化用）
+  void setRotoBrushPanel(app::panels::RotoBrushPanel* panel);
+
   struct InpaintParams {
     QString prompt;
     QString negativePrompt;
@@ -535,7 +552,8 @@ signals:
   void foregroundColorUsed();
   void overlayChanged();
   void comfyUiStateChanged(bool connected);
-  void aiSelectionRefined();   ///< ComfyUI 推論で選択が更新されたとき
+  void aiSelectionRefined();   ///< ComfyUI / ONNX 推論で選択が更新されたとき
+  void rotoMaskApplied();      ///< Rotoブラシのストローク確定でマスクが更新されたとき
   void aiModelsLoaded(QStringList models);
   /// step/total ステップ数 + 現在ノード ID
   void aiProgressUpdate(int step, int totalSteps, QString nodeId);
@@ -657,10 +675,15 @@ private:
 
   // Mesh deform session
   std::optional<core::MeshDeformTool> m_meshDeformTool;
+  std::optional<core::Layer> m_meshDeformSavedLayer; ///< ghost防止: セッション開始前のレイヤー状態
+  std::vector<core::MeshDeformTool::PinSnapshot> m_meshDeformPinHistory; ///< ピン単位アンドゥ用
   core::mesh::MeshGenConfig m_meshGenConfig;
   int m_meshGenType {0};  // 0=Grid, 1=EdgeAdaptive
   core::mesh::GridMeshGenerator     m_gridMeshGen;
   core::mesh::EdgeAdaptiveMeshGenerator m_edgeMeshGen;
+
+  // ── Roto ブラシパネル参照 ─────────────────────────────────────────────
+  app::panels::RotoBrushPanel* m_rotoBrushPanel {nullptr};
 
   // ── ONNX セグメンテーションエンジン ──────────────────────────────────
   std::unique_ptr<core::ai::OnnxSegEngine> m_onnxSegEngine;

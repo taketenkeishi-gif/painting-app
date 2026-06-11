@@ -70,6 +70,7 @@
 #include "app/panels/AdjustmentPropertyPanel.h"
 #include "app/panels/AiPanel.h"
 #include "app/panels/MeshDeformPanel.h"
+#include "app/panels/RotoBrushPanel.h"
 #include "app/ui/Theme.h"
 #include "app/panels/GenerativeFillDialog.h"
 #include "app/panels/LayerPanel.h"
@@ -523,6 +524,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_adjustmentPanel(new app::panels::AdjustmentPropertyPanel(this)),
       m_aiPanel(new app::panels::AiPanel(this)),
       m_meshDeformPanel(new app::panels::MeshDeformPanel(nullptr, this)),
+      m_rotoBrushPanel(new app::panels::RotoBrushPanel(nullptr, this)),
       m_layerPanel(new app::panels::LayerPanel(this)),
       m_toolPanel(new app::panels::ToolPanel(this)),
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
@@ -551,6 +553,7 @@ MainWindow::MainWindow(QWidget* parent)
   m_quickSliderPanel->setController(m_controller);
   m_subToolPanel->setController(m_controller);
   m_toolPropertyPanel->setController(m_controller);
+  m_controller->setRotoBrushPanel(m_rotoBrushPanel);
   m_toolPanel->setSections(app::panels::ToolPanel::ButtonsOnly);
   m_quickSliderPanel->setSections(app::panels::ToolPanel::QuickSlidersOnly);
 
@@ -1046,7 +1049,7 @@ void MainWindow::setupShellLayout() {
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
   m_meshDeformDock = makeDock(QString::fromUtf8(u8"メッシュ変形"), m_meshDeformPanel, "MeshDeformDock");
-  m_meshDeformDock->hide();
+  m_rotoBrushDock  = makeDock(QString::fromUtf8(u8"Rotoブラシ"),  m_rotoBrushPanel,  "RotoBrushDock");
   // Native title bars are kept so Qt's dock drag/float/rearrange machinery works.
   // They are styled compact and dark via QSS in applyUiChrome().
   // Tabified docks can be floated by right-clicking the tab (Qt standard behavior).
@@ -1077,10 +1080,12 @@ void MainWindow::setupShellLayout() {
   addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
   addDockWidget(Qt::RightDockWidgetArea, m_infoDock);
   addDockWidget(Qt::RightDockWidgetArea, m_meshDeformDock);
+  addDockWidget(Qt::RightDockWidgetArea, m_rotoBrushDock);
   tabifyDockWidget(m_layerDock, m_adjustmentDock);
   tabifyDockWidget(m_layerDock, m_aiDock);
   tabifyDockWidget(m_layerDock, m_infoDock);
   tabifyDockWidget(m_layerDock, m_meshDeformDock);
+  tabifyDockWidget(m_layerDock, m_rotoBrushDock);
 
   m_toolDock->raise();
   m_layerDock->raise();
@@ -1090,7 +1095,8 @@ void MainWindow::setupShellLayout() {
   const QList<QDockWidget*> allDocks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock, m_meshDeformDock
+      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock,
+      m_meshDeformDock, m_rotoBrushDock
   };
   for (auto* dock : allDocks) {
     if (!dock) continue;
@@ -1730,13 +1736,15 @@ void MainWindow::createMenus() {
     if (m_controller->beginMeshDeformSession()) {
       m_meshDeformPanel->setController(m_controller);
       m_meshDeformPanel->updateFromController();
-      if (m_meshDeformDock) {
-        m_meshDeformDock->show();
-        m_meshDeformDock->raise();
-      }
+      if (m_meshDeformDock) m_meshDeformDock->raise();
+    } else if (m_controller->isInTransformMode()) {
+      statusBar()->showMessage(QString::fromUtf8(u8"メッシュ変形: 自由変形を終了してから実行してください"), 3000);
     } else {
       statusBar()->showMessage(QString::fromUtf8(u8"メッシュ変形: ラスターレイヤーを選択してください"), 3000);
     }
+  });
+  connect(m_meshDeformPanel, &app::panels::MeshDeformPanel::sessionEnded, this, [this]() {
+    if (m_layerDock) m_layerDock->raise();
   });
   connect(m_gaussianBlurAction,  &QAction::triggered, this, [this]() {
     statusBar()->showMessage(QString::fromUtf8(u8"ガウスぼかし: 未実装"), 3000);

@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QTabletEvent>
 #include <QWheelEvent>
 
@@ -287,19 +288,45 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
 
     // ── FreeTransform フローティング画像プレビュー ───────────────────────────
     if (overlay.hasTransformPreview && !overlay.transformFloatingImage.isNull()) {
-      const double screenCX = target.x() + static_cast<double>(overlay.transformCenterX) * state.zoom;
-      const double screenCY = target.y() + static_cast<double>(overlay.transformCenterY) * state.zoom;
-      const double fw = static_cast<double>(overlay.transformHalfW) * state.zoom;
-      const double fh = static_cast<double>(overlay.transformHalfH) * state.zoom;
-      painter.save();
-      painter.setClipRect(target);  // キャンバス外にピクセルを表示しない
-      painter.translate(screenCX, screenCY);
-      painter.rotate(static_cast<double>(overlay.transformRot) * (180.0 / 3.14159265358979323846));
-      painter.scale(static_cast<double>(overlay.transformSx), static_cast<double>(overlay.transformSy));
-      painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 8.0);
-      painter.drawImage(QRectF(-fw, -fh, fw * 2.0, fh * 2.0), overlay.transformFloatingImage);
-      painter.restore();
-      painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+      if (overlay.transformIsDistort) {
+        // Distort（透視変換）モード: quadToQuad でリアルタイムプレビュー
+        const double imgW = static_cast<double>(overlay.transformFloatingImage.width());
+        const double imgH = static_cast<double>(overlay.transformFloatingImage.height());
+        QPolygonF srcPoly;
+        srcPoly << QPointF(0, 0) << QPointF(imgW, 0)
+                << QPointF(imgW, imgH) << QPointF(0, imgH);
+        QPolygonF dstPoly;
+        for (int i = 0; i < 4; ++i) {
+          dstPoly << QPointF(
+              target.x() + static_cast<double>(overlay.transformDistortCorners[i].x) * state.zoom,
+              target.y() + static_cast<double>(overlay.transformDistortCorners[i].y) * state.zoom);
+        }
+        QTransform perspTransform;
+        if (QTransform::quadToQuad(srcPoly, dstPoly, perspTransform)) {
+          painter.save();
+          painter.setClipRect(target);
+          painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 8.0);
+          painter.setWorldTransform(perspTransform, true);
+          painter.drawImage(QPointF(0, 0), overlay.transformFloatingImage);
+          painter.restore();
+          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        }
+      } else {
+        // 通常アフィン変換プレビュー
+        const double screenCX = target.x() + static_cast<double>(overlay.transformCenterX) * state.zoom;
+        const double screenCY = target.y() + static_cast<double>(overlay.transformCenterY) * state.zoom;
+        const double fw = static_cast<double>(overlay.transformHalfW) * state.zoom;
+        const double fh = static_cast<double>(overlay.transformHalfH) * state.zoom;
+        painter.save();
+        painter.setClipRect(target);
+        painter.translate(screenCX, screenCY);
+        painter.rotate(static_cast<double>(overlay.transformRot) * (180.0 / 3.14159265358979323846));
+        painter.scale(static_cast<double>(overlay.transformSx), static_cast<double>(overlay.transformSy));
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 8.0);
+        painter.drawImage(QRectF(-fw, -fh, fw * 2.0, fh * 2.0), overlay.transformFloatingImage);
+        painter.restore();
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+      }
     }
 
     // ── Tool line overlay (LineTool / MoveLayer) ────────────────────────────
@@ -572,6 +599,41 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
         painter.setBrush(selected ? QColor(72, 195, 255) : QColor(240, 240, 255));
         painter.drawRect(QRectF(pt.x() - 4.0, pt.y() - 4.0, 8.0, 8.0));
       }
+    }
+
+    // ── Rotoブラシ FG/BG ストロークオーバーレイ ─────────────────────────────────
+    if (overlay.toolOverlay.hasRotoStrokes) {
+      auto toS = [&](const core::FPoint& p) -> QPointF {
+        return QPointF(target.x() + static_cast<double>(p.x) * state.zoom,
+                       target.y() + static_cast<double>(p.y) * state.zoom);
+      };
+      const double radius = static_cast<double>(overlay.toolOverlay.rotoBrushRadius) * state.zoom;
+
+      auto drawStroke = [&](const std::vector<core::FPoint>& pts, bool fg) {
+        if (pts.size() < 2) return;
+        // alpha を 140 にしてストローク半透明を表現
+        const QColor col = fg ? QColor(60, 220, 60, 140) : QColor(220, 50, 50, 140);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        QPen pen(col, std::max(radius * 2.0, 2.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+        QPainterPath path;
+        path.moveTo(toS(pts[0]));
+        for (std::size_t i = 1; i < pts.size(); ++i)
+          path.lineTo(toS(pts[i]));
+        painter.drawPath(path);
+        // 始点マーカー
+        const QPointF s0 = toS(pts[0]);
+        painter.setPen(QPen(col.lighter(130), 1.5));
+        painter.setBrush(col);
+        painter.drawEllipse(s0, radius, radius);
+      };
+
+      for (const auto& stroke : overlay.toolOverlay.rotoStrokes)
+        drawStroke(stroke.points, stroke.isForeground);
+      if (!overlay.toolOverlay.rotoActiveStroke.empty())
+        drawStroke(overlay.toolOverlay.rotoActiveStroke,
+                   overlay.toolOverlay.rotoActiveFg);
     }
 
     // ── Mesh Deform プレビュー・ワイヤーフレーム・ピン ─────────────────────────

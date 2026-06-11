@@ -1,5 +1,6 @@
 #include "app/bridge/AppController.h"
 #include "app/bridge/ComfyUiClient.h"
+#include "app/panels/RotoBrushPanel.h"
 #include "core/selection/providers/ClassicProvider.h"
 
 #include <algorithm>
@@ -412,6 +413,12 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
     view.transformRot     = m_freeTransformTool->rot();
     view.transformHalfW   = m_freeTransformTool->halfW();
     view.transformHalfH   = m_freeTransformTool->halfH();
+    if (m_freeTransformTool->isDistortMode()) {
+      view.transformIsDistort = true;
+      const core::FPoint* dc = m_freeTransformTool->distortCorners();
+      for (int i = 0; i < 4; ++i)
+        view.transformDistortCorners[i] = dc[i];
+    }
   }
 
     // Mesh deform preview + wireframe
@@ -2632,6 +2639,26 @@ bool AppController::undo() {
   if (m_stroking) {
     return false;
   }
+  // メッシュ変形中は Ctrl+Z でピン単位アンドゥ（履歴がなければセッションキャンセル）
+  if (isInMeshDeformMode()) {
+    if (!m_meshDeformPinHistory.empty()) {
+      auto snap = std::move(m_meshDeformPinHistory.back());
+      m_meshDeformPinHistory.pop_back();
+      m_meshDeformTool->restorePins(std::move(snap));
+      emit overlayChanged();
+      emit canvasChanged();
+    } else {
+      cancelMeshDeformSession();
+      emit toolStateChanged();
+    }
+    return true;
+  }
+  // 自由変形セッション中は Ctrl+Z でキャンセル（Photoshop / CSP 同様の挙動）
+  if (isInTransformMode()) {
+    cancelTransformSession();
+    emit toolStateChanged();
+    return true;
+  }
   if (m_undoHistory.empty()) {
     return false;
   }
@@ -3877,10 +3904,36 @@ bool AppController::commitTransformSession() {
 
   // \u30D5\u30ED\u30FC\u30C6\u30A3\u30F3\u30B0\u753B\u50CF\u3092\u30AD\u30E3\u30F3\u30D0\u30B9\u30B5\u30A4\u30BA\u306EQImage\u306B\u5408\u6210\uFF08\u9AD8\u54C1\u8CEA\u88DC\u9593\uFF09
   QTransform transform;
-  transform.translate(static_cast<double>(cx), static_cast<double>(cy));
-  transform.rotate(static_cast<double>(rotDeg));
-  transform.scale(static_cast<double>(sx), static_cast<double>(sy));
-  transform.translate(-static_cast<double>(hw), -static_cast<double>(hh));
+  if (m_freeTransformTool->isDistortMode()) {
+    // \u900F\u8996\u5909\u63DB\uFF08Distort\uFF09\u30E2\u30FC\u30C9: quadToQuad \u3067\u30D1\u30FC\u30B9\u30DA\u30AF\u30C6\u30A3\u30D6\u5909\u63DB\u3092\u69CB\u7BC9
+    // srcPoly: \u5143\u753B\u50CF\u306E4\u9802\u70B9\uFF08\u753B\u50CF\u30ED\u30FC\u30AB\u30EB\u5EA7\u6A19\uFF09
+    // dstPoly: \u5909\u5F62\u5F8C\u306E4\u9802\u70B9\uFF08\u30AD\u30E3\u30F3\u30D0\u30B9\u5EA7\u6A19\uFF09
+    const float imgW = static_cast<float>(m_transformSession->floatingImage.width());
+    const float imgH = static_cast<float>(m_transformSession->floatingImage.height());
+    QPolygonF srcPoly;
+    srcPoly << QPointF(0, 0)
+            << QPointF(imgW, 0)
+            << QPointF(imgW, imgH)
+            << QPointF(0,    imgH);
+    const core::FPoint* dc = m_freeTransformTool->distortCorners();
+    QPolygonF dstPoly;
+    dstPoly << QPointF(static_cast<double>(dc[0].x), static_cast<double>(dc[0].y))
+            << QPointF(static_cast<double>(dc[1].x), static_cast<double>(dc[1].y))
+            << QPointF(static_cast<double>(dc[2].x), static_cast<double>(dc[2].y))
+            << QPointF(static_cast<double>(dc[3].x), static_cast<double>(dc[3].y));
+    if (!QTransform::quadToQuad(srcPoly, dstPoly, transform)) {
+      // \u7E2E\u9000\uFF08\u30B3\u30FC\u30CA\u30FC\u304C\u4E00\u76F4\u7DDA\u306A\u3069\uFF09: \u30A2\u30D5\u30A3\u30F3\u30D5\u30A9\u30FC\u30EB\u30D0\u30C3\u30AF
+      transform.translate(static_cast<double>(cx), static_cast<double>(cy));
+      transform.rotate(static_cast<double>(rotDeg));
+      transform.scale(static_cast<double>(sx), static_cast<double>(sy));
+      transform.translate(-static_cast<double>(hw), -static_cast<double>(hh));
+    }
+  } else {
+    transform.translate(static_cast<double>(cx), static_cast<double>(cy));
+    transform.rotate(static_cast<double>(rotDeg));
+    transform.scale(static_cast<double>(sx), static_cast<double>(sy));
+    transform.translate(-static_cast<double>(hw), -static_cast<double>(hh));
+  }
 
   // 高品質変換。result.offsetX/Y は result.image.pixel(0,0) が対応する変換後座標。
   // Bicubic/Lanczos3 では off-canvas クリッピングが発生するため、
@@ -4074,6 +4127,9 @@ bool AppController::beginMeshDeformSession() {
     auto* layer = m_document.activeLayer();
     if (!layer || !layer->isRaster()) return false;
 
+    // セッション前のレイヤー状態を保存（ghost防止 + キャンセル時復元用）
+    m_meshDeformSavedLayer = *layer;
+
     const core::PixelBuffer srcBuf = layer->buffer();
     const core::SelectionMask& sel = m_document.selection();
 
@@ -4085,6 +4141,16 @@ bool AppController::beginMeshDeformSession() {
 
     m_meshDeformTool->beginSession(srcBuf, sel, *gen, m_meshGenConfig);
 
+    // ゴースト防止: 可視性OFF + バッファをゼロフィル（二重安全策）
+    // setVisible(false) だけでは compositor が拾わないケースがあるため、
+    // buffer を透明にクリアして確実にコンポジットから除外する。
+    // m_meshDeformSavedLayer に元の状態が保存済みなのでキャンセル/コミット時に完全復元できる。
+    layer->setVisible(false);
+    layer->buffer().fill(core::Color{0, 0, 0, 0});
+    m_meshDeformPinHistory.clear();
+
+    rerender();
+    emit canvasChanged();
     emit overlayChanged();
     return true;
 }
@@ -4095,22 +4161,27 @@ bool AppController::commitMeshDeformSession() {
     core::PixelBuffer result = m_meshDeformTool->renderFinal();
 
     auto* layer = m_document.activeLayer();
-    if (!layer) { m_meshDeformTool.reset(); return false; }
+    if (!layer) { m_meshDeformTool.reset(); m_meshDeformSavedLayer.reset(); return false; }
 
-    // Push undo entry
+    // コミット前に可視性を復元（beforeLayer の visible は元の状態に合わせる）
+    const bool origVisible = m_meshDeformSavedLayer.has_value()
+                             ? m_meshDeformSavedLayer->visible() : true;
+    layer->setVisible(origVisible);
+    layer->buffer() = std::move(result);
+
+    // Push undo entry — beforeLayer は変形前の本来のピクセル（保存済み）
     StrokeHistoryEntry entry;
     entry.kind        = HistoryKind::StrokeWithSelection;
     entry.layerIndex  = m_document.activeLayerIndex();
-    entry.beforeLayer = *layer;
+    entry.beforeLayer = m_meshDeformSavedLayer.has_value() ? *m_meshDeformSavedLayer : *layer;
     entry.beforeSelection = m_document.selection();
-
-    layer->buffer() = std::move(result);
-
     entry.afterLayer     = *layer;
     entry.afterSelection = m_document.selection();
     pushHistoryEntry(std::move(entry));
 
     m_meshDeformTool.reset();
+    m_meshDeformSavedLayer.reset();
+    m_meshDeformPinHistory.clear();
 
     rerender();
     emit canvasChanged();
@@ -4124,6 +4195,17 @@ bool AppController::cancelMeshDeformSession() {
     if (!m_meshDeformTool.has_value()) return false;
     m_meshDeformTool->cancelSession();
     m_meshDeformTool.reset();
+
+    // 元レイヤーを復元（visibility + buffer + 全状態）
+    if (m_meshDeformSavedLayer.has_value()) {
+        auto* layer = m_document.activeLayer();
+        if (layer) {
+            *layer = *m_meshDeformSavedLayer;
+        }
+        m_meshDeformSavedLayer.reset();
+    }
+    m_meshDeformPinHistory.clear();
+
     rerender();
     emit canvasChanged();
     emit overlayChanged();
@@ -4138,7 +4220,7 @@ int AppController::meshDeformAddPin(float canvasX, float canvasY) {
     if (!isInMeshDeformMode()) return -1;
     auto* layer = m_document.activeLayer();
     if (!layer) return -1;
-    // Convert canvas coords to buffer-local coords (subtract layer offset)
+    m_meshDeformPinHistory.push_back(m_meshDeformTool->snapshotPins());
     float lx = canvasX - static_cast<float>(layer->offsetX());
     float ly = canvasY - static_cast<float>(layer->offsetY());
     int id = m_meshDeformTool->addPin({lx, ly});
@@ -4150,6 +4232,7 @@ void AppController::meshDeformMovePin(int id, float canvasX, float canvasY) {
     if (!isInMeshDeformMode()) return;
     auto* layer = m_document.activeLayer();
     if (!layer) return;
+    m_meshDeformPinHistory.push_back(m_meshDeformTool->snapshotPins());
     float lx = canvasX - static_cast<float>(layer->offsetX());
     float ly = canvasY - static_cast<float>(layer->offsetY());
     m_meshDeformTool->movePin(id, {lx, ly});
@@ -4158,6 +4241,7 @@ void AppController::meshDeformMovePin(int id, float canvasX, float canvasY) {
 
 void AppController::meshDeformRemovePin(int id) {
     if (!isInMeshDeformMode()) return;
+    m_meshDeformPinHistory.push_back(m_meshDeformTool->snapshotPins());
     m_meshDeformTool->removePin(id);
     emit overlayChanged();
 }
@@ -4491,6 +4575,34 @@ void AppController::setupOnnxInferenceCallback() {
       });
 }
 
+// ── Roto ブラシ ─────────────────────────────────────────────────────────────
+void AppController::setRotoBrushForeground(bool isFg) {
+  // AiSelectTool はストローク中にペン色を e.alt で判断するが、
+  // パネルからの切り替えも反映できるよう FG フラグを設定する。
+  // 現状、ストローク開始時に e.alt で上書きされるため主にパネル表示の同期用。
+  static_cast<void>(isFg);  // 将来拡張: m_aiSelectTool->setDefaultFg(isFg);
+}
+
+void AppController::setRotoBrushRadius(float radiusPx) {
+  if (m_aiSelectTool)
+    m_aiSelectTool->setBrushRadius(radiusPx);
+  emit overlayChanged();
+}
+
+void AppController::clearRotoStrokes() {
+  if (!m_aiSelectTool) return;
+  m_aiSelectTool->clearRotoStrokes();
+  m_document.selection().clear();
+  emit documentChanged();
+  emit layersChanged();
+  emit overlayChanged();
+}
+
+void AppController::setRotoBrushPanel(app::panels::RotoBrushPanel* panel) {
+  m_rotoBrushPanel = panel;
+  if (panel) panel->setController(this);
+}
+
 bool AppController::isSubToolCompatibleWithLayerKind(
     const app::ui::SubToolDescriptor& subTool,
     core::LayerKind layerKind) const noexcept {
@@ -4689,13 +4801,14 @@ void AppController::applyUiStateToTools() {
     m_rectSelectionTool->setGapCloseRadius(m_uiState.selectionGapClose);
     m_rectSelectionTool->setEdgeAware(m_uiState.selectionEdgeSnap);
   }
-  // ObjectSelect subtool → SAM2 がある場合は AiSelectTool のコールバックを注入
+  // ObjectSelect subtool → AiSelectTool は常に RotoBrush モードで動作
   if (m_aiSelectTool != nullptr) {
     m_aiSelectTool->setThreshold(m_uiState.autoSelectThreshold);
     m_aiSelectTool->setReferAllLayers(m_uiState.autoSelectReferAllLayers);
     m_aiSelectTool->setAntiAlias(m_uiState.antiAlias);
     m_aiSelectTool->setAddMode(false);
     m_aiSelectTool->setSubtractMode(false);
+    m_aiSelectTool->setInputMode(core::AiSelectTool::InputMode::RotoBrush);
   }
   if (m_gradientTool != nullptr) {
     m_gradientTool->setOpacity(static_cast<float>(m_uiState.opacity) / 100.0f);

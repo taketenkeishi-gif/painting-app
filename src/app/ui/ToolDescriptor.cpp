@@ -351,19 +351,23 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   }(),
                   {ToolPropertyKey::SelectionOp, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionEdgeSnap, ToolPropertyKey::SelectionGapClose},
                   "クリック点と類似した連続した色域を選択。Shift=追加、Alt=減算。"),
-              makeSubTool(
-                  "object_select",
-                  "オブジェクト選択",
-                  []() {
-                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
-                    p.selectionMode = SelectionMode::ObjectSelect;
-                    p.autoSelectThreshold = 24;
-                    p.autoSelectContiguous = false;
-                    p.autoSelectReferAllLayers = true;
-                    return p;
-                  }(),
-                  {ToolPropertyKey::SelectionOp, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionEdgeSnap, ToolPropertyKey::SelectionGapClose},
-                  "クリックで全レイヤーの類似色をまとめて選択。ComfyUI 接続時は SAM2 で高精度化。Shift=追加、Alt=減算。"),
+              [&]() {
+                auto sub = makeSubTool(
+                    "object_select",
+                    "オブジェクト選択",
+                    []() {
+                      BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
+                      p.selectionMode = SelectionMode::ObjectSelect;
+                      p.autoSelectThreshold = 24;
+                      p.autoSelectContiguous = false;
+                      p.autoSelectReferAllLayers = true;
+                      return p;
+                    }(),
+                    {ToolPropertyKey::SelectionOp, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionEdgeSnap, ToolPropertyKey::SelectionGapClose},
+                    u8"左ドラッグ=前景 / Alt+ドラッグ=背景 でストロークを塗り SAM2 でマスク生成。Ctrl=クリア。");
+                sub.targetToolKind = core::ToolKind::AiSelect;
+                return sub;
+              }(),
           },
           {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
           "選択範囲を作成します。",

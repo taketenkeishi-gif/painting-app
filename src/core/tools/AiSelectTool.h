@@ -4,6 +4,7 @@
 #include <functional>
 #include <vector>
 
+#include "core/common/FPoint.h"
 #include "core/selection/SelectionMask.h"
 #include "core/tools/ITool.h"
 
@@ -23,6 +24,9 @@ namespace core {
 // ─────────────────────────────────────────────────────────────────────────────
 class AiSelectTool : public ITool {
 public:
+  /// 入力モード — Click (点選択) / RotoBrush (FG/BGストローク)
+  enum class InputMode { Click, RotoBrush };
+
   struct Settings {
     int  threshold       {24};   ///< 色許容範囲 0–255（スタブ使用時）
     bool referAllLayers  {true}; ///< 合成レイヤーを参照
@@ -59,6 +63,13 @@ public:
   void setGranularity    (int v)  noexcept { m_settings.granularity    = std::clamp(v, 0, 3); }
   const Settings& settings() const noexcept { return m_settings; }
 
+  // ── RotoBrush モード ──────────────────────────────────────────────────────
+  void      setInputMode  (InputMode m)  noexcept { m_inputMode    = m; }
+  InputMode inputMode()   const noexcept           { return m_inputMode; }
+  void      setBrushRadius(float r)      noexcept { m_brushRadius  = r; }
+  float     brushRadius() const noexcept           { return m_brushRadius; }
+  void      clearRotoStrokes() noexcept;
+
   /// ComfyUI 推論コールバックを注入（nullptr = stub only）
   void setInferenceCallback(InferenceCallback cb) { m_inferenceCallback = std::move(cb); }
 
@@ -94,6 +105,14 @@ private:
 
   std::vector<Point> m_positivePoints;
   std::vector<Point> m_negativePoints;
+
+  // ── RotoBrush 専用状態 ───────────────────────────────────────────────────
+  InputMode          m_inputMode     {InputMode::RotoBrush};
+  std::vector<ToolOverlayState::RotoStroke> m_rotoStrokes;  ///< 確定済みストローク
+  std::vector<FPoint> m_activeStroke;                       ///< 描画中ストローク
+  bool               m_paintFg      {true};   ///< 前景(true) / 背景(false)
+  bool               m_strokeActive {false};
+  float              m_brushRadius  {8.f};
 };
 
 } // namespace core

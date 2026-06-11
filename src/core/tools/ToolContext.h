@@ -86,6 +86,17 @@ struct ToolOverlayState {
   std::vector<core::FPoint> meshDeformPinCurrents;   ///< current pin positions
   std::vector<core::FPoint> meshDeformPinOriginals;  ///< original pin positions
   int meshDeformActivePin {-1};                      ///< highlighted pin index
+
+  // Rotoブラシ FG/BG ストロークオーバーレイ (AiSelectTool RotoBrush モード)
+  struct RotoStroke {
+    bool  isForeground {true};  ///< true=前景(緑), false=背景(赤)
+    std::vector<FPoint> points;
+  };
+  bool                    hasRotoStrokes  {false};
+  std::vector<RotoStroke> rotoStrokes;             ///< 確定済みストローク
+  std::vector<FPoint>     rotoActiveStroke;        ///< 描画中ストローク
+  bool                    rotoActiveFg   {true};   ///< 描画中ストロークが前景か
+  float                   rotoBrushRadius {8.f};   ///< 表示用ブラシ半径(px)
 };
 
 struct ToolResult {

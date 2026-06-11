@@ -100,7 +100,9 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/MinimalWebSocket.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/MeshDeformPanel.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/RotoBrushPanel.cpp
 )
+
 
 
 if(PAINT_BUILD_APP)

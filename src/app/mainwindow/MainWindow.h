@@ -38,6 +38,7 @@ class AdjustmentPropertyPanel;
 class AiPanel;
 class LayerPanel;
 class MeshDeformPanel;
+class RotoBrushPanel;
 class SubToolPanel;
 class ToolPanel;
 class ToolPropertyPanel;
@@ -161,6 +162,7 @@ private:
   app::panels::AdjustmentPropertyPanel* m_adjustmentPanel {nullptr};
   app::panels::AiPanel*         m_aiPanel         {nullptr};
   app::panels::MeshDeformPanel* m_meshDeformPanel  {nullptr};
+  app::panels::RotoBrushPanel*  m_rotoBrushPanel   {nullptr};
   app::panels::LayerPanel* m_layerPanel {nullptr};
   app::panels::ToolPanel* m_toolPanel {nullptr};
   app::panels::ToolPanel* m_quickSliderPanel {nullptr};
@@ -184,7 +186,8 @@ private:
   QDockWidget* m_aiDock    {nullptr};
   QDockWidget* m_layerDock {nullptr};
   QDockWidget* m_infoDock {nullptr};
-  QDockWidget* m_meshDeformDock {nullptr};
+  QDockWidget* m_meshDeformDock  {nullptr};
+  QDockWidget* m_rotoBrushDock   {nullptr};
   QToolBar* m_quickToolBar {nullptr};
   QLabel* m_currentToolLabel {nullptr};
   QLabel* m_currentSubToolLabel {nullptr};
