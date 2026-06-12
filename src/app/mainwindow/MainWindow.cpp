@@ -19,6 +19,8 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDockWidget>
+#include "DocumentWorkspace.h"
+#include <DockManager.h>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
@@ -53,6 +55,7 @@
 #include <QStatusBar>
 #include <QStyle>
 #include <QSet>
+#include <QStackedWidget>
 #include <QTabBar>
 #include <QTabWidget>
 #include <QMouseEvent>
@@ -94,7 +97,6 @@ namespace {
 
 // Verification flags to track constructor execution
 static bool g_colorSwatchWidgetCreated = false;
-
 
 class TitleBarDragArea : public QWidget {
 public:
@@ -681,43 +683,7 @@ MainWindow::MainWindow(QWidget* parent)
          ag.top()  + (ag.height() - h) / 2);
   }
 
-  // ── キャンバスホスト（タブバー + キャンバス）を作成 ──────────────────
-  m_canvasHost = new QWidget(this);
-  m_canvasHost->setObjectName("canvasHost");
-  auto* hostLayout = new QVBoxLayout(m_canvasHost);
-  hostLayout->setContentsMargins(0, 0, 0, 0);
-  hostLayout->setSpacing(0);
-
-  m_documentTabBar = new QTabBar(m_canvasHost);
-  m_documentTabBar->setTabsClosable(true);
-  m_documentTabBar->setMovable(false);
-  m_documentTabBar->setExpanding(false);
-  m_documentTabBar->setUsesScrollButtons(true);
-  m_documentTabBar->setObjectName("documentTabBar");
-  m_documentTabBar->setStyleSheet(
-      "QTabBar { background: #1a1f2e; }"
-      "QTabBar::tab {"
-      "  background: #1a1f2e; color: #8090a8;"
-      "  padding: 3px 10px; margin-right: 1px;"
-      "  border: none; border-bottom: 2px solid transparent;"
-      "  font-size: 11px; min-width: 60px; max-width: 200px; }"
-      "QTabBar::tab:selected {"
-      "  background: #232b3a; color: #d8e6ff;"
-      "  border-bottom: 2px solid #4e8ef7; }"
-      "QTabBar::tab:hover:!selected { background: #202636; color: #b0c4e0; }"
-      "QTabBar::close-button { subcontrol-position: right; }"
-  );
-  hostLayout->addWidget(m_documentTabBar);
-  m_canvasWidget->setParent(m_canvasHost);
-  hostLayout->addWidget(m_canvasWidget);
-
-  // ── 最初のドキュメントエントリを登録 ───────────────────────────────────
-  m_documents.push_back({m_controller, {}});
-  m_activeDocIndex = 0;
-  m_documentTabBar->addTab(QString::fromUtf8(u8"無題"));
-
-  connect(m_documentTabBar, &QTabBar::tabCloseRequested, this, &MainWindow::onTabCloseRequested);
-  connect(m_documentTabBar, &QTabBar::currentChanged,    this, &MainWindow::onTabCurrentChanged);
+  // ── 最初のドキュメントは setupShellLayout() 内で QDockWidget として生成 ──
 
   m_canvasWidget->setController(m_controller);
   m_adjustmentPanel->setController(m_controller);
@@ -738,21 +704,7 @@ MainWindow::MainWindow(QWidget* parent)
   applyUiChrome();
 
   connectController(m_controller);
-  connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, &MainWindow::updateNavigatorPreview);
-  connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, [this]() {
-    if (m_zoomStatusLabel != nullptr) {
-      m_zoomStatusLabel->setText(QString("ズーム: %1%").arg(m_canvasWidget->zoomPercent()));
-    }
-  });
-  connect(m_canvasWidget, &app::canvasview::CanvasWidget::canvasPositionChanged,
-          this, [this](int x, int y) {
-    if (m_cursorPosStatusLabel == nullptr) return;
-    if (x < 0 || y < 0) {
-      m_cursorPosStatusLabel->setText("X: -  Y: -");
-    } else {
-      m_cursorPosStatusLabel->setText(QString("X: %1  Y: %2").arg(x).arg(y));
-    }
-  });
+  connectCanvasSignals(m_canvasWidget);
 
   onToolStateChanged();
   updateUndoRedoState();
@@ -764,7 +716,10 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::setupShellLayout() {
-  setCentralWidget(m_canvasHost);
+  // DocumentWorkspace を中央ウィジェットとして配置
+  m_workspace = new DocumentWorkspace(this);
+  setCentralWidget(m_workspace);
+
   setDockNestingEnabled(true);
   setDockOptions(QMainWindow::AllowNestedDocks | QMainWindow::AllowTabbedDocks |
                  QMainWindow::AnimatedDocks | QMainWindow::GroupedDragging);
@@ -1242,11 +1197,19 @@ void MainWindow::setupShellLayout() {
   tabifyDockWidget(m_layerDock, m_aiDock);
   tabifyDockWidget(m_layerDock, m_infoDock);
 
+  // ── 最初のドキュメント ────────────────────────────────────────────────────
+  {
+    m_workspace->addDocument(m_canvasWidget, QString::fromUtf8(u8"無題"));
+    m_documents.push_back({m_controller, {}, m_canvasWidget, nullptr});
+    m_activeDocIndex = 0;
+    connectWorkspaceSignals(m_workspace);
+  }
+
   m_toolDock->raise();
   m_layerDock->raise();
   m_defaultDockState = saveState();
 
-  // Connect dock state changes to dynamic title bar management
+  // Connect dock state changes to dynamic title bar management (panel docks only)
   const QList<QDockWidget*> allDocks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
@@ -1262,14 +1225,14 @@ void MainWindow::setupShellLayout() {
     });
   }
 
-  // After layout pass: tag native dock tab bars (for QSS hide), rebuild
-  // DockTitleBar tab buttons, and connect visibilityChanged so that
-  // closing/showing a dock refreshes the sibling tab lists.
+  // After layout pass: tag native dock tab bars (for QSS hide), rebuild DockTitleBar.
+  // DocumentWorkspace 内部（ADS）のタブバーはドキュメントタブなので Dock タブとして扱わない。
   QTimer::singleShot(0, this, [this] {
     for (auto* tb : findChildren<QTabBar*>()) {
       if (qobject_cast<QTabWidget*>(tb->parentWidget())) continue;
+      // ADS / DocumentWorkspace 内部のタブバーをドック管理から除外
+      if (m_workspace && m_workspace->isAncestorOf(tb)) continue;
       tb->setProperty("dockTabBar", true);
-      // Force QSS re-evaluation for the property to take effect immediately.
       tb->style()->unpolish(tb);
       tb->style()->polish(tb);
       tb->update();
@@ -1603,6 +1566,8 @@ void MainWindow::createMenus() {
   viewMenu->addSeparator();
   viewMenu->addAction(m_toggleGridAction);
   viewMenu->addAction(m_toggleOverlayAction);
+  viewMenu->addSeparator();
+  // ドキュメントビューモードは ADS が自動管理（タブ横: 並び替え、縦: フロート）
 
   if (m_toolDock != nullptr) {
     windowMenu->addAction(m_toolDock->toggleViewAction());
@@ -2535,7 +2500,106 @@ void MainWindow::applyUiChrome() {
       "  color: #c5cde0; text-align: center; height: 8px;"
       "}"
       "QProgressBar::chunk { background: #4e8ef7; border-radius: 2px; }"
+
+      // ── ADS ドキュメントエリア dark theme ──────────────────────────────
+      // Qt Advanced Docking System のセレクターは C++ クラス名に ads-- プレフィックス
+      "ads--CDockContainerWidget { background: #0c101c; }"
+
+      "ads--CDockAreaWidget {"
+      "  background: #131720;"
+      "  border: none;"
+      "}"
+
+      "ads--CDockAreaTitleBar {"
+      "  background: #131720;"
+      "  border-bottom: 1px solid #1f2536;"
+      "  padding: 0px;"
+      "}"
+
+      "ads--CDockAreaTabBar {"
+      "  background: #131720;"
+      "  border: none;"
+      "}"
+      // スクロールボタン（タブ多数時）
+      "ads--CDockAreaTabBar QToolButton {"
+      "  background: #1a1f2e; border: none; color: #7a8ab0;"
+      "  width: 16px; height: 26px;"
+      "}"
+      "ads--CDockAreaTabBar QToolButton:hover { background: #2a3050; }"
+
+      // 非アクティブタブ
+      "ads--CDockWidgetTab {"
+      "  background: #1a1f2e;"
+      "  min-width: 100px; max-width: 220px;"
+      "  padding: 3px 10px;"
+      "  border: none;"
+      "  border-right: 1px solid #1f2536;"
+      "}"
+      // タブ内テキスト（QLabel が実際のテキストを保持）
+      "ads--CDockWidgetTab QLabel { color: #7a8ab0; }"
+      // アクティブタブ
+      "ads--CDockWidgetTab[activeTab=\"true\"] {"
+      "  background: #0c1018;"
+      "  border-bottom: 2px solid #4e8ef7;"
+      "  border-right: 1px solid #1f2536;"
+      "}"
+      "ads--CDockWidgetTab[activeTab=\"true\"] QLabel { color: #e8eaed; }"
+      // ホバー（非アクティブ）
+      "ads--CDockWidgetTab:hover {"
+      "  background: #1e2540;"
+      "}"
+      "ads--CDockWidgetTab:hover QLabel { color: #a0b0d0; }"
+      // タブ内 × ボタン
+      "ads--CDockWidgetTab QToolButton#tabCloseButton {"
+      "  background: transparent; border: none;"
+      "  width: 14px; height: 14px;"
+      "}"
+
+      // フローティングコンテナ
+      "ads--CFloatingDockContainer {"
+      "  background: #131720;"
+      "  border: 1px solid #2a2e3e;"
+      "}"
+      "ads--CFloatingDockContainer ads--CDockAreaTitleBar {"
+      "  background: #1a1f2e;"
+      "}"
+
+      // DockOverlay cross: 背景のみ透明化（機能・判定は ADS 標準維持）
+      "ads--CDockOverlayCross { background: transparent; border: none; }"
+
   );
+
+  // CDockManager は constructor で setStyleSheet(focus_highlighting.css) を自身に持つ。
+  // Qt cascade では widget 自身の stylesheet が祖先より優先されるため、
+  // CDockManager の stylesheet に dark theme override を直接追記する。
+  if (m_workspace) {
+    if (auto* dm = m_workspace->findChild<ads::CDockManager*>()) {
+      dm->setStyleSheet(dm->styleSheet() +
+          "\nads--CDockContainerWidget { background: #0c101c; }"
+          "\nads--CDockAreaWidget { background: #131720; border: none; }"
+          "\nads--CDockAreaTitleBar { background: #131720; border-bottom: 1px solid #1f2536; padding: 0px; }"
+          "\nads--CDockAreaTabBar { background: #131720; border: none; }"
+          "\nads--CDockAreaTabBar QToolButton { background: #1a1f2e; border: none; color: #7a8ab0; width: 16px; height: 26px; }"
+          "\nads--CDockAreaTabBar QToolButton:hover { background: #2a3050; }"
+          // 非アクティブタブ（このエリアで非表示）
+          "\nads--CDockWidgetTab { background: #1a1f2e; min-width: 100px; max-width: 220px; padding: 3px 10px; border: none; border-right: 1px solid #1f2536; }"
+          "\nads--CDockWidgetTab QLabel { color: #7a8ab0; }"
+          // アクティブタブ（このエリアで表示中、ただしフォーカスなし）— 中間グレー
+          "\nads--CDockWidgetTab[activeTab=\"true\"] { background: #171c2a; border-right: 1px solid #1f2536; }"
+          "\nads--CDockWidgetTab[activeTab=\"true\"] QLabel { color: #9db0c8; }"
+          // フォーカスタブ（現在編集中のドキュメント）— 白 + 青アンダーライン
+          "\nads--CDockWidgetTab[focused=\"true\"] { background: #0c1018; border-bottom: 2px solid #4e8ef7; border-right: 1px solid #1f2536; }"
+          "\nads--CDockWidgetTab[focused=\"true\"] QLabel { color: #e8eaed; }"
+          "\nads--CDockWidgetTab[focused=\"true\"]:hover QLabel { color: #e8eaed; }"
+          // ホバー
+          "\nads--CDockWidgetTab:hover { background: #1e2540; }"
+          "\nads--CDockWidgetTab:hover QLabel { color: #a0b0d0; }"
+          "\nads--CDockWidgetTab QToolButton#tabCloseButton { background: transparent; border: none; width: 14px; height: 14px; }"
+          "\nads--CFloatingDockContainer { background: #131720; border: 1px solid #2a2e3e; }"
+          "\nads--CFloatingDockContainer ads--CDockAreaTitleBar { background: #1a1f2e; }"
+          "\nads--CDockOverlayCross { background: transparent; border: none; }");
+    }
+  }
 }
 
 void MainWindow::updateWindowTitle() {
@@ -2544,9 +2608,11 @@ void MainWindow::updateWindowTitle() {
       ? QString::fromUtf8(u8"無題")
       : QFileInfo(m_currentFilePath).fileName();
   setWindowTitle(QString("%1%2 — Painting-app").arg(dirty ? "*" : "", name));
-  // タブのラベルも更新
-  if (m_activeDocIndex >= 0 && m_activeDocIndex < m_documentTabBar->count()) {
-    m_documentTabBar->setTabText(m_activeDocIndex, tabLabelForDocument(m_activeDocIndex));
+  // アクティブドキュメントタブのタイトルを更新
+  if (m_activeDocIndex >= 0 && m_activeDocIndex < (int)m_documents.size()) {
+    const QString label = tabLabelForDocument(m_activeDocIndex);
+    auto* canvas = m_documents[m_activeDocIndex].canvasWidget;
+    m_workspace->setDocumentTitle(canvas, label);
   }
 }
 
@@ -2585,9 +2651,12 @@ QString MainWindow::tabLabelForDocument(int index) const {
 }
 
 void MainWindow::updateDocumentTabLabels() {
-  for (int i = 0; i < (int)m_documents.size() && i < m_documentTabBar->count(); ++i) {
-    m_documentTabBar->setTabText(i, tabLabelForDocument(i));
+  for (int i = 0; i < (int)m_documents.size(); ++i) {
+    const QString label = tabLabelForDocument(i);
+    auto* canvas = m_documents[i].canvasWidget;
+    m_workspace->setDocumentTitle(canvas, label);
   }
+  QTimer::singleShot(0, this, &MainWindow::updateDockTitleBars);
 }
 
 void MainWindow::addDocumentEntry(app::bridge::AppController* ctrl, const QString& filePath) {
@@ -2596,16 +2665,24 @@ void MainWindow::addDocumentEntry(app::bridge::AppController* ctrl, const QStrin
   if ((int)m_documents.size() >= maxDocs) {
     QMessageBox::warning(this, QString::fromUtf8(u8"ドキュメント上限"),
         QString::fromUtf8(u8"同時に開けるドキュメント数の上限（%1）に達しました。\n"
-                          u8"タブを閉じてから再度お試しください。").arg(maxDocs));
+                          u8"ドキュメントを閉じてから再度お試しください。").arg(maxDocs));
     delete ctrl;
     return;
   }
-  m_documents.push_back({ctrl, filePath});
-  const int newIndex = (int)m_documents.size() - 1;
-  m_documentTabBar->addTab(QString::fromUtf8(u8"無題"));
-  m_documentTabBar->setCurrentIndex(newIndex);  // triggers onTabCurrentChanged
-  // QTabBar::currentChanged は既に switchToDocument を呼ぶが、
-  // addTab 直後は index が変わらない場合があるため明示的に呼ぶ
+
+  // ドキュメントごとに独立した CanvasWidget を生成して DocumentWorkspace に追加
+  auto* canvas = new app::canvasview::CanvasWidget(this);
+  canvas->setController(ctrl);
+  connectCanvasSignals(canvas);
+
+  const QString name = filePath.isEmpty()
+      ? QString::fromUtf8(u8"無題")
+      : QFileInfo(filePath).fileName();
+
+  const int newIndex = (int)m_documents.size();
+  m_documents.push_back({ctrl, filePath, canvas, nullptr});
+
+  m_workspace->addDocument(canvas, name);
   switchToDocument(newIndex);
   checkMemoryAndWarn();
 }
@@ -2624,6 +2701,10 @@ void MainWindow::switchToDocument(int index) {
   m_activeDocIndex = index;
   m_controller = m_documents[index].controller;
   m_currentFilePath = m_documents[index].filePath;
+
+  // アクティブ CanvasWidget を切り替え
+  if (m_documents[index].canvasWidget)
+    m_canvasWidget = m_documents[index].canvasWidget;
 
   connectController(m_controller);
 
@@ -2644,10 +2725,8 @@ void MainWindow::switchToDocument(int index) {
   updateWindowTitle();
   updateNavigatorPreview();
 
-  if (m_documentTabBar->currentIndex() != index) {
-    QSignalBlocker blocker(m_documentTabBar);
-    m_documentTabBar->setCurrentIndex(index);
-  }
+  // 該当ドキュメントのキャンバスをアクティブにする（workspace か floating か）
+  m_workspace->setActiveDocument(m_documents[index].canvasWidget);
 }
 
 void MainWindow::closeDocumentAt(int index) {
@@ -2677,11 +2756,10 @@ void MainWindow::closeDocumentAt(int index) {
     return;
   }
 
-  // タブとエントリを削除
-  {
-    QSignalBlocker blocker(m_documentTabBar);
-    m_documentTabBar->removeTab(index);
-  }
+  // 閉じる前に参照を保持
+  auto* oldCanvas = m_documents[index].canvasWidget;
+  auto* oldSub    = m_documents[index].subWindow;
+
   if (index != m_activeDocIndex)
     disconnectController(ctrl);
   m_documents.erase(m_documents.begin() + index);
@@ -2696,17 +2774,69 @@ void MainWindow::closeDocumentAt(int index) {
   m_activeDocIndex = -1;  // リセットして強制再接続させる
   switchToDocument(nextIndex);
 
+  // CanvasWidget を workspace から除去して削除
+  m_workspace->removeDocument(oldCanvas);
+  if (oldCanvas && oldCanvas != m_canvasWidget)
+    oldCanvas->deleteLater();
+
   delete ctrl;
 }
 
-void MainWindow::onTabCloseRequested(int index) {
-  closeDocumentAt(index);
+
+// ────────────────────────────────────────────────────────────────────────────
+// CanvasWidget シグナル接続（ドキュメントごとに呼ぶ）
+// アクティブなキャンバスだけがステータスバーを更新するようにガードする
+// ────────────────────────────────────────────────────────────────────────────
+void MainWindow::connectCanvasSignals(app::canvasview::CanvasWidget* canvas) {
+  connect(canvas, &app::canvasview::CanvasWidget::viewTransformChanged, this,
+          [this, canvas]() {
+    if (canvas != m_canvasWidget) return;
+    updateNavigatorPreview();
+  });
+  connect(canvas, &app::canvasview::CanvasWidget::viewTransformChanged, this,
+          [this, canvas]() {
+    if (canvas != m_canvasWidget) return;
+    if (m_zoomStatusLabel)
+      m_zoomStatusLabel->setText(QString("ズーム: %1%").arg(m_canvasWidget->zoomPercent()));
+  });
+  connect(canvas, &app::canvasview::CanvasWidget::canvasPositionChanged, this,
+          [this, canvas](int x, int y) {
+    if (canvas != m_canvasWidget) return;
+    if (!m_cursorPosStatusLabel) return;
+    if (x < 0 || y < 0)
+      m_cursorPosStatusLabel->setText("X: -  Y: -");
+    else
+      m_cursorPosStatusLabel->setText(QString("X: %1  Y: %2").arg(x).arg(y));
+  });
 }
 
-void MainWindow::onTabCurrentChanged(int index) {
-  if (index == m_activeDocIndex) return;
-  switchToDocument(index);
+
+// ────────────────────────────────────────────────────────────────────────────
+// DocumentWorkspace シグナル接続
+// ────────────────────────────────────────────────────────────────────────────
+void MainWindow::connectWorkspaceSignals(DocumentWorkspace* ws) {
+  // タブ切替 → switchToDocument
+  connect(ws, &DocumentWorkspace::activeDocumentChanged,
+          this, [this](app::canvasview::CanvasWidget* canvas) {
+    for (int i = 0; i < (int)m_documents.size(); ++i) {
+      if (m_documents[i].canvasWidget == canvas) {
+        if (i != m_activeDocIndex) switchToDocument(i);
+        return;
+      }
+    }
+  });
+  // × ボタン → closeDocumentAt
+  connect(ws, &DocumentWorkspace::closeRequested,
+          this, [this](app::canvasview::CanvasWidget* canvas) {
+    for (int i = 0; i < (int)m_documents.size(); ++i) {
+      if (m_documents[i].canvasWidget == canvas) {
+        closeDocumentAt(i);
+        return;
+      }
+    }
+  });
 }
+
 
 void MainWindow::checkMemoryAndWarn() {
   QSettings settings("taketenkeishi", "LayeredPaintApp");
@@ -4437,10 +4567,26 @@ void MainWindow::onGenerativeFillTriggered() {
 // ─────────────────────────────────────────────────────────────────────────────
 void MainWindow::onAiUpscaleTriggered() {
   if (m_controller == nullptr) return;
-  const core::PixelBuffer& src = m_controller->compositedBuffer();
+
+  // 選択範囲があればその領域のみ、なければキャンバス全体を対象とする
+  const core::PixelBuffer src = m_controller->exportSelectionOrCanvasFromComposite();
   if (src.width() <= 0 || src.height() <= 0) {
     statusBar()->showMessage(QString::fromUtf8(u8"キャンバスが空です"), 1800);
     return;
+  }
+
+  // 選択範囲のオフセットを取得（選択なし = 0, 0）
+  int pasteOffsetX = 0;
+  int pasteOffsetY = 0;
+  {
+    const core::SelectionMask& sel = m_controller->document().selection();
+    if (sel.hasSelection()) {
+      const auto bounds = sel.boundingRect();
+      if (bounds.has_value()) {
+        pasteOffsetX = bounds->x;
+        pasteOffsetY = bounds->y;
+      }
+    }
   }
 
   // 登録済みフォルダ（デフォルト <exe>/models/ 含む）を全て走査
@@ -4466,7 +4612,8 @@ void MainWindow::onAiUpscaleTriggered() {
   const QString layerName =
       QString::fromUtf8(u8"高解像度化 %1×%2").arg(newW).arg(newH);
 
-  if (m_controller->pasteBufferAsNewRasterLayer(dlg.result(), layerName.toStdString())) {
+  if (m_controller->pasteBufferAsNewRasterLayerAtOffset(
+        dlg.result(), pasteOffsetX, pasteOffsetY, layerName.toStdString())) {
     updateUndoRedoState();
     statusBar()->showMessage(
         QString::fromUtf8(u8"高解像度化完了: %1 × %2 px").arg(newW).arg(newH), 3000);

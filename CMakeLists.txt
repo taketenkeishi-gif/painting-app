@@ -76,6 +76,20 @@ if(PAINT_USE_ONNX)
   endif()
 endif()
 
+# ── Qt Advanced Docking System — CSP-style document tab/float management ──────
+# Provides per-document tab detach, float, and re-dock without touching Tool docks.
+if(PAINT_BUILD_APP)
+  include(FetchContent)
+  FetchContent_Declare(
+    qtads
+    GIT_REPOSITORY https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System.git
+    GIT_TAG        4.3.1
+    GIT_SHALLOW    TRUE
+  )
+  set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(qtads)
+endif()
+
 add_subdirectory(src)
 
 if(PAINT_BUILD_TESTS)

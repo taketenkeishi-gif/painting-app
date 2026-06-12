@@ -6,6 +6,7 @@
 #include <QMainWindow>
 #include <QColor>
 #include <QByteArray>
+#include <QPoint>
 #include <QString>
 #include <QStringList>
 
@@ -18,11 +19,15 @@ class QLabel;
 class QMenu;
 class QKeySequence;
 class QDockWidget;
+class QMdiArea;
+class QMdiSubWindow;
+class QVBoxLayout;
 class QPushButton;
 class QGridLayout;
 class QSpinBox;
 class QSplitter;
 class QSlider;
+class QStackedWidget;
 class QTabBar;
 class QTabWidget;
 class QToolBar;
@@ -46,6 +51,8 @@ class ColorWheelWidget;
 }
 
 namespace app::mainwindow {
+
+class DocumentWorkspace;
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -128,15 +135,16 @@ private slots:
   void onHueSatLightTriggered();
   void onAiUpscaleTriggered();
   void onAiModelFolderTriggered();
-  void onTabCloseRequested(int index);
-  void onTabCurrentChanged(int index);
   void onAppSettingsTriggered();
 
 private:
   // ── マルチドキュメント ──────────────────────────────────────────────────
   struct DocumentEntry {
-    app::bridge::AppController* controller {nullptr};
-    QString filePath;
+    app::bridge::AppController*    controller   {nullptr};
+    QString                        filePath;
+    app::canvasview::CanvasWidget* canvasWidget  {nullptr};
+    // subWindow は FloatingDocumentWindow 使用時のみ非 nullptr
+    QMdiSubWindow*                 subWindow     {nullptr};
   };
   void connectController(app::bridge::AppController* ctrl);
   void disconnectController(app::bridge::AppController* ctrl);
@@ -146,6 +154,8 @@ private:
   void updateDocumentTabLabels();
   QString tabLabelForDocument(int index) const;
   void checkMemoryAndWarn();
+  void connectCanvasSignals(app::canvasview::CanvasWidget* canvas);
+  void connectWorkspaceSignals(DocumentWorkspace* ws);
   // ────────────────────────────────────────────────────────────────────────
   void setupShellLayout();
   void createMenus();
@@ -187,9 +197,10 @@ private:
   // ── マルチドキュメント状態 ──────────────────────────────────────────────
   std::vector<DocumentEntry> m_documents;
   int m_activeDocIndex {-1};
-  QTabBar* m_documentTabBar {nullptr};
-  QWidget* m_canvasHost {nullptr};
   // ────────────────────────────────────────────────────────────────────────
+  // ── ドキュメントワークスペース ──────────────────────────────────────────────
+  DocumentWorkspace*                       m_workspace {nullptr};
+  // ────────────────────────────────────────────────────────────────────────────
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
   app::panels::AdjustmentPropertyPanel* m_adjustmentPanel {nullptr};

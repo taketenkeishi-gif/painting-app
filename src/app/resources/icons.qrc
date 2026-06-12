@@ -17,6 +17,8 @@
   <qresource prefix="/icons/16">
     <file>icons/16/brush.svg</file>
     <file>icons/16/clip.svg</file>
+    <file>icons/16/close_tab.svg</file>
+    <file>icons/16/close_tab_hover.svg</file>
     <file>icons/16/command_palette.svg</file>
     <file>icons/16/delete.svg</file>
     <file>icons/16/down.svg</file>

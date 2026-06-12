@@ -95,6 +95,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/UiState.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/IconLoader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/mainwindow/MainWindow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/mainwindow/DocumentWorkspace.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/CanvasWidget.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/SelectionOverlayRenderer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AdjustmentPropertyPanel.cpp
@@ -139,6 +140,7 @@ if(PAINT_BUILD_APP)
       Qt6::Gui
       Qt6::Widgets
       Qt6::Network
+      qt6advanceddocking
   )
   if(PAINT_USE_SKIA)
     target_link_libraries(paint_app PRIVATE paint_skia_platform)
