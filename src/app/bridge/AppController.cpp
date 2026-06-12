@@ -1731,10 +1731,12 @@ bool AppController::fillSelectionOrCanvas() {
   const core::Layer before = *active;
   const core::SelectionMask& selection = m_document.selection();
   if (selection.hasSelection()) {
-    for (int y = 0; y < active->buffer().height(); ++y) {
-      for (int x = 0; x < active->buffer().width(); ++x) {
-        if (selection.contains(x, y)) {
-          active->buffer().setPixel(x, y, m_currentColor);
+    const int ox = active->offsetX();
+    const int oy = active->offsetY();
+    for (int by = 0; by < active->buffer().height(); ++by) {
+      for (int bx = 0; bx < active->buffer().width(); ++bx) {
+        if (selection.contains(bx + ox, by + oy)) {
+          active->buffer().setPixel(bx, by, m_currentColor);
         }
       }
     }
@@ -1769,10 +1771,14 @@ bool AppController::deleteSelectionPixels() {
   const core::Layer before = *active;
   const core::SelectionMask& selection = m_document.selection();
   if (selection.hasSelection()) {
-    for (int y = 0; y < active->buffer().height(); ++y) {
-      for (int x = 0; x < active->buffer().width(); ++x) {
-        if (selection.contains(x, y)) {
-          active->buffer().setPixel(x, y, core::Color::Transparent());
+    // バッファローカル座標 (bx, by) をキャンバス座標 (bx + ox, by + oy) に変換して
+    // 選択マスク（キャンバス座標系）と照合する。
+    const int ox = active->offsetX();
+    const int oy = active->offsetY();
+    for (int by = 0; by < active->buffer().height(); ++by) {
+      for (int bx = 0; bx < active->buffer().width(); ++bx) {
+        if (selection.contains(bx + ox, by + oy)) {
+          active->buffer().setPixel(bx, by, core::Color::Transparent());
         }
       }
     }
@@ -3226,6 +3232,12 @@ void AppController::setSelectionAntiAlias(bool enabled) {
 
 void AppController::setSelectionOp(core::SelectionOp op) {
   if (m_uiState.selectionOp == op) return;
+  // モード切替時に未確定の青プレビューがあれば自動確定する。
+  // confirmAiSelectMask() は現在の op でマージするため、切替前に呼ぶことで
+  // New→Add なら「新規確定」、Add→Subtract なら「追加確定」が自然に行われる。
+  if (m_hasPendingAiMask) {
+    confirmAiSelectMask();
+  }
   m_uiState.selectionOp = op;
   applyUiStateToTools();
   emit toolStateChanged();
