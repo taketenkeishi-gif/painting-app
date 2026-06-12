@@ -2655,120 +2655,320 @@ void MainWindow::onResizeCanvas() {
   const core::Size cur = m_controller->document().canvasSize();
   const int curW = cur.width, curH = cur.height;
 
+  // ── コンテンツ境界スキャン（QImage 経由で高速化） ─────────────────────
+  const QImage thumbSrc =
+    platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
+  QRect contentBounds(0, 0, curW, curH);
+  {
+    int minX = curW, minY = curH, maxX = -1, maxY = -1;
+    for (int y = 0; y < thumbSrc.height(); ++y) {
+      const uchar* line = thumbSrc.constScanLine(y);
+      for (int x = 0; x < thumbSrc.width(); ++x) {
+        if (line[x * 4 + 3] > 0) {  // alpha channel (Format_RGBA8888)
+          if (maxX < 0) { minX = maxX = x; minY = maxY = y; }
+          else {
+            minX = std::min(minX, x); minY = std::min(minY, y);
+            maxX = std::max(maxX, x); maxY = std::max(maxY, y);
+          }
+        }
+      }
+    }
+    if (maxX >= 0)
+      contentBounds = QRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
+  }
+
+  // ── 状態変数 ─────────────────────────────────────────────────────────
+  int  anchorRow = 1, anchorCol = 1;
+  bool useCustomOffset = false;
+  int  customOffX = 0, customOffY = 0;
+  bool updLock = false;
+
+  // ── ダイアログ ────────────────────────────────────────────────────────
   QDialog dialog(this);
   dialog.setWindowTitle("キャンバスサイズを変更");
-  dialog.setMinimumWidth(380);
+  dialog.setMinimumWidth(640);
 
   auto* root = new QVBoxLayout(&dialog);
-  root->setSpacing(10);
+  root->setSpacing(12);
   root->setContentsMargins(16, 14, 16, 14);
 
-  // 現在サイズ表示
-  auto* curLabel = new QLabel(
-    QString("現在のサイズ: %1 × %2 px").arg(curW).arg(curH), &dialog);
-  curLabel->setStyleSheet("color:#7a8aaa;font-size:10px;");
+  auto* mainRow = new QHBoxLayout();
+  mainRow->setSpacing(16);
 
-  // 新サイズ入力
+  // ── プレビューパネル ──────────────────────────────────────────────────
+  constexpr int PREV_W = 240, PREV_H = 210;
+  auto* previewLabel = new QLabel(&dialog);
+  previewLabel->setFixedSize(PREV_W, PREV_H);
+  previewLabel->setAlignment(Qt::AlignCenter);
+  previewLabel->setStyleSheet(
+    "background:#0c0f1c;border:1px solid #252d48;border-radius:6px;");
+
+  // ── コントロール列 ────────────────────────────────────────────────────
+  auto* ctrl = new QVBoxLayout();
+  ctrl->setSpacing(10);
+
+  // サイズ入力
   auto* sizeBox  = new QGroupBox("新しいサイズ", &dialog);
   auto* sizeGrid = new QGridLayout(sizeBox);
   sizeGrid->setSpacing(6);
-  auto* newW    = new QSpinBox(&dialog);
-  auto* newH    = new QSpinBox(&dialog);
-  auto* lockBtn = new QPushButton("🔒", &dialog);
+  sizeGrid->setColumnStretch(1, 1);
+
+  auto* newW = new QSpinBox(&dialog);
+  auto* newH = new QSpinBox(&dialog);
   newW->setRange(1, 16384);  newW->setSuffix(" px");  newW->setValue(curW);
   newH->setRange(1, 16384);  newH->setSuffix(" px");  newH->setValue(curH);
-  lockBtn->setFixedSize(28, 28);
+
+  // ロックボタン（縦長・幅と高さの中間に配置）
+  auto* lockBtn = new QPushButton(&dialog);
+  lockBtn->setFixedSize(22, 52);
   lockBtn->setCheckable(true);
   lockBtn->setToolTip("縦横比をロック");
-  lockBtn->setStyleSheet(
-    "QPushButton{border:1px solid #3a4460;border-radius:4px;background:#1e2338;font-size:13px;}"
-    "QPushButton:checked{background:#2a3a5a;border-color:#4e8ef7;}"
-    "QPushButton:hover{background:#262c48;}");
-
-  bool updLock = false;
-  connect(newW, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int v){
-    if (updLock || !lockBtn->isChecked()) return;
-    updLock = true;
-    if (curW > 0) newH->setValue(qRound(static_cast<double>(curH) / curW * v));
-    updLock = false;
-  });
-  connect(newH, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int v){
-    if (updLock || !lockBtn->isChecked()) return;
-    updLock = true;
-    if (curH > 0) newW->setValue(qRound(static_cast<double>(curW) / curH * v));
-    updLock = false;
-  });
-
-  sizeGrid->addWidget(new QLabel("幅",  &dialog), 0, 0);
-  sizeGrid->addWidget(newW, 0, 1);
-  sizeGrid->addWidget(lockBtn, 0, 2, 2, 1, Qt::AlignVCenter);
-  sizeGrid->addWidget(new QLabel("高さ", &dialog), 1, 0);
-  sizeGrid->addWidget(newH, 1, 1);
-
-  // アンカーポイント（3×3グリッド）
-  auto* anchorBox = new QGroupBox("配置（既存コンテンツの位置）", &dialog);
-  auto* anchorGrid = new QGridLayout(anchorBox);
-  anchorGrid->setSpacing(2);
-  anchorGrid->setContentsMargins(8, 8, 8, 8);
-
-  int anchorCol = 1, anchorRow = 1;  // デフォルト: 中央
-  QVector<QPushButton*> anchorBtns;
-  const QString anchorActive =
-    "QPushButton{background:#2a3a5a;border:2px solid #4e8ef7;border-radius:3px;min-width:26px;min-height:26px;}";
-  const QString anchorNormal =
-    "QPushButton{background:#1e2338;border:1px solid #3a4460;border-radius:3px;min-width:26px;min-height:26px;}"
-    "QPushButton:hover{background:#262c48;border-color:#5a7ab0;}";
-
-  for (int r = 0; r < 3; ++r) {
-    for (int c = 0; c < 3; ++c) {
-      auto* btn = new QPushButton("", &dialog);
-      btn->setFixedSize(28, 28);
-      btn->setStyleSheet(r == 1 && c == 1 ? anchorActive : anchorNormal);
-      const int rr = r, cc = c;
-      connect(btn, &QPushButton::clicked, &dialog, [&, rr, cc](){
-        anchorRow = rr; anchorCol = cc;
-        for (int i = 0; i < anchorBtns.size(); ++i)
-          anchorBtns[i]->setStyleSheet(
-            (i / 3 == anchorRow && i % 3 == anchorCol) ? anchorActive : anchorNormal);
-      });
-      anchorBtns.append(btn);
-      anchorGrid->addWidget(btn, r, c);
-    }
-  }
-  // オフセット表示ラベル
-  auto* offsetLabel = new QLabel(&dialog);
-  offsetLabel->setStyleSheet("color:#7a8aaa;font-size:10px;");
-  auto updateOffset = [&](){
-    int ow = newW->value() - curW;
-    int oh = newH->value() - curH;
-    int ox = anchorCol == 0 ? 0 : (anchorCol == 1 ? ow/2 : ow);
-    int oy = anchorRow == 0 ? 0 : (anchorRow == 1 ? oh/2 : oh);
-    offsetLabel->setText(QString("オフセット: (%1, %2) px").arg(ox).arg(oy));
+  auto refreshLockStyle = [lockBtn](){
+    bool on = lockBtn->isChecked();
+    lockBtn->setText(on ? "=" : ":");
+    lockBtn->setStyleSheet(QString(
+      "QPushButton{"
+      "border:2px solid %1;border-radius:5px;background:%2;"
+      "color:%3;font-size:13px;font-weight:bold;}"
+      "QPushButton:hover{background:#212640;}"
+    ).arg(on?"#4e8ef7":"#303858", on?"#162040":"#161a2c", on?"#6aaeff":"#505a78"));
   };
-  connect(newW, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int){ updateOffset(); });
-  connect(newH, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int){ updateOffset(); });
-  updateOffset();
+  refreshLockStyle();
+  QObject::connect(lockBtn, &QPushButton::toggled, lockBtn,
+    [refreshLockStyle](bool){ refreshLockStyle(); });
 
-  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+  // スワップボタン（縦横入れ替え）
+  auto* swapBtn = new QPushButton("⇄", &dialog);
+  swapBtn->setFixedSize(26, 26);
+  swapBtn->setToolTip("縦横を入れ替え (Swap W/H)");
+  swapBtn->setStyleSheet(
+    "QPushButton{border:1px solid #303858;border-radius:4px;background:#161a2c;"
+    "font-size:15px;color:#7a9ac0;}"
+    "QPushButton:hover{background:#1e2440;border-color:#4a6090;color:#aaccff;}"
+    "QPushButton:pressed{background:#162040;}");
+
+  sizeGrid->addWidget(new QLabel("幅",   &dialog), 0, 0);
+  sizeGrid->addWidget(newW,                        0, 1);
+  sizeGrid->addWidget(lockBtn,                     0, 2, 2, 1, Qt::AlignVCenter);
+  sizeGrid->addWidget(swapBtn,                     0, 3, Qt::AlignVCenter);
+  sizeGrid->addWidget(new QLabel("高さ", &dialog), 1, 0);
+  sizeGrid->addWidget(newH,                        1, 1);
+  ctrl->addWidget(sizeBox);
+
+  // コンテンツ情報 + フィットボタン
+  auto* contentBox = new QGroupBox("コンテンツ情報", &dialog);
+  auto* contentVL  = new QVBoxLayout(contentBox);
+  contentVL->setSpacing(5);
+  auto* contentInfoLbl = new QLabel(
+    QString("非透明範囲: %1 × %2 px  （左上: %3, %4）")
+      .arg(contentBounds.width()).arg(contentBounds.height())
+      .arg(contentBounds.x()).arg(contentBounds.y()),
+    &dialog);
+  contentInfoLbl->setStyleSheet("color:#8a9bbb;font-size:10px;");
+  auto* fitRow  = new QHBoxLayout();
+  auto* fitBtn  = new QPushButton("コンテンツに合わせる", &dialog);
+  fitBtn->setStyleSheet(
+    "QPushButton{background:#162040;border:1px solid #4e8ef7;border-radius:4px;padding:3px 8px;}"
+    "QPushButton:hover{background:#1e2e58;}");
+  auto* padLbl  = new QLabel("余白:", &dialog);
+  auto* padSpin = new QSpinBox(&dialog);
+  padSpin->setRange(0, 2000);  padSpin->setSuffix(" px");  padSpin->setValue(0);
+  padSpin->setFixedWidth(78);
+  fitRow->addWidget(fitBtn);
+  fitRow->addSpacing(8);
+  fitRow->addWidget(padLbl);
+  fitRow->addWidget(padSpin);
+  fitRow->addStretch();
+  contentVL->addWidget(contentInfoLbl);
+  contentVL->addLayout(fitRow);
+  ctrl->addWidget(contentBox);
+
+  // アンカーグリッド（方向矢印付き）
+  auto* anchorBox = new QGroupBox("配置（既存コンテンツの位置）", &dialog);
+  auto* anchorVL  = new QVBoxLayout(anchorBox);
+  anchorVL->setSpacing(5);
+
+  static const char* kArrows[9] = {"↖","↑","↗","←","·","→","↙","↓","↘"};
+  auto* agWidget = new QWidget(&dialog);
+  agWidget->setFixedSize(102, 102);
+  auto* ag = new QGridLayout(agWidget);
+  ag->setSpacing(4);
+  ag->setContentsMargins(3, 3, 3, 3);
+  QVector<QPushButton*> anchorBtns;
+  for (int i = 0; i < 9; ++i) {
+    auto* b = new QPushButton(QString::fromUtf8(kArrows[i]), &dialog);
+    b->setFixedSize(26, 26);
+    anchorBtns.append(b);
+    ag->addWidget(b, i/3, i%3);
+  }
+
+  auto* offsetLabel = new QLabel(&dialog);
+  offsetLabel->setStyleSheet("color:#6a7a9a;font-size:10px;");
+  anchorVL->addWidget(agWidget, 0, Qt::AlignLeft);
+  anchorVL->addWidget(offsetLabel);
+  ctrl->addWidget(anchorBox);
+  ctrl->addStretch();
+
+  mainRow->addWidget(previewLabel);
+  mainRow->addLayout(ctrl, 1);
+  root->addLayout(mainRow);
+
+  auto* buttons = new QDialogButtonBox(
+    QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
   buttons->button(QDialogButtonBox::Ok)->setText("変更");
-
-  root->addWidget(curLabel);
-  root->addWidget(sizeBox);
-  root->addWidget(anchorBox);
-  root->addWidget(offsetLabel);
   root->addWidget(buttons);
 
-  connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-  connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+  // ── ヘルパー ─────────────────────────────────────────────────────────
+  auto getOffsetXY = [&](int& ox, int& oy) {
+    if (useCustomOffset) { ox = customOffX; oy = customOffY; return; }
+    int dw = newW->value() - curW, dh = newH->value() - curH;
+    ox = anchorCol == 0 ? 0 : (anchorCol == 1 ? dw/2 : dw);
+    oy = anchorRow == 0 ? 0 : (anchorRow == 1 ? dh/2 : dh);
+  };
+
+  std::function<void()> updateAnchorStyles = [&](){
+    const QString active =
+      "QPushButton{background:#1a2e5a;border:2px solid #4e8ef7;border-radius:4px;"
+      "color:#7ab4ff;font:bold 12px 'Segoe UI';}";
+    const QString normal =
+      "QPushButton{background:#14182a;border:1px solid #252d48;border-radius:4px;"
+      "color:#3a4a68;font:12px 'Segoe UI';}"
+      "QPushButton:hover{background:#1a2038;border-color:#3a5080;color:#6a8ab0;}";
+    for (int i = 0; i < 9; ++i)
+      anchorBtns[i]->setStyleSheet(
+        (i/3 == anchorRow && i%3 == anchorCol) ? active : normal);
+  };
+
+  std::function<void()> updateOffset = [&](){
+    int ox, oy; getOffsetXY(ox, oy);
+    offsetLabel->setText(QString("オフセット: (%1, %2) px").arg(ox).arg(oy));
+  };
+
+  std::function<void()> updatePreview = [&](){
+    int ox, oy; getOffsetXY(ox, oy);
+    int nw = newW->value(), nh = newH->value();
+
+    QPixmap pm(PREV_W, PREV_H);
+    pm.fill(QColor(0x0c, 0x0f, 0x1c));
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::SmoothPixmapTransform);
+
+    // スケール: プレビュー内に収まるよう余白 12px を確保
+    constexpr double MARGIN = 12.0;
+    double scale = std::min(
+      (PREV_W - MARGIN * 2) / std::max(nw, 1),
+      (PREV_H - MARGIN * 2) / std::max(nh, 1));
+    int pw = std::max(1, qRound(nw * scale));
+    int ph = std::max(1, qRound(nh * scale));
+    int px = (PREV_W - pw) / 2;
+    int py = (PREV_H - ph) / 2;
+
+    // チェッカーボード（新キャンバス領域）
+    constexpr int CS = 8;
+    for (int cy = 0; cy < ph; cy += CS)
+      for (int cx = 0; cx < pw; cx += CS) {
+        bool e = ((cx/CS + cy/CS) % 2 == 0);
+        p.fillRect(px+cx, py+cy, std::min(CS, pw-cx), std::min(CS, ph-cy),
+          e ? QColor(72, 74, 88) : QColor(52, 54, 66));
+      }
+
+    // 旧キャンバスをオフセット位置にサムネイル描画
+    if (!thumbSrc.isNull()) {
+      int olx = px + qRound(ox * scale);
+      int oly = py + qRound(oy * scale);
+      int olw = std::max(1, qRound(curW * scale));
+      int olh = std::max(1, qRound(curH * scale));
+      QRect clip = QRect(olx, oly, olw, olh).intersected(QRect(px, py, pw, ph));
+      if (!clip.isEmpty()) {
+        p.save();
+        p.setClipRect(clip);
+        p.drawImage(QRectF(olx, oly, olw, olh), thumbSrc);
+        p.restore();
+      }
+      // 旧キャンバス枠（オレンジ破線）
+      p.setPen(QPen(QColor(255, 160, 50, 180), 1, Qt::DashLine));
+      p.setBrush(Qt::NoBrush);
+      p.drawRect(olx, oly, olw-1, olh-1);
+    }
+
+    // 新キャンバス枠（青実線）
+    p.setPen(QPen(QColor(0x4e, 0x8e, 0xf7), 1));
+    p.setBrush(Qt::NoBrush);
+    p.drawRect(px, py, pw-1, ph-1);
+
+    // サイズテキスト
+    p.setPen(QColor(0x6a, 0x8a, 0xbb));
+    QFont lf; lf.setPixelSize(9); p.setFont(lf);
+    p.drawText(px+3, py+ph-3, QString("%1 × %2 px").arg(nw).arg(nh));
+
+    p.end();
+    previewLabel->setPixmap(pm);
+  };
+
+  // ── シグナル接続 ──────────────────────────────────────────────────────
+
+  // アンカーボタン
+  for (int i = 0; i < 9; ++i) {
+    const int r = i/3, c = i%3;
+    QObject::connect(anchorBtns[i], &QPushButton::clicked, &dialog, [&, r, c](){
+      anchorRow = r; anchorCol = c;
+      useCustomOffset = false;
+      updateAnchorStyles(); updateOffset(); updatePreview();
+    });
+  }
+
+  // 縦横スワップ
+  QObject::connect(swapBtn, &QPushButton::clicked, &dialog, [&](){
+    int tw = newW->value(), th = newH->value();
+    updLock = true; newW->setValue(th); newH->setValue(tw); updLock = false;
+    useCustomOffset = false;
+    updateOffset(); updatePreview();
+  });
+
+  // サイズ変更（縦横比ロック付き）
+  QObject::connect(newW, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int v){
+    if (updLock) return;
+    if (lockBtn->isChecked() && curW > 0) {
+      updLock = true;
+      newH->setValue(qRound(static_cast<double>(curH) / curW * v));
+      updLock = false;
+    }
+    updateOffset(); updatePreview();
+  });
+  QObject::connect(newH, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int v){
+    if (updLock) return;
+    if (lockBtn->isChecked() && curH > 0) {
+      updLock = true;
+      newW->setValue(qRound(static_cast<double>(curW) / curH * v));
+      updLock = false;
+    }
+    updateOffset(); updatePreview();
+  });
+
+  // コンテンツに合わせる
+  QObject::connect(fitBtn, &QPushButton::clicked, &dialog, [&](){
+    int pad = padSpin->value();
+    updLock = true;
+    newW->setValue(contentBounds.width()  + pad * 2);
+    newH->setValue(contentBounds.height() + pad * 2);
+    updLock = false;
+    useCustomOffset = true;
+    customOffX = pad - contentBounds.x();
+    customOffY = pad - contentBounds.y();
+    updateOffset(); updatePreview();
+  });
+
+  // ── 初期描画 ─────────────────────────────────────────────────────────
+  updateAnchorStyles();
+  updateOffset();
+  updatePreview();
+
+  QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+  QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
   if (dialog.exec() != QDialog::Accepted) return;
 
-  // アンカーポイントからオフセット計算
-  // anchorCol/Row: 0=左上, 1=中央, 2=右下 → 既存コンテンツの左上が移動先
-  const int dw = newW->value() - curW;
-  const int dh = newH->value() - curH;
-  const int offX = anchorCol == 0 ? 0 : (anchorCol == 1 ? dw / 2 : dw);
-  const int offY = anchorRow == 0 ? 0 : (anchorRow == 1 ? dh / 2 : dh);
-
+  int offX, offY;
+  getOffsetXY(offX, offY);
   m_controller->resizeCanvas(newW->value(), newH->value(), offX, offY);
 }
 

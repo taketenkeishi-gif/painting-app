@@ -71,6 +71,12 @@ public:
   /// スクリーン座標 (target相対) でのヒットテスト
   int hitTestScreen(float sx, float sy) const noexcept;
 
+  // ── Distort mode (Ctrl + corner drag) ────────────────────────────────────
+  /// Ctrl + corner drag で透視変換モードに入っているか。
+  bool isDistortMode() const noexcept { return m_distortMode; }
+  /// 透視変換モード時の4コーナー [TL, TR, BR, BL] キャンバス座標。
+  const FPoint* distortCorners() const noexcept { return m_distortCorners; }
+
 private:
   // ハンドル番号
   //   0=TL 1=TC 2=TR
@@ -79,6 +85,10 @@ private:
   //   8=Rotate
 
   static constexpr int kOpposite[8] = {7,6,5,4,3,2,1,0};
+
+  // コーナーハンドル → corners[] インデックス (TL TR BR BL)
+  // 0=TL→0, 2=TR→1, 7=BR→2, 5=BL→3, その他=-1
+  static constexpr int kHandleToCornerIdx[8] = {0,-1,1,-1,-1,3,-1,2};
 
   // ローカル↔キャンバス変換
   void toCanvas(float lx, float ly, float& cx, float& cy) const noexcept;
@@ -112,6 +122,12 @@ private:
   FPoint m_handles[9]; // 0-7 scale, 8 rotate
 
   float m_zoom {1.f};
+
+  // 透視変換（Distort）モード
+  bool   m_distortMode        {false};
+  FPoint m_distortCorners[4];     ///< 独立コーナー [TL, TR, BR, BL] キャンバス座標
+  FPoint m_dragDistortCorners[4]; ///< ドラッグ開始時の distortCorners スナップショット
+  int    m_distortDragCorner  {-1};  ///< ドラッグ中コーナーインデックス (0..3)
 };
 
 } // namespace core

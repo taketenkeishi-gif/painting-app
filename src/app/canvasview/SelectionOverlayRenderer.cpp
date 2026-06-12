@@ -46,7 +46,7 @@ void SelectionOverlayRenderer::render(QPainter&                  painter,
   // inside() clamps out-of-bounds to "unselected"
   auto inside = [&](int x, int y) -> bool {
     if (x < 0 || y < 0 || x >= w || y >= h) return false;
-    return mask.maskValue(x, y) >= 128;
+    return mask.maskValue(x, y) != 0;
   };
 
   QPainterPath blackPath, whitePath;
