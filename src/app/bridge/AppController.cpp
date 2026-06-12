@@ -5984,13 +5984,71 @@ AppController::DebugActionResult AppController::executeDebugAction(
     return r;
   }
 
+  if (type == QLatin1String("inject-ai-mask")) {
+    // Synthetic pending AI mask for deterministic scenario testing.
+    // Sets m_pendingAiMask / m_hasPendingAiMask via the same applyAiSelectResult()
+    // path as real SAM/ONNX inference — confirmAiSelectMask() is the unit under test.
+    const QJsonObject maskObj = opts.value(QLatin1String("mask")).toObject();
+    const int W         = maskObj.value(QLatin1String("width")).toInt(512);
+    const int H         = maskObj.value(QLatin1String("height")).toInt(512);
+    const QString shape = maskObj.value(QLatin1String("shape")).toString(QLatin1String("circle"));
+    const int targetPx  = maskObj.value(QLatin1String("pixels")).toInt(5000);
+    const int cx        = maskObj.value(QLatin1String("centerX")).toInt(W / 2);
+    const int cy        = maskObj.value(QLatin1String("centerY")).toInt(H / 2);
+
+    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(W * H), 0u);
+    int filledCount = 0;
+
+    if (shape == QLatin1String("circle")) {
+      // Radius from area: A = π·r²  →  r = sqrt(targetPx / π)
+      const double r2 = static_cast<double>(targetPx) / M_PI;
+      for (int y = 0; y < H; ++y) {
+        for (int x = 0; x < W; ++x) {
+          const double dx = x - cx;
+          const double dy = y - cy;
+          if (dx * dx + dy * dy <= r2) {
+            pixels[static_cast<std::size_t>(y * W + x)] = 255u;
+            ++filledCount;
+          }
+        }
+      }
+    } else {
+      // Square fallback
+      const int half = static_cast<int>(std::sqrt(static_cast<double>(targetPx))) / 2;
+      for (int y = std::max(0, cy - half); y <= std::min(H - 1, cy + half); ++y)
+        for (int x = std::max(0, cx - half); x <= std::min(W - 1, cx + half); ++x) {
+          pixels[static_cast<std::size_t>(y * W + x)] = 255u;
+          ++filledCount;
+        }
+    }
+
+    core::SelectionMask mask(W, H);
+    mask.setPixels(pixels);
+    applyAiSelectResult(std::move(mask));
+
+    r.success = true;
+    r.message = QString("AI mask injected: shape=%1 requested=%2px actual=%3px")
+                    .arg(shape).arg(targetPx).arg(filledCount);
+    r.data = QJsonObject{
+      {QLatin1String("shape"),           shape},
+      {QLatin1String("width"),           W},
+      {QLatin1String("height"),          H},
+      {QLatin1String("centerX"),         cx},
+      {QLatin1String("centerY"),         cy},
+      {QLatin1String("requestedPixels"), targetPx},
+      {QLatin1String("actualPixels"),    filledCount}
+    };
+    return r;
+  }
+
   if (type == QLatin1String("list")) {
     // Return available debug actions
     QJsonArray actions;
     actions << QLatin1String("aiselect-confirm")
             << QLatin1String("aiselect-reset")
             << QLatin1String("aiselect-set-op")
-            << QLatin1String("selection-clear");
+            << QLatin1String("selection-clear")
+            << QLatin1String("inject-ai-mask");
     r.success = true;
     r.message = QLatin1String("Available debug actions");
     r.data    = QJsonObject{{QLatin1String("actions"), actions}};

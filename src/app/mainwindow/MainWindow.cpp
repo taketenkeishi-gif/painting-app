@@ -3,9 +3,11 @@
 #include <QPainterPath>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <functional>
+#include <limits>
 #include <vector>
 
 #include <QAction>
@@ -59,6 +61,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QUrl>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QTextStream>
 #include <QStandardPaths>
@@ -529,6 +532,124 @@ QString layerKindJa(core::LayerKind kind) {
       return "不明";
   }
 }
+
+// ── AccelSpinBox ─────────────────────────────────────────────────────────────
+// ボタン長押しで指数関数的に増加する SpinBox。
+// 1500ms ごとにステップが 2 倍になり、最大 64 倍でキャップ。
+class AccelSpinBox : public QSpinBox {
+  QElapsedTimer m_holdTimer;
+  qint64 m_lastCallAt {-9999};
+  int    m_lastDir    {0};
+public:
+  explicit AccelSpinBox(QWidget* parent = nullptr) : QSpinBox(parent) {
+    setAccelerated(true);
+  }
+  void stepBy(int steps) override {
+    if (!m_holdTimer.isValid()) m_holdTimer.start();
+    qint64 now = m_holdTimer.elapsed();
+    const int dir = (steps >= 0) ? 1 : -1;
+    if (dir != m_lastDir || (now - m_lastCallAt) > 700) {
+      m_holdTimer.restart();
+      now = 0;
+    }
+    m_lastCallAt = m_holdTimer.elapsed();
+    m_lastDir    = dir;
+    const double mult = std::min(64.0, std::pow(2.0, now / 1500.0));
+    QSpinBox::stepBy(dir * std::max(1, qRound(std::abs(steps) * mult)));
+  }
+};
+
+// ── AnchorGridWidget ──────────────────────────────────────────────────────────
+// Krita 風の 3×3 ドット＋ライングリッド。Q_OBJECT 不要、コールバックで通知。
+class AnchorGridWidget : public QWidget {
+  int m_row {1}, m_col {1}, m_hover {-1};
+public:
+  std::function<void(int, int)> onChanged;
+
+  explicit AnchorGridWidget(QWidget* parent = nullptr) : QWidget(parent) {
+    setFixedSize(108, 108);
+    setMouseTracking(true);
+    setAttribute(Qt::WA_Hover, true);
+  }
+  int row() const { return m_row; }
+  int col() const { return m_col; }
+  void setSelection(int r, int c) { m_row = r; m_col = c; update(); }
+
+protected:
+  static QPoint dotPos(int r, int c) {
+    return { 18 + c * 36, 18 + r * 36 };
+  }
+
+  void paintEvent(QPaintEvent*) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+
+    // 背景
+    p.setPen(QPen(QColor(0x1e, 0x28, 0x44), 1));
+    p.setBrush(QColor(0x0c, 0x10, 0x1e));
+    p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 6, 6);
+
+    // 格子線
+    p.setPen(QPen(QColor(0x25, 0x32, 0x52), 1));
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 3; ++c) {
+        QPoint pt = dotPos(r, c);
+        if (c < 2) p.drawLine(pt, dotPos(r, c + 1));
+        if (r < 2) p.drawLine(pt, dotPos(r + 1, c));
+      }
+
+    // ドット
+    for (int r = 0; r < 3; ++r) {
+      for (int c = 0; c < 3; ++c) {
+        QPoint pt = dotPos(r, c);
+        bool sel   = (r == m_row && c == m_col);
+        bool hov   = (r * 3 + c == m_hover);
+        if (sel) {
+          p.setPen(Qt::NoPen);
+          p.setBrush(QColor(0x4e, 0x8e, 0xf7));
+          p.drawEllipse(pt, 8, 8);
+          // 白い中心点
+          p.setBrush(Qt::white);
+          p.drawEllipse(pt, 3, 3);
+        } else if (hov) {
+          p.setPen(QPen(QColor(0x4e, 0x8e, 0xf7), 1.5));
+          p.setBrush(QColor(0x18, 0x28, 0x50));
+          p.drawEllipse(pt, 6, 6);
+        } else {
+          p.setPen(QPen(QColor(0x38, 0x48, 0x6a), 1));
+          p.setBrush(QColor(0x15, 0x1c, 0x32));
+          p.drawEllipse(pt, 5, 5);
+        }
+      }
+    }
+  }
+
+  void mousePressEvent(QMouseEvent* e) override {
+    if (e->button() != Qt::LeftButton) return;
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 3; ++c) {
+        if ((e->pos() - dotPos(r, c)).manhattanLength() <= 16) {
+          m_row = r; m_col = c;
+          update();
+          if (onChanged) onChanged(r, c);
+          return;
+        }
+      }
+  }
+
+  void mouseMoveEvent(QMouseEvent* e) override {
+    int prev = m_hover;
+    m_hover = -1;
+    for (int i = 0; i < 9; ++i) {
+      if ((e->pos() - dotPos(i / 3, i % 3)).manhattanLength() <= 16) {
+        m_hover = i; break;
+      }
+    }
+    if (m_hover != prev) update();
+  }
+
+  void leaveEvent(QEvent*) override { m_hover = -1; update(); }
+};
 
 } // namespace
 
@@ -2655,25 +2776,44 @@ void MainWindow::onResizeCanvas() {
   const core::Size cur = m_controller->document().canvasSize();
   const int curW = cur.width, curH = cur.height;
 
-  // ── コンテンツ境界スキャン（QImage 経由で高速化） ─────────────────────
-  const QImage thumbSrc =
-    platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
+  // ── コンテンツ境界スキャン（全レイヤー・canvas 外も含む） ────────────────
+  // compositedBuffer はキャンバス内のみなので、各レイヤーバッファを直接走査する。
   QRect contentBounds(0, 0, curW, curH);
   {
-    int minX = curW, minY = curH, maxX = -1, maxY = -1;
-    for (int y = 0; y < thumbSrc.height(); ++y) {
-      const uchar* line = thumbSrc.constScanLine(y);
-      for (int x = 0; x < thumbSrc.width(); ++x) {
-        if (line[x * 4 + 3] > 0) {  // alpha channel (Format_RGBA8888)
-          if (maxX < 0) { minX = maxX = x; minY = maxY = y; }
-          else {
-            minX = std::min(minX, x); minY = std::min(minY, y);
-            maxX = std::max(maxX, x); maxY = std::max(maxY, y);
-          }
-        }
+    const auto& doc = m_controller->document();
+    int minX = std::numeric_limits<int>::max();
+    int minY = std::numeric_limits<int>::max();
+    int maxX = std::numeric_limits<int>::min();
+    int maxY = std::numeric_limits<int>::min();
+    bool found = false;
+
+    for (std::size_t li = 0; li < doc.layerCount(); ++li) {
+      const auto& layer = doc.layerAt(li);
+      if (!layer.isRaster() || !layer.visible()) continue;
+      const auto& buf = layer.buffer();
+      const int lox = layer.offsetX(), loy = layer.offsetY();
+      // 非常に大きいレイヤーは全体を占有扱いにして走査をスキップ
+      constexpr int MAX_SCAN = 8 * 1024 * 1024;
+      if (buf.width() * buf.height() > MAX_SCAN) {
+        minX = std::min(minX, lox);
+        minY = std::min(minY, loy);
+        maxX = std::max(maxX, lox + buf.width()  - 1);
+        maxY = std::max(maxY, loy + buf.height() - 1);
+        found = true;
+        continue;
       }
+      for (int y = 0; y < buf.height(); ++y)
+        for (int x = 0; x < buf.width(); ++x)
+          if (buf.pixel(x, y).a > 0) {
+            int cx = lox + x, cy = loy + y;
+            if (!found) { minX = maxX = cx; minY = maxY = cy; found = true; }
+            else {
+              minX = std::min(minX, cx); minY = std::min(minY, cy);
+              maxX = std::max(maxX, cx); maxY = std::max(maxY, cy);
+            }
+          }
     }
-    if (maxX >= 0)
+    if (found)
       contentBounds = QRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
   }
 
@@ -2847,6 +2987,9 @@ void MainWindow::onResizeCanvas() {
   std::function<void()> updatePreview = [&](){
     int ox, oy; getOffsetXY(ox, oy);
     int nw = newW->value(), nh = newH->value();
+
+    const QImage thumbSrc =
+      platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
 
     QPixmap pm(PREV_W, PREV_H);
     pm.fill(QColor(0x0c, 0x0f, 0x1c));
