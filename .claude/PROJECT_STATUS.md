@@ -1,8 +1,8 @@
 # プロジェクト状態 — Paint App
 
-**Last Updated:** 2026-06-11  
-**Latest Commit:** `b97c990` (fix: preserve off-canvas pixels during high quality transform)  
-**Current Phase:** Phase 1 実装中（Layer Offset Model Phase 0-2 完了）
+**Last Updated:** 2026-06-12  
+**Latest Commit:** `0cc1a45` (feat: implement Roto Brush — wire object_select subtool to AiSelectTool)  
+**Current Phase:** Phase 1 実装中 + MV連携ワークフロー（AIアップスケール完了）
 
 ---
 
@@ -60,8 +60,16 @@
 - ✅ Export PNG / JPEG
 - ✅ Clipboard copy/paste
 - ✅ Import as layer
-- ❌ PSD/PSB 対応
+- ✅ **PSD エクスポート**（ファイルメニュー「PSDとして書き出し」接続済み・Ctrl+Shift+D）
+- ❌ PSD インポート
 - ❌ ネイティブフォーマット
+
+#### AI 機能
+- 🔧 **AI アップスケール**（ComfyUI + ONNX + バイリニア 3段階。ビルド確認待ち）
+- 🔧 **AI モデルフォルダ管理 UI**（QSettings 永続保存）
+- 🔧 **Roto Brush / SAM2 基盤**（`PAINT_USE_ONNX=ON` 時有効、モデルセットアップ待ち）
+- 🔧 **Mesh Deformation（Puppet Warp）**（ワイヤーフレーム表示・変形実装済み）
+- ✅ FreeTransform ツール（高品質変換・コーナーアンカー修正済み）
 
 #### カラーシステム
 - ✅ HSV カラーホイール
@@ -98,6 +106,12 @@
 | SAM2 ONNX | AI 選択ツール基盤（PAINT_USE_ONNX） | — | ✅ DONE |
 | Vector Live Preview | ベクターレイヤー描画中プレビュー | — | ✅ DONE |
 | UI Theme Refresh | Dark theme redesign | — | ✅ DONE |
+| **FreeTransform 修正** | 高品質変換・コーナーアンカー修正 | `22d3fc2` | ✅ DONE |
+| **Mesh Deformation** | Puppet Warp（ワイヤーフレーム・変形） | `8b42467`, `f3cf765` | ✅ DONE |
+| **Roto Brush** | object_select → AiSelectTool 接続 | `0cc1a45` | 🔧 ONNX モデル待ち |
+| **AI アップスケール** | ComfyUI + ONNX + バイリニア 3段階 | 未コミット | 🔧 コミット待ち |
+| **AI モデルフォルダ管理** | AiModelFolderDialog（QSettings） | 未コミット | 🔧 コミット待ち |
+| **ComfyUI アップスケール対応** | fetchUpscaleModels + buildUpscaleWorkflow | 未コミット | 🔧 コミット待ち |
 
 ### 過去セッション（2026-05）
 
@@ -132,26 +146,38 @@ CSP/Photoshop 互換の「レイヤーオフセット + 独立 PixelBuffer」モ
 
 ## 次のタスク（優先順）
 
-### 🔴 高優先度
+### 🔴 即着手可能（依存なし）
 
-1. **ADR-008 Phase 3** — オフセットレイヤーへの描画（BrushTool buffer動的拡張）
+1. ~~**PSD 出力 → ファイルメニュー接続**~~ ✅ 完了
+
+2. **AIアップスケール未コミット変更のコミット**
+   - 変更対象: UpscaleEngine / UpscaleDialog / AiModelFolderDialog / ComfyUiClient / MainWindow / CMakeLists.txt
+   - `cmake --build build --config Release` → 型チェック確認後にコミット
+
+3. **選択範囲を新規レイヤーとして切り出し** （〜2時間）
+   - `AppController::extractSelectionToNewLayer()` を追加
+   - 切り出し後、元レイヤーの選択領域を透明化
+   - MV ワークフロー W-041/042 に対応
+
+### 🔴 高優先度（依存あり）
+
+4. **SAM2 ONNX モデルセットアップ** （AI 選択ツール実用化）
+   - `cmake -DPAINT_USE_ONNX=ON` でリビルド
+   - sam2_hiera_t.onnx を `build\Release\models\` に配置
+   - Roto Brush の動作確認
+
+5. **ADR-008 Phase 3** — オフセットレイヤーへの描画（BrushTool buffer動的拡張）
    - 現在はオフセット 0 のレイヤーで描画→移動の順序が前提
    - Phase 3 実装で「移動済みレイヤーに直接描画」が可能になる
    - **HIGH RISK**: 全描画ツールに影響。ユニットテスト整備が前提条件
 
-2. **SAM2 ONNX モデルセットアップ** （AI 選択ツール実用化）
-   - `scripts\download_sam2.ps1` で モデルをエクスポート
-   - `vcpkg install onnxruntime:x64-windows`
-   - `cmake -DPAINT_USE_ONNX=ON` でリビルド
-   - `build\Release\models\` に自動配置
-
-2. **ベクター編集ツール実装** （Vector 層を完全化）
+6. **ベクター編集ツール実装** （Vector 層を完全化）
    - Point edit （選択・移動・削除）
    - Path split / connect / simplify
    - テーパー形状適用
    - 推定工数: 20 時間
 
-3. **フォルダレイヤー階層** （UI 標準機能化）
+7. **フォルダレイヤー階層** （UI 標準機能化）
    - `Layer::parent` ポインタ追加
    - LayerPanel 再帰表示
    - ドラッグ drop-into-folder 対応
@@ -159,29 +185,47 @@ CSP/Photoshop 互換の「レイヤーオフセット + 独立 PixelBuffer」モ
 
 ### 🟡 中優先度
 
-4. **ペンタブ筆圧統合** （入力品質向上）
+8. **ペンタブ筆圧統合** （入力品質向上）
    - Wintab / Windows Ink API 統合
    - `QTabletEvent` 処理
    - ToolPropertyPanel に筆圧プレビュー表示
    - 推定工数: 15 時間
 
-5. **Skia 本移植** （GPU レンダリング）
+9. **Skia 本移植** （GPU レンダリング）
    - `PAINT_USE_SKIA=ON` を default
    - Vulkan / Metal バックエンド動作確認
    - CPU fallback 検証
    - 推定工数: 30 時間
 
-6. **クリッピンググループ合成** （標準機能化）
-   - Renderer での処理
-   - UI：layer clipping toggle
-   - 推定工数: 8 時間
+10. **クリッピンググループ合成** （標準機能化）
+    - Renderer での処理
+    - UI：layer clipping toggle
+    - 推定工数: 8 時間
 
 ### 🟢 低優先度（Phase 1+）
 
-7. グラデーション・テキストツール
-8. 調整レイヤー（トーンカーブ・色相彩度）
-9. PSD/PSB インポート
-10. MV 制作ソフト連携（Phase 2）
+11. グラデーション・テキストツール
+12. 調整レイヤー（トーンカーブ・色相彩度）
+13. アンシャープマスクフィルター（MV ワークフロー W-030）
+14. LaMa インペイントエンジン（MV ワークフロー W-050）
+15. PSD インポート
+
+---
+
+## MV 連携ワークフロー進捗（別ドキュメント参照）
+
+詳細: [docs/MV_EXPORT_WORKFLOW.md](../docs/MV_EXPORT_WORKFLOW.md)
+
+| ステップ | 完了度 | 残作業 |
+|----------|--------|--------|
+| 1. 画像インポート | 80% | キャンバスリサイズオプション |
+| 2. 背景/キャラ分離 | 30% | SAM2 モデルセットアップ・自動分割 |
+| **3. AIアップスケール** | **95%** | ONNX モデル同梱（任意） |
+| 4. エッジ強調 | 0% | 全タスク未着手 |
+| 5. パーツ分離 | 10% | SAM2 依存・切り出しコマンド未実装 |
+| 6. カモフラージュ | 0% | LaMa モデル選定が先 |
+| 7. 手動調整 | 90% | プレビューのみ残 |
+| **8. PSD出力** | **100%** | ✅ 完了 |
 
 ---
 

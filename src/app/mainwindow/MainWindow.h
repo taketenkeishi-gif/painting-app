@@ -70,6 +70,7 @@ private slots:
   void onSaveAsTriggered();
   void onExportPngTriggered();
   void onExportFlattenedTriggered();
+  void onExportPsdTriggered();
   void onUndoTriggered();
   void onRedoTriggered();
   void onCutTriggered();
@@ -231,6 +232,7 @@ private:
   QAction* m_saveAsAction {nullptr};
   QAction* m_exportPngAction {nullptr};
   QAction* m_exportFlattenedAction {nullptr};
+  QAction* m_exportPsdAction {nullptr};
   QAction* m_exitAction {nullptr};
   QAction* m_undoAction {nullptr};
   QAction* m_redoAction {nullptr};

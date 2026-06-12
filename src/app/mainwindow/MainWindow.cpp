@@ -66,13 +66,15 @@
 #include "app/bridge/AppController.h"
 #include "app/bridge/LpaExporter.h"
 #include "app/bridge/LpaImporter.h"
+#include "app/bridge/PsdExporter.h"
 #include "app/canvasview/CanvasWidget.h"
 #include "app/panels/AdjustmentPropertyPanel.h"
 #include "app/panels/AiPanel.h"
-#include "app/panels/MeshDeformPanel.h"
-#include "app/panels/RotoBrushPanel.h"
 #include "app/ui/Theme.h"
+#include "app/panels/AiModelFolderDialog.h"
 #include "app/panels/GenerativeFillDialog.h"
+#include "app/panels/UpscaleDialog.h"
+#include "core/ai/UpscaleEngine.h"
 #include "app/panels/LayerPanel.h"
 #include "app/panels/SubToolPanel.h"
 #include "app/panels/ToolPanel.h"
@@ -295,6 +297,19 @@ protected:
     for (int r = 0; r < 3; ++r)
       for (int c = 0; c < 2; ++c)
         p.drawPoint(5 + c * 4, 5 + r * 4);
+  }
+
+  void mouseMoveEvent(QMouseEvent* event) override {
+    QWidget::mouseMoveEvent(event);
+    // ボタン上ではデフォルト矢印、それ以外(グリップ・タブ間スペース・ストレッチ)はドラッグ可能を示す手カーソル
+    const QPoint pos = event->position().toPoint();
+    bool overButton = false;
+    for (auto* btn : m_tabBtns) {
+      if (btn->geometry().contains(pos)) { overButton = true; break; }
+    }
+    if (!overButton) overButton = m_floatBtn->geometry().contains(pos);
+    if (!overButton) overButton = m_closeBtn->geometry().contains(pos);
+    setCursor(overButton ? Qt::ArrowCursor : Qt::OpenHandCursor);
   }
 
 private:
@@ -523,8 +538,6 @@ MainWindow::MainWindow(QWidget* parent)
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
       m_adjustmentPanel(new app::panels::AdjustmentPropertyPanel(this)),
       m_aiPanel(new app::panels::AiPanel(this)),
-      m_meshDeformPanel(new app::panels::MeshDeformPanel(nullptr, this)),
-      m_rotoBrushPanel(new app::panels::RotoBrushPanel(nullptr, this)),
       m_layerPanel(new app::panels::LayerPanel(this)),
       m_toolPanel(new app::panels::ToolPanel(this)),
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
@@ -553,7 +566,6 @@ MainWindow::MainWindow(QWidget* parent)
   m_quickSliderPanel->setController(m_controller);
   m_subToolPanel->setController(m_controller);
   m_toolPropertyPanel->setController(m_controller);
-  m_controller->setRotoBrushPanel(m_rotoBrushPanel);
   m_toolPanel->setSections(app::panels::ToolPanel::ButtonsOnly);
   m_quickSliderPanel->setSections(app::panels::ToolPanel::QuickSlidersOnly);
 
@@ -1048,8 +1060,6 @@ void MainWindow::setupShellLayout() {
   m_adjustmentDock = makeDock("調整レイヤー", m_adjustmentPanel, "AdjustmentDock");
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
-  m_meshDeformDock = makeDock(QString::fromUtf8(u8"メッシュ変形"), m_meshDeformPanel, "MeshDeformDock");
-  m_rotoBrushDock  = makeDock(QString::fromUtf8(u8"Rotoブラシ"),  m_rotoBrushPanel,  "RotoBrushDock");
   // Native title bars are kept so Qt's dock drag/float/rearrange machinery works.
   // They are styled compact and dark via QSS in applyUiChrome().
   // Tabified docks can be floated by right-clicking the tab (Qt standard behavior).
@@ -1079,13 +1089,9 @@ void MainWindow::setupShellLayout() {
   addDockWidget(Qt::RightDockWidgetArea, m_adjustmentDock);
   addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
   addDockWidget(Qt::RightDockWidgetArea, m_infoDock);
-  addDockWidget(Qt::RightDockWidgetArea, m_meshDeformDock);
-  addDockWidget(Qt::RightDockWidgetArea, m_rotoBrushDock);
   tabifyDockWidget(m_layerDock, m_adjustmentDock);
   tabifyDockWidget(m_layerDock, m_aiDock);
   tabifyDockWidget(m_layerDock, m_infoDock);
-  tabifyDockWidget(m_layerDock, m_meshDeformDock);
-  tabifyDockWidget(m_layerDock, m_rotoBrushDock);
 
   m_toolDock->raise();
   m_layerDock->raise();
@@ -1095,8 +1101,7 @@ void MainWindow::setupShellLayout() {
   const QList<QDockWidget*> allDocks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock,
-      m_meshDeformDock, m_rotoBrushDock
+      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock
   };
   for (auto* dock : allDocks) {
     if (!dock) continue;
@@ -1144,6 +1149,7 @@ void MainWindow::createMenus() {
   m_saveAsAction = new QAction("名前を付けて保存(&A)...", this);
   m_exportPngAction = new QAction("PNG書き出し(&P)...", this);
   m_exportFlattenedAction = new QAction("統合画像を書き出し(&E)...", this);
+  m_exportPsdAction = new QAction("PSDとして書き出し(&D)...", this);
   m_exitAction = new QAction("終了(&X)", this);
   auto* closeAction = new QAction("閉じる(&C)", this);
   m_undoAction = new QAction("元に戻す(&U)", this);
@@ -1229,6 +1235,7 @@ void MainWindow::createMenus() {
   m_saveAsAction->setShortcut(QKeySequence::SaveAs);
   m_exportPngAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
   m_exportFlattenedAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E));
+  m_exportPsdAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
   m_exitAction->setShortcut(QKeySequence::Quit);
   closeAction->setShortcut(QKeySequence::Close);
   m_undoAction->setShortcut(QKeySequence::Undo);
@@ -1302,6 +1309,7 @@ void MainWindow::createMenus() {
   fileMenu->addSeparator();
   fileMenu->addAction(m_exportPngAction);
   fileMenu->addAction(m_exportFlattenedAction);
+  fileMenu->addAction(m_exportPsdAction);
   if (m_recentFilesMenu != nullptr) {
     rebuildRecentFilesMenu();
     fileMenu->addMenu(m_recentFilesMenu);
@@ -1354,8 +1362,11 @@ void MainWindow::createMenus() {
     removeAction->setEnabled(false);  // Phase C で有効化
     auto* inpaintAction = aiMenu->addAction(QString::fromUtf8(u8"生成塗りつぶし..."));
     inpaintAction->setEnabled(false);  // Phase D で有効化
-    auto* upscaleAction = aiMenu->addAction(QString::fromUtf8(u8"高解像度化..."));
-    upscaleAction->setEnabled(false);
+    m_aiUpscaleAction = aiMenu->addAction(QString::fromUtf8(u8"高解像度化(&U)..."));
+    m_aiUpscaleAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_U));
+    aiMenu->addSeparator();
+    m_aiModelFolderAction = aiMenu->addAction(
+        QString::fromUtf8(u8"AI モデルフォルダを設定(&F)..."));
     aiMenu->addSeparator();
     if (m_aiDock != nullptr) {
       aiMenu->addAction(m_aiDock->toggleViewAction());
@@ -1552,6 +1563,7 @@ void MainWindow::createMenus() {
   scFile->addAction(m_saveAsAction);
   scFile->addAction(m_exportPngAction);
   scFile->addAction(m_exportFlattenedAction);
+  scFile->addAction(m_exportPsdAction);
   scFile->addSeparator();
   scFile->addAction(m_exitAction);
 
@@ -1637,6 +1649,7 @@ void MainWindow::createMenus() {
   connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::onSaveAsTriggered);
   connect(m_exportPngAction, &QAction::triggered, this, &MainWindow::onExportPngTriggered);
   connect(m_exportFlattenedAction, &QAction::triggered, this, &MainWindow::onExportFlattenedTriggered);
+  connect(m_exportPsdAction, &QAction::triggered, this, &MainWindow::onExportPsdTriggered);
   connect(m_exitAction, &QAction::triggered, this, &QWidget::close);
   connect(closeAction, &QAction::triggered, this, &QWidget::close);
   connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndoTriggered);
@@ -1710,6 +1723,8 @@ void MainWindow::createMenus() {
   connect(m_transparentColorAction, &QAction::triggered, this, &MainWindow::onUseTransparentColor);
   connect(m_generativeFillAction,  &QAction::triggered, this, &MainWindow::onGenerativeFillTriggered);
   connect(m_connectComfyUiAction,  &QAction::triggered, this, &MainWindow::onConnectComfyUiTriggered);
+  connect(m_aiUpscaleAction,       &QAction::triggered, this, &MainWindow::onAiUpscaleTriggered);
+  connect(m_aiModelFolderAction,   &QAction::triggered, this, &MainWindow::onAiModelFolderTriggered);
   connect(m_brightnessContrastAction, &QAction::triggered, this, &MainWindow::onBrightnessContrastTriggered);
   connect(m_hueSatLightAction,        &QAction::triggered, this, &MainWindow::onHueSatLightTriggered);
   connect(m_resetRotationAction, &QAction::triggered, this, [this]() {
@@ -1734,17 +1749,12 @@ void MainWindow::createMenus() {
   });
   connect(m_meshDeformAction, &QAction::triggered, this, [this]() {
     if (m_controller->beginMeshDeformSession()) {
-      m_meshDeformPanel->setController(m_controller);
-      m_meshDeformPanel->updateFromController();
-      if (m_meshDeformDock) m_meshDeformDock->raise();
+      if (m_toolPropertyDock) m_toolPropertyDock->raise();
     } else if (m_controller->isInTransformMode()) {
       statusBar()->showMessage(QString::fromUtf8(u8"メッシュ変形: 自由変形を終了してから実行してください"), 3000);
     } else {
       statusBar()->showMessage(QString::fromUtf8(u8"メッシュ変形: ラスターレイヤーを選択してください"), 3000);
     }
-  });
-  connect(m_meshDeformPanel, &app::panels::MeshDeformPanel::sessionEnded, this, [this]() {
-    if (m_layerDock) m_layerDock->raise();
   });
   connect(m_gaussianBlurAction,  &QAction::triggered, this, [this]() {
     statusBar()->showMessage(QString::fromUtf8(u8"ガウスぼかし: 未実装"), 3000);
@@ -1804,6 +1814,7 @@ void MainWindow::createMenus() {
   markCommand(m_saveAsAction, "file.save_as");
   markCommand(m_exportPngAction, "file.export_png");
   markCommand(m_exportFlattenedAction, "file.export_flattened");
+  markCommand(m_exportPsdAction, "file.export_psd");
   markCommand(m_clearRecentFilesAction, "file.clear_recent");
   markCommand(m_exitAction, "file.exit");
   markCommand(m_undoAction, "edit.undo");
@@ -1853,6 +1864,8 @@ void MainWindow::createMenus() {
   markCommand(m_transparentColorAction, "color.transparent");
   markCommand(m_generativeFillAction,  "edit.generative_fill");
   markCommand(m_connectComfyUiAction,  "edit.connect_comfyui");
+  markCommand(m_aiUpscaleAction,       "ai.upscale");
+  markCommand(m_aiModelFolderAction,   "ai.model_folder");
   for (const auto& [kind, action] : m_toolActions) {
     if (action != nullptr) {
       markCommand(action, QString("tool.%1").arg(static_cast<int>(kind)));
@@ -2935,6 +2948,23 @@ void MainWindow::onExportFlattenedTriggered() {
   }
 }
 
+void MainWindow::onExportPsdTriggered() {
+  const QString path = QFileDialog::getSaveFileName(
+      this,
+      "PSDとして書き出し",
+      QString(),
+      "Photoshop Document (*.psd)");
+  if (path.isEmpty()) {
+    return;
+  }
+  const auto result = app::psd::exportPsd(m_controller->document(), path.toStdString());
+  if (result.success) {
+    statusBar()->showMessage(QString("PSDを書き出しました: %1").arg(path), 2500);
+  } else {
+    QMessageBox::critical(this, "PSD書き出しエラー", QString::fromStdString(result.error));
+  }
+}
+
 void MainWindow::onSetToolTriggered() {
   auto* action = qobject_cast<QAction*>(sender());
   if (action == nullptr || m_controller == nullptr) {
@@ -3640,6 +3670,55 @@ void MainWindow::onGenerativeFillTriggered() {
     updateUndoRedoState();
     statusBar()->showMessage("AI 生成結果を新規レイヤーとして追加しました", 2500);
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI 高解像度化
+// ─────────────────────────────────────────────────────────────────────────────
+void MainWindow::onAiUpscaleTriggered() {
+  if (m_controller == nullptr) return;
+  const core::PixelBuffer& src = m_controller->compositedBuffer();
+  if (src.width() <= 0 || src.height() <= 0) {
+    statusBar()->showMessage(QString::fromUtf8(u8"キャンバスが空です"), 1800);
+    return;
+  }
+
+  // 登録済みフォルダ（デフォルト <exe>/models/ 含む）を全て走査
+  std::vector<core::ai::UpscaleEngine::ModelInfo> models;
+  for (const QString& folder : app::panels::AiModelFolderDialog::loadFolders()) {
+    const auto found = core::ai::UpscaleEngine::scanModels(folder.toStdString());
+    models.insert(models.end(), found.begin(), found.end());
+  }
+  // 表示名でソートして重複除去
+  std::sort(models.begin(), models.end(),
+            [](const auto& a, const auto& b){ return a.path < b.path; });
+  models.erase(std::unique(models.begin(), models.end(),
+                            [](const auto& a, const auto& b){ return a.path == b.path; }),
+               models.end());
+
+  app::panels::UpscaleDialog dlg(src, models, m_controller->comfyUiClient(), this);
+  if (dlg.exec() != QDialog::Accepted || !dlg.hasResult()) {
+    return;
+  }
+
+  const int newW = dlg.result().width();
+  const int newH = dlg.result().height();
+  const QString layerName =
+      QString::fromUtf8(u8"高解像度化 %1×%2").arg(newW).arg(newH);
+
+  if (m_controller->pasteBufferAsNewRasterLayer(dlg.result(), layerName.toStdString())) {
+    updateUndoRedoState();
+    statusBar()->showMessage(
+        QString::fromUtf8(u8"高解像度化完了: %1 × %2 px").arg(newW).arg(newH), 3000);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI モデルフォルダ設定
+// ─────────────────────────────────────────────────────────────────────────────
+void MainWindow::onAiModelFolderTriggered() {
+  app::panels::AiModelFolderDialog dlg(this);
+  dlg.exec();
 }
 
 // ── 画像調整ダイアログ ────────────────────────────────────────────────────

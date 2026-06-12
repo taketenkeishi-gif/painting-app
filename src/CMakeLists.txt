@@ -89,6 +89,8 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AppController.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/LpaExporter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/LpaImporter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/PsdExporter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/PsdImporter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/ToolDescriptor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/UiState.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/IconLoader.cpp
