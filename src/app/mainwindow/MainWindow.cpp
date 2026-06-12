@@ -53,8 +53,10 @@
 #include <QStatusBar>
 #include <QStyle>
 #include <QSet>
+#include <QTabBar>
 #include <QTabWidget>
 #include <QMouseEvent>
+#include <QCloseEvent>
 #include <QToolBar>
 #include <QTimer>
 #include <QVariant>
@@ -679,6 +681,44 @@ MainWindow::MainWindow(QWidget* parent)
          ag.top()  + (ag.height() - h) / 2);
   }
 
+  // ── キャンバスホスト（タブバー + キャンバス）を作成 ──────────────────
+  m_canvasHost = new QWidget(this);
+  m_canvasHost->setObjectName("canvasHost");
+  auto* hostLayout = new QVBoxLayout(m_canvasHost);
+  hostLayout->setContentsMargins(0, 0, 0, 0);
+  hostLayout->setSpacing(0);
+
+  m_documentTabBar = new QTabBar(m_canvasHost);
+  m_documentTabBar->setTabsClosable(true);
+  m_documentTabBar->setMovable(false);
+  m_documentTabBar->setExpanding(false);
+  m_documentTabBar->setUsesScrollButtons(true);
+  m_documentTabBar->setObjectName("documentTabBar");
+  m_documentTabBar->setStyleSheet(
+      "QTabBar { background: #1a1f2e; }"
+      "QTabBar::tab {"
+      "  background: #1a1f2e; color: #8090a8;"
+      "  padding: 3px 10px; margin-right: 1px;"
+      "  border: none; border-bottom: 2px solid transparent;"
+      "  font-size: 11px; min-width: 60px; max-width: 200px; }"
+      "QTabBar::tab:selected {"
+      "  background: #232b3a; color: #d8e6ff;"
+      "  border-bottom: 2px solid #4e8ef7; }"
+      "QTabBar::tab:hover:!selected { background: #202636; color: #b0c4e0; }"
+      "QTabBar::close-button { subcontrol-position: right; }"
+  );
+  hostLayout->addWidget(m_documentTabBar);
+  m_canvasWidget->setParent(m_canvasHost);
+  hostLayout->addWidget(m_canvasWidget);
+
+  // ── 最初のドキュメントエントリを登録 ───────────────────────────────────
+  m_documents.push_back({m_controller, {}});
+  m_activeDocIndex = 0;
+  m_documentTabBar->addTab(QString::fromUtf8(u8"無題"));
+
+  connect(m_documentTabBar, &QTabBar::tabCloseRequested, this, &MainWindow::onTabCloseRequested);
+  connect(m_documentTabBar, &QTabBar::currentChanged,    this, &MainWindow::onTabCurrentChanged);
+
   m_canvasWidget->setController(m_controller);
   m_adjustmentPanel->setController(m_controller);
   m_aiPanel->setController(m_controller);
@@ -697,19 +737,7 @@ MainWindow::MainWindow(QWidget* parent)
   createToolBar();
   applyUiChrome();
 
-  connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &MainWindow::onToolStateChanged);
-  connect(m_controller, &app::bridge::AppController::foregroundColorUsed, this, [this]() {
-    pushForegroundColorHistory(m_controller->toolState().color);
-    refreshColorHistoryButtons();
-  }, Qt::QueuedConnection);
-  connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateActiveLayerStatus);
-  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateActiveLayerStatus);
-  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateUndoRedoState);
-  connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateUndoRedoState);
-  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateNavigatorPreview);
-  connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateNavigatorPreview);
-  connect(m_controller, &app::bridge::AppController::documentChanged, this, &MainWindow::updateWindowTitle);
-  connect(m_controller, &app::bridge::AppController::layersChanged, this, &MainWindow::updateWindowTitle);
+  connectController(m_controller);
   connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, &MainWindow::updateNavigatorPreview);
   connect(m_canvasWidget, &app::canvasview::CanvasWidget::viewTransformChanged, this, [this]() {
     if (m_zoomStatusLabel != nullptr) {
@@ -736,7 +764,7 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::setupShellLayout() {
-  setCentralWidget(m_canvasWidget);
+  setCentralWidget(m_canvasHost);
   setDockNestingEnabled(true);
   setDockOptions(QMainWindow::AllowNestedDocks | QMainWindow::AllowTabbedDocks |
                  QMainWindow::AnimatedDocks | QMainWindow::GroupedDragging);
@@ -1346,6 +1374,9 @@ void MainWindow::createMenus() {
   m_transformAction           = new QAction(QString::fromUtf8(u8"変形(&T)"), this);
   m_freeTransformAction       = new QAction(QString::fromUtf8(u8"自由変形(&F)"), this);
   m_meshDeformAction          = new QAction(QString::fromUtf8(u8"メッシュ変形(&M)"), this);
+  m_appSettingsAction         = new QAction(QString::fromUtf8(u8"環境設定(&P)..."), this);
+  m_closeDocumentAction       = new QAction(QString::fromUtf8(u8"ドキュメントを閉じる(&W)"), this);
+  m_closeDocumentAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_W));
 
   m_recentFilesMenu = fileMenu->addMenu("最近使ったファイル");
 
@@ -1438,7 +1469,10 @@ void MainWindow::createMenus() {
     fileMenu->addMenu(m_recentFilesMenu);
   }
   fileMenu->addSeparator();
+  fileMenu->addAction(m_closeDocumentAction);
   fileMenu->addAction(closeAction);
+  fileMenu->addSeparator();
+  fileMenu->addAction(m_appSettingsAction);
   fileMenu->addAction(m_exitAction);
   editMenu->addAction(m_undoAction);
   editMenu->addAction(m_redoAction);
@@ -1902,8 +1936,10 @@ void MainWindow::createMenus() {
           2000);
     }
   });
-  connect(m_controller, &app::bridge::AppController::comfyUiStateChanged,
-          this, &MainWindow::onComfyUiStateChanged);
+  connect(m_appSettingsAction, &QAction::triggered, this, &MainWindow::onAppSettingsTriggered);
+  connect(m_closeDocumentAction, &QAction::triggered, this, [this]() {
+    closeDocumentAt(m_activeDocIndex);
+  });
   connect(m_clearRecentFilesAction, &QAction::triggered, this, [this]() {
     m_recentFiles.clear();
     rebuildRecentFilesMenu();
@@ -2508,7 +2544,262 @@ void MainWindow::updateWindowTitle() {
       ? QString::fromUtf8(u8"無題")
       : QFileInfo(m_currentFilePath).fileName();
   setWindowTitle(QString("%1%2 — Painting-app").arg(dirty ? "*" : "", name));
+  // タブのラベルも更新
+  if (m_activeDocIndex >= 0 && m_activeDocIndex < m_documentTabBar->count()) {
+    m_documentTabBar->setTabText(m_activeDocIndex, tabLabelForDocument(m_activeDocIndex));
+  }
 }
+
+// ── マルチドキュメント実装 ────────────────────────────────────────────────
+
+void MainWindow::connectController(app::bridge::AppController* ctrl) {
+  connect(ctrl, &app::bridge::AppController::toolStateChanged, this, &MainWindow::onToolStateChanged);
+  connect(ctrl, &app::bridge::AppController::foregroundColorUsed, this, [this]() {
+    pushForegroundColorHistory(m_controller->toolState().color);
+    refreshColorHistoryButtons();
+  }, Qt::QueuedConnection);
+  connect(ctrl, &app::bridge::AppController::layersChanged,  this, &MainWindow::updateActiveLayerStatus);
+  connect(ctrl, &app::bridge::AppController::documentChanged,this, &MainWindow::updateActiveLayerStatus);
+  connect(ctrl, &app::bridge::AppController::documentChanged,this, &MainWindow::updateUndoRedoState);
+  connect(ctrl, &app::bridge::AppController::layersChanged,  this, &MainWindow::updateUndoRedoState);
+  connect(ctrl, &app::bridge::AppController::documentChanged,this, &MainWindow::updateNavigatorPreview);
+  connect(ctrl, &app::bridge::AppController::layersChanged,  this, &MainWindow::updateNavigatorPreview);
+  connect(ctrl, &app::bridge::AppController::documentChanged,this, &MainWindow::updateWindowTitle);
+  connect(ctrl, &app::bridge::AppController::layersChanged,  this, &MainWindow::updateWindowTitle);
+  connect(ctrl, &app::bridge::AppController::comfyUiStateChanged,
+          this, &MainWindow::onComfyUiStateChanged);
+}
+
+void MainWindow::disconnectController(app::bridge::AppController* ctrl) {
+  if (ctrl) disconnect(ctrl, nullptr, this, nullptr);
+}
+
+QString MainWindow::tabLabelForDocument(int index) const {
+  if (index < 0 || index >= (int)m_documents.size()) return {};
+  const auto& entry = m_documents[index];
+  const bool dirty = entry.controller && entry.controller->isDirty();
+  const QString name = entry.filePath.isEmpty()
+      ? QString::fromUtf8(u8"無題")
+      : QFileInfo(entry.filePath).fileName();
+  return dirty ? name + " *" : name;
+}
+
+void MainWindow::updateDocumentTabLabels() {
+  for (int i = 0; i < (int)m_documents.size() && i < m_documentTabBar->count(); ++i) {
+    m_documentTabBar->setTabText(i, tabLabelForDocument(i));
+  }
+}
+
+void MainWindow::addDocumentEntry(app::bridge::AppController* ctrl, const QString& filePath) {
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  const int maxDocs = settings.value("app/maxOpenDocuments", 10).toInt();
+  if ((int)m_documents.size() >= maxDocs) {
+    QMessageBox::warning(this, QString::fromUtf8(u8"ドキュメント上限"),
+        QString::fromUtf8(u8"同時に開けるドキュメント数の上限（%1）に達しました。\n"
+                          u8"タブを閉じてから再度お試しください。").arg(maxDocs));
+    delete ctrl;
+    return;
+  }
+  m_documents.push_back({ctrl, filePath});
+  const int newIndex = (int)m_documents.size() - 1;
+  m_documentTabBar->addTab(QString::fromUtf8(u8"無題"));
+  m_documentTabBar->setCurrentIndex(newIndex);  // triggers onTabCurrentChanged
+  // QTabBar::currentChanged は既に switchToDocument を呼ぶが、
+  // addTab 直後は index が変わらない場合があるため明示的に呼ぶ
+  switchToDocument(newIndex);
+  checkMemoryAndWarn();
+}
+
+void MainWindow::switchToDocument(int index) {
+  if (index < 0 || index >= (int)m_documents.size()) return;
+  if (index == m_activeDocIndex && m_controller == m_documents[index].controller) return;
+
+  // 現在のファイルパスをエントリに保存
+  if (m_activeDocIndex >= 0 && m_activeDocIndex < (int)m_documents.size()) {
+    m_documents[m_activeDocIndex].filePath = m_currentFilePath;
+  }
+
+  disconnectController(m_controller);
+
+  m_activeDocIndex = index;
+  m_controller = m_documents[index].controller;
+  m_currentFilePath = m_documents[index].filePath;
+
+  connectController(m_controller);
+
+  // 全パネルを新しいコントローラに接続
+  m_canvasWidget->setController(m_controller);
+  m_adjustmentPanel->setController(m_controller);
+  m_aiPanel->setController(m_controller);
+  m_layerPanel->setController(m_controller);
+  m_toolPanel->setController(m_controller);
+  m_quickSliderPanel->setController(m_controller);
+  m_subToolPanel->setController(m_controller);
+  m_toolPropertyPanel->setController(m_controller);
+
+  // UI 更新
+  onToolStateChanged();
+  updateUndoRedoState();
+  updateActiveLayerStatus();
+  updateWindowTitle();
+  updateNavigatorPreview();
+
+  if (m_documentTabBar->currentIndex() != index) {
+    QSignalBlocker blocker(m_documentTabBar);
+    m_documentTabBar->setCurrentIndex(index);
+  }
+}
+
+void MainWindow::closeDocumentAt(int index) {
+  if (index < 0 || index >= (int)m_documents.size()) return;
+  auto* ctrl = m_documents[index].controller;
+
+  // ダーティチェック
+  if (ctrl && ctrl->isDirty()) {
+    const QString name = m_documents[index].filePath.isEmpty()
+        ? QString::fromUtf8(u8"無題")
+        : QFileInfo(m_documents[index].filePath).fileName();
+    const int ret = QMessageBox::question(
+        this,
+        QString::fromUtf8(u8"未保存の変更"),
+        QString::fromUtf8(u8"「%1」に保存されていない変更があります。\n閉じますか？").arg(name),
+        QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Cancel);
+    if (ret != QMessageBox::Discard) return;
+  }
+
+  // 最後のドキュメントの場合は新規ドキュメントにリセット（タブは維持）
+  if (m_documents.size() == 1) {
+    m_currentFilePath.clear();
+    m_documents[0].filePath.clear();
+    ctrl->newDocument(m_lastCanvasWidth, m_lastCanvasHeight, m_lastCanvasDpi);
+    updateWindowTitle();
+    return;
+  }
+
+  // タブとエントリを削除
+  {
+    QSignalBlocker blocker(m_documentTabBar);
+    m_documentTabBar->removeTab(index);
+  }
+  if (index != m_activeDocIndex)
+    disconnectController(ctrl);
+  m_documents.erase(m_documents.begin() + index);
+
+  // アクティブインデックス調整
+  int nextIndex = m_activeDocIndex;
+  if (index < m_activeDocIndex) {
+    --nextIndex;
+  } else if (index == m_activeDocIndex) {
+    nextIndex = qBound(0, nextIndex, (int)m_documents.size() - 1);
+  }
+  m_activeDocIndex = -1;  // リセットして強制再接続させる
+  switchToDocument(nextIndex);
+
+  delete ctrl;
+}
+
+void MainWindow::onTabCloseRequested(int index) {
+  closeDocumentAt(index);
+}
+
+void MainWindow::onTabCurrentChanged(int index) {
+  if (index == m_activeDocIndex) return;
+  switchToDocument(index);
+}
+
+void MainWindow::checkMemoryAndWarn() {
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+  const int warnMB = settings.value("app/memoryWarningMB", 2048).toInt();
+  // ドキュメント数 × 推定メモリ（キャンバスサイズから概算）
+  long long totalEstimatedKB = 0;
+  for (const auto& entry : m_documents) {
+    if (!entry.controller) continue;
+    const auto sz = entry.controller->document().canvasSize();
+    // RGBA 8bit: width * height * 4 bytes * レイヤー数（概算 5）
+    const long long layerCount = qMax(1LL, (long long)entry.controller->document().layerCount());
+    totalEstimatedKB += (long long)sz.width * sz.height * 4 * layerCount / 1024;
+  }
+  if (totalEstimatedKB / 1024 >= warnMB) {
+    statusBar()->showMessage(
+        QString::fromUtf8(u8"⚠ 推定メモリ使用量が %1 MB を超えました。タブを閉じることを検討してください。")
+            .arg(warnMB),
+        5000);
+  }
+}
+
+void MainWindow::onAppSettingsTriggered() {
+  QDialog dialog(this);
+  dialog.setWindowTitle(QString::fromUtf8(u8"環境設定"));
+  dialog.setMinimumWidth(380);
+
+  QSettings settings("taketenkeishi", "LayeredPaintApp");
+
+  auto* layout = new QVBoxLayout(&dialog);
+  layout->setSpacing(12);
+  layout->setContentsMargins(16, 14, 16, 14);
+
+  // ── マルチドキュメント ──────────────────────────────────────────────
+  auto* mdGroup = new QGroupBox(QString::fromUtf8(u8"マルチドキュメント"), &dialog);
+  auto* mdForm  = new QFormLayout(mdGroup);
+  mdForm->setLabelAlignment(Qt::AlignRight);
+  mdForm->setSpacing(8);
+
+  auto* maxDocsSpin = new QSpinBox(&dialog);
+  maxDocsSpin->setRange(1, 20);
+  maxDocsSpin->setValue(settings.value("app/maxOpenDocuments", 10).toInt());
+  maxDocsSpin->setSuffix(QString::fromUtf8(u8" 個"));
+  mdForm->addRow(QString::fromUtf8(u8"同時展開最大数:"), maxDocsSpin);
+
+  auto* memWarnSpin = new QSpinBox(&dialog);
+  memWarnSpin->setRange(256, 32768);
+  memWarnSpin->setSingleStep(256);
+  memWarnSpin->setValue(settings.value("app/memoryWarningMB", 2048).toInt());
+  memWarnSpin->setSuffix(" MB");
+  mdForm->addRow(QString::fromUtf8(u8"メモリ警告閾値:"), memWarnSpin);
+
+  layout->addWidget(mdGroup);
+
+  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+  layout->addWidget(buttons);
+
+  connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+  if (dialog.exec() != QDialog::Accepted) return;
+
+  settings.setValue("app/maxOpenDocuments", maxDocsSpin->value());
+  settings.setValue("app/memoryWarningMB",  memWarnSpin->value());
+  statusBar()->showMessage(QString::fromUtf8(u8"環境設定を保存しました"), 2000);
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+  // 未保存のドキュメントをチェック
+  QStringList dirtyNames;
+  for (const auto& entry : m_documents) {
+    if (entry.controller && entry.controller->isDirty()) {
+      dirtyNames << (entry.filePath.isEmpty()
+          ? QString::fromUtf8(u8"無題")
+          : QFileInfo(entry.filePath).fileName());
+    }
+  }
+  if (!dirtyNames.isEmpty()) {
+    const QString list = dirtyNames.join(", ");
+    const int ret = QMessageBox::question(
+        this,
+        QString::fromUtf8(u8"未保存の変更"),
+        QString::fromUtf8(u8"以下のドキュメントに未保存の変更があります:\n%1\n\n終了しますか？").arg(list),
+        QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Cancel);
+    if (ret != QMessageBox::Discard) {
+      event->ignore();
+      return;
+    }
+  }
+  event->accept();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 void MainWindow::updateUndoRedoState() {
   if (m_undoAction == nullptr || m_redoAction == nullptr) {
@@ -2613,164 +2904,307 @@ void MainWindow::onRedoTriggered() {
 }
 
 void MainWindow::onNewCanvas() {
-  if (m_controller && m_controller->isDirty()) {
-    const int ret = QMessageBox::question(
-        this,
-        "未保存の変更",
-        "保存されていない変更があります。新規キャンバスを作成しますか？",
-        QMessageBox::Discard | QMessageBox::Cancel,
-        QMessageBox::Cancel);
-    if (ret != QMessageBox::Discard) {
-      return;
-    }
-  }
+  // マルチドキュメント: 新規は常に新しいタブで開く（既存ドキュメントは保持）
   QDialog dialog(this);
   dialog.setWindowTitle("新規キャンバス");
-  dialog.setMinimumWidth(360);
+  dialog.setMinimumWidth(640);
 
   auto* root = new QVBoxLayout(&dialog);
-  root->setSpacing(10);
+  root->setSpacing(12);
   root->setContentsMargins(16, 14, 16, 14);
 
-  // ── プリセット ─────────────────────────────────────────────────────────
+  // ── アイコン生成ヘルパー ──────────────────────────────────────────────
+  // 南京錠アイコン（縦長ボタン用: 上下に接続ラインつき）
+  auto makeLockPm = [](bool locked, int w, int h) -> QPixmap {
+    QPixmap pm(w, h);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    const float fw = float(w), fh = float(h), cx = fw * 0.5f;
+    const QColor lineClr = locked ? QColor(0x3a, 0x72, 0xd8) : QColor(0x30, 0x40, 0x60);
+    const QColor iconClr = locked ? QColor(0x6a, 0xae, 0xff) : QColor(0x5a, 0x6a, 0x8a);
+
+    // 上下の接続ライン（スピンボックスを繋ぐ視覚的なつなぎ）
+    const float lp = fh * 0.17f;
+    p.setPen(QPen(lineClr, 1.5f, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(QPointF(cx, 0.f), QPointF(cx, lp));
+    p.drawLine(QPointF(cx, fh - lp), QPointF(cx, fh));
+
+    // ボディ
+    const float bw = fw * 0.80f, bh = fh * 0.36f;
+    const float bx = (fw - bw) * 0.5f, by = fh * 0.545f;
+    p.setPen(Qt::NoPen);
+    p.setBrush(iconClr);
+    p.drawRoundedRect(QRectF(bx, by, bw, bh), 2.5f, 2.5f);
+
+    // キーホール（ロック時）
+    if (locked) {
+      const float kx = cx, ky = by + bh * 0.34f, kr = bh * 0.17f;
+      p.setBrush(QColor(0x08, 0x0b, 0x16));
+      p.drawEllipse(QPointF(kx, ky), kr, kr);
+      p.drawRect(QRectF(kx - kr * 0.44f, ky, kr * 0.88f, bh * 0.28f));
+    }
+
+    // シャックル（アーチ）
+    const float sw = bw * 0.54f, sr = sw * 0.5f;
+    const float sx = cx - sr, sy = by - sr * 1.18f;
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(iconClr, 2.1f, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    if (locked) {
+      QPainterPath path;
+      path.moveTo(sx, by);
+      path.lineTo(sx, sy + sr);
+      path.arcTo(QRectF(sx, sy, sw, sr * 2.f), 180.f, -180.f);
+      path.lineTo(sx + sw, by);
+      p.drawPath(path);
+    } else {
+      // 右端が開いた南京錠
+      QPainterPath path;
+      path.moveTo(sx, by);
+      path.lineTo(sx, sy + sr);
+      path.arcTo(QRectF(sx, sy, sw, sr * 2.f), 180.f, -140.f);
+      const QPointF ep = path.currentPosition();
+      path.lineTo(ep + QPointF(sw * 0.05f, -fh * 0.09f));
+      p.drawPath(path);
+    }
+    p.end();
+    return pm;
+  };
+
+  // 縦スワップ矢印アイコン（上▲ 軸線 下▼）
+  auto makeSwapPm = [](int sz) -> QPixmap {
+    QPixmap pm(sz, sz);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QColor clr(0x7a, 0x9a, 0xc0);
+    const float fsz = float(sz), cx = fsz * 0.5f;
+    const float m = fsz * 0.13f, aw = fsz * 0.44f, ah = fsz * 0.30f;
+    p.setPen(Qt::NoPen);
+    p.setBrush(clr);
+    QPolygonF up;
+    up << QPointF(cx, m) << QPointF(cx - aw/2, m + ah) << QPointF(cx + aw/2, m + ah);
+    p.drawPolygon(up);
+    QPolygonF dn;
+    dn << QPointF(cx, fsz-m) << QPointF(cx - aw/2, fsz-m-ah) << QPointF(cx + aw/2, fsz-m-ah);
+    p.drawPolygon(dn);
+    p.setPen(QPen(clr, 1.8f, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(QPointF(cx, m+ah+0.5f), QPointF(cx, fsz-m-ah-0.5f));
+    p.end();
+    return pm;
+  };
+
+  // ── レイアウト ────────────────────────────────────────────────────────
+  auto* mainRow = new QHBoxLayout();
+  mainRow->setSpacing(16);
+
+  // プレビューパネル
+  constexpr int PREV_W = 220, PREV_H = 200;
+  auto* previewLabel = new QLabel(&dialog);
+  previewLabel->setFixedSize(PREV_W, PREV_H);
+  previewLabel->setAlignment(Qt::AlignCenter);
+  previewLabel->setStyleSheet(
+    "background:#0c0f1c;border:1px solid #252d48;border-radius:6px;");
+
+  // コントロール列
+  auto* ctrl = new QVBoxLayout();
+  ctrl->setSpacing(10);
+
+  // プリセット
   struct Preset { const char* name; int w; int h; int dpi; };
   static const Preset kPresets[] = {
-    {"カスタム",         0,    0,   72},
-    {"HD  1280×720",  1280,  720,   72},
-    {"FHD 1920×1080", 1920, 1080,   72},
-    {"4K  3840×2160", 3840, 2160,   72},
-    {"A4 (72dpi)",    595,  842,   72},
-    {"A4 (300dpi)",  2480, 3508,  300},
-    {"B5 (72dpi)",   516,  729,   72},
-    {"正方形 1000",   1000, 1000,   72},
-    {"正方形 2000",   2000, 2000,   72},
+    {"カスタム",          0,    0,   72},
+    {"HD  1280×720",   1280,  720,   72},
+    {"FHD 1920×1080",  1920, 1080,   72},
+    {"4K  3840×2160",  3840, 2160,   72},
+    {"A4 (72dpi)",      595,  842,   72},
+    {"A4 (300dpi)",    2480, 3508,  300},
+    {"B5 (72dpi)",      516,  729,   72},
+    {"正方形 1000",     1000, 1000,   72},
+    {"正方形 2000",     2000, 2000,   72},
   };
+  auto* presetBox   = new QGroupBox("プリセット", &dialog);
+  auto* presetVL    = new QVBoxLayout(presetBox);
+  presetVL->setSpacing(5);
   auto* presetCombo = new QComboBox(&dialog);
-  for (auto& p : kPresets) presetCombo->addItem(p.name);
+  for (auto& pr : kPresets) presetCombo->addItem(pr.name);
+  presetVL->addWidget(presetCombo);
+  ctrl->addWidget(presetBox);
 
-  // ── サイズ入力 ─────────────────────────────────────────────────────────
+  // サイズ入力
   auto* sizeBox  = new QGroupBox("キャンバスサイズ", &dialog);
   auto* sizeGrid = new QGridLayout(sizeBox);
   sizeGrid->setSpacing(6);
+  sizeGrid->setColumnStretch(1, 1);
 
-  auto* widthSpin  = new QSpinBox(&dialog);
-  auto* heightSpin = new QSpinBox(&dialog);
-  auto* dpiSpin    = new QSpinBox(&dialog);
-  auto* lockBtn    = new QPushButton("🔒", &dialog);
-  widthSpin->setRange(1, 16384);  widthSpin->setSuffix(" px");
-  heightSpin->setRange(1, 16384); heightSpin->setSuffix(" px");
-  dpiSpin->setRange(1, 1200);     dpiSpin->setSuffix(" dpi");
-  widthSpin->setValue(m_lastCanvasWidth);
-  heightSpin->setValue(m_lastCanvasHeight);
-  dpiSpin->setValue(m_lastCanvasDpi);
-  lockBtn->setFixedSize(28, 28);
+  auto* widthSpin  = new AccelSpinBox(&dialog);
+  auto* heightSpin = new AccelSpinBox(&dialog);
+  auto* dpiSpin    = new AccelSpinBox(&dialog);
+  widthSpin->setRange(1, 16384);  widthSpin->setSuffix(" px");  widthSpin->setValue(m_lastCanvasWidth);
+  heightSpin->setRange(1, 16384); heightSpin->setSuffix(" px"); heightSpin->setValue(m_lastCanvasHeight);
+  dpiSpin->setRange(1, 1200);     dpiSpin->setSuffix(" dpi");   dpiSpin->setValue(m_lastCanvasDpi);
+
+  // 縦長ロックボタン（幅・高さのスピンボックスを視覚的に繋ぐ）
+  auto* lockBtn = new QPushButton(&dialog);
+  lockBtn->setFixedSize(22, 52);
   lockBtn->setCheckable(true);
-  lockBtn->setChecked(false);
+  lockBtn->setText("");
   lockBtn->setToolTip("縦横比をロック");
-  lockBtn->setStyleSheet(
-    "QPushButton{border:1px solid #3a4460;border-radius:4px;background:#1e2338;font-size:13px;}"
-    "QPushButton:checked{background:#2a3a5a;border-color:#4e8ef7;}"
-    "QPushButton:hover{background:#262c48;}");
 
-  // プレビューラベル（ピクセル数・印刷サイズ）
+  // スワップボタン（縦横入れ替え）
+  auto* swapBtn = new QPushButton(&dialog);
+  swapBtn->setFixedSize(26, 26);
+  swapBtn->setText("");
+  swapBtn->setToolTip("縦横を入れ替え");
+  swapBtn->setIcon(QIcon(makeSwapPm(26)));
+  swapBtn->setIconSize(QSize(18, 18));
+  swapBtn->setStyleSheet(
+    "QPushButton{border:1px solid #2e3a56;border-radius:4px;background:#141828;}"
+    "QPushButton:hover{border-color:#4a6090;background:#1c2440;}"
+    "QPushButton:pressed{background:#121630;}");
+
+  // サイズ情報ラベル
   auto* infoLabel = new QLabel(&dialog);
-  infoLabel->setStyleSheet("color:#7a8aaa;font-size:10px;");
+  infoLabel->setStyleSheet("color:#8a9bbb;font-size:10px;");
 
-  auto updateInfo = [&]() {
-    int w = widthSpin->value(), h = heightSpin->value(), d = dpiSpin->value();
-    double mmW = w / (d / 25.4);
-    double mmH = h / (d / 25.4);
-    infoLabel->setText(QString("%1 × %2 px  (%3 × %4 mm @ %5dpi)")
-      .arg(w).arg(h)
-      .arg(mmW, 0, 'f', 1).arg(mmH, 0, 'f', 1).arg(d));
-  };
-  updateInfo();
-
-  bool updatingSize = false;
-  auto onWidthChanged = [&](int val) {
-    if (updatingSize) return;
-    if (lockBtn->isChecked() && heightSpin->value() > 0) {
-      updatingSize = true;
-      double ratio = static_cast<double>(heightSpin->value()) / widthSpin->value();
-      if (val > 0) heightSpin->setValue(qRound(val * ratio));
-      updatingSize = false;
-    }
-    updateInfo();
-  };
-  auto onHeightChanged = [&](int val) {
-    if (updatingSize) return;
-    if (lockBtn->isChecked() && widthSpin->value() > 0) {
-      updatingSize = true;
-      double ratio = static_cast<double>(widthSpin->value()) / heightSpin->value();
-      if (val > 0) widthSpin->setValue(qRound(val * ratio));
-      updatingSize = false;
-    }
-    updateInfo();
-  };
-  connect(widthSpin,  QOverload<int>::of(&QSpinBox::valueChanged), &dialog, onWidthChanged);
-  connect(heightSpin, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, onHeightChanged);
-  connect(dpiSpin,    QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int){ updateInfo(); });
-
-  // 向き切り替えボタン
-  auto* orientRow = new QHBoxLayout();
-  auto* portraitBtn  = new QPushButton("縦", &dialog);
-  auto* landscapeBtn = new QPushButton("横", &dialog);
-  portraitBtn->setCheckable(true);  portraitBtn->setChecked(true);
-  landscapeBtn->setCheckable(true);
-  const QString orientStyle =
-    "QPushButton{border:1px solid #3a4460;border-radius:4px;background:#1e2338;padding:3px 14px;}"
-    "QPushButton:checked{background:#2a3a5a;border-color:#4e8ef7;color:#c5d8ff;}"
-    "QPushButton:hover{background:#262c48;}";
-  portraitBtn->setStyleSheet(orientStyle);
-  landscapeBtn->setStyleSheet(orientStyle);
-  auto swapIfNeeded = [&](bool portrait) {
-    int w = widthSpin->value(), h = heightSpin->value();
-    if (portrait && w > h) { widthSpin->setValue(h); heightSpin->setValue(w); }
-    else if (!portrait && w < h) { widthSpin->setValue(h); heightSpin->setValue(w); }
-  };
-  connect(portraitBtn,  &QPushButton::clicked, &dialog, [&](){ portraitBtn->setChecked(true);  landscapeBtn->setChecked(false); swapIfNeeded(true); });
-  connect(landscapeBtn, &QPushButton::clicked, &dialog, [&](){ landscapeBtn->setChecked(true); portraitBtn->setChecked(false);  swapIfNeeded(false); });
-  orientRow->addWidget(portraitBtn);
-  orientRow->addWidget(landscapeBtn);
-  orientRow->addStretch();
-
-  // プリセット選択時
-  connect(presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), &dialog, [&](int idx){
-    if (idx <= 0 || kPresets[idx].w == 0) return;
-    updatingSize = true;
-    widthSpin->setValue(kPresets[idx].w);
-    heightSpin->setValue(kPresets[idx].h);
-    dpiSpin->setValue(kPresets[idx].dpi);
-    updatingSize = false;
-    updateInfo();
-  });
-
-  sizeGrid->addWidget(new QLabel("幅",  &dialog), 0, 0);
-  sizeGrid->addWidget(widthSpin, 0, 1);
-  sizeGrid->addWidget(lockBtn,   0, 2, 2, 1, Qt::AlignVCenter);
-  sizeGrid->addWidget(new QLabel("高さ", &dialog), 1, 0);
-  sizeGrid->addWidget(heightSpin, 1, 1);
+  // col0=ラベル, col1=スピン(stretch), col2=lockBtn(rowspan2), col3=swapBtn(rowspan2)
+  sizeGrid->addWidget(new QLabel("幅",     &dialog), 0, 0);
+  sizeGrid->addWidget(widthSpin,                      0, 1);
+  sizeGrid->addWidget(lockBtn,                        0, 2, 2, 1, Qt::AlignVCenter);
+  sizeGrid->addWidget(swapBtn,                        0, 3, 2, 1, Qt::AlignVCenter);
+  sizeGrid->addWidget(new QLabel("高さ",   &dialog), 1, 0);
+  sizeGrid->addWidget(heightSpin,                     1, 1);
   sizeGrid->addWidget(new QLabel("解像度", &dialog), 2, 0);
-  sizeGrid->addWidget(dpiSpin, 2, 1);
-  sizeGrid->addLayout(orientRow, 3, 0, 1, 3);
-  sizeGrid->addWidget(infoLabel, 4, 0, 1, 3);
+  sizeGrid->addWidget(dpiSpin,                        2, 1);
+  sizeGrid->addWidget(infoLabel,                      3, 0, 1, 4);
+  ctrl->addWidget(sizeBox);
+
+  mainRow->addWidget(previewLabel);
+  mainRow->addLayout(ctrl, 1);
+  root->addLayout(mainRow);
 
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
   buttons->button(QDialogButtonBox::Ok)->setText("作成");
-
-  root->addWidget(new QLabel("プリセット", &dialog));
-  root->addWidget(presetCombo);
-  root->addWidget(sizeBox);
   root->addWidget(buttons);
 
-  connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-  connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+  // ── ロジック ─────────────────────────────────────────────────────────
+  bool updLock = false;
+  // ロックON時に記録した比率 (H/W)。ロックを有効にした瞬間に更新。
+  double lockedAspect = static_cast<double>(m_lastCanvasHeight) / std::max(1, m_lastCanvasWidth);
+
+  auto refreshLockIcon = [lockBtn, &makeLockPm]() {
+    const bool on = lockBtn->isChecked();
+    lockBtn->setIcon(QIcon(makeLockPm(on, 22, 52)));
+    lockBtn->setIconSize(QSize(18, 46));
+    lockBtn->setStyleSheet(QString(
+      "QPushButton{border:2px solid %1;border-radius:5px;background:%2;}"
+      "QPushButton:hover{background:#1e2540;}"
+    ).arg(on ? "#4e8ef7" : "#2e3858", on ? "#142038" : "#131726"));
+  };
+  refreshLockIcon();
+
+  auto updateInfo = [&]() {
+    const int w = widthSpin->value(), h = heightSpin->value(), d = dpiSpin->value();
+    const double mmW = w / (d / 25.4), mmH = h / (d / 25.4);
+    infoLabel->setText(QString("%1 × %2 px  （%3 × %4 mm @ %5 dpi）")
+      .arg(w).arg(h)
+      .arg(mmW, 0, 'f', 1).arg(mmH, 0, 'f', 1).arg(d));
+  };
+
+  auto updatePreview = [&]() {
+    const int nw = widthSpin->value(), nh = heightSpin->value();
+    QPixmap pm(PREV_W, PREV_H);
+    pm.fill(QColor(0x0c, 0x0f, 0x1c));
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::SmoothPixmapTransform);
+    constexpr double MG = 12.0;
+    const double sc = std::min((PREV_W - MG*2) / std::max(nw, 1),
+                               (PREV_H - MG*2) / std::max(nh, 1));
+    const int pw = std::max(1, qRound(nw * sc));
+    const int ph = std::max(1, qRound(nh * sc));
+    const int px = (PREV_W - pw) / 2, py = (PREV_H - ph) / 2;
+    constexpr int CS = 8;
+    for (int cy = 0; cy < ph; cy += CS)
+      for (int cx = 0; cx < pw; cx += CS) {
+        bool e = ((cx/CS + cy/CS) % 2 == 0);
+        p.fillRect(px+cx, py+cy, std::min(CS, pw-cx), std::min(CS, ph-cy),
+          e ? QColor(72, 74, 88) : QColor(52, 54, 66));
+      }
+    p.setPen(QPen(QColor(0x4e, 0x8e, 0xf7), 1));
+    p.setBrush(Qt::NoBrush);
+    p.drawRect(px, py, pw-1, ph-1);
+    p.setPen(QColor(0x6a, 0x8a, 0xbb));
+    QFont lf; lf.setPixelSize(9); p.setFont(lf);
+    p.drawText(px+3, py+ph-3, QString("%1 × %2 px").arg(nw).arg(nh));
+    p.end();
+    previewLabel->setPixmap(pm);
+  };
+
+  // ── シグナル接続 ──────────────────────────────────────────────────────
+
+  // ロックON時に現在の比率を記録
+  QObject::connect(lockBtn, &QPushButton::toggled, &dialog, [&](bool on) {
+    if (on) lockedAspect = static_cast<double>(heightSpin->value()) / std::max(1, widthSpin->value());
+    refreshLockIcon();
+  });
+
+  QObject::connect(widthSpin, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int v) {
+    if (updLock) return;
+    if (lockBtn->isChecked() && v > 0) {
+      updLock = true;
+      heightSpin->setValue(qRound(v * lockedAspect));
+      updLock = false;
+    }
+    updateInfo(); updatePreview();
+  });
+  QObject::connect(heightSpin, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int v) {
+    if (updLock) return;
+    if (lockBtn->isChecked() && v > 0) {
+      updLock = true;
+      widthSpin->setValue(qRound(v / std::max(lockedAspect, 1e-6)));
+      updLock = false;
+    }
+    updateInfo(); updatePreview();
+  });
+  QObject::connect(dpiSpin, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, [&](int) {
+    updateInfo();
+  });
+
+  QObject::connect(swapBtn, &QPushButton::clicked, &dialog, [&]() {
+    const int tw = widthSpin->value(), th = heightSpin->value();
+    updLock = true; widthSpin->setValue(th); heightSpin->setValue(tw); updLock = false;
+    if (lockBtn->isChecked()) lockedAspect = 1.0 / std::max(lockedAspect, 1e-6);
+    updateInfo(); updatePreview();
+  });
+
+  connect(presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), &dialog, [&](int idx) {
+    if (idx <= 0 || kPresets[idx].w == 0) return;
+    updLock = true;
+    widthSpin->setValue(kPresets[idx].w);
+    heightSpin->setValue(kPresets[idx].h);
+    dpiSpin->setValue(kPresets[idx].dpi);
+    updLock = false;
+    if (lockBtn->isChecked())
+      lockedAspect = static_cast<double>(kPresets[idx].h) / std::max(1, kPresets[idx].w);
+    updateInfo(); updatePreview();
+  });
+
+  QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+  QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+  updateInfo();
+  updatePreview();
+
   if (dialog.exec() != QDialog::Accepted) return;
 
   m_lastCanvasWidth  = widthSpin->value();
   m_lastCanvasHeight = heightSpin->value();
   m_lastCanvasDpi    = dpiSpin->value();
-  m_currentFilePath.clear();
+
+  // 新しい AppController + ドキュメントを新規タブとして追加
+  auto* newCtrl = new app::bridge::AppController(this);
+  addDocumentEntry(newCtrl, {});
+  // addDocumentEntry 後 m_controller は newCtrl になっている
   m_controller->newDocument(m_lastCanvasWidth, m_lastCanvasHeight, m_lastCanvasDpi);
   updateWindowTitle();
 }
@@ -3130,27 +3564,29 @@ void MainWindow::onToolStateChanged() {
 }
 
 void MainWindow::onOpenTriggered() {
-  if (m_controller && m_controller->isDirty()) {
-    const int ret = QMessageBox::question(
-        this,
-        "未保存の変更",
-        "保存されていない変更があります。ファイルを開きますか？",
-        QMessageBox::Discard | QMessageBox::Cancel,
-        QMessageBox::Cancel);
-    if (ret != QMessageBox::Discard) {
-      return;
-    }
-  }
+  // マルチドキュメント: 新規タブで開く（既存ドキュメントは保持）
   const QString path = QFileDialog::getOpenFileName(
       this,
-      "プロジェクトを開く",
+      QString::fromUtf8(u8"プロジェクトを開く"),
       m_currentFilePath.isEmpty() ? QString() : QFileInfo(m_currentFilePath).absolutePath(),
       "全てのファイル (*.lpa *.png *.jpg *.jpeg *.bmp);;"
       "LayeredPaintApp プロジェクト (*.lpa);;"
       "画像ファイル (*.png *.jpg *.jpeg *.bmp)");
-  if (path.isEmpty()) {
-    return;
+  if (path.isEmpty()) return;
+
+  // 既に開いているか確認 → 開いていればそのタブに切り替え
+  const QString absPath = QFileInfo(path).absoluteFilePath();
+  for (int i = 0; i < (int)m_documents.size(); ++i) {
+    if (QFileInfo(m_documents[i].filePath).absoluteFilePath() == absPath) {
+      switchToDocument(i);
+      return;
+    }
   }
+
+  // 新しいタブとして開く
+  auto* newCtrl = new app::bridge::AppController(this);
+  addDocumentEntry(newCtrl, {});
+  // addDocumentEntry 後 m_controller は newCtrl になっている
   if (path.endsWith(QStringLiteral(".lpa"), Qt::CaseInsensitive)) {
     openLpaFile(path);
   } else {
@@ -3159,17 +3595,7 @@ void MainWindow::onOpenTriggered() {
 }
 
 void MainWindow::onNewFromClipboardTriggered() {
-  if (m_controller && m_controller->isDirty()) {
-    const int ret = QMessageBox::question(
-        this,
-        "未保存の変更",
-        "保存されていない変更があります。クリップボードから新規キャンバスを作成しますか？",
-        QMessageBox::Discard | QMessageBox::Cancel,
-        QMessageBox::Cancel);
-    if (ret != QMessageBox::Discard) {
-      return;
-    }
-  }
+  // マルチドキュメント: 新規タブで作成（既存ドキュメントは保持）
   const QImage image = QGuiApplication::clipboard()->image();
   if (image.isNull()) {
     statusBar()->showMessage("クリップボードに画像がありません", 1800);
@@ -3180,8 +3606,9 @@ void MainWindow::onNewFromClipboardTriggered() {
     statusBar()->showMessage("クリップボード画像が不正です", 1800);
     return;
   }
+  auto* newCtrl = new app::bridge::AppController(this);
+  addDocumentEntry(newCtrl, {});
   m_controller->importFlattenedBuffer(buffer, "クリップボード");
-  m_currentFilePath.clear();
   statusBar()->showMessage("クリップボード画像から新規キャンバスを作成しました", 2200);
   updateWindowTitle();
 }
@@ -3242,7 +3669,10 @@ void MainWindow::onSaveAsTriggered() {
   }
   if (ok) {
     m_currentFilePath = path;
+    if (m_activeDocIndex >= 0 && m_activeDocIndex < (int)m_documents.size())
+      m_documents[m_activeDocIndex].filePath = path;
     pushRecentFile(path);
+    updateDocumentTabLabels();
     statusBar()->showMessage(QString("保存しました: %1").arg(path), 2500);
   }
 }
@@ -3347,6 +3777,7 @@ void MainWindow::onFillTriggered() {
 }
 
 void MainWindow::onExtractSelectionToNewLayerTriggered() {
+  if (!m_controller) return;
   if (m_controller->extractSelectionToNewLayer()) {
     updateUndoRedoState();
   }
@@ -4365,7 +4796,10 @@ bool MainWindow::openImageFile(const QString& path) {
   const QFileInfo info(path);
   m_controller->importFlattenedBuffer(buffer, info.completeBaseName().toStdString());
   m_currentFilePath = path;
+  if (m_activeDocIndex >= 0 && m_activeDocIndex < (int)m_documents.size())
+    m_documents[m_activeDocIndex].filePath = path;
   pushRecentFile(path);
+  updateDocumentTabLabels();
   statusBar()->showMessage(QString("開きました: %1").arg(path), 2500);
   updateWindowTitle();
   return true;
@@ -4417,7 +4851,10 @@ bool MainWindow::openLpaFile(const QString& path) {
   }
   m_controller->replaceDocument(std::move(*result.document));
   m_currentFilePath = path;
+  if (m_activeDocIndex >= 0 && m_activeDocIndex < (int)m_documents.size())
+    m_documents[m_activeDocIndex].filePath = path;
   pushRecentFile(path);
+  updateDocumentTabLabels();
   statusBar()->showMessage(QString("開きました: %1").arg(path), 2500);
   updateWindowTitle();
   return true;
@@ -4789,11 +5226,6 @@ void MainWindow::auditUIMetrics() {
   f << "\n========== AUDIT END ==========\n";
   f.close();
   qDebug() << "Audit written to C:\\Portfolio\\Paint_App\\ui_audit.txt";
-}
-
-void MainWindow::onExtractSelectionToNewLayerTriggered() {
-  if (!m_controller) return;
-  m_controller->extractSelectionToNewLayer();
 }
 
 } // namespace app::mainwindow

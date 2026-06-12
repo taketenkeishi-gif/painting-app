@@ -13,6 +13,7 @@
 #include "core/tools/ToolType.h"
 
 class QAction;
+class QCloseEvent;
 class QLabel;
 class QMenu;
 class QKeySequence;
@@ -22,6 +23,7 @@ class QGridLayout;
 class QSpinBox;
 class QSplitter;
 class QSlider;
+class QTabBar;
 class QTabWidget;
 class QToolBar;
 class QWidget;
@@ -58,6 +60,7 @@ public:
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
+  void closeEvent(QCloseEvent* event) override;
 
 private slots:
   void onNewCanvas();
@@ -125,8 +128,25 @@ private slots:
   void onHueSatLightTriggered();
   void onAiUpscaleTriggered();
   void onAiModelFolderTriggered();
+  void onTabCloseRequested(int index);
+  void onTabCurrentChanged(int index);
+  void onAppSettingsTriggered();
 
 private:
+  // ── マルチドキュメント ──────────────────────────────────────────────────
+  struct DocumentEntry {
+    app::bridge::AppController* controller {nullptr};
+    QString filePath;
+  };
+  void connectController(app::bridge::AppController* ctrl);
+  void disconnectController(app::bridge::AppController* ctrl);
+  void addDocumentEntry(app::bridge::AppController* ctrl, const QString& filePath);
+  void switchToDocument(int index);
+  void closeDocumentAt(int index);
+  void updateDocumentTabLabels();
+  QString tabLabelForDocument(int index) const;
+  void checkMemoryAndWarn();
+  // ────────────────────────────────────────────────────────────────────────
   void setupShellLayout();
   void createMenus();
   void createToolBar();
@@ -164,6 +184,12 @@ private:
   void updateDockTitleBars();
   void setupStatusBar();
 
+  // ── マルチドキュメント状態 ──────────────────────────────────────────────
+  std::vector<DocumentEntry> m_documents;
+  int m_activeDocIndex {-1};
+  QTabBar* m_documentTabBar {nullptr};
+  QWidget* m_canvasHost {nullptr};
+  // ────────────────────────────────────────────────────────────────────────
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
   app::panels::AdjustmentPropertyPanel* m_adjustmentPanel {nullptr};
@@ -300,6 +326,8 @@ private:
   QAction* m_hueSatLightAction        {nullptr};
   QLabel*  m_comfyUiStatusLabel    {nullptr};
   QAction* m_clearRecentFilesAction {nullptr};
+  QAction* m_appSettingsAction {nullptr};
+  QAction* m_closeDocumentAction {nullptr};
   // キャンバス表示
   QAction* m_resetRotationAction       {nullptr};
   QAction* m_mirrorViewAction          {nullptr};
