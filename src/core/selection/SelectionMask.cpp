@@ -48,7 +48,7 @@ bool SelectionMask::setRect(const Rect& rect) {
 
   for (int y = top; y <= bottom; ++y) {
     for (int x = left; x <= right; ++x) {
-      m_mask[indexOf(x, y)] = 1U;
+      m_mask[indexOf(x, y)] = 255U;
     }
   }
 
@@ -191,7 +191,7 @@ bool SelectionMask::applyRect(SelectionOp op, const Rect& rect) {
   const int bottom = std::clamp(rect.y + std::max(0, rect.height) - 1, 0, m_height - 1);
   for (int y = top; y <= bottom; ++y) {
     for (int x = left; x <= right; ++x) {
-      tmp[static_cast<std::size_t>(y) * static_cast<std::size_t>(m_width) + static_cast<std::size_t>(x)] = 1U;
+      tmp[static_cast<std::size_t>(y) * static_cast<std::size_t>(m_width) + static_cast<std::size_t>(x)] = 255U;
     }
   }
   return applyPixels(op, tmp);
@@ -206,7 +206,7 @@ bool SelectionMask::applyPixels(SelectionOp op, const std::vector<std::uint8_t>&
   std::vector<std::uint8_t> before = m_mask;
   if (op == SelectionOp::Add) {
     for (std::size_t i = 0; i < n; ++i) {
-      if (pixels[i] != 0U) m_mask[i] = 1U;
+      if (pixels[i] != 0U) m_mask[i] = 255U;
     }
   } else if (op == SelectionOp::Subtract) {
     for (std::size_t i = 0; i < n; ++i) {
@@ -214,7 +214,7 @@ bool SelectionMask::applyPixels(SelectionOp op, const std::vector<std::uint8_t>&
     }
   } else { // Intersect
     for (std::size_t i = 0; i < n; ++i) {
-      m_mask[i] = (m_mask[i] != 0U && pixels[i] != 0U) ? 1U : 0U;
+      m_mask[i] = (m_mask[i] != 0U && pixels[i] != 0U) ? 255U : 0U;
     }
   }
   if (m_mask == before) return false;
@@ -321,7 +321,7 @@ bool SelectionMask::expand(int radius) {
           if (src[indexOf(nx, ny)] != 0U) hit = true;
         }
       }
-      if (hit) m_mask[indexOf(x, y)] = 1U;
+      if (hit) m_mask[indexOf(x, y)] = 255U;
     }
   }
   recomputeBounds(m_mask, m_width, m_height, m_hasSelection, m_bounds);

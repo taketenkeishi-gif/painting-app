@@ -94,12 +94,14 @@ std::size_t Document::duplicateLayer(std::size_t index) {
 }
 
 bool Document::removeLayer(std::size_t index) noexcept {
-  if (index >= m_layers.size() || m_layers.size() <= 1 || m_layers[index].isPaperLayer()) {
+  if (index >= m_layers.size()) {
     return false;
   }
 
   m_layers.erase(m_layers.begin() + static_cast<std::ptrdiff_t>(index));
-  if (m_activeLayerIndex == index) {
+  if (m_layers.empty()) {
+    m_activeLayerIndex = 0;
+  } else if (m_activeLayerIndex == index) {
     m_activeLayerIndex = index < m_layers.size() ? index : m_layers.size() - 1;
   } else if (m_activeLayerIndex > index) {
     --m_activeLayerIndex;

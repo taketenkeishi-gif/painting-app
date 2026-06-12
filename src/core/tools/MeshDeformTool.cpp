@@ -28,6 +28,10 @@ void MeshDeformTool::beginSession(core::PixelBuffer           src,
     m_preview = m_source;
 
     m_active = true;
+
+    // Populate lastDeformedPositions with identity (original positions)
+    // so the wireframe overlay is immediately visible.
+    solveAndUpdatePreview();
 }
 
 void MeshDeformTool::cancelSession() noexcept
@@ -166,6 +170,18 @@ void MeshDeformTool::solveAndUpdatePreview()
 
     m_preview.resize(m_source.width(), m_source.height());
     m_previewRenderer.render(m_source, m_preview, m_selection, meshCopy);
+}
+
+MeshDeformTool::PinSnapshot MeshDeformTool::snapshotPins() const noexcept
+{
+    return { m_mesh.pins, m_mesh.nextPinId };
+}
+
+void MeshDeformTool::restorePins(PinSnapshot snap)
+{
+    m_mesh.pins      = std::move(snap.pins);
+    m_mesh.nextPinId = snap.nextPinId;
+    solveAndUpdatePreview();
 }
 
 } // namespace core

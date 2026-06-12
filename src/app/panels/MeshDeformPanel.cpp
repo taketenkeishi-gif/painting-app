@@ -16,7 +16,7 @@ MeshDeformPanel::MeshDeformPanel(app::bridge::AppController* controller,
     : QWidget(parent)
     , m_controller(controller)
 {
-    setWindowTitle("Mesh Deform");
+    setWindowTitle(QString::fromUtf8(u8"メッシュ変形"));
 
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(8, 8, 8, 8);
@@ -25,7 +25,7 @@ MeshDeformPanel::MeshDeformPanel(app::bridge::AppController* controller,
     // --- Grid Rows slider ---
     {
         auto* rowLayout = new QHBoxLayout;
-        m_rowsLabel = new QLabel(tr("Rows: 16"), this);
+        m_rowsLabel = new QLabel(QString::fromUtf8(u8"縦: 16"), this);
         m_rowsLabel->setMinimumWidth(70);
         m_rowsSlider = new QSlider(Qt::Horizontal, this);
         m_rowsSlider->setRange(4, 64);
@@ -38,7 +38,7 @@ MeshDeformPanel::MeshDeformPanel(app::bridge::AppController* controller,
     // --- Grid Cols slider ---
     {
         auto* colLayout = new QHBoxLayout;
-        m_colsLabel = new QLabel(tr("Cols: 16"), this);
+        m_colsLabel = new QLabel(QString::fromUtf8(u8"横: 16"), this);
         m_colsLabel->setMinimumWidth(70);
         m_colsSlider = new QSlider(Qt::Horizontal, this);
         m_colsSlider->setRange(4, 64);
@@ -51,10 +51,10 @@ MeshDeformPanel::MeshDeformPanel(app::bridge::AppController* controller,
     // --- Mode combo ---
     {
         auto* modeLayout = new QHBoxLayout;
-        modeLayout->addWidget(new QLabel(tr("Mode:"), this));
+        modeLayout->addWidget(new QLabel(QString::fromUtf8(u8"モード:"), this));
         m_modeCombo = new QComboBox(this);
-        m_modeCombo->addItem(tr("Similarity (scale+rotate)"));
-        m_modeCombo->addItem(tr("Rigid (rotate only)"));
+        m_modeCombo->addItem(QString::fromUtf8(u8"シミラリティ（拡縮+回転）"));
+        m_modeCombo->addItem(QString::fromUtf8(u8"リジッド（回転のみ）"));
         modeLayout->addWidget(m_modeCombo);
         mainLayout->addLayout(modeLayout);
     }
@@ -62,28 +62,28 @@ MeshDeformPanel::MeshDeformPanel(app::bridge::AppController* controller,
     // --- Generator combo ---
     {
         auto* genLayout = new QHBoxLayout;
-        genLayout->addWidget(new QLabel(tr("Generator:"), this));
+        genLayout->addWidget(new QLabel(QString::fromUtf8(u8"メッシュ生成:"), this));
         m_generatorCombo = new QComboBox(this);
-        m_generatorCombo->addItem(tr("Grid (uniform)"));
-        m_generatorCombo->addItem(tr("Edge Adaptive"));
+        m_generatorCombo->addItem(QString::fromUtf8(u8"グリッド（均等）"));
+        m_generatorCombo->addItem(QString::fromUtf8(u8"エッジ適応"));
         genLayout->addWidget(m_generatorCombo);
         mainLayout->addLayout(genLayout);
     }
 
     // --- Wireframe checkbox ---
-    m_wireframeCheck = new QCheckBox(tr("Show Wireframe"), this);
+    m_wireframeCheck = new QCheckBox(QString::fromUtf8(u8"ワイヤーフレーム表示"), this);
     m_wireframeCheck->setChecked(true);
     mainLayout->addWidget(m_wireframeCheck);
 
     // --- Regenerate button ---
-    m_regenerateBtn = new QPushButton(tr("Regenerate Mesh"), this);
+    m_regenerateBtn = new QPushButton(QString::fromUtf8(u8"メッシュ再生成"), this);
     mainLayout->addWidget(m_regenerateBtn);
 
     // --- Confirm / Cancel buttons ---
     {
         auto* btnLayout = new QHBoxLayout;
-        m_confirmBtn = new QPushButton(tr("Confirm"), this);
-        m_cancelBtn  = new QPushButton(tr("Cancel"),  this);
+        m_confirmBtn = new QPushButton(QString::fromUtf8(u8"確定"), this);
+        m_cancelBtn  = new QPushButton(QString::fromUtf8(u8"キャンセル"), this);
         btnLayout->addWidget(m_confirmBtn);
         btnLayout->addWidget(m_cancelBtn);
         mainLayout->addLayout(btnLayout);
@@ -94,7 +94,7 @@ MeshDeformPanel::MeshDeformPanel(app::bridge::AppController* controller,
     // --- Connect signals ---
 
     connect(m_rowsSlider, &QSlider::valueChanged, this, [this](int v) {
-        m_rowsLabel->setText(tr("Rows: %1").arg(v));
+        m_rowsLabel->setText(QString::fromUtf8(u8"縦: %1").arg(v));
         if (m_controller) {
             m_controller->meshDeformSetGridDensity(m_rowsSlider->value(),
                                                    m_colsSlider->value());
@@ -102,7 +102,7 @@ MeshDeformPanel::MeshDeformPanel(app::bridge::AppController* controller,
     });
 
     connect(m_colsSlider, &QSlider::valueChanged, this, [this](int v) {
-        m_colsLabel->setText(tr("Cols: %1").arg(v));
+        m_colsLabel->setText(QString::fromUtf8(u8"横: %1").arg(v));
         if (m_controller) {
             m_controller->meshDeformSetGridDensity(m_rowsSlider->value(),
                                                    m_colsSlider->value());
@@ -156,13 +156,15 @@ void MeshDeformPanel::updateFromController()
 void MeshDeformPanel::onConfirm()
 {
     if (m_controller) m_controller->commitMeshDeformSession();
-    hide();
+    updateFromController();
+    emit sessionEnded();
 }
 
 void MeshDeformPanel::onCancel()
 {
     if (m_controller) m_controller->cancelMeshDeformSession();
-    hide();
+    updateFromController();
+    emit sessionEnded();
 }
 
 void MeshDeformPanel::onRegenerateMesh()

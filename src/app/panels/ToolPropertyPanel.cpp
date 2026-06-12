@@ -58,6 +58,8 @@ QString toolNameJa(core::ToolKind kind) {
       return "直線";
     case core::ToolKind::RectSelection:
       return "選択";
+    case core::ToolKind::AiSelect:
+      return "オブジェクト選択";
     case core::ToolKind::MoveLayer:
       return "移動";
     case core::ToolKind::Hand:
@@ -100,7 +102,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       m_fillThresholdLabel(new QLabel("しきい値", this)),
       m_fillGapCloseLabel(new QLabel("隙間閉じ", this)),
       m_selectionModeLabel(new QLabel("選択モード", this)),
-      m_autoSelectThresholdLabel(new QLabel("自動選択しきい値", this)),
+      m_autoSelectThresholdLabel(new QLabel("しきい値", this)),
       m_aiGranularityLabel(new QLabel("AI 選択粒度", this)),
       m_colorButton(new QPushButton("色を選択", this)),
       m_sizeSpin(new QSpinBox(this)),
@@ -208,9 +210,9 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   std::tie(m_roundnessLabel, m_roundnessSlider, m_roundnessSpin) =
       createLabeledSlider("真円率", 0, 100, 0);
   std::tie(m_taperStartLabel, m_taperStartSlider, m_taperStartSpin) =
-      createLabeledSlider("入り抜き（始点）", 0, 100, 0);
+      createLabeledSlider("テーパー(始)", 0, 100, 0);
   std::tie(m_taperEndLabel, m_taperEndSlider, m_taperEndSpin) =
-      createLabeledSlider("入り抜き（終点）", 0, 100, 0);
+      createLabeledSlider("テーパー(終)", 0, 100, 0);
   m_snapAngleSlider->setRange(0, 180);
   m_snapAngleSpin->setRange(0, 180);
   m_simplifySlider->setRange(0, 100);
@@ -317,6 +319,33 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
     row->setProperty("responsiveRow", true);
   };
 
+  // ラベル列の固定幅 — 最長ラベル"フェザー半径"(6字)に合わせて全スライダーが同じ位置で始まる
+  constexpr int kLabelW = 72;
+
+  // [label | slider | spin] を1行に並べるヘルパー
+  auto makeInlineRow = [](QLabel* lbl, QSlider* sl, QSpinBox* sp) -> QHBoxLayout* {
+    lbl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    lbl->setFixedWidth(kLabelW);
+    auto* r = new QHBoxLayout();
+    r->setContentsMargins(0, 0, 0, 0);
+    r->setSpacing(4);
+    r->addWidget(lbl);
+    r->addWidget(sl, 1);
+    r->addWidget(sp);
+    return r;
+  };
+  // [label | widget] を1行に並べるヘルパー（コンボ等）
+  auto makeInlineCombo = [](QLabel* lbl, QWidget* w) -> QHBoxLayout* {
+    lbl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    lbl->setFixedWidth(kLabelW);
+    auto* r = new QHBoxLayout();
+    r->setContentsMargins(0, 0, 0, 0);
+    r->setSpacing(4);
+    r->addWidget(lbl);
+    r->addWidget(w, 1);
+    return r;
+  };
+
   auto* titleFrame = new QFrame(m_contentWidget);
   auto* titleLayout = new QVBoxLayout(titleFrame);
   titleLayout->setContentsMargins(2, 2, 2, 2);
@@ -352,29 +381,11 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   basicLayout->setContentsMargins(4, 4, 4, 4);
   basicLayout->setSpacing(4);
 
-  auto* opacityRow = new QHBoxLayout();
-  markResponsiveRow(opacityRow);
-  opacityRow->addWidget(m_opacitySlider, 1);
-  opacityRow->addWidget(m_opacitySpin);
-
-  auto* hardnessRow = new QHBoxLayout();
-  markResponsiveRow(hardnessRow);
-  hardnessRow->addWidget(m_hardnessSlider, 1);
-  hardnessRow->addWidget(m_hardnessSpin);
-
-  auto* sizeRow = new QHBoxLayout();
-  markResponsiveRow(sizeRow);
-  sizeRow->addWidget(m_sizeSlider, 1);
-  sizeRow->addWidget(m_sizeSpin);
-
-  basicLayout->addWidget(m_colorLabel);
+  m_colorLabel->hide();
   basicLayout->addWidget(m_colorButton);
-  basicLayout->addWidget(m_sizeLabel);
-  basicLayout->addLayout(sizeRow);
-  basicLayout->addWidget(m_opacityLabel);
-  basicLayout->addLayout(opacityRow);
-  basicLayout->addWidget(m_hardnessLabel);
-  basicLayout->addLayout(hardnessRow);
+  basicLayout->addLayout(makeInlineRow(m_sizeLabel, m_sizeSlider, m_sizeSpin));
+  basicLayout->addLayout(makeInlineRow(m_opacityLabel, m_opacitySlider, m_opacitySpin));
+  basicLayout->addLayout(makeInlineRow(m_hardnessLabel, m_hardnessSlider, m_hardnessSpin));
   contentLayout->addWidget(basicGroup);
 
   auto* dynamicsGroup = new QGroupBox("ブラシ特性", m_contentWidget);
@@ -383,14 +394,7 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   dynamicsLayout->setSpacing(4);
 
   appendLabeledRow(dynamicsLayout, m_flowLabel, m_flowSlider, m_flowSpin);
-
-  auto* spacingRow = new QHBoxLayout();
-  markResponsiveRow(spacingRow);
-  spacingRow->addWidget(m_spacingSlider, 1);
-  spacingRow->addWidget(m_spacingSpin);
-
-  dynamicsLayout->addWidget(m_spacingLabel);
-  dynamicsLayout->addLayout(spacingRow);
+  dynamicsLayout->addLayout(makeInlineRow(m_spacingLabel, m_spacingSlider, m_spacingSpin));
   contentLayout->addWidget(dynamicsGroup);
   m_brushDynamicsSection = dynamicsGroup;
 
@@ -399,14 +403,8 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   correctionLayout->setContentsMargins(4, 4, 4, 4);
   correctionLayout->setSpacing(4);
 
-  auto* stabilizationRow = new QHBoxLayout();
-  markResponsiveRow(stabilizationRow);
-  stabilizationRow->addWidget(m_stabilizationSlider, 1);
-  stabilizationRow->addWidget(m_stabilizationSpin);
-
   correctionLayout->addWidget(m_antiAliasCheck);
-  correctionLayout->addWidget(m_stabilizationLabel);
-  correctionLayout->addLayout(stabilizationRow);
+  correctionLayout->addLayout(makeInlineRow(m_stabilizationLabel, m_stabilizationSlider, m_stabilizationSpin));
   correctionLayout->addWidget(m_postCorrectionCheck);
   correctionLayout->addWidget(m_velocityCorrectionCheck);
   contentLayout->addWidget(correctionGroup);
@@ -543,20 +541,9 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto* vectorLayout = new QVBoxLayout(vectorGroup);
   vectorLayout->setContentsMargins(4, 4, 4, 4);
   vectorLayout->setSpacing(4);
-  auto* snapAngleRow = new QHBoxLayout();
-  markResponsiveRow(snapAngleRow);
-  snapAngleRow->addWidget(m_snapAngleSlider, 1);
-  snapAngleRow->addWidget(m_snapAngleSpin);
-  auto* simplifyRow = new QHBoxLayout();
-  markResponsiveRow(simplifyRow);
-  simplifyRow->addWidget(m_simplifySlider, 1);
-  simplifyRow->addWidget(m_simplifySpin);
-  vectorLayout->addWidget(m_snapAngleLabel);
-  vectorLayout->addLayout(snapAngleRow);
-  vectorLayout->addWidget(m_simplifyLabel);
-  vectorLayout->addLayout(simplifyRow);
-  vectorLayout->addWidget(m_vectorEraseModeLabel);
-  vectorLayout->addWidget(m_vectorEraseModeCombo);
+  vectorLayout->addLayout(makeInlineRow(m_snapAngleLabel, m_snapAngleSlider, m_snapAngleSpin));
+  vectorLayout->addLayout(makeInlineRow(m_simplifyLabel, m_simplifySlider, m_simplifySpin));
+  vectorLayout->addLayout(makeInlineCombo(m_vectorEraseModeLabel, m_vectorEraseModeCombo));
   vectorLayout->addWidget(m_vectorTrimOutsideCheck);
   contentLayout->addWidget(vectorGroup);
   m_vectorSection = vectorGroup;
@@ -565,20 +552,10 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto* fillLayout = new QVBoxLayout(fillGroup);
   fillLayout->setContentsMargins(4, 4, 4, 4);
   fillLayout->setSpacing(4);
-  auto* fillThresholdRow = new QHBoxLayout();
-  markResponsiveRow(fillThresholdRow);
-  fillThresholdRow->addWidget(m_fillThresholdSlider, 1);
-  fillThresholdRow->addWidget(m_fillThresholdSpin);
-  auto* fillGapCloseRow = new QHBoxLayout();
-  markResponsiveRow(fillGapCloseRow);
-  fillGapCloseRow->addWidget(m_fillGapCloseSlider, 1);
-  fillGapCloseRow->addWidget(m_fillGapCloseSpin);
-  fillLayout->addWidget(m_fillThresholdLabel);
-  fillLayout->addLayout(fillThresholdRow);
+  fillLayout->addLayout(makeInlineRow(m_fillThresholdLabel, m_fillThresholdSlider, m_fillThresholdSpin));
   fillLayout->addWidget(m_fillContiguousCheck);
   fillLayout->addWidget(m_fillReferAllLayersCheck);
-  fillLayout->addWidget(m_fillGapCloseLabel);
-  fillLayout->addLayout(fillGapCloseRow);
+  fillLayout->addLayout(makeInlineRow(m_fillGapCloseLabel, m_fillGapCloseSlider, m_fillGapCloseSpin));
   contentLayout->addWidget(fillGroup);
   m_fillSection = fillGroup;
 
@@ -587,14 +564,6 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   auto* selectionLayout = new QVBoxLayout(selectionGroup);
   selectionLayout->setContentsMargins(4, 4, 4, 4);
   selectionLayout->setSpacing(4);
-  auto* autoSelectThresholdRow = new QHBoxLayout();
-  markResponsiveRow(autoSelectThresholdRow);
-  autoSelectThresholdRow->addWidget(m_autoSelectThresholdSlider, 1);
-  autoSelectThresholdRow->addWidget(m_autoSelectThresholdSpin);
-  auto* featherRow = new QHBoxLayout();
-  markResponsiveRow(featherRow);
-  featherRow->addWidget(m_selectionFeatherSlider, 1);
-  featherRow->addWidget(m_selectionFeatherSpin);
   // op buttons row
   auto* opRow = new QHBoxLayout();
   opRow->setSpacing(2);
@@ -610,18 +579,96 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   gapRow->addWidget(m_selectionGapCloseLabel);
   gapRow->addWidget(m_selectionGapCloseSpin);
 
-  selectionLayout->addWidget(m_selectionModeLabel);
-  selectionLayout->addWidget(m_selectionModeCombo);
-  selectionLayout->addWidget(m_selectionOpLabel);
+  m_selectionOpLabel->hide();
+  selectionLayout->addLayout(makeInlineCombo(m_selectionModeLabel, m_selectionModeCombo));
   selectionLayout->addLayout(opRow);
-  selectionLayout->addWidget(m_autoSelectThresholdLabel);
-  selectionLayout->addLayout(autoSelectThresholdRow);
+  selectionLayout->addLayout(makeInlineRow(m_autoSelectThresholdLabel, m_autoSelectThresholdSlider, m_autoSelectThresholdSpin));
   selectionLayout->addWidget(m_autoSelectContiguousCheck);
   selectionLayout->addWidget(m_autoSelectReferAllLayersCheck);
-  selectionLayout->addWidget(m_aiGranularityLabel);
-  selectionLayout->addWidget(m_aiGranularityCombo);
-  selectionLayout->addWidget(m_selectionFeatherLabel);
-  selectionLayout->addLayout(featherRow);
+  selectionLayout->addLayout(makeInlineCombo(m_aiGranularityLabel, m_aiGranularityCombo));
+
+  // ── Rotoブラシ操作 (AiSelect 専用) ──────────────────────────────────────
+  m_rotoBrushFgBtn    = new QPushButton(QString::fromUtf8(u8"前景 (FG)"), m_contentWidget);
+  m_rotoBrushBgBtn    = new QPushButton(QString::fromUtf8(u8"背景 (BG)"), m_contentWidget);
+  m_rotoBrushClearBtn = new QPushButton(QString::fromUtf8(u8"クリア"), m_contentWidget);
+  m_rotoBrushFgBtn->setCheckable(true);
+  m_rotoBrushBgBtn->setCheckable(true);
+  m_rotoBrushFgBtn->setChecked(true);
+  m_rotoBrushRadiusSlider = new QSlider(Qt::Horizontal, m_contentWidget);
+  m_rotoBrushRadiusSlider->setRange(2, 60);
+  m_rotoBrushRadiusSlider->setValue(8);
+  m_rotoBrushRadiusLabel = new QLabel("8 px", m_contentWidget);
+  m_rotoBrushRadiusLabel->setMinimumWidth(32);
+  auto* rotoModeRow = new QHBoxLayout();
+  rotoModeRow->setSpacing(2);
+  rotoModeRow->addWidget(m_rotoBrushFgBtn, 1);
+  rotoModeRow->addWidget(m_rotoBrushBgBtn, 1);
+  rotoModeRow->addWidget(m_rotoBrushClearBtn);
+  auto* rotoRadiusRow = new QHBoxLayout();
+  markResponsiveRow(rotoRadiusRow);
+  rotoRadiusRow->addWidget(new QLabel(QString::fromUtf8(u8"半径"), m_contentWidget));
+  rotoRadiusRow->addWidget(m_rotoBrushRadiusSlider, 1);
+  rotoRadiusRow->addWidget(m_rotoBrushRadiusLabel);
+  auto* rotoSection = new QWidget(m_contentWidget);
+  auto* rotoLayout  = new QVBoxLayout(rotoSection);
+  rotoLayout->setContentsMargins(0, 0, 0, 0);
+  rotoLayout->setSpacing(3);
+  // AI 閾値スライダー
+  m_aiThresholdSlider = new QSlider(Qt::Horizontal, m_contentWidget);
+  m_aiThresholdSlider->setRange(5, 200);
+  m_aiThresholdSlider->setValue(60);
+  m_aiThresholdLabel = new QLabel("60", m_contentWidget);
+  m_aiThresholdLabel->setMinimumWidth(28);
+  auto* aiThreshRow = new QHBoxLayout();
+  markResponsiveRow(aiThreshRow);
+  aiThreshRow->addWidget(new QLabel(QString::fromUtf8(u8"閾値"), m_contentWidget));
+  aiThreshRow->addWidget(m_aiThresholdSlider, 1);
+  aiThreshRow->addWidget(m_aiThresholdLabel);
+
+  // ベクター近似スライダー
+  m_vectorApproxSlider = new QSlider(Qt::Horizontal, m_contentWidget);
+  m_vectorApproxSlider->setRange(0, 20);
+  m_vectorApproxSlider->setValue(2);
+  m_vectorApproxLabel = new QLabel("2 px", m_contentWidget);
+  m_vectorApproxLabel->setMinimumWidth(32);
+  auto* vecApproxRow = new QHBoxLayout();
+  markResponsiveRow(vecApproxRow);
+  vecApproxRow->addWidget(new QLabel(QString::fromUtf8(u8"境界平滑"), m_contentWidget));
+  vecApproxRow->addWidget(m_vectorApproxSlider, 1);
+  vecApproxRow->addWidget(m_vectorApproxLabel);
+
+  // 拡張/縮小スライダー
+  m_expandPixelsSlider = new QSlider(Qt::Horizontal, m_contentWidget);
+  m_expandPixelsSlider->setRange(-10, 20);
+  m_expandPixelsSlider->setValue(0);
+  m_expandPixelsLabel = new QLabel("0 px", m_contentWidget);
+  m_expandPixelsLabel->setMinimumWidth(40);
+  auto* rotoExpandRow = new QHBoxLayout();
+  markResponsiveRow(rotoExpandRow);
+  rotoExpandRow->addWidget(new QLabel(QString::fromUtf8(u8"拡張/縮小"), m_contentWidget));
+  rotoExpandRow->addWidget(m_expandPixelsSlider, 1);
+  rotoExpandRow->addWidget(m_expandPixelsLabel);
+
+  // 確定ボタン (Enter キーと同じ動作)
+  m_rotoBrushConfirmBtn = new QPushButton(QString::fromUtf8(u8"選択確定 (Enter)"), m_contentWidget);
+  m_rotoBrushConfirmBtn->setEnabled(false);  // ペンディングマスクができるまで無効
+  m_rotoBrushConfirmBtn->setStyleSheet(
+      "QPushButton { background-color: #2a5fc0; color: white; font-weight: bold; "
+      "border-radius: 3px; padding: 2px 8px; min-height: 22px; font-size: 10px; }"
+      "QPushButton:hover { background-color: #3a6fd0; }"
+      "QPushButton:pressed { background-color: #1a4fb0; }"
+      "QPushButton:disabled { background-color: #555; color: #888; }");
+
+  rotoLayout->addLayout(rotoModeRow);
+  rotoLayout->addLayout(rotoRadiusRow);
+  rotoLayout->addLayout(aiThreshRow);
+  rotoLayout->addLayout(vecApproxRow);
+  rotoLayout->addLayout(rotoExpandRow);
+  rotoLayout->addWidget(m_rotoBrushConfirmBtn);
+  selectionLayout->addWidget(rotoSection);
+  m_rotoBrushSection = rotoSection;
+
+  selectionLayout->addLayout(makeInlineRow(m_selectionFeatherLabel, m_selectionFeatherSlider, m_selectionFeatherSpin));
   selectionLayout->addWidget(m_selectionAntiAliasCheck);
   selectionLayout->addLayout(expandRow);
   selectionLayout->addLayout(gapRow);
@@ -629,12 +676,148 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   contentLayout->addWidget(selectionGroup);
   m_selectionSection = selectionGroup;
 
+  // ── メッシュ変形セクション ────────────────────────────────────────────────
+  {
+    auto* grp = new QGroupBox(QString::fromUtf8(u8"メッシュ変形"), m_contentWidget);
+    auto* lay = new QVBoxLayout(grp);
+    lay->setContentsMargins(4, 4, 4, 4);
+    lay->setSpacing(4);
+
+    m_meshDeformRowsLabel  = new QLabel(QString::fromUtf8(u8"縦: 16"), grp);
+    m_meshDeformRowsSlider = new QSlider(Qt::Horizontal, grp);
+    m_meshDeformRowsSlider->setRange(4, 64);
+    m_meshDeformRowsSlider->setValue(16);
+    auto* rowRow = new QHBoxLayout();
+    rowRow->addWidget(m_meshDeformRowsLabel);
+    rowRow->addWidget(m_meshDeformRowsSlider, 1);
+    lay->addLayout(rowRow);
+
+    m_meshDeformColsLabel  = new QLabel(QString::fromUtf8(u8"横: 16"), grp);
+    m_meshDeformColsSlider = new QSlider(Qt::Horizontal, grp);
+    m_meshDeformColsSlider->setRange(4, 64);
+    m_meshDeformColsSlider->setValue(16);
+    auto* colRow = new QHBoxLayout();
+    colRow->addWidget(m_meshDeformColsLabel);
+    colRow->addWidget(m_meshDeformColsSlider, 1);
+    lay->addLayout(colRow);
+
+    auto* modeRow = new QHBoxLayout();
+    modeRow->addWidget(new QLabel(QString::fromUtf8(u8"モード:"), grp));
+    m_meshDeformModeCombo = new QComboBox(grp);
+    m_meshDeformModeCombo->addItem(QString::fromUtf8(u8"シミラリティ（拡縮+回転）"));
+    m_meshDeformModeCombo->addItem(QString::fromUtf8(u8"リジッド（回転のみ）"));
+    modeRow->addWidget(m_meshDeformModeCombo, 1);
+    lay->addLayout(modeRow);
+
+    auto* genRow = new QHBoxLayout();
+    genRow->addWidget(new QLabel(QString::fromUtf8(u8"メッシュ生成:"), grp));
+    m_meshDeformGenCombo = new QComboBox(grp);
+    m_meshDeformGenCombo->addItem(QString::fromUtf8(u8"グリッド（均等）"));
+    m_meshDeformGenCombo->addItem(QString::fromUtf8(u8"エッジ適応"));
+    genRow->addWidget(m_meshDeformGenCombo, 1);
+    lay->addLayout(genRow);
+
+    m_meshDeformWireCheck = new QCheckBox(QString::fromUtf8(u8"ワイヤーフレーム表示"), grp);
+    m_meshDeformWireCheck->setChecked(true);
+    lay->addWidget(m_meshDeformWireCheck);
+
+    m_meshDeformRegenBtn = new QPushButton(QString::fromUtf8(u8"メッシュ再生成"), grp);
+    lay->addWidget(m_meshDeformRegenBtn);
+
+    auto* btnRow = new QHBoxLayout();
+    m_meshDeformConfirmBtn = new QPushButton(QString::fromUtf8(u8"確定"), grp);
+    m_meshDeformCancelBtn  = new QPushButton(QString::fromUtf8(u8"キャンセル"), grp);
+    btnRow->addWidget(m_meshDeformConfirmBtn);
+    btnRow->addWidget(m_meshDeformCancelBtn);
+    lay->addLayout(btnRow);
+
+    contentLayout->addWidget(grp);
+    m_meshDeformSection = grp;
+  }
+
   contentLayout->addStretch(1);
+
+  // Flatten & compact all group-box internal layouts
+  {
+    const auto groups = m_contentWidget->findChildren<QGroupBox*>();
+    for (QGroupBox* grp : groups) {
+      if (QLayout* lay = grp->layout()) {
+        lay->setContentsMargins(3, 1, 3, 2);
+        lay->setSpacing(3);
+      }
+    }
+    contentLayout->setSpacing(1);
+  }
 
   m_scrollArea->setWidgetResizable(true);
   m_scrollArea->setFrameShape(QFrame::NoFrame);
   m_scrollArea->setWidget(m_contentWidget);
   hostLayout->addWidget(m_scrollArea);
+
+  // Compact stylesheet: flat GroupBox borders, small controls
+  m_contentWidget->setStyleSheet(QStringLiteral(
+    "QGroupBox {"
+    "  border: none;"
+    "  border-top: 1px solid #3f3f3f;"
+    "  margin-top: 8px;"
+    "  padding-top: 13px;"
+    "  font-size: 10px;"
+    "  color: #909090;"
+    "}"
+    "QGroupBox::title {"
+    "  subcontrol-origin: margin;"
+    "  subcontrol-position: top left;"
+    "  padding: 0px 3px;"
+    "  left: 4px;"
+    "  top: 1px;"
+    "}"
+    "QPushButton {"
+    "  min-height: 20px;"
+    "  max-height: 22px;"
+    "  padding: 0px 5px;"
+    "  font-size: 10px;"
+    "}"
+    "QComboBox {"
+    "  min-height: 20px;"
+    "  max-height: 22px;"
+    "  font-size: 10px;"
+    "  padding: 0px 2px;"
+    "}"
+    "QSpinBox {"
+    "  min-height: 20px;"
+    "  max-height: 22px;"
+    "  font-size: 10px;"
+    "  min-width: 40px;"
+    "  max-width: 46px;"
+    "  padding: 0px 1px;"
+    "}"
+    "QCheckBox {"
+    "  font-size: 10px;"
+    "  spacing: 4px;"
+    "}"
+    "QLabel {"
+    "  font-size: 10px;"
+    "}"
+    "QSlider::groove:horizontal {"
+    "  border: none;"
+    "  height: 3px;"
+    "  background: #505050;"
+    "  border-radius: 1px;"
+    "}"
+    "QSlider::sub-page:horizontal {"
+    "  background: #4a7fc0;"
+    "  height: 3px;"
+    "  border-radius: 1px;"
+    "}"
+    "QSlider::handle:horizontal {"
+    "  background: #b0b0b0;"
+    "  border: none;"
+    "  width: 10px;"
+    "  height: 10px;"
+    "  margin: -4px 0;"
+    "  border-radius: 5px;"
+    "}"
+  ));
 
   connect(m_detailToggleButton, &QPushButton::clicked, this, &ToolPropertyPanel::onToggleDetailRequested);
   connect(m_pinConfigButton, &QPushButton::clicked, this, &ToolPropertyPanel::onConfigurePinnedRequested);
@@ -704,6 +887,18 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
       &ToolPropertyPanel::onAutoSelectReferAllLayersToggled);
   connect(m_aiGranularityCombo, qOverload<int>(&QComboBox::currentIndexChanged),
           this, &ToolPropertyPanel::onAiGranularityChanged);
+  connect(m_rotoBrushFgBtn,      &QPushButton::clicked, this, &ToolPropertyPanel::onRotoBrushFgClicked);
+  connect(m_rotoBrushBgBtn,      &QPushButton::clicked, this, &ToolPropertyPanel::onRotoBrushBgClicked);
+  connect(m_rotoBrushClearBtn,   &QPushButton::clicked, this, &ToolPropertyPanel::onRotoBrushClearClicked);
+  connect(m_rotoBrushConfirmBtn, &QPushButton::clicked, this, &ToolPropertyPanel::onRotoBrushConfirmClicked);
+  connect(m_rotoBrushRadiusSlider, &QSlider::valueChanged,
+          this, &ToolPropertyPanel::onRotoBrushRadiusChanged);
+  connect(m_aiThresholdSlider, &QSlider::valueChanged,
+          this, &ToolPropertyPanel::onAiThresholdChanged);
+  connect(m_vectorApproxSlider, &QSlider::valueChanged,
+          this, &ToolPropertyPanel::onVectorApproxChanged);
+  connect(m_expandPixelsSlider, &QSlider::valueChanged,
+          this, &ToolPropertyPanel::onExpandPixelsChanged);
   connect(m_blendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onBlendModeChanged);
   connect(m_buildupModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onBuildupModeToggled);
   connect(m_eraseModeCheck, &QCheckBox::toggled, this, &ToolPropertyPanel::onEraseModeToggled);
@@ -735,6 +930,14 @@ ToolPropertyPanel::ToolPropertyPanel(QWidget* parent)
   connect(m_angleJitterCheck,        &QCheckBox::toggled,         this, &ToolPropertyPanel::onAngleJitterToggled);
   connect(m_angleJitterAmountSlider, &QSlider::valueChanged,      this, &ToolPropertyPanel::onAngleJitterAmountSliderChanged);
   connect(m_dabCountSlider,          &QSlider::valueChanged,      this, &ToolPropertyPanel::onDabCountSliderChanged);
+  // メッシュ変形
+  connect(m_meshDeformRowsSlider,  &QSlider::valueChanged,                      this, &ToolPropertyPanel::onMeshDeformRowsChanged);
+  connect(m_meshDeformColsSlider,  &QSlider::valueChanged,                      this, &ToolPropertyPanel::onMeshDeformColsChanged);
+  connect(m_meshDeformModeCombo,   qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onMeshDeformModeChanged);
+  connect(m_meshDeformGenCombo,    qOverload<int>(&QComboBox::currentIndexChanged), this, &ToolPropertyPanel::onMeshDeformGeneratorChanged);
+  connect(m_meshDeformRegenBtn,    &QPushButton::clicked,                       this, &ToolPropertyPanel::onMeshDeformRegenerateClicked);
+  connect(m_meshDeformConfirmBtn,  &QPushButton::clicked,                       this, &ToolPropertyPanel::onMeshDeformConfirmClicked);
+  connect(m_meshDeformCancelBtn,   &QPushButton::clicked,                       this, &ToolPropertyPanel::onMeshDeformCancelClicked);
 
   applyResponsiveLayout();
 }
@@ -749,7 +952,11 @@ void ToolPropertyPanel::setController(app::bridge::AppController* controller) {
     return;
   }
 
-  connect(m_controller, &app::bridge::AppController::toolStateChanged, this, &ToolPropertyPanel::refreshFromController);
+  connect(m_controller, &app::bridge::AppController::toolStateChanged,  this, &ToolPropertyPanel::refreshFromController);
+  connect(m_controller, &app::bridge::AppController::overlayChanged,    this, [this]() {
+    if (m_rotoBrushConfirmBtn && m_controller)
+      m_rotoBrushConfirmBtn->setEnabled(m_controller->hasPendingAiMask());
+  });
   loadPinnedForCurrentTool();
   refreshDetailToggleText();
   refreshFromController();
@@ -993,7 +1200,6 @@ void ToolPropertyPanel::refreshFromController() {
   const bool showVectorMode = pinnedOrDetail(supportsVectorEraseMode, QStringLiteral("vector_mode"));
   const bool showVectorTrim = pinnedOrDetail(supportsVectorTrimOutside, QStringLiteral("vector_trim"));
 
-  m_colorLabel->setVisible(showColor);
   m_colorButton->setVisible(showColor);
   m_sizeLabel->setVisible(showSize);
   m_sizeSlider->setVisible(showSize);
@@ -1032,6 +1238,7 @@ void ToolPropertyPanel::refreshFromController() {
   m_velocitySection->setVisible(showBrushAdv);
   m_textureSection->setVisible(showBrushAdv);
   m_wetSection->setVisible(showBrushAdv);
+  if (m_dabSection) m_dabSection->setVisible(showBrushAdv);
   m_shapeTypeCombo->setVisible(supportsShape);
   m_angleLabel->setVisible(supportsAngle);
   m_angleSlider->setVisible(supportsAngle);
@@ -1076,7 +1283,7 @@ void ToolPropertyPanel::refreshFromController() {
   m_autoSelectContiguousCheck->setVisible(supportsAutoSelectContiguous);
   m_autoSelectReferAllLayersCheck->setVisible(supportsAutoSelectReferAllLayers);
 
-  // AI 選択粒度 (AiSelectTool 専用)
+  // AI 選択粒度 + Rotoブラシ操作 (AiSelectTool 専用)
   const bool isAiSelect = (m_controller->currentTool() == core::ToolKind::AiSelect);
   if (m_aiGranularityLabel != nullptr) m_aiGranularityLabel->setVisible(isAiSelect);
   if (m_aiGranularityCombo != nullptr) {
@@ -1086,6 +1293,7 @@ void ToolPropertyPanel::refreshFromController() {
       m_aiGranularityCombo->setCurrentIndex(m_controller->aiSelectGranularity());
     }
   }
+  if (m_rotoBrushSection != nullptr) m_rotoBrushSection->setVisible(isAiSelect);
 
   const bool supportsSelectionFeather = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionFeather);
   const bool supportsSelectionAA      = m_controller->currentToolHasProperty(app::ui::ToolPropertyKey::SelectionAntiAlias);
@@ -1112,11 +1320,23 @@ void ToolPropertyPanel::refreshFromController() {
       m_showDetails && (supportsSnapAngle || supportsSimplify || showVectorMode || showVectorTrim));
   m_fillSection->setVisible(
       m_showDetails && (supportsFillThreshold || supportsFillContiguous || supportsFillReferAllLayers || supportsFillGapClose));
+  // AiSelect ツールは詳細表示フラグに関係なく常に表示する
   m_selectionSection->setVisible(
-      m_showDetails &&
-      (supportsSelectionMode || supportsSelectionOp || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
-       supportsAutoSelectReferAllLayers || supportsSelectionFeather || supportsSelectionAA ||
-       supportsSelectionExpand || supportsSelectionGap || supportsSelectionEdge));
+      isAiSelect ||
+      (m_showDetails &&
+       (supportsSelectionMode || supportsSelectionOp || supportsAutoSelectThreshold || supportsAutoSelectContiguous ||
+        supportsAutoSelectReferAllLayers || supportsSelectionFeather || supportsSelectionAA ||
+        supportsSelectionExpand || supportsSelectionGap || supportsSelectionEdge)));
+
+  // メッシュ変形セクション
+  const bool isInMeshDeform = m_controller->isInMeshDeformMode();
+  if (m_meshDeformSection != nullptr) m_meshDeformSection->setVisible(isInMeshDeform);
+  if (isInMeshDeform && m_meshDeformModeCombo != nullptr) {
+    const QSignalBlocker blk(m_meshDeformModeCombo);
+    const auto deformMode = m_controller->meshDeformMode();
+    m_meshDeformModeCombo->setCurrentIndex(
+        deformMode == core::mesh::DeformMode::Similarity ? 0 : 1);
+  }
 
   const app::bridge::ToolStateViewModel state = m_controller->toolState();
   const QSignalBlocker blocker1(m_sizeSpin);
@@ -1636,6 +1856,49 @@ void ToolPropertyPanel::onAiGranularityChanged(int index) {
   m_controller->setAiSelectGranularity(granularity);
 }
 
+void ToolPropertyPanel::onRotoBrushFgClicked() {
+  if (m_rotoBrushFgBtn)  m_rotoBrushFgBtn->setChecked(true);
+  if (m_rotoBrushBgBtn)  m_rotoBrushBgBtn->setChecked(false);
+  if (m_controller) m_controller->setRotoBrushForeground(true);
+}
+
+void ToolPropertyPanel::onRotoBrushBgClicked() {
+  if (m_rotoBrushFgBtn)  m_rotoBrushFgBtn->setChecked(false);
+  if (m_rotoBrushBgBtn)  m_rotoBrushBgBtn->setChecked(true);
+  if (m_controller) m_controller->setRotoBrushForeground(false);
+}
+
+void ToolPropertyPanel::onRotoBrushClearClicked() {
+  if (m_controller) m_controller->clearRotoStrokes();
+}
+
+void ToolPropertyPanel::onRotoBrushConfirmClicked() {
+  if (m_controller) m_controller->confirmAiSelectMask();
+}
+
+void ToolPropertyPanel::onRotoBrushRadiusChanged(int value) {
+  if (m_rotoBrushRadiusLabel) m_rotoBrushRadiusLabel->setText(QString::number(value) + " px");
+  if (m_controller) m_controller->setRotoBrushRadius(static_cast<float>(value));
+}
+
+void ToolPropertyPanel::onAiThresholdChanged(int value) {
+  if (m_aiThresholdLabel) m_aiThresholdLabel->setText(QString::number(value));
+  if (m_controller) m_controller->setAiThreshold(value);
+}
+
+void ToolPropertyPanel::onVectorApproxChanged(int value) {
+  if (m_vectorApproxLabel) m_vectorApproxLabel->setText(QString::number(value) + " px");
+  if (m_controller) m_controller->setVectorApprox(value);
+}
+
+void ToolPropertyPanel::onExpandPixelsChanged(int value) {
+  if (m_expandPixelsLabel) {
+    const QString text = (value > 0 ? QString("+") : QString()) + QString::number(value) + " px";
+    m_expandPixelsLabel->setText(text);
+  }
+  if (m_controller) m_controller->setExpandPixels(value);
+}
+
 void ToolPropertyPanel::onSelectionFeatherSliderChanged(int value) {
   if (m_controller == nullptr) return;
   if (m_selectionFeatherSpin != nullptr) {
@@ -1821,6 +2084,36 @@ void ToolPropertyPanel::onDabCountSliderChanged(int value) {
   if (m_controller) m_controller->setDabCount(value);
 }
 
+// ── メッシュ変形スロット ─────────────────────────────────────────────────────
+void ToolPropertyPanel::onMeshDeformRowsChanged(int value) {
+  if (!m_controller) return;
+  m_meshDeformRowsLabel->setText(QString::fromUtf8(u8"縦: %1").arg(value));
+  m_controller->meshDeformSetGridDensity(value, m_meshDeformColsSlider->value());
+}
+void ToolPropertyPanel::onMeshDeformColsChanged(int value) {
+  if (!m_controller) return;
+  m_meshDeformColsLabel->setText(QString::fromUtf8(u8"横: %1").arg(value));
+  m_controller->meshDeformSetGridDensity(m_meshDeformRowsSlider->value(), value);
+}
+void ToolPropertyPanel::onMeshDeformModeChanged(int index) {
+  if (!m_controller) return;
+  const auto mode = (index == 0) ? core::mesh::DeformMode::Similarity
+                                 : core::mesh::DeformMode::Rigid;
+  m_controller->meshDeformSetMode(mode);
+}
+void ToolPropertyPanel::onMeshDeformGeneratorChanged(int index) {
+  if (m_controller) m_controller->meshDeformSetGeneratorType(index);
+}
+void ToolPropertyPanel::onMeshDeformRegenerateClicked() {
+  if (m_controller) m_controller->meshDeformRegenerateMesh();
+}
+void ToolPropertyPanel::onMeshDeformConfirmClicked() {
+  if (m_controller) m_controller->commitMeshDeformSession();
+}
+void ToolPropertyPanel::onMeshDeformCancelClicked() {
+  if (m_controller) m_controller->cancelMeshDeformSession();
+}
+
 void ToolPropertyPanel::updateColorButton() {
   if (m_controller == nullptr) {
     return;
@@ -1833,7 +2126,9 @@ void ToolPropertyPanel::updateColorButton() {
 
   m_colorButton->setText(QString("色 %1").arg(hex));
   m_colorButton->setStyleSheet(
-      QString("QPushButton { background-color: rgba(%1, %2, %3, %4); color: %5; border: 1px solid #555; padding: 2px 4px; }")
+      QString("QPushButton { background-color: rgba(%1, %2, %3, %4); color: %5; "
+              "border: 1px solid #555; padding: 0px 4px; "
+              "min-height: 20px; max-height: 22px; font-size: 10px; border-radius: 2px; }")
           .arg(color.red())
           .arg(color.green())
           .arg(color.blue())
@@ -1857,13 +2152,14 @@ std::tuple<QLabel*, QSlider*, QSpinBox*> ToolPropertyPanel::createLabeledSlider(
 void ToolPropertyPanel::appendLabeledRow(
     QVBoxLayout* layout, QLabel* label, QSlider* slider, QSpinBox* spin)
 {
+  label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  label->setFixedWidth(72);
   auto* row = new QHBoxLayout();
   row->setContentsMargins(0, 0, 0, 0);
   row->setSpacing(4);
-  row->setProperty("responsiveRow", true);
+  row->addWidget(label);
   row->addWidget(slider, 1);
   row->addWidget(spin);
-  layout->addWidget(label);
   layout->addLayout(row);
 }
 

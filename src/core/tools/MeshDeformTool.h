@@ -46,6 +46,16 @@ public:
     /// Hit-test: return pin id whose .current is within radiusPx, or -1.
     int  hitTestPin(core::FPoint localPos, float radiusPx = 8.f) const noexcept;
 
+    // ── Pin undo support ─────────────────────────────────────────────────────
+    struct PinSnapshot {
+        std::vector<mesh::Pin> pins;
+        int nextPinId {0};
+    };
+    /// Capture current pin state for undo.
+    PinSnapshot snapshotPins() const noexcept;
+    /// Restore a previously captured pin state and re-solve.
+    void restorePins(PinSnapshot snap);
+
     // ── Deformation settings ─────────────────────────────────────────────────
     void               setMode(mesh::DeformMode m) noexcept;
     mesh::DeformMode   mode()                      const noexcept;

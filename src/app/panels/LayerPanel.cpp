@@ -1774,7 +1774,7 @@ void LayerPanel::refreshButtonState() {
 
   QListWidgetItem* currentItem = m_layerList->currentItem();
   const bool hasSelection = currentItem != nullptr;
-  const bool canDelete = m_controller->document().layerCount() > 1;
+  const bool canDelete = true;
   const int current = m_layerList->currentRow();
   const int lastRow = static_cast<int>(m_controller->document().layerCount()) - 1;
   const bool paperSelected = currentItem != nullptr && currentItem->data(kPaperRole).toBool();
@@ -1841,7 +1841,7 @@ void LayerPanel::refreshButtonState() {
   m_lockButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
   m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
   m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
-  m_quickRemoveButton->setEnabled(hasSelection && !paperSelected && canDelete);
+  m_quickRemoveButton->setEnabled(hasSelection && !paperSelected);
 
   // トグル状態をボタンの checked 状態に反映（setChecked は clicked を emit しない）
   {
