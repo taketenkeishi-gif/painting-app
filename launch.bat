@@ -14,7 +14,10 @@ if not errorlevel 1 (
     timeout /t 1 /nobreak >nul
 )
 
-:: 2. Incremental build (cmake skips unchanged files automatically)
+:: 2. Configure (ensure PAINT_DEBUG_SERVER=ON in cmake cache)
+cmake -B "%BUILD_DIR%" -DPAINT_DEBUG_SERVER=ON >nul 2>&1
+
+:: 3. Incremental build (cmake skips unchanged files automatically)
 echo [launch] Building...
 cmake --build "%BUILD_DIR%" --config Release
 if errorlevel 1 (
@@ -23,13 +26,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: 3. Deploy Qt DLLs if missing
+:: 4. Deploy Qt DLLs if missing
 if not exist "%BUILD_DIR%\src\Release\Qt6Core.dll" (
     echo [launch] Deploying Qt DLLs...
     "%WINDEPLOYQT%" "%EXE%" >nul 2>&1
 )
 
-:: 4. Launch
-echo [launch] Starting...
-start "" "%EXE%"
+:: 5. Launch with Dev_Bridge debug server enabled (port 9223)
+echo [launch] Starting with --debug-server...
+start "" "%EXE%" --debug-server
 endlocal
