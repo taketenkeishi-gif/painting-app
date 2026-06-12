@@ -29,6 +29,9 @@ public:
 
   struct Settings {
     int  threshold       {24};   ///< 色許容範囲 0–255（スタブ使用時）
+    int  aiThreshold     {60};   ///< Rotoブラシ用閾値（複数シード対応の高め設定）
+    int  vectorApprox    {2};    ///< 選択境界の平滑化半径（0=なし）
+    int  expandPixels    {0};    ///< マスク拡張(+)/縮小(-)ピクセル数
     bool referAllLayers  {true}; ///< 合成レイヤーを参照
     bool antiAlias       {true}; ///< エッジをぼかして滑らかに
     bool addMode         {false};///< 既存選択に追加（OR）
@@ -56,6 +59,9 @@ public:
 
   // ── 設定 ──────────────────────────────────────────────────────────────────
   void setThreshold      (int v)  noexcept { m_settings.threshold      = std::clamp(v, 0, 255); }
+  void setAiThreshold    (int v)  noexcept { m_settings.aiThreshold    = std::clamp(v, 0, 255); }
+  void setVectorApprox   (int v)  noexcept { m_settings.vectorApprox   = std::clamp(v, 0, 20); }
+  void setExpandPixels   (int v)  noexcept { m_settings.expandPixels   = std::clamp(v, -20, 20); }
   void setReferAllLayers (bool v) noexcept { m_settings.referAllLayers = v; }
   void setAntiAlias      (bool v) noexcept { m_settings.antiAlias      = v; }
   void setAddMode        (bool v) noexcept { m_settings.addMode        = v; }
@@ -84,12 +90,20 @@ public:
   const std::vector<Point>& positivePoints() const noexcept { return m_positivePoints; }
   const std::vector<Point>& negativePoints() const noexcept { return m_negativePoints; }
 
+  /// SelectionMask を pixels ピクセル拡張(+)または縮小(-)
+  static SelectionMask expandMask(const SelectionMask& src, int pixels);
+
 private:
   /// スタブ推論: エッジ検出 + 分散適応フラッドフィル
+  /// thresholdOverride < 0 のとき m_settings.threshold を使用
   SelectionMask runStubSegmentation(const PixelBuffer& source,
                                     const SelectionMask& currentSelection,
                                     const std::vector<Point>& positivePoints,
-                                    const std::vector<Point>& negativePoints) const;
+                                    const std::vector<Point>& negativePoints,
+                                    int thresholdOverride = -1) const;
+
+  /// SelectionMask の境界に morphological close を適用して平滑化
+  static SelectionMask smoothMask(const SelectionMask& src, int radius);
 
   /// ピクセルのソーベル勾配大きさを計算
   static float sobelMagnitude(const PixelBuffer& buf, int x, int y) noexcept;
