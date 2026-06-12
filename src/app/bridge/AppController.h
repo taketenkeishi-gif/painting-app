@@ -283,6 +283,9 @@ public:
 
   bool fillSelectionOrCanvas();
   bool deleteSelectionPixels();
+  /// 選択範囲をアクティブレイヤーから切り出して1つ上に新規レイヤーとして作成する。
+  /// 元レイヤーの選択領域は透明化される。選択範囲がない場合は何もしない。
+  bool extractSelectionToNewLayer();
   core::PixelBuffer exportSelectionOrCanvasFromComposite() const;
   void importFlattenedBuffer(const core::PixelBuffer& buffer, const std::string& layerName = "Imported");
   bool pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName = "Pasted Layer");

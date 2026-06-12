@@ -78,6 +78,7 @@ private slots:
   void onPasteTriggered();
   void onDeletePixelsTriggered();
   void onFillTriggered();
+  void onExtractSelectionToNewLayerTriggered();
   void onSetToolTriggered();
   void onSelectAllTriggered();
   void onDeselectTriggered();
@@ -242,6 +243,7 @@ private:
   QAction* m_deletePixelsAction {nullptr};
   QAction* m_fillAction {nullptr};
   QAction* m_clearAction {nullptr};
+  QAction* m_extractSelectionAction {nullptr};
   QAction* m_addLayerAction {nullptr};
   QAction* m_addRasterLayerAction {nullptr};
   QAction* m_addVectorLayerAction {nullptr};

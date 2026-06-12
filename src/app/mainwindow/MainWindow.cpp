@@ -1281,6 +1281,7 @@ void MainWindow::createMenus() {
   m_deletePixelsAction = new QAction("選択ピクセルを削除(&D)", this);
   m_fillAction = new QAction("塗りつぶし(&F)", this);
   m_clearAction = new QAction("クリア(&L)", this);
+  m_extractSelectionAction = new QAction(QString::fromUtf8(u8"選択範囲を新規レイヤーに切り出し(&J)"), this);
   m_addLayerAction = new QAction("新規ラスターレイヤー(&R)", this);
   m_addRasterLayerAction = m_addLayerAction;
   m_addVectorLayerAction = new QAction("新規ベクターレイヤー(&V)", this);
@@ -1367,6 +1368,7 @@ void MainWindow::createMenus() {
   m_deletePixelsAction->setShortcut(QKeySequence(Qt::Key_Delete));
   m_fillAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Backspace));
   m_clearAction->setShortcut(QKeySequence(Qt::Key_Backspace));
+  m_extractSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_J));
   m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
   m_addVectorLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_N));
   m_addFolderLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
@@ -1448,6 +1450,7 @@ void MainWindow::createMenus() {
   editMenu->addAction(m_deletePixelsAction);
   editMenu->addAction(m_fillAction);
   editMenu->addAction(m_clearAction);
+  editMenu->addAction(m_extractSelectionAction);
   editMenu->addSeparator();
   {
     auto* transformSubMenu = editMenu->addMenu(QString::fromUtf8(u8"変形(&T)"));
@@ -1781,6 +1784,7 @@ void MainWindow::createMenus() {
   connect(m_deletePixelsAction, &QAction::triggered, this, &MainWindow::onDeletePixelsTriggered);
   connect(m_fillAction, &QAction::triggered, this, &MainWindow::onFillTriggered);
   connect(m_clearAction, &QAction::triggered, this, &MainWindow::onDeletePixelsTriggered);
+  connect(m_extractSelectionAction, &QAction::triggered, this, &MainWindow::onExtractSelectionToNewLayerTriggered);
   connect(m_clearSelectionAction, &QAction::triggered, this, &MainWindow::onClearSelectionTriggered);
   connect(m_selectAllAction, &QAction::triggered, this, &MainWindow::onSelectAllTriggered);
   connect(m_deselectAction, &QAction::triggered, this, &MainWindow::onDeselectTriggered);
@@ -2817,6 +2821,10 @@ void MainWindow::onResizeCanvas() {
       contentBounds = QRect(minX, minY, maxX - minX + 1, maxY - minY + 1);
   }
 
+  // ── プレビュー用サムネイル（キャンバス内合成結果） ──────────────────────────
+  const QImage thumbSrc =
+    platform::qt::QtImageConverter::toQImage(m_controller->compositedBuffer());
+
   // ── 状態変数 ─────────────────────────────────────────────────────────
   int  anchorRow = 1, anchorCol = 1;
   bool useCustomOffset = false;
@@ -2853,8 +2861,8 @@ void MainWindow::onResizeCanvas() {
   sizeGrid->setSpacing(6);
   sizeGrid->setColumnStretch(1, 1);
 
-  auto* newW = new QSpinBox(&dialog);
-  auto* newH = new QSpinBox(&dialog);
+  auto* newW = new AccelSpinBox(&dialog);
+  auto* newH = new AccelSpinBox(&dialog);
   newW->setRange(1, 16384);  newW->setSuffix(" px");  newW->setValue(curW);
   newH->setRange(1, 16384);  newH->setSuffix(" px");  newH->setValue(curH);
 
@@ -2911,7 +2919,7 @@ void MainWindow::onResizeCanvas() {
     "QPushButton{background:#162040;border:1px solid #4e8ef7;border-radius:4px;padding:3px 8px;}"
     "QPushButton:hover{background:#1e2e58;}");
   auto* padLbl  = new QLabel("余白:", &dialog);
-  auto* padSpin = new QSpinBox(&dialog);
+  auto* padSpin = new AccelSpinBox(&dialog);
   padSpin->setRange(0, 2000);  padSpin->setSuffix(" px");  padSpin->setValue(0);
   padSpin->setFixedWidth(78);
   fitRow->addWidget(fitBtn);
@@ -2928,26 +2936,13 @@ void MainWindow::onResizeCanvas() {
   auto* anchorVL  = new QVBoxLayout(anchorBox);
   anchorVL->setSpacing(5);
 
-  static const char* kArrows[9] = {"↖","↑","↗","←","·","→","↙","↓","↘"};
-  auto* agWidget = new QWidget(&dialog);
-  agWidget->setFixedSize(102, 102);
-  auto* ag = new QGridLayout(agWidget);
-  ag->setSpacing(4);
-  ag->setContentsMargins(3, 3, 3, 3);
-  QVector<QPushButton*> anchorBtns;
-  for (int i = 0; i < 9; ++i) {
-    auto* b = new QPushButton(QString::fromUtf8(kArrows[i]), &dialog);
-    b->setFixedSize(26, 26);
-    anchorBtns.append(b);
-    ag->addWidget(b, i/3, i%3);
-  }
+  auto* anchorWidget = new AnchorGridWidget(&dialog);
 
   auto* offsetLabel = new QLabel(&dialog);
   offsetLabel->setStyleSheet("color:#6a7a9a;font-size:10px;");
-  anchorVL->addWidget(agWidget, 0, Qt::AlignLeft);
+  anchorVL->addWidget(anchorWidget, 0, Qt::AlignLeft);
   anchorVL->addWidget(offsetLabel);
   ctrl->addWidget(anchorBox);
-  ctrl->addStretch();
 
   mainRow->addWidget(previewLabel);
   mainRow->addLayout(ctrl, 1);
@@ -2966,18 +2961,6 @@ void MainWindow::onResizeCanvas() {
     oy = anchorRow == 0 ? 0 : (anchorRow == 1 ? dh/2 : dh);
   };
 
-  std::function<void()> updateAnchorStyles = [&](){
-    const QString active =
-      "QPushButton{background:#1a2e5a;border:2px solid #4e8ef7;border-radius:4px;"
-      "color:#7ab4ff;font:bold 12px 'Segoe UI';}";
-    const QString normal =
-      "QPushButton{background:#14182a;border:1px solid #252d48;border-radius:4px;"
-      "color:#3a4a68;font:12px 'Segoe UI';}"
-      "QPushButton:hover{background:#1a2038;border-color:#3a5080;color:#6a8ab0;}";
-    for (int i = 0; i < 9; ++i)
-      anchorBtns[i]->setStyleSheet(
-        (i/3 == anchorRow && i%3 == anchorCol) ? active : normal);
-  };
 
   std::function<void()> updateOffset = [&](){
     int ox, oy; getOffsetXY(ox, oy);
@@ -3050,15 +3033,12 @@ void MainWindow::onResizeCanvas() {
 
   // ── シグナル接続 ──────────────────────────────────────────────────────
 
-  // アンカーボタン
-  for (int i = 0; i < 9; ++i) {
-    const int r = i/3, c = i%3;
-    QObject::connect(anchorBtns[i], &QPushButton::clicked, &dialog, [&, r, c](){
-      anchorRow = r; anchorCol = c;
-      useCustomOffset = false;
-      updateAnchorStyles(); updateOffset(); updatePreview();
-    });
-  }
+  // アンカーウィジェット
+  anchorWidget->onChanged = [&](int r, int c){
+    anchorRow = r; anchorCol = c;
+    useCustomOffset = false;
+    updateOffset(); updatePreview();
+  };
 
   // 縦横スワップ
   QObject::connect(swapBtn, &QPushButton::clicked, &dialog, [&](){
@@ -3102,7 +3082,7 @@ void MainWindow::onResizeCanvas() {
   });
 
   // ── 初期描画 ─────────────────────────────────────────────────────────
-  updateAnchorStyles();
+  anchorWidget->setSelection(1, 1);
   updateOffset();
   updatePreview();
 
@@ -3362,6 +3342,12 @@ void MainWindow::onDeletePixelsTriggered() {
 
 void MainWindow::onFillTriggered() {
   if (m_controller->fillSelectionOrCanvas()) {
+    updateUndoRedoState();
+  }
+}
+
+void MainWindow::onExtractSelectionToNewLayerTriggered() {
+  if (m_controller->extractSelectionToNewLayer()) {
     updateUndoRedoState();
   }
 }
@@ -4803,6 +4789,11 @@ void MainWindow::auditUIMetrics() {
   f << "\n========== AUDIT END ==========\n";
   f.close();
   qDebug() << "Audit written to C:\\Portfolio\\Paint_App\\ui_audit.txt";
+}
+
+void MainWindow::onExtractSelectionToNewLayerTriggered() {
+  if (!m_controller) return;
+  m_controller->extractSelectionToNewLayer();
 }
 
 } // namespace app::mainwindow

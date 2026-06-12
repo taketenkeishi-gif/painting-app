@@ -1803,6 +1803,125 @@ bool AppController::deleteSelectionPixels() {
   return true;
 }
 
+bool AppController::extractSelectionToNewLayer() {
+  // 選択範囲チェック
+  const core::SelectionMask& selection = m_document.selection();
+  if (!selection.hasSelection()) {
+    return false;
+  }
+
+  // アクティブレイヤーがラスターであることを確認
+  core::Layer* active = m_document.activeLayer();
+  if (active == nullptr || active->kind() != core::LayerKind::Raster) {
+    return false;
+  }
+
+  const std::size_t activeIndex = m_document.activeLayerIndex();
+
+  // ── Step 1: アクティブレイヤーの before スナップショット ────────────────
+  const core::Layer beforeSource = *active;
+
+  // ── Step 2: 選択領域のピクセルを新規レイヤーバッファにコピー ────────────
+  // 新規レイヤーはキャンバスと同サイズで作成し、元レイヤーと同オフセット。
+  // 元レイヤーのバッファローカル座標で反復し、選択マスク（キャンバス座標系）と照合する。
+  ++m_layerCounter;
+  const std::string newName = "レイヤー " + std::to_string(m_layerCounter);
+  // 同じ parentId を継承して同グループに配置する
+  const uint32_t inheritParentId = active->parentId();
+
+  const std::size_t newIdx = m_document.addRasterLayer(newName);
+  core::Layer& newLayer = m_document.layerAt(newIdx);
+  if (inheritParentId != 0) {
+    newLayer.setParentId(inheritParentId);
+  }
+
+  const int ox = active->offsetX();
+  const int oy = active->offsetY();
+
+  // 選択領域ピクセルを新レイヤーへコピー（新レイヤーはキャンバスサイズのバッファ）
+  for (int by = 0; by < active->buffer().height(); ++by) {
+    for (int bx = 0; bx < active->buffer().width(); ++bx) {
+      const int cx = bx + ox;
+      const int cy = by + oy;
+      if (selection.contains(cx, cy)) {
+        const core::Color c = active->buffer().pixel(bx, by);
+        if (newLayer.buffer().inBounds(cx, cy)) {
+          newLayer.buffer().setPixel(cx, cy, c);
+        }
+      }
+    }
+  }
+
+  const core::Layer afterNew = newLayer;
+
+  // ── Step 3: 元レイヤーの選択領域を透明化 ────────────────────────────────
+  // addRasterLayer は末尾に追加するため active の参照が変わらないことを前提とする。
+  // ただし m_document.layerAt(activeIndex) で再取得する（安全策）。
+  core::Layer& sourceLayer = m_document.layerAt(activeIndex);
+  for (int by = 0; by < sourceLayer.buffer().height(); ++by) {
+    for (int bx = 0; bx < sourceLayer.buffer().width(); ++bx) {
+      const int cx = bx + ox;
+      const int cy = by + oy;
+      if (selection.contains(cx, cy)) {
+        sourceLayer.buffer().setPixel(bx, by, core::Color::Transparent());
+      }
+    }
+  }
+
+  const core::Layer afterSource = sourceLayer;
+
+  // ── Step 4: 新レイヤーをアクティブレイヤーの1つ上（activeIndex）に移動 ──
+  // addRasterLayer は末尾 (newIdx) に追加した。
+  // activeIndex の位置まで moveLayerUp を繰り返して挿入位置を調整する。
+  // 新レイヤーが activeIndex の真上（= activeIndex）に来るように移動する。
+  // 末尾 → activeIndex へ: (newIdx - activeIndex) 回 moveLayerUp 相当が必要。
+  // moveLayer(from, to) は内部で adjusts activeLayerIndex しないため直接使用する。
+  // ここでは Document::moveLayer を呼び履歴なしで位置調整する（後で一括登録）。
+  // ※ undo は2エントリ分 (元レイヤー修正 + 新レイヤー追加) を連続 push する。
+  if (newIdx > activeIndex) {
+    for (std::size_t cur = newIdx; cur > activeIndex; --cur) {
+      m_document.moveLayerUp(cur);
+    }
+  }
+  // 移動後の新レイヤーのインデックスは activeIndex になっている。
+  // 元レイヤーは activeIndex+1 に押し下がっている。
+  const std::size_t insertedIdx = activeIndex;
+  const std::size_t movedSourceIdx = activeIndex + 1;
+
+  m_document.setActiveLayer(insertedIdx);
+
+  // ── Step 5: アンドゥ登録 ────────────────────────────────────────────────
+  // まず元レイヤー変更をアンドゥ履歴に積む
+  {
+    StrokeHistoryEntry srcEntry;
+    srcEntry.kind       = HistoryKind::Stroke;
+    srcEntry.actionName = "選択範囲を切り出し（元レイヤー）";
+    srcEntry.layerIndex = movedSourceIdx;
+    srcEntry.layerId    = m_document.layerAt(movedSourceIdx).id();
+    srcEntry.beforeLayer = beforeSource;
+    srcEntry.afterLayer  = afterSource;
+    pushHistoryEntry(std::move(srcEntry));
+  }
+  // 次に新レイヤー追加をアンドゥ履歴に積む
+  {
+    StrokeHistoryEntry addEntry;
+    addEntry.kind       = HistoryKind::LayerAdd;
+    addEntry.actionName = "選択範囲を切り出し（新レイヤー）";
+    addEntry.layerIndex = insertedIdx;
+    addEntry.afterLayer = m_document.layerAt(insertedIdx);
+    addEntry.beforeIndex = movedSourceIdx;  // undo 後に戻すアクティブインデックス
+    addEntry.afterIndex  = insertedIdx;
+    pushHistoryEntry(std::move(addEntry));
+  }
+
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
 core::PixelBuffer AppController::exportSelectionOrCanvasFromComposite() const {
   const core::SelectionMask& selection = m_document.selection();
   if (!selection.hasSelection()) {
