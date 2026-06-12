@@ -505,4 +505,61 @@ QJsonObject ComfyUiClient::buildSamWorkflow(const SamRequest& req) {
   return wf;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// fetchUpscaleModels
+// ─────────────────────────────────────────────────────────────────────────────
+void ComfyUiClient::fetchUpscaleModels(std::function<void(QStringList)> callback) {
+  auto* reply = get("/object_info/UpscaleModelLoader");
+  connect(reply, &QNetworkReply::finished, this, [reply, cb = std::move(callback)]() {
+    QStringList models;
+    if (reply->error() == QNetworkReply::NoError) {
+      const QJsonObject root = QJsonDocument::fromJson(reply->readAll()).object();
+      // {"UpscaleModelLoader": {"input": {"required": {"model_name": [[name,...], {}]}}}}
+      const QJsonArray names =
+          root["UpscaleModelLoader"].toObject()
+              ["input"].toObject()
+              ["required"].toObject()
+              ["model_name"].toArray()
+              .first().toArray();
+      for (const QJsonValue& v : names) {
+        const QString s = v.toString();
+        if (!s.isEmpty()) models << s;
+      }
+    }
+    if (cb) cb(models);
+    reply->deleteLater();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildUpscaleWorkflow
+// ─────────────────────────────────────────────────────────────────────────────
+QJsonObject ComfyUiClient::buildUpscaleWorkflow(const QString& inputFilename,
+                                                  const QString& modelName) {
+  // Node 1: LoadImage
+  QJsonObject n1, i1;
+  i1["image"]  = inputFilename;
+  i1["upload"] = QString("image");
+  n1["class_type"] = "LoadImage";  n1["inputs"] = i1;
+
+  // Node 2: UpscaleModelLoader
+  QJsonObject n2, i2;
+  i2["model_name"] = modelName;
+  n2["class_type"] = "UpscaleModelLoader";  n2["inputs"] = i2;
+
+  // Node 3: ImageUpscaleWithModel
+  QJsonObject n3, i3;
+  i3["upscale_model"] = QJsonArray{QJsonArray{"2"}, 0};
+  i3["image"]         = QJsonArray{QJsonArray{"1"}, 0};
+  n3["class_type"] = "ImageUpscaleWithModel";  n3["inputs"] = i3;
+
+  // Node 4: SaveImage
+  QJsonObject n4, i4;
+  i4["images"]          = QJsonArray{QJsonArray{"3"}, 0};
+  i4["filename_prefix"] = QString("lpa_upscale_");
+  n4["class_type"] = "SaveImage";  n4["inputs"] = i4;
+
+  return QJsonObject{{"1", n1}, {"2", n2}, {"3", n3}, {"4", n4}};
+}
+
 } // namespace app::bridge

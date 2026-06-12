@@ -519,6 +519,8 @@ public:
   void confirmAiSelectMask();
   /// 青いプレビュー（ペンディングマスク）があるか
   bool hasPendingAiMask() const noexcept { return m_hasPendingAiMask; }
+  /// 現在の選択演算モード
+  core::SelectionOp currentSelectionOp() const noexcept { return m_uiState.selectionOp; }
 
   // ── Dev_Bridge debug interface ─────────────────────────────────────────
   // Active only when PAINT_DEBUG_SERVER is defined (--debug-server launch flag).

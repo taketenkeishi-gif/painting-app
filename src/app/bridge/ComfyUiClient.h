@@ -106,6 +106,13 @@ public:
   static QJsonObject buildInpaintWorkflow(const InpaintRequest& req);
   static QJsonObject buildSamWorkflow    (const SamRequest&     req);
 
+  /// ComfyUI の UpscaleModelLoader が使用できるモデル名一覧を取得
+  void fetchUpscaleModels(std::function<void(QStringList)> callback);
+
+  /// アップスケール専用ワークフロー JSON を構築
+  static QJsonObject buildUpscaleWorkflow(const QString& inputFilename,
+                                           const QString& modelName);
+
   /// ワークフロー JSON に prompt/seed/checkpoint を注入して返す。
   /// CLIPTextEncode ノード(1番目=positive, 2番目=negative), KSampler, CheckpointLoader を検索。
   static QJsonObject injectWorkflowParams(
