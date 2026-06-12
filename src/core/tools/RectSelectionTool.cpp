@@ -47,8 +47,58 @@ bool RectSelectionTool::isInsideSelection(const SelectionMask& sel, const Point&
 
 // ── 多角形ラッソリセット ──────────────────────────────────────────────────
 void RectSelectionTool::cancelPolygon() noexcept {
-  m_polyInProgress = false;
-  m_polyPoints.clear();
+  m_polyInProgress  = false;
+  m_polyPressing    = false;
+  m_polyHasDrag     = false;
+  m_polyNodes.clear();
+}
+
+// Enter キー確定: ノードをポップせずそのまま選択確定
+ToolResult RectSelectionTool::confirmPolygonLasso(ToolContext& context) {
+  ToolResult result;
+  if (m_polyNodes.size() >= 3) {
+    result.selectionChanged = applyPolygon(context, m_opAtPress);
+    if (result.selectionChanged) applyFeather(context);
+    result.viewportChanged = true;
+  }
+  cancelPolygon();
+  return result;
+}
+
+// ベジェノード列を密な Point 列に平坦化（既存ラスタライザに渡す）
+static std::vector<core::Point> flattenPolyNodes(
+    const std::vector<RectSelectionTool::PolyLassoNode>& nodes)
+{
+  std::vector<core::Point> pts;
+  const int N = static_cast<int>(nodes.size());
+  if (N == 0) return pts;
+  pts.reserve(N * 8);
+  for (int i = 0; i < N; ++i) {
+    const auto& A = nodes[i];
+    const auto& B = nodes[(i + 1) % N];
+    if (!A.smooth && !B.smooth) {
+      pts.push_back({static_cast<int>(A.anchor.x), static_cast<int>(A.anchor.y)});
+    } else {
+      const core::FPoint p0 = A.anchor;
+      const core::FPoint p1 = A.smooth
+          ? core::FPoint{A.anchor.x + A.handleOut.x, A.anchor.y + A.handleOut.y}
+          : A.anchor;
+      const core::FPoint p2 = B.smooth
+          ? core::FPoint{B.anchor.x - B.handleOut.x, B.anchor.y - B.handleOut.y}
+          : B.anchor;
+      const core::FPoint p3 = B.anchor;
+      const float dx = p3.x - p0.x, dy = p3.y - p0.y;
+      const int steps = std::max(8, static_cast<int>(std::sqrt(dx*dx + dy*dy) * 0.5f));
+      for (int j = 0; j < steps; ++j) {
+        const float t = static_cast<float>(j) / static_cast<float>(steps);
+        const float u = 1.f - t;
+        const float x = u*u*u*p0.x + 3.f*u*u*t*p1.x + 3.f*u*t*t*p2.x + t*t*t*p3.x;
+        const float y = u*u*u*p0.y + 3.f*u*u*t*p1.y + 3.f*u*t*t*p2.y + t*t*t*p3.y;
+        pts.push_back({static_cast<int>(x + 0.5f), static_cast<int>(y + 0.5f)});
+      }
+    }
+  }
+  return pts;
 }
 
 // ── ハンドルヒットテスト ──────────────────────────────────────────────────
@@ -147,38 +197,38 @@ ToolResult RectSelectionTool::onPointerPress(ToolContext& context, const ToolPoi
   if (m_mode == Mode::PolygonLasso) {
     result.viewportChanged = true;
     if (event.isDblClick) {
-      // ダブルクリック: 最後に追加されたクリック頂点を除去し確定
-      if (!m_polyPoints.empty()) {
-        m_polyPoints.pop_back();  // 通常 press で追加された分を除去
+      // ダブルクリック: release で追加されたノードを1つ除去して確定
+      if (!m_polyNodes.empty()) {
+        m_polyNodes.pop_back();
       }
-      if (m_polyPoints.size() >= 3) {
-        result.selectionChanged = applyPolygon(context, op);
+      if (m_polyNodes.size() >= 3) {
+        result.selectionChanged = applyPolygon(context, m_opAtPress);
         if (result.selectionChanged) applyFeather(context);
-
       }
       cancelPolygon();
     } else {
-      // 通常クリック: 頂点追加
+      // 通常 press: ノード追加は release に延期してドラッグを測定
       if (!m_polyInProgress) {
         m_polyInProgress = true;
-        m_polyPoints.clear();
+        m_polyNodes.clear();
         m_opAtPress = op;
       }
-      // 最初の頂点に近ければ閉じる（距離 < 8px）
-      if (m_polyPoints.size() >= 3) {
-        const Point& first = m_polyPoints.front();
-        const int dx = event.point.x - first.x;
-        const int dy = event.point.y - first.y;
-        if (dx * dx + dy * dy <= 64) {
+      // 最初のノードに近ければ閉じる（距離 < 8px）
+      if (!m_polyNodes.empty()) {
+        const FPoint& first = m_polyNodes.front().anchor;
+        const float dx = event.fpoint.x - first.x;
+        const float dy = event.fpoint.y - first.y;
+        if (dx * dx + dy * dy <= 64.f) {
           result.selectionChanged = applyPolygon(context, m_opAtPress);
           if (result.selectionChanged) applyFeather(context);
-  
           cancelPolygon();
           return result;
         }
       }
-      m_polyPoints.push_back(event.point);
-      m_polyMouse = event.point;
+      m_polyPressing    = true;
+      m_polyPressAnchor = event.fpoint;
+      m_polyHasDrag     = false;
+      m_polyDragHandle  = {0, 0};
     }
 
     return result;
@@ -272,9 +322,18 @@ ToolResult RectSelectionTool::onPointerMove(ToolContext& context, const ToolPoin
     return result;
   }
 
-  // ── 多角形ラッソ: マウス追従 ──────────────────────────────────────────────
+  // ── 多角形ラッソ: マウス追従 + ドラッグハンドル測定 ──────────────────────
   if (m_mode == Mode::PolygonLasso) {
-    m_polyMouse = event.point;
+    m_polyMouse = event.fpoint;
+    if (m_polyPressing) {
+      const float dx = event.fpoint.x - m_polyPressAnchor.x;
+      const float dy = event.fpoint.y - m_polyPressAnchor.y;
+      if (dx * dx + dy * dy >= 9.f) {  // 3px 閾値を超えたらドラッグ確定
+        m_polyHasDrag    = true;
+        m_polyDragHandle = {dx, dy};
+      }
+      result.viewportChanged = true;
+    }
     return result;
   }
 
@@ -324,8 +383,19 @@ ToolResult RectSelectionTool::onPointerRelease(ToolContext& context, const ToolP
     return result;
   }
 
-  // 多角形ラッソ中は release では何もしない（click/dblclick で処理）
+  // 多角形ラッソ: release でノードを確定（コーナー or スムース）
   if (m_mode == Mode::PolygonLasso) {
+    if (m_polyPressing) {
+      m_polyPressing = false;
+      PolyLassoNode node;
+      node.anchor    = m_polyPressAnchor;
+      node.handleOut = m_polyHasDrag ? m_polyDragHandle : FPoint{0, 0};
+      node.smooth    = m_polyHasDrag;
+      m_polyNodes.push_back(node);
+      m_polyMouse  = m_polyPressAnchor;
+      m_polyHasDrag = false;
+      result.viewportChanged = true;
+    }
     return result;
   }
 
@@ -423,8 +493,14 @@ ToolOverlayState RectSelectionTool::overlay() const {
   // 多角形ラッソ進行中
   if (m_mode == Mode::PolygonLasso && m_polyInProgress) {
     state.hasPolyLasso = true;
-    state.polyLassoVertices = m_polyPoints;
-    state.polyLassoMouse = m_polyMouse;
+    state.polyLassoNodes.reserve(m_polyNodes.size());
+    for (const auto& n : m_polyNodes) {
+      state.polyLassoNodes.push_back({n.anchor, n.smooth ? n.handleOut : FPoint{0, 0}});
+    }
+    state.polyLassoMouse       = m_polyMouse;
+    state.polyLassoIsDragging  = m_polyPressing && m_polyHasDrag;
+    state.polyLassoDragAnchor  = m_polyPressAnchor;
+    state.polyLassoDragHandle  = m_polyDragHandle;
     state.cursorHint = OverlayCursorHint::Cross;
     return state;
   }
@@ -554,13 +630,16 @@ bool RectSelectionTool::applyLasso(ToolContext& context, SelectionOp op) {
 bool RectSelectionTool::applyPolygon(ToolContext& context, SelectionOp op) {
   const int width  = context.document.canvasSize().width;
   const int height = context.document.canvasSize().height;
-  if (width <= 0 || height <= 0 || m_polyPoints.size() < 3) return false;
+  if (width <= 0 || height <= 0 || m_polyNodes.size() < 3) return false;
+
+  const auto flatPoints = flattenPolyNodes(m_polyNodes);
+  if (flatPoints.size() < 3) return false;
 
   // NEW PATH: SelectionEngine → ClassicProvider → SelectionRefiner
   SelectionRequest request;
   request.type = SelectionRequest::Type::PolygonLasso;
   request.op = op;
-  request.points = m_polyPoints;
+  request.points = flatPoints;
   request.feather = m_featherRadius;
   request.antiAlias = m_antiAlias;
   request.expandPixels = m_expandPixels;

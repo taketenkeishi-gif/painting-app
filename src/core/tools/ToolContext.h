@@ -49,10 +49,17 @@ struct ToolOverlayState {
   bool polygonClosed {false};           // draw as closed polygon vs open path
   std::vector<Point> polygonPoints;
 
-  // 多角形ラッソ: クリック頂点リスト + マウス追従線
+  // 多角形ラッソ: ベジェ対応ノードリスト + マウス追従線
+  struct PolyLassoNodeView {
+    FPoint anchor;
+    FPoint handleOut;  ///< アウトハンドル（アンカー相対）。(0,0) = コーナー
+  };
   bool hasPolyLasso {false};
-  std::vector<Point> polyLassoVertices;  // 確定頂点
-  Point polyLassoMouse {0, 0};           // 現在マウス位置
+  std::vector<PolyLassoNodeView> polyLassoNodes;   ///< 確定ノード
+  FPoint polyLassoMouse {0, 0};                    ///< 現在マウス位置
+  bool   polyLassoIsDragging   {false};            ///< ハンドルドラッグ中
+  FPoint polyLassoDragAnchor   {0, 0};             ///< ドラッグ中アンカー
+  FPoint polyLassoDragHandle   {0, 0};             ///< ドラッグ中ハンドル（アンカー相対）
 
   // ベクターストロークのライブプレビュー（描画中のみ有効）
   bool hasVectorPreview {false};
