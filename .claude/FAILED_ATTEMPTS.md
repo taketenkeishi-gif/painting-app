@@ -144,6 +144,77 @@ Get-Process で確認するまで気づかなかった
 
 **参考:** `GPT_DEVELOPMENT_MANAGER.md` → Build Artifact Verification Rule
 
+## 2026-06-12
+
+### SAM ONNX デコーダのマスク座標ずれ（パディング非考慮リサイズ）
+
+**試み:** SAM デコーダに `orig_im_size=[H, W]` を渡し、返ってきた `maskH×maskW` マスクをキャンバスにそのまま貼り付けた
+
+**理由:** `maskH==originalHeight && maskW==originalWidth` なら座標は一致しているはずと思い込んだ
+
+**失敗内容:**
+
+```
+composited=800x600, scale=1.28 の場合:
+  ストローク重心 y ≈ 394（キャンバス座標）
+  マスク重心    y ≈ 236（マスクピクセル座標）
+  → 青いマスクの形状は正しいが、Y方向に上にずれて表示される
+  X方向は正確（ストローク重心 x≈406、マスク重心 x≈407 一致）
+```
+
+**原因:**
+
+SAM の ONNX デコーダは `orig_im_size=[H, W]` を受け取っても、
+**パディング済み 1024×1024 から [H, W] へ直接リサイズ**する実装の場合がある（パディング除去なし）。
+
+エンコーダでは `scale = min(1024/W, 1024/H)` でアスペクト比維持リサイズし、
+残りをゼロパディングする:
+
+```
+800×600 の場合:
+  scale = 1024/800 = 1.28
+  newW = 1024（幅フル）  → X パディングなし → X 誤差なし ✓
+  newH = round(600*1.28) = 768  → Y に 256px パディング
+  デコーダが 1024→600 直接リサイズ: y_mask = y_canvas × 0.75（0.75 = 600/1024）
+```
+
+X が正確で Y のみずれる非対称な症状はこのパターンの特徴的サイン。
+
+**学んだこと:**
+
+- `maskH == originalHeight` だからといって座標が一致する保証はない
+- SAM ONNX デコーダの `orig_im_size` 実装はモデルによって異なる
+- 「X が正確、Y のみずれる」→ **幅だけ 1024 にフィットしている landscape 画像**を疑う
+- デバッグ十字（ストローク重心 vs マスク重心）の X 一致・Y 不一致で即判断できる
+
+**修正方法:**
+
+`OnnxSegEngine::decode` のマスク→キャンバス変換を「スケール考慮バイリニア補間」に統一:
+
+```cpp
+// 正しい式: canvas(x,y) → encoder(x*scale, y*scale) → mask
+// scaleW = scale * maskW / kInputSize
+// scaleH = scale * maskH / kInputSize
+const float scaleW = scale * static_cast<float>(maskW) / static_cast<float>(kInputSize);
+const float scaleH = scale * static_cast<float>(maskH) / static_cast<float>(kInputSize);
+for (int y = 0; y < originalHeight; ++y) {
+    for (int x = 0; x < originalWidth; ++x) {
+        const float mxf = (x + 0.5f) * scaleW - 0.5f;
+        const float myf = (y + 0.5f) * scaleH - 0.5f;
+        // バイリニア補間してピクセル値を取得...
+    }
+}
+```
+
+検証:
+- 800×600 X軸: `1.28 × 800/1024 = 1.0` → mx = x（変化なし、パディングなしで正しい）
+- 800×600 Y軸: `1.28 × 600/1024 = 0.75` → my = y×0.75（圧縮されたマスクを正しく伸長）
+- maskH=1024 の場合: `scale × 1024/1024 = scale` → encoder 座標へ直接マップ（従来と同等）
+
+**参考:** `src/core/ai/OnnxSegEngine.cpp` → `decode()` の「マスクを元画像サイズへ展開」節
+
+---
+
 ## インデックス
 
 | 日付 | 内容 | 原因 | 修正済 |
@@ -151,4 +222,5 @@ Get-Process で確認するまで気づかなかった
 | 2026-06-08 | (例) Skia 色反転 | フォーマット誤解 | ✅ |
 | 2026-06-10 | FreeTransform / Layer Offset 不整合 | アーキテクチャ設計差分を後回しにした | ✅ |
 | 2026-06-10 | Build 成功なのに動作変化なし | 別ディレクトリの古いバイナリを起動していた | ✅ |
+| 2026-06-12 | SAM マスク Y座標ずれ（パディング非考慮リサイズ） | デコーダが 1024×1024 から直接リサイズ、パディング除去なし | ✅ |
 
