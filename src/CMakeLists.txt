@@ -27,6 +27,7 @@ set(CORE_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/core/tools/TextTool.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/GenerativeFillEngine.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/OnnxSegEngine.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/ai/UpscaleEngine.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/mesh/MLSSolver.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/mesh/TriangulationBuilder.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/mesh/GridMeshGenerator.cpp
@@ -77,6 +78,12 @@ if(PAINT_USE_SKIA)
   endif()
 endif()
 
+# ── Dev_Bridge debug server (opt-in) ─────────────────────────────────────────
+# Enable with: cmake -DPAINT_DEBUG_SERVER=ON ...
+# Adds a local HTTP server (port 9223) for runtime observation by Dev_Bridge.
+# Never compiled into release builds unless explicitly set.
+option(PAINT_DEBUG_SERVER "Build Dev_Bridge HTTP debug server into the app" OFF)
+
 set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AppController.cpp
@@ -96,11 +103,12 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPropertyPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ColorWheelWidget.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/GenerativeFillDialog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/UpscaleDialog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AiModelFolderDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/ComfyUiClient.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/MinimalWebSocket.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/MeshDeformPanel.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/RotoBrushPanel.cpp
 )
 
 
@@ -133,5 +141,13 @@ if(PAINT_BUILD_APP)
   if(PAINT_USE_SKIA)
     target_link_libraries(paint_app PRIVATE paint_skia_platform)
     target_compile_definitions(paint_app PRIVATE PAINT_USE_SKIA)
+  endif()
+
+  if(PAINT_DEBUG_SERVER)
+    target_sources(paint_app PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/app/debug/DebugServer.cpp
+    )
+    target_compile_definitions(paint_app PRIVATE PAINT_DEBUG_SERVER)
+    message(STATUS "Dev_Bridge debug server enabled (port 9223)")
   endif()
 endif()

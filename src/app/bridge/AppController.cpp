@@ -1,6 +1,5 @@
 #include "app/bridge/AppController.h"
 #include "app/bridge/ComfyUiClient.h"
-#include "app/panels/RotoBrushPanel.h"
 #include "core/selection/providers/ClassicProvider.h"
 
 #include <algorithm>
@@ -394,7 +393,15 @@ AppController::AppController(QObject* parent)
   const QString encPath = exeDir + "/models/sam2_encoder.onnx";
   const QString decPath = exeDir + "/models/sam2_decoder.onnx";
   if (QFile::exists(encPath) && QFile::exists(decPath)) {
-    initOnnxEngine(encPath, decPath);
+    bool ok = initOnnxEngine(encPath, decPath);
+    if (ok) {
+      qDebug() << "[OnnxSeg] MobileSAM loaded OK";
+    } else {
+      qDebug() << "[OnnxSeg] MobileSAM load FAILED:" << QString::fromStdString(
+          m_onnxSegEngine ? m_onnxSegEngine->loadError() : "engine null");
+    }
+  } else {
+    qDebug() << "[OnnxSeg] Model files not found:" << encPath << decPath;
   }
 }
 
@@ -454,6 +461,12 @@ CanvasOverlayViewModel AppController::canvasOverlay() const {
             view.meshDeformPinOriginals.push_back({pin.original.x + offX, pin.original.y + offY});
         }
     }
+
+  // AiSelect / Roto Brush — キャッシュ済み青マスクプレビューを渡す
+  if (!m_aiMaskPreviewImage.isNull()) {
+    view.hasAiMaskPreview = true;
+    view.aiMaskPreview    = m_aiMaskPreviewImage;
+  }
 
   return view;
 }
@@ -3611,6 +3624,28 @@ bool AppController::isInTransformMode() const noexcept {
   return m_freeTransformTool != nullptr && m_freeTransformTool->isActive();
 }
 
+int AppController::freeTransformHitTestScreen(float sx, float sy) const noexcept {
+  if (m_freeTransformTool == nullptr || !m_freeTransformTool->isActive()) return -1;
+  return m_freeTransformTool->hitTestScreen(sx, sy);
+}
+
+bool AppController::isPolyLassoInProgress() const noexcept {
+  return m_rectSelectionTool != nullptr
+      && m_rectSelectionTool->mode() == core::RectSelectionTool::Mode::PolygonLasso
+      && m_rectSelectionTool->isPolyInProgress();
+}
+
+bool AppController::commitPolyLasso() {
+  if (!isPolyLassoInProgress()) return false;
+  core::ToolContext ctx = makeToolContext();
+  const auto result = m_rectSelectionTool->confirmPolygonLasso(ctx);
+  if (result.selectionChanged || result.viewportChanged) {
+    setDirty(true);
+    return true;
+  }
+  return false;
+}
+
 bool AppController::isInTextEditMode() const noexcept {
   return m_textTool != nullptr && m_textTool->isEditing();
 }
@@ -4152,6 +4187,7 @@ bool AppController::beginMeshDeformSession() {
     rerender();
     emit canvasChanged();
     emit overlayChanged();
+    emit toolStateChanged();
     return true;
 }
 
@@ -4187,6 +4223,7 @@ bool AppController::commitMeshDeformSession() {
     emit canvasChanged();
     emit layersChanged();
     emit overlayChanged();
+    emit toolStateChanged();
     setDirty(true);
     return true;
 }
@@ -4209,6 +4246,7 @@ bool AppController::cancelMeshDeformSession() {
     rerender();
     emit canvasChanged();
     emit overlayChanged();
+    emit toolStateChanged();
     return true;
 }
 
@@ -4516,11 +4554,84 @@ void AppController::onComfyUiServerStartupTimeout() {
 }
 
 void AppController::applyAiSelectResult(core::SelectionMask mask) {
+  // SAM\u7D50\u679C\u304B\u3089\u9752\u3044\u30D7\u30EC\u30D3\u30E5\u30FCQImage\u3092\u751F\u6210\u3057\u3001\u30DA\u30F3\u30C7\u30A3\u30F3\u30B0\u72B6\u614B\u306B\u4FDD\u5B58
+  // \u2192 \u78BA\u5B9A\uFF08Enter/\u30DC\u30BF\u30F3\uFF09\u307E\u3067\u9078\u629E\u306B\u306F\u9069\u7528\u3057\u306A\u3044
+  // expand/contract 適用 (ONNX パス)
+  if (m_aiSelectTool) {
+    const int ep = m_aiSelectTool->settings().expandPixels;
+    if (ep != 0)
+      mask = core::AiSelectTool::expandMask(mask, ep);
+  }
+
+  const int W = mask.width(), H = mask.height();
+  if (W > 0 && H > 0 && mask.hasSelection()) {
+    m_aiMaskPreviewImage = QImage(W, H, QImage::Format_ARGB32);
+    m_aiMaskPreviewImage.fill(Qt::transparent);
+    const QRgb blueRgba = QColor(0, 120, 255, 100).rgba();
+    for (int y = 0; y < H; ++y) {
+      auto* scanline = reinterpret_cast<QRgb*>(m_aiMaskPreviewImage.scanLine(y));
+      for (int x = 0; x < W; ++x)
+        if (mask.contains(x, y)) scanline[x] = blueRgba;
+    }
+    m_pendingAiMask    = std::move(mask);
+    m_hasPendingAiMask = true;
+  } else {
+    m_aiMaskPreviewImage = QImage();
+    m_pendingAiMask      = core::SelectionMask();
+    m_hasPendingAiMask   = false;
+  }
+  // \u9752\u3044\u30D7\u30EC\u30D3\u30E5\u30FC\u306E\u307F\u66F4\u65B0\uFF08\u30DE\u30FC\u30C1\u30F3\u30B0\u30A2\u30F3\u30C4\u306F\u307E\u3060\u5909\u3048\u306A\u3044\uFF09
+  emit overlayChanged();
+}
+
+void AppController::confirmAiSelectMask() {
+  if (!m_hasPendingAiMask) return;
+
+  const int W = m_pendingAiMask.width();
+  const int H = m_pendingAiMask.height();
+
+  // \u9078\u629E\u30E2\u30FC\u30C9\u3092\u5224\u5B9A\uFF08+\u8FFD\u52A0 / -\u524A\u9664 / \u65B0\u898F\uFF09
+  core::SelectionOp op = core::SelectionOp::New;
+  if (m_aiSelectTool) {
+    const auto& s = m_aiSelectTool->settings();
+    if      (s.addMode)      op = core::SelectionOp::Add;
+    else if (s.subtractMode) op = core::SelectionOp::Subtract;
+  }
+
+  // \u30DA\u30F3\u30C7\u30A3\u30F3\u30B0\u30DE\u30B9\u30AF\u306E\u30D4\u30AF\u30BB\u30EB\u30C7\u30FC\u30BF\u3092\u53D6\u308A\u51FA\u3059
+  std::vector<std::uint8_t> pixels(static_cast<std::size_t>(W * H), 0);
+  for (int y = 0; y < H; ++y)
+    for (int x = 0; x < W; ++x)
+      pixels[static_cast<std::size_t>(y * W + x)] = m_pendingAiMask.maskValue(x, y);
+
   const core::SelectionMask before = m_document.selection();
-  m_document.selection() = std::move(mask);
-  pushSelectionHistoryIfChanged(before, u8"AI\u9078\u629E\u7CBE\u78BA");
+
+  // Add/Subtract \u304B\u3064\u540C\u30B5\u30A4\u30BA\u306E\u65E2\u5B58\u9078\u629E\u304C\u3042\u308B\u5834\u5408\u306E\u307F\u30DE\u30FC\u30B8\u3002
+  // \u305D\u308C\u4EE5\u5916\uFF08New\u3001\u9078\u629E\u306A\u3057\u3001\u30B5\u30A4\u30BA\u4E0D\u4E00\u81F4\uFF09\u306F\u76F4\u63A5\u7F6E\u63DB\u3002
+  const bool canMerge = (op != core::SelectionOp::New)
+                        && (m_document.selection().width()  == W)
+                        && (m_document.selection().height() == H);
+  if (canMerge) {
+    m_document.selection().applyPixels(op, pixels);
+  } else {
+    core::SelectionMask newSel(W, H);
+    newSel.setPixels(pixels);
+    m_document.selection() = std::move(newSel);
+  }
+
+  // \u30DA\u30F3\u30C7\u30A3\u30F3\u30B0\u72B6\u614B\u30AF\u30EA\u30A2
+  m_hasPendingAiMask   = false;
+  m_pendingAiMask      = core::SelectionMask();
+  m_aiMaskPreviewImage = QImage();
+
+  // \u78BA\u5B9A\u5F8C\u306B\u30B9\u30C8\u30ED\u30FC\u30AF\u3092\u81EA\u52D5\u30AF\u30EA\u30A2\uFF08\u6B21\u306E\u30D1\u30B9\u7528\u306B\u767D\u7D19\u306B\u623B\u3059\uFF09
+  if (m_aiSelectTool)
+    m_aiSelectTool->clearRotoStrokes();
+
+  pushSelectionHistoryIfChanged(before, u8"AI\u9078\u629E\u78BA\u5B9A");
   emit documentChanged();
   emit layersChanged();
+  emit overlayChanged();  // Confirm \u30DC\u30BF\u30F3\u3092\u7121\u52B9\u5316\u3059\u308B\u305F\u3081\u306B\u5FC5\u8981
   emit aiSelectionRefined();
 }
 
@@ -4560,18 +4671,120 @@ void AppController::setupOnnxInferenceCallback() {
              const std::vector<core::Point>& negPoints) {
         if (!m_onnxSegEngine || !m_onnxSegEngine->isLoaded()) return;
 
+        const int W = composited.width();
+        const int H = composited.height();
+
+        // \u2500\u2500 \u30C7\u30D0\u30C3\u30B0\u30ED\u30B0\u3092\u30D5\u30A1\u30A4\u30EB\u306B\u66F8\u304D\u51FA\u3059 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+        static FILE* dbgLog = std::fopen("C:/Users/Keishi/onnx_debug.log", "a");
+        if (dbgLog) {
+            std::fprintf(dbgLog, "[ONNX] callback fired composited=%dx%d pos=%d neg=%d rev=%llu encRev=%llu\n",
+                W, H, (int)posPoints.size(), (int)negPoints.size(),
+                (unsigned long long)m_compositeRevision,
+                (unsigned long long)m_onnxLastEncodedRevision);
+            if (!posPoints.empty())
+                std::fprintf(dbgLog, "[ONNX] first posPoint: px=%d py=%d\n",
+                    posPoints[0].x, posPoints[0].y);
+            std::fflush(dbgLog);
+        }
+
         // \u753B\u50CF\u304C\u5909\u308F\u3063\u305F\uFF08\u518D\u63CF\u753B revision \u304C\u9032\u3093\u3060\uFF09\u3068\u304D\u3060\u3051\u518D\u30A8\u30F3\u30B3\u30FC\u30C9
-        if (m_compositeRevision != m_onnxLastEncodedRevision) {
-          if (!m_onnxSegEngine->encodeImage(composited)) return;
+        bool needEncode = (m_compositeRevision != m_onnxLastEncodedRevision);
+        if (dbgLog) { std::fprintf(dbgLog, "[ONNX] needEncode=%d\n", (int)needEncode); std::fflush(dbgLog); }
+        if (needEncode) {
+          bool ok = m_onnxSegEngine->encodeImage(composited);
+          if (dbgLog) { std::fprintf(dbgLog, "[ONNX] encodeImage result=%d\n", (int)ok); std::fflush(dbgLog); }
+          if (!ok) return;
           m_onnxLastEncodedRevision = m_compositeRevision;
         }
 
-        const int W = composited.width();
-        const int H = composited.height();
         auto result = m_onnxSegEngine->decode(posPoints, negPoints, W, H, m_onnxGranularity);
+        if (dbgLog) { std::fprintf(dbgLog, "[ONNX] decode valid=%d iou=%.4f\n", (int)result.valid, result.iou); std::fflush(dbgLog); }
         if (!result.valid) return;
 
+        // \u2500\u2500 \u30B9\u30C8\u30ED\u30FC\u30AF\u91CD\u5FC3\u30ED\u30B0 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+        if (dbgLog && !posPoints.empty()) {
+            long long spx = 0, spy = 0;
+            for (const auto& p : posPoints) { spx += p.x; spy += p.y; }
+            const int n = static_cast<int>(posPoints.size());
+            std::fprintf(dbgLog,
+                "[ONNX] posPoints n=%d centroid=(%.1f,%.1f) first=(%d,%d) last=(%d,%d)\n",
+                n, (double)spx/n, (double)spy/n,
+                posPoints.front().x, posPoints.front().y,
+                posPoints.back().x,  posPoints.back().y);
+            std::fflush(dbgLog);
+        }
+
+        // \u2500\u2500 \u30DE\u30B9\u30AF\u91CD\u5FC3\u30FB\u30D0\u30A6\u30F3\u30C7\u30A3\u30F3\u30B0\u30DC\u30C3\u30AF\u30B9\u30ED\u30B0 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+        {
+            int selPixels = 0;
+            int minX = W, minY = H, maxX = -1, maxY = -1;
+            long long smx = 0, smy = 0;
+            for (int y = 0; y < H; ++y)
+                for (int x = 0; x < W; ++x)
+                    if (result.mask.contains(x, y)) {
+                        ++selPixels;
+                        smx += x; smy += y;
+                        if (x < minX) minX = x;
+                        if (y < minY) minY = y;
+                        if (x > maxX) maxX = x;
+                        if (y > maxY) maxY = y;
+                    }
+            if (dbgLog) {
+                if (selPixels > 0) {
+                    std::fprintf(dbgLog,
+                        "[ONNX] mask selPixels=%d bbox=(%d,%d)-(%d,%d) centroid=(%.1f,%.1f)\n",
+                        selPixels, minX, minY, maxX, maxY,
+                        (double)smx/selPixels, (double)smy/selPixels);
+                } else {
+                    std::fprintf(dbgLog, "[ONNX] mask selPixels=0 (no selection)\n");
+                }
+                std::fflush(dbgLog);
+            }
+        }
+
         applyAiSelectResult(std::move(result.mask));
+
+        // ── 視覚デバッグ: ストローク重心にオレンジ十字を描画 ──────────────────
+        // オレンジ十字 = 実際に渡したストロークの重心（キャンバス座標）
+        // 白い十字    = マスクのピクセル重心（キャンバス座標）
+        // 両者が視覚的に同じ位置 → 座標変換は正しい
+        // 両者がずれる           → どこかで座標ズレが発生
+        if (!m_aiMaskPreviewImage.isNull() && !posPoints.empty()) {
+            long long spx = 0, spy = 0;
+            for (const auto& p : posPoints) { spx += p.x; spy += p.y; }
+            const int scx = static_cast<int>(spx / (long long)posPoints.size());
+            const int scy = static_cast<int>(spy / (long long)posPoints.size());
+
+            // マスク重心計算
+            long long mmx = 0, mmy = 0; int mpix = 0;
+            for (int y2 = 0; y2 < H; ++y2)
+                for (int x2 = 0; x2 < W; ++x2)
+                    if (m_aiMaskPreviewImage.pixelColor(x2, y2).alpha() > 0) {
+                        mmx += x2; mmy += y2; ++mpix;
+                    }
+
+            const QRgb orangePx = QColor(255, 140, 0, 255).rgba();
+            const QRgb whitePx  = QColor(255, 255, 255, 255).rgba();
+
+            auto drawCross = [&](int cx, int cy, QRgb color, int half) {
+                for (int d = -half; d <= half; ++d) {
+                    auto setpx = [&](int px2, int py2) {
+                        if (px2 >= 0 && px2 < W && py2 >= 0 && py2 < H)
+                            reinterpret_cast<QRgb*>(m_aiMaskPreviewImage.scanLine(py2))[px2] = color;
+                    };
+                    setpx(cx + d, cy);
+                    setpx(cx, cy + d);
+                }
+            };
+
+            if (mpix > 0) {
+                const int mcx = static_cast<int>(mmx / mpix);
+                const int mcy = static_cast<int>(mmy / mpix);
+                drawCross(mcx, mcy, whitePx, 10);  // 白 = マスク重心
+            }
+            drawCross(scx, scy, orangePx, 10);   // オレンジ = ストローク重心
+        }
+        // ─────────────────────────────────────────────────────────────────────
       });
 }
 
@@ -4589,18 +4802,31 @@ void AppController::setRotoBrushRadius(float radiusPx) {
   emit overlayChanged();
 }
 
+void AppController::setAiThreshold(int value) {
+  if (m_aiSelectTool)
+    m_aiSelectTool->setAiThreshold(value);
+}
+
+void AppController::setVectorApprox(int value) {
+  if (m_aiSelectTool)
+    m_aiSelectTool->setVectorApprox(value);
+}
+
+void AppController::setExpandPixels(int value) {
+  if (m_aiSelectTool)
+    m_aiSelectTool->setExpandPixels(value);
+}
+
 void AppController::clearRotoStrokes() {
   if (!m_aiSelectTool) return;
   m_aiSelectTool->clearRotoStrokes();
   m_document.selection().clear();
+  m_aiMaskPreviewImage = QImage();
+  m_pendingAiMask      = core::SelectionMask();
+  m_hasPendingAiMask   = false;
   emit documentChanged();
   emit layersChanged();
   emit overlayChanged();
-}
-
-void AppController::setRotoBrushPanel(app::panels::RotoBrushPanel* panel) {
-  m_rotoBrushPanel = panel;
-  if (panel) panel->setController(this);
 }
 
 bool AppController::isSubToolCompatibleWithLayerKind(
@@ -4806,8 +5032,8 @@ void AppController::applyUiStateToTools() {
     m_aiSelectTool->setThreshold(m_uiState.autoSelectThreshold);
     m_aiSelectTool->setReferAllLayers(m_uiState.autoSelectReferAllLayers);
     m_aiSelectTool->setAntiAlias(m_uiState.antiAlias);
-    m_aiSelectTool->setAddMode(false);
-    m_aiSelectTool->setSubtractMode(false);
+    m_aiSelectTool->setAddMode(m_uiState.selectionOp == core::SelectionOp::Add);
+    m_aiSelectTool->setSubtractMode(m_uiState.selectionOp == core::SelectionOp::Subtract);
     m_aiSelectTool->setInputMode(core::AiSelectTool::InputMode::RotoBrush);
   }
   if (m_gradientTool != nullptr) {
@@ -5646,5 +5872,124 @@ void AppController::setDirty(bool dirty) noexcept {
   m_dirty = dirty;
   emit dirtyChanged(m_dirty);
 }
+
+// ── Dev_Bridge debug interface ──────────────────────────────────────────────
+
+#ifdef PAINT_DEBUG_SERVER
+
+AppController::DebugState AppController::debugState() const {
+  DebugState s;
+
+  // Tool
+  s.tool = QString::fromStdString(currentToolDisplayName());
+  s.aiSelectActive = (currentTool() == core::ToolKind::AiSelect);
+
+  // Pending AI mask / preview
+  s.hasPendingMask  = m_hasPendingAiMask;
+  s.previewVisible  = m_hasPendingAiMask;   // preview = pending mask exists
+
+  // Selection op
+  switch (m_uiState.selectionOp) {
+    case core::SelectionOp::New:      s.selectionOp = QLatin1String("New");      break;
+    case core::SelectionOp::Add:      s.selectionOp = QLatin1String("Add");      break;
+    case core::SelectionOp::Subtract: s.selectionOp = QLatin1String("Subtract"); break;
+    default:                          s.selectionOp = QLatin1String("New");      break;
+  }
+
+  // Selection mask
+  const core::SelectionMask& sel = m_document.selection();
+  s.selectionWidth  = sel.width();
+  s.selectionHeight = sel.height();
+  int pixelCount = 0;
+  for (int y = 0; y < sel.height(); ++y)
+    for (int x = 0; x < sel.width(); ++x)
+      if (sel.maskValue(x, y) > 0) ++pixelCount;
+  s.selectionPixels = pixelCount;
+
+  // Canvas dimensions
+  s.canvasWidth  = m_document.canvasSize().width;
+  s.canvasHeight = m_document.canvasSize().height;
+
+  // Layers
+  s.layerCount = static_cast<int>(m_document.layerCount());
+  const core::Layer* active = m_document.activeLayer();
+  s.activeLayerName = active ? QString::fromStdString(active->name()) : QString();
+
+  // Undo
+  s.undoDepth = static_cast<int>(m_undoHistory.size());
+  s.canUndo   = canUndo();
+
+  return s;
+}
+
+AppController::DebugActionResult AppController::executeDebugAction(
+    const QString& type, const QString& target, const QJsonObject& opts)
+{
+  DebugActionResult r;
+
+  if (type == QLatin1String("aiselect-confirm")) {
+    // Confirm pending AI mask (same as pressing Enter in AI Select mode)
+    if (!m_hasPendingAiMask) {
+      r.success = false;
+      r.message = QLatin1String("No pending AI mask to confirm");
+      return r;
+    }
+    confirmAiSelectMask();
+    r.success = true;
+    r.message = QLatin1String("AI select mask confirmed");
+    return r;
+  }
+
+  if (type == QLatin1String("aiselect-reset")) {
+    // Clear pending mask and roto strokes (no selection change)
+    m_hasPendingAiMask = false;
+    m_pendingAiMask    = core::SelectionMask();
+    if (m_aiSelectTool) m_aiSelectTool->clearRotoStrokes();
+    r.success = true;
+    r.message = QLatin1String("AI select state reset");
+    return r;
+  }
+
+  if (type == QLatin1String("aiselect-set-op")) {
+    // Set Add / Subtract / New on AiSelectTool settings
+    const QString op = opts.value(QLatin1String("op")).toString(target);
+    if (op == QLatin1String("Add")) {
+      setSelectionOp(core::SelectionOp::Add);
+    } else if (op == QLatin1String("Subtract")) {
+      setSelectionOp(core::SelectionOp::Subtract);
+    } else {
+      setSelectionOp(core::SelectionOp::New);
+    }
+    r.success = true;
+    r.message = QLatin1String("Selection op set to ") + op;
+    return r;
+  }
+
+  if (type == QLatin1String("selection-clear")) {
+    clearSelection();
+    r.success = true;
+    r.message = QLatin1String("Selection cleared");
+    return r;
+  }
+
+  if (type == QLatin1String("list")) {
+    // Return available debug actions
+    QJsonArray actions;
+    actions << QLatin1String("aiselect-confirm")
+            << QLatin1String("aiselect-reset")
+            << QLatin1String("aiselect-set-op")
+            << QLatin1String("selection-clear");
+    r.success = true;
+    r.message = QLatin1String("Available debug actions");
+    r.data    = QJsonObject{{QLatin1String("actions"), actions}};
+    return r;
+  }
+
+  r.success = false;
+  r.message = QLatin1String("Unknown debug action: ") + type;
+  return r;
+}
+
+#endif // PAINT_DEBUG_SERVER
 
 } // namespace app::bridge

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <QImage>
+#include <QJsonObject>
 #include <QList>
 #include <QObject>
 #include <QPixmap>
@@ -50,10 +51,6 @@
 #include "core/tools/MeshDeformTool.h"
 #include "core/mesh/GridMeshGenerator.h"
 #include "core/mesh/EdgeAdaptiveMeshGenerator.h"
-
-namespace app::panels {
-class RotoBrushPanel;
-}
 
 namespace app::bridge {
 class ComfyUiClient;
@@ -184,6 +181,10 @@ struct CanvasOverlayViewModel {
   std::vector<std::array<int,3>>    meshDeformTriangles;
   std::vector<core::FPoint>         meshDeformPinCurrents;
   std::vector<core::FPoint>         meshDeformPinOriginals;
+
+  // AiSelect / Roto Brush — SAM推論後の青いマスクプレビュー
+  bool   hasAiMaskPreview {false};
+  QImage aiMaskPreview;
 };
 
 class AppController : public QObject {
@@ -364,6 +365,13 @@ public:
   bool commitTransformSession();
   bool cancelTransformSession();
   bool isInTransformMode() const noexcept;
+  /// カーソル表示用ヒットテスト（sx/sy = canvas座標 × zoom）。
+  /// 戻り値: 0-8=ハンドル, -2=ボックス内部(移動), -1=外部/非アクティブ
+  int  freeTransformHitTestScreen(float sx, float sy) const noexcept;
+
+  // ── 多角形ラッソ確定（Enter キー） ──────────────────────────────────────
+  bool isPolyLassoInProgress() const noexcept;
+  bool commitPolyLasso();
 
   // ── Mesh deform session ─────────────────────────────────────────────────
   bool beginMeshDeformSession();
@@ -495,14 +503,55 @@ public:
   int  aiSelectGranularity() const noexcept { return m_onnxGranularity; }
 
   // ── Roto ブラシ ───────────────────────────────────────────────────────
-  /// 前景/背景ブラシモードを切り替える（RotoBrushPanel → AiSelectTool）
+  /// 前景/背景ブラシモードを切り替える
   void setRotoBrushForeground(bool isFg);
   /// ブラシ表示半径を設定する
   void setRotoBrushRadius(float radiusPx);
+  /// Rotoブラシ用閾値（スタブBFS の許容色差）を設定する
+  void setAiThreshold(int value);
+  /// 選択境界平滑化半径を設定する（0=なし）
+  void setVectorApprox(int value);
+  /// マスク拡張(+)/縮小(-)ピクセル数を設定する
+  void setExpandPixels(int value);
   /// 全ストロークとプロンプト点をクリアし選択をリセットする
   void clearRotoStrokes();
-  /// RotoBrushPanel を後から接続する（MainWindow の遅延初期化用）
-  void setRotoBrushPanel(app::panels::RotoBrushPanel* panel);
+  /// 青いプレビューを確定し、マーチングアンツ選択として適用する
+  void confirmAiSelectMask();
+  /// 青いプレビュー（ペンディングマスク）があるか
+  bool hasPendingAiMask() const noexcept { return m_hasPendingAiMask; }
+
+  // ── Dev_Bridge debug interface ─────────────────────────────────────────
+  // Active only when PAINT_DEBUG_SERVER is defined (--debug-server launch flag).
+  // Provides structured state snapshot and action dispatch for runtime verification.
+
+#ifdef PAINT_DEBUG_SERVER
+  struct DebugState {
+    QString tool;
+    bool    aiSelectActive  {false};
+    bool    hasPendingMask  {false};
+    QString selectionOp;          // "New" | "Add" | "Subtract"
+    bool    previewVisible  {false};
+    int     selectionWidth  {0};
+    int     selectionHeight {0};
+    int     selectionPixels {0};  // count of non-zero bytes in selection mask
+    int     canvasWidth     {0};
+    int     canvasHeight    {0};
+    int     layerCount      {0};
+    QString activeLayerName;
+    int     undoDepth       {0};
+    bool    canUndo         {false};
+  };
+
+  struct DebugActionResult {
+    bool        success {false};
+    QString     message;
+    QJsonObject data;
+  };
+
+  DebugState         debugState() const;
+  DebugActionResult  executeDebugAction(const QString& type, const QString& target,
+                                        const QJsonObject& opts = {});
+#endif // PAINT_DEBUG_SERVER
 
   struct InpaintParams {
     QString prompt;
@@ -682,14 +731,16 @@ private:
   core::mesh::GridMeshGenerator     m_gridMeshGen;
   core::mesh::EdgeAdaptiveMeshGenerator m_edgeMeshGen;
 
-  // ── Roto ブラシパネル参照 ─────────────────────────────────────────────
-  app::panels::RotoBrushPanel* m_rotoBrushPanel {nullptr};
-
   // ── ONNX セグメンテーションエンジン ──────────────────────────────────
   std::unique_ptr<core::ai::OnnxSegEngine> m_onnxSegEngine;
   std::uint64_t m_onnxLastEncodedRevision {static_cast<std::uint64_t>(-1)};
   int           m_onnxGranularity         {1};
   void setupOnnxInferenceCallback();
+  // SAM結果から生成した青いプレビューQImage（canvasOverlay() で返す用キャッシュ）
+  QImage m_aiMaskPreviewImage;
+  // Enter / 確定ボタンで適用するペンディングSAMマスク
+  core::SelectionMask m_pendingAiMask;
+  bool                m_hasPendingAiMask {false};
 
   // ── ComfyUI サーバー管理 ────────────────────────────────────────────
   void ensureComfyUiRunning(const QUrl& serverUrl);
