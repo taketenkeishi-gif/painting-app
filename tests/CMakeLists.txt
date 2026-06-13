@@ -15,6 +15,7 @@ add_executable(app_smoke_tests
   ${CMAKE_CURRENT_SOURCE_DIR}/app/AppControllerSmokeTests.cpp
   ${PROJECT_SOURCE_DIR}/src/app/bridge/AppController.cpp
   ${PROJECT_SOURCE_DIR}/src/app/bridge/AiGenerationController.cpp
+  ${PROJECT_SOURCE_DIR}/src/app/bridge/AiService.cpp
   ${PROJECT_SOURCE_DIR}/src/app/bridge/ComfyUiClient.cpp
   ${PROJECT_SOURCE_DIR}/src/app/ui/ToolDescriptor.cpp
   ${PROJECT_SOURCE_DIR}/src/app/ui/UiState.cpp

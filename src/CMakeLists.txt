@@ -99,6 +99,7 @@ option(PAINT_DEBUG_SERVER "Build Dev_Bridge HTTP debug server into the app" OFF)
 
 set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/main.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/commands/CommandRegistry.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AppController.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/LpaExporter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/LpaImporter.cpp
@@ -123,6 +124,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AiModelFolderDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/WorkflowBindingDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AiGenerationController.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AiService.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/ComfyUiClient.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/MinimalWebSocket.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
@@ -168,6 +170,9 @@ if(PAINT_BUILD_APP)
       ${CMAKE_CURRENT_SOURCE_DIR}/app/debug/DebugServer.cpp
     )
     target_compile_definitions(paint_app PRIVATE PAINT_DEBUG_SERVER)
+    # paint_comfy_platform も同じ定義が必要。ComfyClient.h の #ifdef でクラスレイアウトが
+    # 変わるため、全 TU で一致させないと ABI ミスマッチによるクラッシュが起きる。
+    target_compile_definitions(paint_comfy_platform PUBLIC PAINT_DEBUG_SERVER)
     message(STATUS "Dev_Bridge debug server enabled (port 9223)")
   endif()
 

@@ -1,4 +1,5 @@
 #include "app/bridge/AppController.h"
+#include "app/bridge/AiService.h"
 #include "app/bridge/ComfyUiClient.h"
 #include "core/selection/providers/ClassicProvider.h"
 
@@ -805,29 +806,15 @@ bool AppController::setLayerParent(std::size_t layerIndex, uint32_t newParentId)
   }
   core::Layer& layer = m_document.layerAt(layerIndex);
   if (layer.parentId() == newParentId) {
-    return false;  // 変更なし
+    return false;
   }
   // 循環防止: newParentId が layer の子孫（直接・間接）であれば拒否
-  // （自己参照 layer.id()==newParentId も isDescendantOf で検出される）
   if (newParentId != 0 && isDescendantOf(newParentId, layer.id())) {
     return false;
   }
-
-  const core::Layer before = layer;
-  layer.setParentId(newParentId);
-
-  StrokeHistoryEntry entry;
-  entry.kind = HistoryKind::Stroke;
-  entry.actionName = "親フォルダ変更";
-  entry.layerIndex = layerIndex;
-  entry.layerId = layer.id();
-  entry.beforeLayer = before;
-  entry.afterLayer = layer;
-  pushHistoryEntry(std::move(entry));
-
-  emit layersChanged();
-  emit documentChanged();
-  return true;
+  return executeLayerAttributeEdit(layerIndex, "親フォルダ変更",
+      EditFlags::EmitLayers | EditFlags::EmitDocument,
+      [newParentId](core::Layer& l) { l.setParentId(newParentId); });
 }
 
 bool AppController::duplicateLayer(std::size_t index) {
@@ -1127,39 +1114,13 @@ void AppController::setLayerOpacity(std::size_t index, int opacityPercent) {
     return;
   }
   const float normalized = static_cast<float>(clampPercent(opacityPercent)) / 100.0F;
-  core::Layer& layer = m_document.layerAt(index);
-  if (std::abs(layer.opacity() - normalized) < 0.0001F) {
+  if (std::abs(m_document.layerAt(index).opacity() - normalized) < 0.0001F) {
     return;
   }
-  // 直前が同レイヤーの不透明度変更なら afterLayer だけ更新（スライダードラッグで大量エントリ防止）
-  if (!m_undoHistory.empty()) {
-    StrokeHistoryEntry& last = m_undoHistory.back();
-    if (last.kind == HistoryKind::Stroke &&
-        last.actionName == "不透明度変更" &&
-        last.layerId == layer.id()) {
-      layer.setOpacity(normalized);
-      last.afterLayer = layer;
-      rerender();
-      emit canvasChanged();
-      emit layersChanged();
-      emit documentChanged();
-      return;
-    }
-  }
-  const core::Layer before = layer;
-  layer.setOpacity(normalized);
-  StrokeHistoryEntry entry;
-  entry.kind = HistoryKind::Stroke;
-  entry.actionName = "不透明度変更";
-  entry.layerIndex = index;
-  entry.layerId = layer.id();
-  entry.beforeLayer = before;
-  entry.afterLayer = layer;
-  pushHistoryEntry(std::move(entry));
-  rerender();
-  emit canvasChanged();
-  emit layersChanged();
-  emit documentChanged();
+  executeLayerAttributeEdit(index, "不透明度変更",
+      EditFlags::Rerender | EditFlags::EmitCanvas | EditFlags::EmitLayers |
+      EditFlags::EmitDocument | EditFlags::CoalesceOp,
+      [normalized](core::Layer& l) { l.setOpacity(normalized); });
 }
 
 void AppController::setActiveLayerOpacity(int opacityPercent) {
@@ -1181,24 +1142,12 @@ void AppController::setLayerBlendMode(std::size_t index, core::BlendMode mode) {
   if (index >= m_document.layerCount()) {
     return;
   }
-  core::Layer& layer = m_document.layerAt(index);
-  if (layer.blendMode() == mode) {
+  if (m_document.layerAt(index).blendMode() == mode) {
     return;
   }
-  const core::Layer before = layer;
-  layer.setBlendMode(mode);
-  StrokeHistoryEntry entry;
-  entry.kind = HistoryKind::Stroke;
-  entry.actionName = "ブレンドモード変更";
-  entry.layerIndex = index;
-  entry.layerId = layer.id();
-  entry.beforeLayer = before;
-  entry.afterLayer = layer;
-  pushHistoryEntry(std::move(entry));
-  rerender();
-  emit canvasChanged();
-  emit layersChanged();
-  emit documentChanged();
+  executeLayerAttributeEdit(index, "ブレンドモード変更",
+      EditFlags::Rerender | EditFlags::EmitCanvas | EditFlags::EmitLayers | EditFlags::EmitDocument,
+      [mode](core::Layer& l) { l.setBlendMode(mode); });
 }
 
 void AppController::setActiveLayerBlendMode(core::BlendMode mode) {
@@ -1872,18 +1821,72 @@ bool AppController::contractSelection(int radiusPixels) {
 }
 
 bool AppController::toggleQuickMaskMode() {
+  const int W = m_document.canvasSize().width;
+  const int H = m_document.canvasSize().height;
+
   if (!m_quickMaskMode) {
-    // クイックマスクモード ON: 現在の選択をマスク化
+    // ── クイックマスクモード ON ────────────────────────────────────────────
     m_quickMaskSnapshot = m_document.selection();
     m_quickMaskMode = true;
-    // マスク表示のみ、選択範囲は一時消去（選択→マスク表示に）
+
+    // 一時バッファをキャンバスサイズで初期化
+    m_quickMaskLayer.emplace("__quickmask__", W, H);
+    m_quickMaskLayer->buffer() = core::PixelBuffer(W, H, core::Color{0, 0, 0, 0});
+
+    // 既存選択範囲がある場合: 選択範囲を白（alpha=255）で描画
+    const core::SelectionMask& sel = m_quickMaskSnapshot;
+    if (sel.hasSelection()) {
+      for (int y = 0; y < H; ++y) {
+        for (int x = 0; x < W; ++x) {
+          const std::uint8_t v = sel.maskValue(x, y);
+          if (v > 0) {
+            m_quickMaskLayer->buffer().setPixel(x, y, core::Color{255, 255, 255, v});
+          }
+        }
+      }
+    }
+
+    // 選択範囲をクリア（クイックマスクバッファが代替）
     m_document.selection().clear();
+    rerender();  // QM ON 直後の表示を確定（既存選択があった場合の初期 overlay も正しく出す）
   } else {
-    // クイックマスクモード OFF: マスクを選択に戻す
+    // ── クイックマスクモード OFF ───────────────────────────────────────────
+    // バッファの alpha チャンネルを SelectionMask に変換
+    const core::SelectionMask selBefore = m_document.selection();
+    core::SelectionMask newSel(W, H);
+    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(W * H), 0);
+    for (int y = 0; y < H; ++y) {
+      for (int x = 0; x < W; ++x) {
+        pixels[static_cast<std::size_t>(y * W + x)] =
+            m_quickMaskLayer->buffer().pixel(x, y).a;
+      }
+    }
+    newSel.setPixels(pixels);
+
+    // QMバッファを破棄する前にスナップショットを取る（Undo復元用）
+    const core::Layer qmSnapshot = *m_quickMaskLayer;
+
     m_quickMaskMode = false;
-    m_document.selection() = m_quickMaskSnapshot;
+    m_quickMaskLayer.reset();
     m_quickMaskSnapshot.clear();
+
+    m_document.selection() = newSel;
+
+    // QuickMaskCommit エントリ: 選択変化 + QM バッファを一括保存
+    // Undo すると QM モードに戻り、beforeLayer の QM バッファが復元される
+    if (!(selBefore == newSel)) {
+      StrokeHistoryEntry entry;
+      entry.kind            = HistoryKind::QuickMaskCommit;
+      entry.actionName      = u8"クイックマスク確定";
+      entry.beforeSelection = selBefore;
+      entry.afterSelection  = newSel;
+      entry.beforeLayer     = qmSnapshot;  // QM バッファ（undo 時に復元）
+      pushHistoryEntry(std::move(entry));
+    }
+    rerender();  // overlay を即座に消去してから通知
   }
+
+  emit layersChanged();    // LayerPanel に特殊行を反映
   emit documentChanged();
   emit overlayChanged();
   return true;
@@ -2746,20 +2749,26 @@ void AppController::beginStroke(int x, int y) {
   PendingStrokeState pending;
   pending.actionName = actionNameForTool(activeKind);
   if (toolWritesPixels(activeKind)) {
-    core::Layer* activeLayer = m_document.activeLayer();
-    if (activeLayer == nullptr) {
-      return;
+    if (m_quickMaskMode && m_quickMaskLayer) {
+      // QMモード: QMバッファのスナップショットを取る
+      pending.trackQmPixels = true;
+      pending.beforeQmLayer = *m_quickMaskLayer;
+    } else {
+      core::Layer* activeLayer = m_document.activeLayer();
+      if (activeLayer == nullptr) {
+        return;
+      }
+      pending.trackPixels = true;
+      pending.layerIndex = m_document.activeLayerIndex();
+      pending.layerId    = activeLayer->id();
+      pending.beforeLayer = *activeLayer;
     }
-    pending.trackPixels = true;
-    pending.layerIndex = m_document.activeLayerIndex();
-    pending.layerId    = activeLayer->id();  // 安定ID を記録
-    pending.beforeLayer = *activeLayer;
   }
   if (toolWritesSelection(activeKind)) {
     pending.trackSelection = true;
     pending.beforeSelection = m_document.selection();
   }
-  if (pending.trackPixels || pending.trackSelection) {
+  if (pending.trackPixels || pending.trackSelection || pending.trackQmPixels) {
     m_pendingStroke = std::move(pending);
   } else {
     m_pendingStroke.reset();
@@ -2837,20 +2846,25 @@ void AppController::beginStrokeF(float x, float y, float pressure, float tiltX, 
   PendingStrokeState pending;
   pending.actionName = actionNameForTool(activeKind);
   if (toolWritesPixels(activeKind)) {
-    core::Layer* activeLayer = m_document.activeLayer();
-    if (activeLayer == nullptr) {
-      return;
+    if (m_quickMaskMode && m_quickMaskLayer) {
+      pending.trackQmPixels = true;
+      pending.beforeQmLayer = *m_quickMaskLayer;
+    } else {
+      core::Layer* activeLayer = m_document.activeLayer();
+      if (activeLayer == nullptr) {
+        return;
+      }
+      pending.trackPixels = true;
+      pending.layerIndex = m_document.activeLayerIndex();
+      pending.layerId    = activeLayer->id();
+      pending.beforeLayer = *activeLayer;
     }
-    pending.trackPixels = true;
-    pending.layerIndex = m_document.activeLayerIndex();
-    pending.layerId    = activeLayer->id();  // 安定ID を記録
-    pending.beforeLayer = *activeLayer;
   }
   if (toolWritesSelection(activeKind)) {
     pending.trackSelection = true;
     pending.beforeSelection = m_document.selection();
   }
-  if (pending.trackPixels || pending.trackSelection) {
+  if (pending.trackPixels || pending.trackSelection || pending.trackQmPixels) {
     m_pendingStroke = std::move(pending);
   } else {
     m_pendingStroke.reset();
@@ -3077,6 +3091,23 @@ bool AppController::undo() {
       m_document.insertLayerAt(entry.layerIndex, *entry.beforeLayer);
       m_document.setActiveLayer(entry.layerIndex);
       break;
+    case HistoryKind::QuickMaskStroke:
+      // QMモードが継続中のときだけ復元する
+      if (m_quickMaskMode && m_quickMaskLayer && entry.beforeLayer.has_value()) {
+        *m_quickMaskLayer = *entry.beforeLayer;
+      }
+      break;
+    case HistoryKind::QuickMaskCommit:
+      // QMモード確定を取り消す: 選択範囲を戻し、QMモードに再突入してバッファを復元
+      m_document.selection() = entry.beforeSelection;
+      if (entry.beforeLayer.has_value()) {
+        const int W = m_document.canvasSize().width;
+        const int H = m_document.canvasSize().height;
+        m_quickMaskMode = true;
+        m_quickMaskLayer.emplace(*entry.beforeLayer);
+        m_quickMaskSnapshot = entry.beforeSelection;
+      }
+      break;
     default:
       break;
   }
@@ -3089,10 +3120,14 @@ bool AppController::undo() {
   if (m_redoHistory.back().kind == HistoryKind::LayerVisibility ||
       m_redoHistory.back().kind == HistoryKind::LayerOrder ||
       m_redoHistory.back().kind == HistoryKind::LayerAdd ||
-      m_redoHistory.back().kind == HistoryKind::LayerRemove) {
+      m_redoHistory.back().kind == HistoryKind::LayerRemove ||
+      m_redoHistory.back().kind == HistoryKind::QuickMaskCommit) {
     emit layersChanged();
   }
   emit documentChanged();
+  if (m_redoHistory.back().kind == HistoryKind::QuickMaskCommit) {
+    emit overlayChanged();
+  }
   return true;
 }
 
@@ -3178,6 +3213,18 @@ bool AppController::redo() {
           entry.afterIndex < m_document.layerCount() ? entry.afterIndex
                                                       : m_document.layerCount() - 1);
       break;
+    case HistoryKind::QuickMaskStroke:
+      if (m_quickMaskMode && m_quickMaskLayer && entry.afterLayer.has_value()) {
+        *m_quickMaskLayer = *entry.afterLayer;
+      }
+      break;
+    case HistoryKind::QuickMaskCommit:
+      // リドゥ: QMモードを終了し、確定した選択範囲を再適用
+      m_document.selection() = entry.afterSelection;
+      m_quickMaskMode = false;
+      m_quickMaskLayer.reset();
+      m_quickMaskSnapshot.clear();
+      break;
     default:
       break;
   }
@@ -3190,10 +3237,14 @@ bool AppController::redo() {
   if (m_undoHistory.back().kind == HistoryKind::LayerVisibility ||
       m_undoHistory.back().kind == HistoryKind::LayerOrder ||
       m_undoHistory.back().kind == HistoryKind::LayerAdd ||
-      m_undoHistory.back().kind == HistoryKind::LayerRemove) {
+      m_undoHistory.back().kind == HistoryKind::LayerRemove ||
+      m_undoHistory.back().kind == HistoryKind::QuickMaskCommit) {
     emit layersChanged();
   }
   emit documentChanged();
+  if (m_undoHistory.back().kind == HistoryKind::QuickMaskCommit) {
+    emit overlayChanged();
+  }
   return true;
 }
 
@@ -4791,7 +4842,11 @@ void AppController::connectComfyUi(const QString& urlStr) {
   const QUrl serverUrl(urlStr);
   m_comfyHttpUrl = urlStr;
 
-  // AiGenerationController (WorkflowBinding ベース) を接続URLで初期化
+  // AiService に URL を反映（既に生成済みの場合のみ）
+  if (m_aiService)
+    m_aiService->setComfyUrl(urlStr);
+
+  // AiGenerationController (WorkflowBinding ベース — inpaint 用) を接続URLで初期化
 #ifdef PAINT_DEBUG_SERVER
   if (m_comfyHttpClient == nullptr) {
     m_comfyHttpClient = new platform::comfy::ComfyClient(this);
@@ -5722,14 +5777,20 @@ void AppController::saveSubToolCatalogToSettings() const {
 
 core::ToolContext AppController::makeToolContext() {
   const bool maskMode = m_uiState.editTarget == app::ui::UiState::EditTarget::Mask;
-  return core::ToolContext {
+  // QMモード中は全ツールの描画先をQMバッファに切り替える (ツール側にQM知識不要)
+  core::Layer* paintTarget = (m_quickMaskMode && m_quickMaskLayer)
+      ? &(*m_quickMaskLayer)
+      : m_document.activeLayer();
+  core::ToolContext ctx {
       m_document,
       m_composited,
       m_currentColor,
       m_secondaryColor,
       m_uiState.size,
       maskMode,
-      &m_selectionEngine};
+      &m_selectionEngine,
+      paintTarget};
+  return ctx;
 }
 
 void AppController::applyToolResult(const core::ToolResult& result) {
@@ -5772,6 +5833,25 @@ void AppController::finishPendingStrokeHistory() {
 
   const PendingStrokeState pending = *m_pendingStroke;
   m_pendingStroke.reset();
+
+  // ── QuickMask strokeアンドゥ ────────────────────────────────────────────
+  if (pending.trackQmPixels) {
+    if (!m_quickMaskLayer || !pending.beforeQmLayer.has_value()) {
+      return;
+    }
+    if (!layersEqual(*pending.beforeQmLayer, *m_quickMaskLayer)) {
+      StrokeHistoryEntry entry;
+      entry.kind = HistoryKind::QuickMaskStroke;
+      entry.actionName = pending.actionName;
+      entry.beforeLayer = *pending.beforeQmLayer;
+      entry.afterLayer  = *m_quickMaskLayer;
+      pushHistoryEntry(std::move(entry));
+      if (currentToolSupportsColor()) {
+        emit foregroundColorUsed();
+      }
+    }
+    return;
+  }
 
   // ── ピクセル＋選択範囲の複合変更（MoveLayerTool + 選択範囲）───────────────
   if (pending.trackPixels && pending.trackSelection) {
@@ -5834,6 +5914,52 @@ void AppController::finishPendingStrokeHistory() {
       pushHistoryEntry(std::move(entry));
     }
   }
+}
+
+bool AppController::executeLayerAttributeEdit(
+    std::size_t layerIndex,
+    std::string_view actionName,
+    EditFlags flags,
+    const std::function<void(core::Layer&)>& mutate)
+{
+  if (layerIndex >= m_document.layerCount()) {
+    return false;
+  }
+  core::Layer& layer = m_document.layerAt(layerIndex);
+
+  // CoalesceOp: 直前が同一 action+layer なら afterLayer だけ上書きして早期リターン
+  if (editFlagSet(flags, EditFlags::CoalesceOp) && !m_undoHistory.empty()) {
+    StrokeHistoryEntry& last = m_undoHistory.back();
+    if (last.kind == HistoryKind::Stroke &&
+        last.actionName == std::string(actionName) &&
+        last.layerId == layer.id()) {
+      mutate(layer);
+      last.afterLayer = layer;
+      if (editFlagSet(flags, EditFlags::Rerender))     rerender();
+      if (editFlagSet(flags, EditFlags::EmitCanvas))   emit canvasChanged();
+      if (editFlagSet(flags, EditFlags::EmitLayers))   emit layersChanged();
+      if (editFlagSet(flags, EditFlags::EmitDocument)) emit documentChanged();
+      return true;
+    }
+  }
+
+  const core::Layer before = layer;
+  mutate(layer);
+
+  StrokeHistoryEntry entry;
+  entry.kind        = HistoryKind::Stroke;
+  entry.actionName  = std::string(actionName);
+  entry.layerIndex  = layerIndex;
+  entry.layerId     = layer.id();
+  entry.beforeLayer = before;
+  entry.afterLayer  = layer;
+  pushHistoryEntry(std::move(entry));
+
+  if (editFlagSet(flags, EditFlags::Rerender))     rerender();
+  if (editFlagSet(flags, EditFlags::EmitCanvas))   emit canvasChanged();
+  if (editFlagSet(flags, EditFlags::EmitLayers))   emit layersChanged();
+  if (editFlagSet(flags, EditFlags::EmitDocument)) emit documentChanged();
+  return true;
 }
 
 void AppController::pushHistoryEntry(StrokeHistoryEntry entry) {
@@ -5931,8 +6057,42 @@ void AppController::clearStrokeHistory() noexcept {
   m_redoHistory.clear();
 }
 
+// クイックマスクバッファを m_composited へ赤 overlay で合成する。
+// マスクの alpha が高い = 非選択部分を半透明の赤で表示（CSP 方式）。
+// ブラシで塗った領域（alpha > 0）だけ赤く表示する。
+// alpha=0（未塗り）の領域は変化なし → Q ON 直後は見た目変化なし。
+static void overlayQuickMask(core::PixelBuffer& dst, const core::Layer& qmLayer,
+                             const core::Rect* clipRect = nullptr) {
+  const int W = dst.width();
+  const int H = dst.height();
+  if (qmLayer.buffer().width() != W || qmLayer.buffer().height() != H) return;
+
+  const int x0 = clipRect ? std::max(0, clipRect->x)                      : 0;
+  const int y0 = clipRect ? std::max(0, clipRect->y)                      : 0;
+  const int x1 = clipRect ? std::min(W, clipRect->x + clipRect->width)    : W;
+  const int y1 = clipRect ? std::min(H, clipRect->y + clipRect->height)   : H;
+
+  for (int y = y0; y < y1; ++y) {
+    for (int x = x0; x < x1; ++x) {
+      const std::uint8_t maskA = qmLayer.buffer().pixel(x, y).a;
+      // 塗った部分（alpha > 0）だけ赤 overlay — 未塗り（alpha=0）は変化なし
+      const float alpha = static_cast<float>(maskA) / 255.0f * 0.5f;
+      if (alpha < 0.001f) continue;
+      const core::Color base = dst.pixel(x, y);
+      dst.setPixel(x, y, core::Color{
+          static_cast<std::uint8_t>(base.r + static_cast<int>((220 - base.r) * alpha)),
+          static_cast<std::uint8_t>(base.g + static_cast<int>((  0 - base.g) * alpha)),
+          static_cast<std::uint8_t>(base.b + static_cast<int>((  0 - base.b) * alpha)),
+          base.a});
+    }
+  }
+}
+
 void AppController::rerender() {
   m_composited = m_renderer.composite(m_document);
+  if (m_quickMaskMode && m_quickMaskLayer) {
+    overlayQuickMask(m_composited, *m_quickMaskLayer);
+  }
   m_lastCompositeDirtyRect.reset();
 }
 
@@ -5944,6 +6104,10 @@ void AppController::rerenderDirty(const core::Rect& dirtyRect) {
   }
   m_renderer.compositeInto(m_document, m_composited, dirtyRect);
   m_lastCompositeDirtyRect = dirtyRect;
+  // QM中: dirty領域のみoverlay適用 (compositeIntoで新鮮なベース → 二重overlayなし)
+  if (m_quickMaskMode && m_quickMaskLayer) {
+    overlayQuickMask(m_composited, *m_quickMaskLayer, &dirtyRect);
+  }
 }
 
 // ── AI ヘルパー: PixelBuffer → PNG バイト列 ──────────────────────────────
@@ -5975,7 +6139,7 @@ void AppController::fetchAiModels() {
 }
 
 // ── AI: インペイント ─────────────────────────────────────────────────────
-void AppController::runInpaint(const InpaintParams& params, int /*batchCount*/) {
+void AppController::runInpaint(const InpaintParams& params, int batchCount) {
 #ifdef PAINT_DEBUG_SERVER
   // AiGenerationController 経由で実行 — 未初期化なら lazy init
   if (m_comfyHttpClient == nullptr) {
@@ -5995,6 +6159,10 @@ void AppController::runInpaint(const InpaintParams& params, int /*batchCount*/) 
     });
     connect(m_aiGenCtrl, &AiGenerationController::started, this, [this]() {
       emit aiProgressUpdate(0, 0, QString());
+    });
+    connect(m_aiGenCtrl, &AiGenerationController::batchCandidatesReady, this,
+            [this](const QList<QPixmap>& px) {
+      emit aiBatchCandidatesReady(px);
     });
   }
   if (m_aiGenCtrl->isBusy()) {
@@ -6047,7 +6215,7 @@ void AppController::runInpaint(const InpaintParams& params, int /*batchCount*/) 
         .denoise(static_cast<double>(params.denoise))
         .seed   (seed);
 
-  m_aiGenCtrl->execute(req);
+  m_aiGenCtrl->executeBatch(req, batchCount);
 #else
   // PAINT_DEBUG_SERVER なしビルドでは旧実装にフォールバック
   if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
@@ -6060,6 +6228,76 @@ void AppController::runInpaint(const InpaintParams& params, int /*batchCount*/) 
   }
   emit aiGenerationError("このビルドでは AI インペイントに --debug-server が必要です");
 #endif
+}
+
+// ── AI: カスタムワークフローでテキスト→画像生成 ──────────────────────────
+void AppController::runGenerateWithWorkflow(const InpaintParams& params,
+                                            int batchCount) {
+  if (m_aiService == nullptr) {
+    m_aiService = new AiService(this, this);
+    m_aiService->setComfyUrl(m_comfyHttpUrl);
+    connect(m_aiService, &AiService::generationStarted, this, [this]() {
+      emit aiProgressUpdate(0, 0, QString());
+    });
+    connect(m_aiService, &AiService::generationProgressUpdate, this,
+            [this](int step, int total) {
+      emit aiProgressUpdate(step, total, QString());
+    });
+    connect(m_aiService, &AiService::generationFinished, this,
+            [this](const QString& opType) {
+      m_aiGenLastError.clear();
+      emit aiGenerationComplete(opType);
+    });
+    connect(m_aiService, &AiService::generationError, this,
+            [this](const QString& msg) {
+      m_aiGenLastError = msg;
+      emit aiGenerationError(msg);
+    });
+    connect(m_aiService, &AiService::batchCandidatesReady, this,
+            [this](const QList<QPixmap>& px) {
+      emit aiBatchCandidatesReady(px);
+    });
+  }
+
+  if (m_aiService->isBusy()) {
+    emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
+    return;
+  }
+
+  const QString wfPath = params.workflowPath;
+  if (wfPath.isEmpty()) {
+    emit aiGenerationError("ワークフローパスが指定されていません。");
+    return;
+  }
+
+  const int seed = (params.seed < 0)
+      ? static_cast<int>(QRandomGenerator::global()->generate())
+      : params.seed;
+
+  const QString posId = params.positiveNodeId;
+  const QString negId = params.negativeNodeId;
+  const QString kId   = params.kSamplerNodeId;
+
+  AiService::GenerateRequest req;
+  req.workflowPath        = wfPath;
+  req.useActiveLayer      = false;
+  req.useCompositedBuffer = false;
+  req.useSelectionAsMask  = false;
+  req.outputLayerName     = QStringLiteral("AI Generated");
+  req.timeoutMs           = 180000;
+
+  if (!posId.isEmpty())
+    req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, params.prompt);
+  if (!negId.isEmpty())
+    req.extraBindings << platform::comfy::WorkflowBinding::clipText(negId, params.negativePrompt);
+  if (!kId.isEmpty())
+    req.extraBindings << platform::comfy::WorkflowBinding::kSampler(kId)
+        .steps  (params.steps)
+        .cfg    (static_cast<double>(params.cfg))
+        .denoise(1.0)
+        .seed   (seed);
+
+  m_aiService->generate(req, batchCount);
 }
 
 // ── AI: テキストから画像生成 ─────────────────────────────────────────────
@@ -6277,13 +6515,99 @@ AppController::DebugState AppController::debugState() const {
   s.undoDepth = static_cast<int>(m_undoHistory.size());
   s.canUndo   = canUndo();
 
+  // QuickMask
+  s.quickMaskMode = m_quickMaskMode;
+  // Active layer buffer XOR checksum (sample 1px in 8 = fast)
+  if (active) {
+    quint32 ck = 0;
+    const auto& buf = active->buffer();
+    const int W = buf.width(), H = buf.height();
+    for (int y = 0; y < H; y += 8)
+      for (int x = 0; x < W; x += 8) {
+        const auto& px = buf.pixel(x, y);
+        ck ^= (quint32(px.r) << 24) | (quint32(px.g) << 16) | (quint32(px.b) << 8) | px.a;
+      }
+    s.activeLayerChecksum = ck;
+  }
+  if (m_quickMaskMode && m_quickMaskLayer) {
+    quint32 ck = 0;
+    const auto& buf = m_quickMaskLayer->buffer();
+    const int W = buf.width(), H = buf.height();
+    for (int y = 0; y < H; y += 8)
+      for (int x = 0; x < W; x += 8) {
+        const auto& px = buf.pixel(x, y);
+        ck ^= (quint32(px.r) << 24) | (quint32(px.g) << 16) | (quint32(px.b) << 8) | px.a;
+      }
+    s.quickMaskChecksum = ck;
+  }
+
+  // AI workflow 観測バッファ
+  s.aiWorkflowPath            = m_aiDbgWorkflowPath;
+  s.aiDetectedNodes           = m_aiDbgDetectedNodes;
+  s.aiLastQueuedWorkflow      = m_aiDbgLastQueuedWorkflow;
+  s.aiLastComfyPayload        = m_aiDbgComfyPayload;
+  s.aiLastComfyHttpStatus     = m_aiDbgComfyHttpStatus;
+  s.aiLastComfyResponseBody   = m_aiDbgComfyResponseBody;
+
   return s;
+}
+
+void AppController::debugCaptureQueuedWorkflow(const QJsonObject& wf) {
+  m_aiDbgLastQueuedWorkflow = wf;
+}
+
+void AppController::debugCaptureComfyPayload(const QByteArray& payload) {
+  m_aiDbgComfyPayload = payload;
+  // payload 全体をファイルへ保存（Dev_Bridge 8KB 制限外でも確認可能）
+  {
+    QFile f(QStringLiteral("debug_comfy_prompt.json"));
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+      f.write(payload);
+  }
+}
+
+void AppController::debugCaptureComfyResponse(int httpStatus, const QByteArray& body) {
+  m_aiDbgComfyHttpStatus   = httpStatus;
+  m_aiDbgComfyResponseBody = QString::fromUtf8(body);
+  // レスポンス全文をファイルへも保存（Dev_Bridge 外からの確認用）
+  {
+    QFile f(QStringLiteral("debug_comfy_response.json"));
+    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+      f.write(body);
+  }
 }
 
 AppController::DebugActionResult AppController::executeDebugAction(
     const QString& type, const QString& target, const QJsonObject& opts)
 {
   DebugActionResult r;
+
+  if (type == QLatin1String("sim-brush-stroke")) {
+    // Simulate a short brush stroke at center of canvas.
+    // Used by Dev_Bridge to verify quickMask redirect without mouse events.
+    const int W = m_document.canvasSize().width;
+    const int H = m_document.canvasSize().height;
+    const int cx = W / 2, cy = H / 2;
+    beginStroke(cx, cy);
+    for (int i = 1; i <= 10; ++i) {
+      continueStroke(cx + i * 4, cy + i * 4);
+    }
+    endStroke();
+    r.success = true;
+    r.message = QString("Brush stroke simulated at (%1,%2) → (%3,%4)")
+                    .arg(cx).arg(cy).arg(cx+40).arg(cy+40);
+    return r;
+  }
+
+  if (type == QLatin1String("toggle-quick-mask")) {
+    const bool ok = toggleQuickMaskMode();
+    r.success = ok;
+    r.message = m_quickMaskMode ? QLatin1String("QuickMask ON") : QLatin1String("QuickMask OFF");
+    r.data = QJsonObject{
+      {QLatin1String("quickMaskMode"), m_quickMaskMode}
+    };
+    return r;
+  }
 
   if (type == QLatin1String("aiselect-confirm")) {
     // Confirm pending AI mask (same as pressing Enter in AI Select mode)
@@ -6387,66 +6711,187 @@ AppController::DebugActionResult AppController::executeDebugAction(
     return r;
   }
 
-  // ── comfy-generate ────────────────────────────────────────────────────────
-  // Triggers AiGenerationController.execute() with current layer + selection.
+  // ── comfy-generate / generate ────────────────────────────────────────────
+  // Triggers AiService.generate() with current layer + selection.
   // opts:
   //   workflowPath  : absolute path to workflow.json (required)
   //   comfyUrl      : ComfyUI base URL (default: http://localhost:8188)
   //   outputLayerName: name for the result layer
   //   timeoutMs     : poll timeout in ms (default: 90000)
-  if (type == QLatin1String("comfy-generate")) {
+  if (type == QLatin1String("comfy-generate") || type == QLatin1String("generate")) {
     const QString workflowPath = opts.value(QLatin1String("workflowPath")).toString(target);
     if (workflowPath.isEmpty()) {
       r.success = false;
-      r.message = QLatin1String("comfy-generate: workflowPath is required");
+      r.message = QLatin1String("generate: workflowPath is required");
       return r;
     }
     const QString comfyUrl = opts.value(QLatin1String("comfyUrl"))
-                                 .toString(QLatin1String("http://localhost:8188"));
+                                 .toString(m_comfyHttpUrl);
     const QString outputLayerName = opts.value(QLatin1String("outputLayerName"))
                                         .toString(QLatin1String("AI 生成"));
     const int timeoutMs = opts.value(QLatin1String("timeoutMs")).toInt(90000);
 
-    // 遅延初期化: ComfyClient + AiGenerationController
-    if (m_comfyHttpClient == nullptr) {
-      m_comfyHttpClient = new platform::comfy::ComfyClient(this);
-      m_comfyHttpClient->setBaseUrl(QUrl(comfyUrl));
+    // AiService 経由で generate — m_aiService が未生成の場合は lazy-init
+    if (m_aiService == nullptr) {
+      m_aiService = new AiService(this, this);
+      connect(m_aiService, &AiService::generationStarted, this, [this]() {
+        emit aiProgressUpdate(0, 0, QString());
+      });
+      connect(m_aiService, &AiService::generationFinished, this,
+              [this](const QString& opType) {
+        m_aiGenLastError.clear();
+        emit aiGenerationComplete(opType);
+      });
+      connect(m_aiService, &AiService::generationError, this,
+              [this](const QString& msg) {
+        m_aiGenLastError = msg;
+        emit aiGenerationError(msg);
+      });
+      connect(m_aiService, &AiService::batchCandidatesReady, this,
+              [this](const QList<QPixmap>& px) {
+        emit aiBatchCandidatesReady(px);
+      });
     }
-    if (m_aiGenCtrl == nullptr) {
-      m_aiGenCtrl = new AiGenerationController(this, m_comfyHttpClient, this);
-      connect(m_aiGenCtrl, &AiGenerationController::errorOccurred,
-              this, [this](const QString& msg) {
-                m_aiGenLastError = msg;
-              });
-      connect(m_aiGenCtrl, &AiGenerationController::finished,
-              this, [this]() {
-                m_aiGenLastError.clear();
-              });
-    }
+    m_aiService->setComfyUrl(comfyUrl);
 
-    if (m_aiGenCtrl->isBusy()) {
+    if (m_aiService->isBusy()) {
       r.success = false;
-      r.message = QLatin1String("comfy-generate: AiGenerationController is busy");
+      r.message = QLatin1String("generate: AiService is busy");
       return r;
     }
 
+    const int batchCount = opts.value(QLatin1String("batchCount")).toInt(1);
     m_aiGenLastError.clear();
 
-    AiGenerationController::Request req;
+    AiService::GenerateRequest req;
     req.workflowPath       = workflowPath;
     req.useActiveLayer     = true;
     req.useSelectionAsMask = m_document.selection().hasSelection();
     req.outputLayerName    = outputLayerName;
     req.timeoutMs          = timeoutMs;
-    m_aiGenCtrl->execute(req);
+    m_aiService->generate(req, batchCount);
 
     r.success = true;
-    r.message = QLatin1String("comfy-generate: started");
+    r.message = QLatin1String("generate: started via AiService");
     r.data = QJsonObject{
-      {QLatin1String("workflowPath"),    workflowPath},
-      {QLatin1String("comfyUrl"),        comfyUrl},
+      {QLatin1String("workflowPath"),     workflowPath},
+      {QLatin1String("comfyUrl"),         comfyUrl},
       {QLatin1String("useSelectionMask"), req.useSelectionAsMask},
-      {QLatin1String("outputLayerName"), outputLayerName},
+      {QLatin1String("outputLayerName"),  outputLayerName},
+      {QLatin1String("batchCount"),       batchCount},
+      {QLatin1String("via"),              QLatin1String("AiService")},
+    };
+    return r;
+  }
+
+  // ── workflow-analyze ──────────────────────────────────────────────────────
+  // workflow.json を読み込み、sampler/prompt/checkpoint ノードを検出して保存する。
+  // opts:
+  //   workflowPath : 解析対象 JSON ファイルの絶対パス（target でも可）
+  if (type == QLatin1String("workflow-analyze")) {
+    const QString path = opts.value(QLatin1String("workflowPath")).toString(target);
+    if (path.isEmpty()) {
+      r.success = false;
+      r.message = QLatin1String("workflow-analyze: workflowPath is required");
+      return r;
+    }
+    bool ok = false;
+    const platform::comfy::WorkflowDocument doc =
+        platform::comfy::WorkflowDocument::load(path, &ok);
+    if (!ok) {
+      r.success = false;
+      r.message = QLatin1String("workflow-analyze: load failed: ") + doc.errorString();
+      return r;
+    }
+
+    // ノード検出ヘルパー
+    auto toArr = [&doc](const QStringList& ids) {
+      QJsonArray a;
+      for (const QString& id : ids) {
+        QJsonObject o;
+        o[QLatin1String("nodeId")]    = id;
+        o[QLatin1String("classType")] = doc.nodeClass(id);
+        a << o;
+      }
+      return a;
+    };
+
+    QJsonObject nodes;
+    nodes[QLatin1String("sampler")]    = toArr(doc.findSamplerNodes());
+    nodes[QLatin1String("prompt")]     = toArr(doc.findPromptNodes());
+    nodes[QLatin1String("checkpoint")] = toArr(doc.findCheckpointNodes());
+    nodes[QLatin1String("totalNodes")] = doc.nodeIds().size();
+
+    m_aiDbgWorkflowPath  = path;
+    m_aiDbgDetectedNodes = nodes;
+
+    r.success = true;
+    r.message = QLatin1String("workflow analyzed");
+    r.data    = nodes;
+    return r;
+  }
+
+  if (type == QLatin1String("undo")) {
+    const bool ok = undo();
+    r.success = ok;
+    r.message = ok ? QLatin1String("undo OK") : QLatin1String("undo failed (nothing to undo)");
+    const auto& s2 = debugState();
+    r.data = QJsonObject{{QLatin1String("undoDepth"), s2.undoDepth}, {QLatin1String("canUndo"), s2.canUndo}};
+    return r;
+  }
+
+  if (type == QLatin1String("redo")) {
+    const bool ok = redo();
+    r.success = ok;
+    r.message = ok ? QLatin1String("redo OK") : QLatin1String("redo failed (nothing to redo)");
+    const auto& s2 = debugState();
+    r.data = QJsonObject{{QLatin1String("undoDepth"), s2.undoDepth}};
+    return r;
+  }
+
+  if (type == QLatin1String("resize-canvas")) {
+    const int w = opts.value(QLatin1String("width")).toInt(m_document.canvasSize().width);
+    const int h = opts.value(QLatin1String("height")).toInt(m_document.canvasSize().height);
+    const int ox = opts.value(QLatin1String("offsetX")).toInt(0);
+    const int oy = opts.value(QLatin1String("offsetY")).toInt(0);
+    const bool ok = resizeCanvas(w, h, ox, oy);
+    r.success = ok;
+    r.message = ok ? QString("resized to %1x%2").arg(w).arg(h) : QLatin1String("resize failed");
+    QJsonObject resizeData;
+    resizeData[QLatin1String("width")]  = m_document.canvasSize().width;
+    resizeData[QLatin1String("height")] = m_document.canvasSize().height;
+    r.data = resizeData;
+    return r;
+  }
+
+  if (type == QLatin1String("set-layer-opacity")) {
+    // Set opacity on a layer by index. Used to verify executeLayerAttributeEdit Undo.
+    const int index   = opts.value(QLatin1String("index")).toInt(0);
+    const int opacity = opts.value(QLatin1String("opacity")).toInt(100);
+    setLayerOpacity(static_cast<std::size_t>(index), opacity);
+    r.success = true;
+    r.message = QString("Layer %1 opacity set to %2%%").arg(index).arg(opacity);
+    r.data    = QJsonObject{
+      {QLatin1String("undoDepth"), static_cast<int>(m_undoHistory.size())},
+      {QLatin1String("canUndo"),   !m_undoHistory.empty()},
+    };
+    return r;
+  }
+
+  if (type == QLatin1String("set-layer-blend-mode")) {
+    // Set blend mode on a layer by index. Used to verify executeLayerAttributeEdit Undo.
+    const int index = opts.value(QLatin1String("index")).toInt(0);
+    const QString modeStr = opts.value(QLatin1String("mode")).toString(QLatin1String("Multiply"));
+    core::BlendMode mode = core::BlendMode::Multiply;
+    if (modeStr == QLatin1String("Normal"))   mode = core::BlendMode::Normal;
+    if (modeStr == QLatin1String("Screen"))   mode = core::BlendMode::Screen;
+    if (modeStr == QLatin1String("Overlay"))  mode = core::BlendMode::Overlay;
+    setLayerBlendMode(static_cast<std::size_t>(index), mode);
+    r.success = true;
+    r.message = QString("Layer %1 blend mode set to %2").arg(index).arg(modeStr);
+    r.data    = QJsonObject{
+      {QLatin1String("undoDepth"), static_cast<int>(m_undoHistory.size())},
+      {QLatin1String("canUndo"),   !m_undoHistory.empty()},
     };
     return r;
   }
@@ -6459,7 +6904,10 @@ AppController::DebugActionResult AppController::executeDebugAction(
             << QLatin1String("aiselect-set-op")
             << QLatin1String("selection-clear")
             << QLatin1String("inject-ai-mask")
-            << QLatin1String("comfy-generate");
+            << QLatin1String("comfy-generate")
+            << QLatin1String("workflow-analyze")
+            << QLatin1String("set-layer-opacity")
+            << QLatin1String("set-layer-blend-mode");
     r.success = true;
     r.message = QLatin1String("Available debug actions");
     r.data    = QJsonObject{{QLatin1String("actions"), actions}};

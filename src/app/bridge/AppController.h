@@ -56,6 +56,7 @@ namespace platform::comfy { class ComfyClient; }
 
 namespace app::bridge {
 class AiGenerationController;
+class AiService;
 class ComfyUiClient;
 
 struct LayerViewModel {
@@ -291,7 +292,9 @@ public:
 
   // ── クイックマスクモード（Photoshop 相当） ───────────────────────────────
   bool isQuickMaskMode() const noexcept { return m_quickMaskMode; }
-  bool toggleQuickMaskMode();  ///< Alt+Q で切り替え
+  bool toggleQuickMaskMode();  ///< Q で切り替え
+  const core::Layer* quickMaskLayerPtr() const noexcept { return m_quickMaskLayer ? &(*m_quickMaskLayer) : nullptr; }
+  core::Layer* quickMaskLayerPtr() noexcept { return m_quickMaskLayer ? &(*m_quickMaskLayer) : nullptr; }
 
   bool fillSelectionOrCanvas();
   bool deleteSelectionPixels();
@@ -563,6 +566,18 @@ public:
     // comfy-generate 実行中フラグ
     bool         aiGenBusy       {false};
     QString      aiGenLastError;
+    // クイックマスク
+    bool         quickMaskMode       {false};
+    quint32      activeLayerChecksum {0};   ///< active layer buffer 32-bit XOR checksum
+    quint32      quickMaskChecksum   {0};   ///< quickMask buffer 32-bit XOR checksum (0 if not active)
+    // AI workflow 観測 (workflow-analyze / comfy-generate で更新)
+    QString      aiWorkflowPath;            ///< 最後に解析した workflow path
+    QJsonObject  aiDetectedNodes;           ///< workflow-analyze で検出したノード一覧
+    QJsonObject  aiLastQueuedWorkflow;      ///< 最後にキューした workflow JSON
+    // POST /prompt キャプチャ（Bad Request 原因特定用）
+    QByteArray   aiLastComfyPayload;        ///< POST /prompt ボディ (raw JSON)
+    int          aiLastComfyHttpStatus {0}; ///< HTTP ステータスコード
+    QString      aiLastComfyResponseBody;   ///< レスポンス本文 (全文)
   };
 
   struct DebugActionResult {
@@ -574,6 +589,11 @@ public:
   DebugState         debugState() const;
   DebugActionResult  executeDebugAction(const QString& type, const QString& target,
                                         const QJsonObject& opts = {});
+
+  /// AiGenerationController から doQueue() 時に呼ばれ、送信 workflow を記録する。
+  void debugCaptureQueuedWorkflow(const QJsonObject& wf);
+  void debugCaptureComfyPayload(const QByteArray& payload);
+  void debugCaptureComfyResponse(int httpStatus, const QByteArray& body);
 #endif // PAINT_DEBUG_SERVER
 
   struct InpaintParams {
@@ -595,6 +615,10 @@ public:
   /// 選択範囲をマスクとしてインペイントを実行。
   /// 選択がない場合は selectionMissing() を emit して返す（全体 inpaint は禁止）。
   void runInpaint(const InpaintParams& params, int batchCount = 1);
+
+  /// カスタムワークフローでテキスト→画像生成 (AiGenerationController 経由)。
+  /// 選択不要・入力画像不要。InpaintParams の mask/inputImage 系フィールドは無視する。
+  void runGenerateWithWorkflow(const InpaintParams& params, int batchCount = 1);
 
   struct Txt2ImgParams {
     QString prompt;
@@ -657,6 +681,10 @@ private:
     StrokeWithSelection,  ///< ピクセル移動＋選択範囲移動を一括アンドゥするための複合エントリ
     LayerAdd,             ///< レイヤー追加（afterLayer = 追加レイヤー、beforeIndex = 操作前アクティブ）
     LayerRemove,          ///< レイヤー削除（beforeLayer = 削除レイヤー、afterIndex = 削除後アクティブ）
+    QuickMaskStroke,      ///< QMバッファへのストローク (beforeLayer/afterLayer = QM buffer snapshot)
+    QuickMaskCommit,      ///< QMモード確定 (beforeLayer=QMバッファ, beforeSelection/afterSelection=選択変化)
+                          ///<   undo: QMモード ON に戻し、beforeLayer を QM バッファとして復元
+                          ///<   redo: QMモード OFF、afterSelection を適用
   };
 
   struct StrokeHistoryEntry {
@@ -679,10 +707,12 @@ private:
   struct PendingStrokeState {
     bool trackPixels {false};
     bool trackSelection {false};
+    bool trackQmPixels {false};  ///< QMモード時: QMバッファをトラック
     std::string actionName {"Stroke"};
     std::size_t layerIndex {0};
     uint32_t layerId {0};  ///< ストローク開始時のレイヤー ID
     std::optional<core::Layer> beforeLayer;
+    std::optional<core::Layer> beforeQmLayer;  ///< QM strokeスナップショット
     core::SelectionMask beforeSelection;
   };
 
@@ -719,6 +749,32 @@ private:
   void clearStrokeHistory() noexcept;
   void rerender();
   void rerenderDirty(const core::Rect& dirtyRect);
+
+  // ── DocumentEditDispatcher ──────────────────────────────────────────────
+  // 新規のレイヤー属性変更を追加する際は必ずこの経路を使う。
+  // snapshot → mutate → pushHistory → notify を自動処理し、
+  // Undo/Dirty/Notify の漏れを構造的に防ぐ。
+  enum class EditFlags : unsigned {
+    None         = 0u,
+    Rerender     = 1u << 0,  ///< rerender() を呼ぶ
+    EmitCanvas   = 1u << 1,  ///< canvasChanged() を emit
+    EmitLayers   = 1u << 2,  ///< layersChanged() を emit
+    EmitDocument = 1u << 3,  ///< documentChanged() を emit
+    CoalesceOp   = 1u << 4,  ///< 直前の同一 action+layer エントリを afterLayer だけ更新（スライダー用）
+  };
+  friend EditFlags operator|(EditFlags a, EditFlags b) {
+    return static_cast<EditFlags>(static_cast<unsigned>(a) | static_cast<unsigned>(b));
+  }
+  friend bool editFlagSet(EditFlags flags, EditFlags f) {
+    return (static_cast<unsigned>(flags) & static_cast<unsigned>(f)) != 0u;
+  }
+
+  /// レイヤー属性変更の汎用ディスパッチャ。
+  /// layerIndex が範囲外なら false を返す。mutate が属性を変えなければ false を返す。
+  bool executeLayerAttributeEdit(std::size_t layerIndex,
+                                 std::string_view actionName,
+                                 EditFlags flags,
+                                 const std::function<void(core::Layer&)>& mutate);
 
   core::Document m_document;
 #ifdef PAINT_USE_SKIA
@@ -819,12 +875,26 @@ private:
   // ── クイックマスクモード ──────────────────────────────────────────────────
   bool m_quickMaskMode {false};
   core::SelectionMask m_quickMaskSnapshot;  ///< mode 再開時の復帰用
+  std::optional<core::Layer> m_quickMaskLayer;  ///< 一時編集バッファ（保存対象外）
 
-  // ── ComfyUI HTTP (platform::comfy — WorkflowBinding ベース) ──────────────
+  // ── AiService (generate facade) ──────────────────────────────────────────
+  AiService*  m_aiService     {nullptr};
+
+  // ── ComfyUI HTTP (platform::comfy — inpaint 用。将来 AiService に移行) ────
   platform::comfy::ComfyClient*  m_comfyHttpClient {nullptr};
   AiGenerationController*        m_aiGenCtrl       {nullptr};
   QString                        m_comfyHttpUrl    {"http://localhost:8188"};
   QString                        m_aiGenLastError;
+
+#ifdef PAINT_DEBUG_SERVER
+  // ── Dev_Bridge AI 観測バッファ ────────────────────────────────────────────
+  QString      m_aiDbgWorkflowPath;
+  QJsonObject  m_aiDbgDetectedNodes;
+  QJsonObject  m_aiDbgLastQueuedWorkflow;
+  QByteArray   m_aiDbgComfyPayload;
+  int          m_aiDbgComfyHttpStatus {0};
+  QString      m_aiDbgComfyResponseBody;
+#endif
 };
 
 } // namespace app::bridge
