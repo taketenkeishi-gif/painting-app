@@ -6116,30 +6116,7 @@ void AppController::fetchAiModels() {
 
 // ── AI: インペイント ─────────────────────────────────────────────────────
 void AppController::runInpaint(const InpaintParams& params, int batchCount) {
-  // AiService lazy-init (generate と同じ接続方式)
-  if (m_aiService == nullptr) {
-    m_aiService = new AiService(this, this);
-    m_aiService->setComfyUrl(m_comfyHttpUrl);
-    connect(m_aiService, &AiService::generationStarted, this, [this]() {
-      emit aiProgressUpdate(0, 0, QString());
-    });
-    connect(m_aiService, &AiService::generationProgressUpdate, this,
-            [this](int step, int total) {
-      emit aiProgressUpdate(step, total, QString());
-    });
-    connect(m_aiService, &AiService::generationFinished, this,
-            [this](const QString& opType) {
-      m_aiGenLastError.clear();
-      emit aiGenerationComplete(opType);
-    });
-    connect(m_aiService, &AiService::generationError, this,
-            [this](const QString& msg) {
-      m_aiGenLastError = msg;
-      emit aiGenerationError(msg);
-    });
-    connect(m_aiService, &AiService::batchCandidatesReady, this,
-            &AppController::aiBatchCandidatesReady);
-  }
+  ensureAiService();
   if (m_aiService->isBusy()) {
     emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
     return;
@@ -6196,32 +6173,7 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
 // ── AI: カスタムワークフローでテキスト→画像生成 ──────────────────────────
 void AppController::runGenerateWithWorkflow(const InpaintParams& params,
                                             int batchCount) {
-  if (m_aiService == nullptr) {
-    m_aiService = new AiService(this, this);
-    m_aiService->setComfyUrl(m_comfyHttpUrl);
-    connect(m_aiService, &AiService::generationStarted, this, [this]() {
-      emit aiProgressUpdate(0, 0, QString());
-    });
-    connect(m_aiService, &AiService::generationProgressUpdate, this,
-            [this](int step, int total) {
-      emit aiProgressUpdate(step, total, QString());
-    });
-    connect(m_aiService, &AiService::generationFinished, this,
-            [this](const QString& opType) {
-      m_aiGenLastError.clear();
-      emit aiGenerationComplete(opType);
-    });
-    connect(m_aiService, &AiService::generationError, this,
-            [this](const QString& msg) {
-      m_aiGenLastError = msg;
-      emit aiGenerationError(msg);
-    });
-    connect(m_aiService, &AiService::batchCandidatesReady, this,
-            [this](const QList<QPixmap>& px) {
-      emit aiBatchCandidatesReady(px);
-    });
-  }
-
+  ensureAiService();
   if (m_aiService->isBusy()) {
     emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
     return;
@@ -6426,6 +6378,39 @@ void AppController::setDirty(bool dirty) noexcept {
   emit dirtyChanged(m_dirty);
 }
 
+// ── AiService 一本化ヘルパー ──────────────────────────────────────────────────
+// UI 経路・debug action 経路どちらも必ずこのメソッドを通す。
+// 接続は初回のみ確立し、以降は何度呼んでも安全。
+void AppController::ensureAiService() {
+  if (m_aiService != nullptr) return;
+
+  m_aiService = new AiService(this, this);
+  m_aiService->setComfyUrl(m_comfyHttpUrl);
+
+  connect(m_aiService, &AiService::generationStarted, this, [this]() {
+    emit aiProgressUpdate(0, 0, QString());
+  });
+  connect(m_aiService, &AiService::generationProgressUpdate, this,
+          [this](int step, int total) {
+    emit aiProgressUpdate(step, total, QString());
+  });
+  connect(m_aiService, &AiService::generationFinished, this,
+          [this](const QString& opType) {
+    m_aiGenLastError.clear();
+    emit aiGenerationComplete(opType);
+  });
+  connect(m_aiService, &AiService::generationError, this,
+          [this](const QString& msg) {
+    m_aiGenLastError = msg;
+    emit aiGenerationError(msg);
+  });
+  connect(m_aiService, &AiService::batchCandidatesReady, this,
+          [this](const QList<QPixmap>& px) {
+    m_batchImages = px;  // apply-candidate debug action 用
+    emit aiBatchCandidatesReady(px);
+  });
+}
+
 // ── Dev_Bridge debug interface ──────────────────────────────────────────────
 
 #ifdef PAINT_DEBUG_SERVER
@@ -6471,8 +6456,9 @@ AppController::DebugState AppController::debugState() const {
     s.layerNames << QString::fromStdString(m_document.layerAt(i).name());
 
   // AiService 状態
-  s.aiGenBusy      = m_aiService ? m_aiService->isBusy() : false;
-  s.aiGenLastError = m_aiGenLastError;
+  s.aiGenBusy             = m_aiService ? m_aiService->isBusy() : false;
+  s.aiGenLastError        = m_aiGenLastError;
+  s.aiControllerInstanceId = m_aiService ? m_aiService->controllerInstanceId() : -1;
 
   // Undo
   s.undoDepth = static_cast<int>(m_undoHistory.size());
@@ -6694,28 +6680,7 @@ AppController::DebugActionResult AppController::executeDebugAction(
                                         .toString(QLatin1String("AI 生成"));
     const int timeoutMs = opts.value(QLatin1String("timeoutMs")).toInt(90000);
 
-    // AiService 経由で generate — m_aiService が未生成の場合は lazy-init
-    if (m_aiService == nullptr) {
-      m_aiService = new AiService(this, this);
-      connect(m_aiService, &AiService::generationStarted, this, [this]() {
-        emit aiProgressUpdate(0, 0, QString());
-      });
-      connect(m_aiService, &AiService::generationFinished, this,
-              [this](const QString& opType) {
-        m_aiGenLastError.clear();
-        emit aiGenerationComplete(opType);
-      });
-      connect(m_aiService, &AiService::generationError, this,
-              [this](const QString& msg) {
-        m_aiGenLastError = msg;
-        emit aiGenerationError(msg);
-      });
-      connect(m_aiService, &AiService::batchCandidatesReady, this,
-              [this](const QList<QPixmap>& px) {
-        m_batchImages = px;  // store for apply-candidate debug action
-        emit aiBatchCandidatesReady(px);
-      });
-    }
+    ensureAiService();
     m_aiService->setComfyUrl(comfyUrl);
 
     if (m_aiService->isBusy()) {
@@ -6765,26 +6730,7 @@ AppController::DebugActionResult AppController::executeDebugAction(
     const int timeoutMs  = opts.value(QLatin1String("timeoutMs")).toInt(180000);
     const int batchCount = opts.value(QLatin1String("batchCount")).toInt(1);
 
-    if (m_aiService == nullptr) {
-      m_aiService = new AiService(this, this);
-      connect(m_aiService, &AiService::generationStarted, this, [this]() {
-        emit aiProgressUpdate(0, 0, QString());
-      });
-      connect(m_aiService, &AiService::generationFinished, this,
-              [this](const QString& opType) {
-        m_aiGenLastError.clear();
-        emit aiGenerationComplete(opType);
-      });
-      connect(m_aiService, &AiService::generationError, this,
-              [this](const QString& msg) {
-        m_aiGenLastError = msg;
-        emit aiGenerationError(msg);
-      });
-      connect(m_aiService, &AiService::batchCandidatesReady, this,
-              [this](const QList<QPixmap>& px) {
-        emit aiBatchCandidatesReady(px);
-      });
-    }
+    ensureAiService();
     m_aiService->setComfyUrl(comfyUrl);
 
     if (m_aiService->isBusy()) {

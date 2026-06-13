@@ -30,8 +30,9 @@ public:
   explicit AiService(AppController* appController, QObject* parent = nullptr);
 
   void    setComfyUrl(const QString& url);
-  QString comfyUrl()  const { return m_url; }
-  bool    isBusy()    const;
+  QString comfyUrl()             const { return m_url; }
+  bool    isBusy()               const;
+  int     controllerInstanceId() const;
 
   // ── generate (WorkflowBinding ベース) ─────────────────────────────────────
   struct GenerateRequest {

@@ -4,6 +4,7 @@
 
 #include "app/bridge/AppController.h"
 
+#include <QApplication>
 #include <QTcpSocket>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -11,6 +12,10 @@
 #include <QImage>
 #include <QBuffer>
 #include <QDebug>
+#include <QAbstractSlider>
+#include <QFrame>
+#include <QPushButton>
+#include <QWidget>
 
 // ── DebugServer ──────────────────────────────────────────────────────────────
 
@@ -95,8 +100,10 @@ void DebugServer::handleRequest(QTcpSocket* socket, const QByteArray& raw) {
 }
 
 QByteArray DebugServer::routeGet(const QString& path, const QString& query) {
-    if (path == QLatin1String("/debug/health"))   return endpointHealth();
-    if (path == QLatin1String("/debug/state"))    return endpointState();
+    if (path == QLatin1String("/debug/health"))       return endpointHealth();
+    if (path == QLatin1String("/debug/state"))        return endpointState();
+    if (path == QLatin1String("/debug/ai-state"))     return endpointAiState();
+    if (path == QLatin1String("/debug/widget-tree"))  return endpointWidgetTree();
     if (path == QLatin1String("/debug/pixels")) {
         int size = 32;
         // Parse ?size=N
@@ -108,6 +115,17 @@ QByteArray DebugServer::routeGet(const QString& path, const QString& query) {
             }
         }
         return endpointPixels(size);
+    }
+    if (path == QLatin1String("/debug/canvas-pixels")) {
+        int size = 16;
+        for (const QString& kv : query.split('&')) {
+            if (kv.startsWith(QLatin1String("size="))) {
+                bool ok;
+                const int n = kv.mid(5).toInt(&ok);
+                if (ok && n > 0 && n <= 64) size = n;
+            }
+        }
+        return endpointCanvasPixels(size);
     }
     return errorJson(404, "Not found: " + path);
 }
@@ -159,10 +177,23 @@ QByteArray DebugServer::endpointState() {
     QJsonObject layers;
     layers[QLatin1String("count")]  = s.layerCount;
     layers[QLatin1String("active")] = s.activeLayerName;
+    QJsonArray layerNames;
+    for (const QString& n : s.layerNames) layerNames.append(n);
+    layers[QLatin1String("names")]  = layerNames;
+
+    QJsonObject aiGen;
+    aiGen[QLatin1String("busy")]               = s.aiGenBusy;
+    aiGen[QLatin1String("lastError")]          = s.aiGenLastError;
+    aiGen[QLatin1String("controllerInstance")] = s.aiControllerInstanceId;
 
     QJsonObject history;
     history[QLatin1String("undoDepth")] = s.undoDepth;
     history[QLatin1String("canUndo")]   = s.canUndo;
+
+    QJsonObject quickMask;
+    quickMask[QLatin1String("active")]              = s.quickMaskMode;
+    quickMask[QLatin1String("activeLayerChecksum")] = static_cast<qint64>(s.activeLayerChecksum);
+    quickMask[QLatin1String("quickMaskChecksum")]   = static_cast<qint64>(s.quickMaskChecksum);
 
     QJsonObject root;
     root[QLatin1String("tool")]      = s.tool;
@@ -172,6 +203,33 @@ QByteArray DebugServer::endpointState() {
     root[QLatin1String("canvas")]    = canvas;
     root[QLatin1String("layers")]    = layers;
     root[QLatin1String("history")]   = history;
+    root[QLatin1String("aiGen")]     = aiGen;
+    root[QLatin1String("quickMask")] = quickMask;
+
+    return okJson(QJsonDocument(root).toJson(QJsonDocument::Compact));
+}
+
+// ── Endpoint: /debug/ai-state ────────────────────────────────────────────────
+//
+// AI workflow 観測状態を返す。
+// workflow-analyze action で更新された detectedNodes と、
+// doQueue() で捕捉した lastQueuedWorkflow を含む。
+
+QByteArray DebugServer::endpointAiState() {
+    const app::bridge::AppController::DebugState s = m_controller->debugState();
+
+    QJsonObject root;
+    root[QLatin1String("workflowPath")]       = s.aiWorkflowPath;
+    root[QLatin1String("detectedNodes")]      = s.aiDetectedNodes;
+    root[QLatin1String("lastQueuedWorkflow")] = s.aiLastQueuedWorkflow;
+    root[QLatin1String("aiGenBusy")]          = s.aiGenBusy;
+    root[QLatin1String("aiGenLastError")]     = s.aiGenLastError;
+    // POST /prompt キャプチャ（Bad Request 原因特定用）
+    root[QLatin1String("comfyHttpStatus")]    = s.aiLastComfyHttpStatus;
+    root[QLatin1String("comfyResponseBody")]  = s.aiLastComfyResponseBody;
+    // payload は巨大になりうるので先頭 8 KB のみ返す
+    const QString payloadStr = QString::fromUtf8(s.aiLastComfyPayload.left(8192));
+    root[QLatin1String("comfyPayloadHead")]   = payloadStr;
 
     return okJson(QJsonDocument(root).toJson(QJsonDocument::Compact));
 }
@@ -211,6 +269,36 @@ QByteArray DebugServer::endpointPixels(int size) {
     return okJson(QJsonDocument(arr).toJson(QJsonDocument::Compact));
 }
 
+// ── Endpoint: /debug/canvas-pixels ──────────────────────────────────────────
+//
+// Returns a sample of composited canvas pixels as a flat RGBA array.
+// Used to verify red overlay presence when quickMask mode is active.
+
+QByteArray DebugServer::endpointCanvasPixels(int size) {
+    const core::PixelBuffer& buf = m_controller->compositedBuffer();
+    const int W = buf.width();
+    const int H = buf.height();
+
+    QJsonArray arr;
+    if (W <= 0 || H <= 0) {
+        return okJson(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+    }
+
+    // Sample a grid of size×size pixels evenly spread across the canvas
+    for (int gy = 0; gy < size; ++gy) {
+        for (int gx = 0; gx < size; ++gx) {
+            const int px = (gx * (W - 1)) / (size - 1 > 0 ? size - 1 : 1);
+            const int py = (gy * (H - 1)) / (size - 1 > 0 ? size - 1 : 1);
+            const core::Color c = buf.pixel(px, py);
+            arr.append(c.r);
+            arr.append(c.g);
+            arr.append(c.b);
+            arr.append(c.a);
+        }
+    }
+    return okJson(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+}
+
 // ── Endpoint: POST /debug/action ─────────────────────────────────────────────
 
 QByteArray DebugServer::endpointAction(const QByteArray& body) {
@@ -233,6 +321,77 @@ QByteArray DebugServer::endpointAction(const QByteArray& body) {
     if (!result.data.isEmpty())
         resp[QLatin1String("data")] = result.data;
     return okJson(QJsonDocument(resp).toJson(QJsonDocument::Compact));
+}
+
+// ── Endpoint: /debug/widget-tree ─────────────────────────────────────────────
+
+static QJsonObject dumpWidget(QWidget* w, int depth = 0) {
+    QJsonObject obj;
+    obj[QLatin1String("class")]      = QLatin1String(w->metaObject()->className());
+    obj[QLatin1String("objectName")] = w->objectName();
+    obj[QLatin1String("visible")]    = w->isVisible();
+    obj[QLatin1String("geometry")]   = QString("%1,%2 %3x%4")
+        .arg(w->x()).arg(w->y()).arg(w->width()).arg(w->height());
+    obj[QLatin1String("minimumSize")] = QString("%1x%2")
+        .arg(w->minimumWidth()).arg(w->minimumHeight());
+    obj[QLatin1String("maximumSize")] = QString("%1x%2")
+        .arg(w->maximumWidth()).arg(w->maximumHeight());
+    obj[QLatin1String("sizeHint")]    = QString("%1x%2")
+        .arg(w->sizeHint().width()).arg(w->sizeHint().height());
+
+    // Inline stylesheet (first 200 chars to keep output manageable)
+    const QString ss = w->styleSheet();
+    if (!ss.isEmpty())
+        obj[QLatin1String("styleSheet")] = ss.left(200);
+
+    // QPushButton: icon size, checkable state
+    if (auto* btn = qobject_cast<QPushButton*>(w)) {
+        obj[QLatin1String("iconSize")]  = QString("%1x%2")
+            .arg(btn->iconSize().width()).arg(btn->iconSize().height());
+        obj[QLatin1String("checkable")] = btn->isCheckable();
+        obj[QLatin1String("text")]      = btn->text();
+        obj[QLatin1String("toolTip")]   = btn->toolTip();
+    }
+    // QAbstractSlider: range, value, orientation
+    if (auto* sl = qobject_cast<QAbstractSlider*>(w)) {
+        obj[QLatin1String("sliderMin")]         = sl->minimum();
+        obj[QLatin1String("sliderMax")]         = sl->maximum();
+        obj[QLatin1String("sliderValue")]       = sl->value();
+        obj[QLatin1String("sliderOrientation")] = (sl->orientation() == Qt::Horizontal) ? "H" : "V";
+    }
+    // QFrame: frame shape (catches separator lines)
+    if (auto* fr = qobject_cast<QFrame*>(w)) {
+        obj[QLatin1String("frameShape")] = static_cast<int>(fr->frameShape());
+    }
+
+    // Property snapshot for debugging tab bars / mdi
+    QStringList props;
+    if (w->property("dockTabBar").isValid())
+        props << QString("dockTabBar=%1").arg(w->property("dockTabBar").toBool() ? "true" : "false");
+    if (w->property("fullText").isValid())
+        props << QString("fullText=%1").arg(w->property("fullText").toString());
+    if (!props.isEmpty())
+        obj[QLatin1String("props")] = props.join("; ");
+
+    QJsonArray children;
+    if (depth < 6) {  // cap depth to keep output manageable
+        for (QObject* child : w->children()) {
+            if (auto* cw = qobject_cast<QWidget*>(child))
+                children.append(dumpWidget(cw, depth + 1));
+        }
+    }
+    if (!children.isEmpty())
+        obj[QLatin1String("children")] = children;
+
+    return obj;
+}
+
+QByteArray DebugServer::endpointWidgetTree() {
+    QJsonArray roots;
+    for (QWidget* w : QApplication::topLevelWidgets())
+        if (w->isVisible())
+            roots.append(dumpWidget(w));
+    return okJson(QJsonDocument(roots).toJson(QJsonDocument::Indented));
 }
 
 // ── HTTP response helpers ────────────────────────────────────────────────────

@@ -3,7 +3,9 @@
 #include <functional>
 
 #include <QByteArray>
+#include <QList>
 #include <QObject>
+#include <QPixmap>
 #include <QString>
 
 #include "platform/comfy/WorkflowBinding.h"
@@ -92,13 +94,19 @@ public:
   /// 実行中に再度呼ぶと errorOccurred を emit してスキップする。
   void execute(const Request& req);
 
-  bool isBusy() const noexcept { return m_busy; }
+  /// batchCount 枚を連続生成する。batchCount==1 は execute() と同等。
+  /// 完了時: batchCount==1 → finished(), batchCount>1 → batchCandidatesReady()
+  void executeBatch(const Request& req, int batchCount);
+
+  bool isBusy()       const noexcept { return m_busy; }
+  int  instanceId()   const noexcept { return m_instanceId; }
 
 signals:
   void started();
   void progressUpdate(int step, int totalSteps);
   void finished();
   void errorOccurred(QString message);
+  void batchCandidatesReady(QList<QPixmap> candidates);
 
 private:
   // ── 内部ステップ ──────────────────────────────────────────────────────────
@@ -107,6 +115,12 @@ private:
 
   // ステップ 2: SelectionMask をグレースケール PNG 化
   static QByteArray selectionToPng(AppController* ac);
+
+  // workflow をロードしてバインドを適用する共通ヘルパー
+  bool loadWorkflowDoc(const Request& req, platform::comfy::WorkflowDocument& out);
+
+  // batch 2枚目以降の実行開始（m_busy チェックをスキップする）
+  void runNextBatchIteration(const Request& req);
 
   // ステップ 3-N: コールバックチェーン
   void doUploadInputImage (platform::comfy::WorkflowDocument doc, const Request& req);
@@ -119,9 +133,18 @@ private:
 
   void fail(const QString& message);
 
-  AppController*                 m_app    {nullptr};
-  platform::comfy::ComfyClient*  m_comfy  {nullptr};
-  bool                           m_busy   {false};
+  AppController*                 m_app        {nullptr};
+  platform::comfy::ComfyClient*  m_comfy      {nullptr};
+  bool                           m_busy       {false};
+  int                            m_instanceId {0};
+
+  static int s_nextInstanceId;
+
+  // ── Batch 状態 ────────────────────────────────────────────────────────────
+  int            m_batchTotal     {1};
+  int            m_batchRemaining {0};
+  QList<QPixmap> m_batchResults;
+  Request        m_batchBaseReq;
 };
 
 } // namespace app::bridge

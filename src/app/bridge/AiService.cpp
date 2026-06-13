@@ -20,6 +20,10 @@ bool AiService::isBusy() const {
   return m_genCtrl && m_genCtrl->isBusy();
 }
 
+int AiService::controllerInstanceId() const {
+  return m_genCtrl ? m_genCtrl->instanceId() : -1;
+}
+
 void AiService::ensureInitialized() {
   if (!m_comfyClient) {
     m_comfyClient = new platform::comfy::ComfyClient(this);

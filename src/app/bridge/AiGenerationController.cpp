@@ -1,7 +1,9 @@
 #include "app/bridge/AiGenerationController.h"
 
 #include <QBuffer>
+#include <QFile>
 #include <QImage>
+#include <QRandomGenerator>
 
 #include "app/bridge/AppController.h"
 #include "core/selection/MaskExporter.h"
@@ -13,13 +15,16 @@ namespace app::bridge {
 
 using namespace platform::comfy;
 
+int AiGenerationController::s_nextInstanceId = 0;
+
 AiGenerationController::AiGenerationController(
     AppController* appController,
     ComfyClient*   comfyClient,
     QObject*       parent)
     : QObject(parent)
-    , m_app  (appController)
-    , m_comfy(comfyClient)
+    , m_app        (appController)
+    , m_comfy      (comfyClient)
+    , m_instanceId (++s_nextInstanceId)
 {}
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,7 +88,39 @@ QByteArray AiGenerationController::selectionToPng(AppController* ac) {
 // ─────────────────────────────────────────────────────────────────────────────
 // execute  — エントリポイント
 // ─────────────────────────────────────────────────────────────────────────────
+static void aiTrace(const char* msg) {
+    QFile f(QStringLiteral("debug_generate_trace.txt"));
+    f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+    f.write(QByteArray(msg) + "\n");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// workflow ロード + バインド適用ヘルパー
+// ─────────────────────────────────────────────────────────────────────────────
+bool AiGenerationController::loadWorkflowDoc(const Request& req,
+                                               WorkflowDocument& out) {
+    if (req.workflowDoc.isValid()) {
+        out = req.workflowDoc;
+    } else if (!req.workflowPath.isEmpty()) {
+        bool ok = false;
+        out = WorkflowDocument::load(req.workflowPath, &ok);
+        if (!ok) {
+            fail(QString("workflow.json の読み込みに失敗しました: %1 — %2")
+                     .arg(req.workflowPath, out.errorString()));
+            return false;
+        }
+    } else {
+        fail("workflowPath と workflowDoc の両方が未設定です。");
+        return false;
+    }
+    for (const WorkflowBinding& b : req.extraBindings) {
+        out.apply(b);
+    }
+    return true;
+}
+
 void AiGenerationController::execute(const Request& req) {
+    aiTrace("execute: entered");
     if (m_busy) {
         emit errorOccurred("AI 生成が実行中です。完了を待ってから再試行してください。");
         return;
@@ -93,37 +130,90 @@ void AiGenerationController::execute(const Request& req) {
         return;
     }
 
-    // WorkflowDocument の準備
     WorkflowDocument doc;
-    if (req.workflowDoc.isValid()) {
-        doc = req.workflowDoc;
-    } else if (!req.workflowPath.isEmpty()) {
-        bool ok = false;
-        doc = WorkflowDocument::load(req.workflowPath, &ok);
-        if (!ok) {
-            emit errorOccurred(
-                QString("workflow.json の読み込みに失敗しました: %1 — %2")
-                    .arg(req.workflowPath, doc.errorString()));
-            return;
-        }
+    if (!loadWorkflowDoc(req, doc)) return;
+
+    aiTrace("execute: loading workflow ok, applying bindings");
+    m_batchTotal = 1;
+    m_busy = true;
+    emit started();
+    aiTrace("execute: started emitted");
+
+    if (req.useActiveLayer || req.useCompositedBuffer) {
+        doUploadInputImage(std::move(doc), req);
     } else {
-        emit errorOccurred("workflowPath と workflowDoc の両方が未設定です。");
+        const QString empty;
+        doUploadMask(std::move(doc), req, empty);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// executeBatch — batch 生成エントリポイント
+// ─────────────────────────────────────────────────────────────────────────────
+void AiGenerationController::executeBatch(const Request& req, int batchCount) {
+    if (batchCount <= 1) {
+        execute(req);
         return;
     }
 
-    // ユーザー指定バインドを先に適用
-    for (const WorkflowBinding& b : req.extraBindings) {
-        doc.apply(b);
+    if (m_busy) {
+        emit errorOccurred("AI 生成が実行中です。完了を待ってから再試行してください。");
+        return;
     }
+    if (m_app == nullptr || m_comfy == nullptr) {
+        emit errorOccurred("AiGenerationController が初期化されていません。");
+        return;
+    }
+
+    m_batchTotal     = batchCount;
+    m_batchRemaining = batchCount;
+    m_batchResults.clear();
+    m_batchBaseReq   = req;
+
+    // 1枚目は execute() 経由（m_batchTotal を設定済みなので batch フローに入る）
+    WorkflowDocument doc;
+    if (!loadWorkflowDoc(req, doc)) return;
 
     m_busy = true;
     emit started();
 
-    // 入力画像のアップロードが必要なら先に実行
     if (req.useActiveLayer || req.useCompositedBuffer) {
         doUploadInputImage(std::move(doc), req);
     } else {
-        // 入力画像なし → マスクの有無を確認
+        const QString empty;
+        doUploadMask(std::move(doc), req, empty);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// runNextBatchIteration — 次バッチを投入する（m_busy チェックなし）
+// ─────────────────────────────────────────────────────────────────────────────
+void AiGenerationController::runNextBatchIteration(const Request& req) {
+    WorkflowDocument doc;
+    if (!loadWorkflowDoc(req, doc)) return;
+
+    // サンプラーノードの seed / noise_seed をランダム化して変種を生成する。
+    // KSampler 以外のカスタムサンプラー (GLIDE_Sampler 等) にも対応するため
+    // findSamplerNodes() でノードをスキャンする。
+    const QStringList samplerNodes = doc.findSamplerNodes();
+    const int newSeed = static_cast<int>(QRandomGenerator::global()->generate());
+    for (const QString& nid : samplerNodes) {
+        const QJsonObject inputs = doc.nodeInputs(nid);
+        if (inputs.contains(QLatin1String("seed"))) {
+            doc.setInput(nid, QLatin1String("seed"), newSeed);
+        }
+        if (inputs.contains(QLatin1String("noise_seed"))) {
+            // QJsonValue は double 精度のため、安全に表現できる範囲で乱数を生成する
+            const double bigSeed = static_cast<double>(
+                (static_cast<quint64>(QRandomGenerator::global()->generate()) << 16)
+                | static_cast<quint64>(QRandomGenerator::global()->generate() & 0xFFFF));
+            doc.setInput(nid, QLatin1String("noise_seed"), bigSeed);
+        }
+    }
+
+    if (req.useActiveLayer || req.useCompositedBuffer) {
+        doUploadInputImage(std::move(doc), req);
+    } else {
         const QString empty;
         doUploadMask(std::move(doc), req, empty);
     }
@@ -167,7 +257,9 @@ void AiGenerationController::doUploadInputImage(WorkflowDocument doc,
 void AiGenerationController::doUploadMask(WorkflowDocument doc,
                                             const Request&   req,
                                             const QString& /*savedImageName*/) {
+    aiTrace("doUploadMask: entered");
     if (!req.useSelectionAsMask) {
+        aiTrace("doUploadMask: skipping mask, going to doQueue");
         doQueue(std::move(doc), req);
         return;
     }
@@ -207,12 +299,35 @@ void AiGenerationController::doUploadMask(WorkflowDocument doc,
 // ステップ 3: キュー投入
 // ─────────────────────────────────────────────────────────────────────────────
 void AiGenerationController::doQueue(WorkflowDocument doc, const Request& req) {
+    aiTrace("doQueue: entered");
+#ifdef PAINT_DEBUG_SERVER
+    // 送信直前に workflow JSON を Dev_Bridge 観測バッファへ記録する。
+    aiTrace("doQueue: capturing queued workflow");
+    m_app->debugCaptureQueuedWorkflow(doc.toJson());
+    aiTrace("doQueue: calling queueWorkflow");
+#endif
     m_comfy->queueWorkflow(doc,
         [this, req](QString promptId, QString err) mutable {
+            aiTrace("doQueue cb: fired");
+#ifdef PAINT_DEBUG_SERVER
+            // POST /prompt 結果（成功・失敗問わず）をキャプチャして Dev_Bridge へ公開する。
+            aiTrace("doQueue cb: getting payload bytes");
+            const QByteArray dbgPl = m_comfy->dbgLastPayload();
+            aiTrace("doQueue cb: calling debugCaptureComfyPayload");
+            m_app->debugCaptureComfyPayload(dbgPl);
+            aiTrace("doQueue cb: getting response bytes");
+            const int dbgStatus = m_comfy->dbgLastResponseStatus();
+            const QByteArray dbgBody = m_comfy->dbgLastResponseBody();
+            aiTrace("doQueue cb: calling debugCaptureComfyResponse");
+            m_app->debugCaptureComfyResponse(dbgStatus, dbgBody);
+            aiTrace("doQueue cb: capture done");
+#endif
             if (!err.isEmpty()) {
+                aiTrace("doQueue cb: error path");
                 fail("ワークフロー投入に失敗: " + err);
                 return;
             }
+            aiTrace("doQueue cb: success, calling doWait");
             doWait(promptId, req);
         });
 }
@@ -255,19 +370,45 @@ void AiGenerationController::doFetch(const QStringList& filenames,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ステップ 6: PNG → PixelBuffer → 新規レイヤー貼り付け
+// ステップ 6: PNG → PixelBuffer → レイヤー貼り付け or 候補収集
 // ─────────────────────────────────────────────────────────────────────────────
 void AiGenerationController::doApplyResult(const QByteArray& pngBytes,
                                              const Request& req) {
     QImage img;
     if (!img.loadFromData(pngBytes, "PNG")) {
-        // PNG でなければ形式を自動判定して再試行
         if (!img.loadFromData(pngBytes)) {
             fail("結果画像のデコードに失敗しました。");
             return;
         }
     }
 
+    if (m_batchTotal > 1) {
+        // ── Batch モード: 候補として収集 ────────────────────────────────────
+        m_batchResults.append(QPixmap::fromImage(img));
+        --m_batchRemaining;
+
+        if (m_batchRemaining > 0) {
+            // 次イテレーション: seed をランダムに差し替えて再投入
+            Request nextReq = m_batchBaseReq;
+            for (WorkflowBinding& b : nextReq.extraBindings) {
+                if (b.target() == WorkflowBinding::Target::KSampler) {
+                    b.seed(static_cast<int>(
+                        QRandomGenerator::global()->generate()));
+                }
+            }
+            runNextBatchIteration(nextReq);
+        } else {
+            // 全バッチ完了 → 候補グリッドへ
+            m_busy = false;
+            QList<QPixmap> results = m_batchResults;
+            m_batchResults.clear();
+            m_batchTotal = 1;
+            emit batchCandidatesReady(results);
+        }
+        return;
+    }
+
+    // ── Single モード: 即レイヤー追加 ───────────────────────────────────────
     const core::PixelBuffer buf =
         platform::qt::QtImageConverter::fromQImage(img);
 
@@ -276,7 +417,6 @@ void AiGenerationController::doApplyResult(const QByteArray& pngBytes,
         return;
     }
 
-    // 新規ラスターレイヤーとして貼り付け（元レイヤーを上書きしない）
     m_app->pasteBufferAsNewRasterLayer(buf, req.outputLayerName.toStdString());
 
     m_busy = false;

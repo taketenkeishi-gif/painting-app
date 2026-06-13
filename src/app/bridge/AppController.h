@@ -577,6 +577,8 @@ public:
     QByteArray   aiLastComfyPayload;        ///< POST /prompt ボディ (raw JSON)
     int          aiLastComfyHttpStatus {0}; ///< HTTP ステータスコード
     QString      aiLastComfyResponseBody;   ///< レスポンス本文 (全文)
+    // インスタンス一本化検証用
+    int          aiControllerInstanceId {-1}; ///< AiService が保持する AiGenerationController の ID
   };
 
   struct DebugActionResult {
@@ -672,6 +674,7 @@ signals:
 
 private:
   void setDirty(bool dirty) noexcept;
+  void ensureAiService();
   enum class HistoryKind {
     Stroke,
     LayerVisibility,
