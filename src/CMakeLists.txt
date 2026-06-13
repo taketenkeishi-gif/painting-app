@@ -78,6 +78,19 @@ if(PAINT_USE_SKIA)
   endif()
 endif()
 
+# ── ComfyUI workflow adapter ─────────────────────────────────────────────────
+add_library(paint_comfy_platform STATIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/platform/comfy/WorkflowDocument.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/platform/comfy/WorkflowBinding.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/platform/comfy/ComfyClient.cpp
+)
+set_target_properties(paint_comfy_platform PROPERTIES AUTOMOC ON)
+target_include_directories(paint_comfy_platform PUBLIC ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(paint_comfy_platform PUBLIC Qt6::Core Qt6::Network)
+if(MSVC)
+  target_compile_options(paint_comfy_platform PRIVATE /utf-8)
+endif()
+
 # ── Dev_Bridge debug server (opt-in) ─────────────────────────────────────────
 # Enable with: cmake -DPAINT_DEBUG_SERVER=ON ...
 # Adds a local HTTP server (port 9223) for runtime observation by Dev_Bridge.
@@ -108,6 +121,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/GenerativeFillDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/UpscaleDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AiModelFolderDialog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AiGenerationController.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/ComfyUiClient.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/MinimalWebSocket.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
@@ -135,6 +149,7 @@ if(PAINT_BUILD_APP)
     PRIVATE
       paint_core
       paint_qt_platform
+      paint_comfy_platform
       Qt6::Core
       Qt6::CorePrivate
       Qt6::Gui
@@ -154,4 +169,15 @@ if(PAINT_BUILD_APP)
     target_compile_definitions(paint_app PRIVATE PAINT_DEBUG_SERVER)
     message(STATUS "Dev_Bridge debug server enabled (port 9223)")
   endif()
+
+  # ── ランタイムリソース: ワークフロー JSON をビルド出力ディレクトリにコピー ──
+  set(WORKFLOW_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/workflows)
+  set(WORKFLOW_DST_DIR $<TARGET_FILE_DIR:paint_app>/resources/workflows)
+  add_custom_command(TARGET paint_app POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${WORKFLOW_DST_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${WORKFLOW_SRC_DIR}/lpa_inpaint_sdxl.json"
+      "${WORKFLOW_DST_DIR}/lpa_inpaint_sdxl.json"
+    COMMENT "Copying workflow JSON to output directory"
+  )
 endif()

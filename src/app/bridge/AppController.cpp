@@ -30,6 +30,11 @@
 
 #include "platform/qt/QtImageConverter.h"
 
+#ifdef PAINT_DEBUG_SERVER
+#  include "app/bridge/AiGenerationController.h"
+#  include "platform/comfy/ComfyClient.h"
+#endif
+
 namespace app::bridge {
 
 namespace {
@@ -1641,6 +1646,168 @@ bool AppController::toggleActiveLayerPositionLock() {
   return true;
 }
 
+// ─── Multi-layer operations ────────────────────────────────────────────────
+
+bool AppController::mergeSelectedLayers() {
+  // m_selectedLayerIds からインデックスを収集（昇順）
+  std::vector<std::size_t> indices;
+  const std::size_t count = m_document.layerCount();
+  for (std::size_t i = 0; i < count; ++i) {
+    if (m_selectedLayerIds.count(m_document.layerAt(i).id())) {
+      indices.push_back(i);
+    }
+  }
+  if (indices.size() < 2) {
+    return mergeActiveLayerDown();  // フォールバック: 通常の下と結合
+  }
+
+  // 選択レイヤーを一時 Document に並べてコンポジット
+  const core::Size size = m_document.canvasSize();
+  core::Document temp(size.width, size.height);
+  temp.setPaperVisible(false);
+  // 最下層から順に追加（indices は昇順）
+  for (std::size_t i = 0; i < indices.size(); ++i) {
+    const core::Layer& src = m_document.layerAt(indices[i]);
+    if (i == 0) {
+      temp.layerAt(0) = src;
+      temp.layerAt(0).setVisible(true);
+    } else {
+      temp.addLayer(src.name(), src.kind());
+      temp.layerAt(i) = src;
+      temp.layerAt(i).setVisible(true);
+    }
+  }
+  core::PixelBuffer merged = m_renderer.composite(temp);
+
+  // 最下層を結合結果で置き換え、それ以外を削除（高インデックスから削除）
+  const std::size_t dstIdx = indices.front();
+  core::Layer& dst = m_document.layerAt(dstIdx);
+  dst.setKind(core::LayerKind::Raster);
+  dst.clearVectorPaths();
+  dst.buffer() = std::move(merged);
+  dst.setOpacity(1.0F);
+  dst.setVisible(true);
+
+  for (std::size_t ri = indices.size() - 1; ri > 0; --ri) {
+    m_document.removeLayer(indices[ri]);
+  }
+  m_document.setActiveLayer(dstIdx);
+  m_selectedLayerIds.clear();
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::mergeVisibleLayers() {
+  const std::size_t count = m_document.layerCount();
+  std::vector<std::size_t> visibleIndices;
+  for (std::size_t i = 0; i < count; ++i) {
+    const core::Layer& layer = m_document.layerAt(i);
+    if (layer.visible() && !layer.isPaperLayer()) {
+      visibleIndices.push_back(i);
+    }
+  }
+  if (visibleIndices.size() < 2) {
+    return false;
+  }
+
+  const core::Size size = m_document.canvasSize();
+  core::Document temp(size.width, size.height);
+  temp.setPaperVisible(false);
+  for (std::size_t i = 0; i < visibleIndices.size(); ++i) {
+    const core::Layer& src = m_document.layerAt(visibleIndices[i]);
+    if (i == 0) {
+      temp.layerAt(0) = src;
+      temp.layerAt(0).setVisible(true);
+    } else {
+      temp.addLayer(src.name(), src.kind());
+      temp.layerAt(i) = src;
+      temp.layerAt(i).setVisible(true);
+    }
+  }
+  core::PixelBuffer merged = m_renderer.composite(temp);
+
+  const std::size_t dstIdx = visibleIndices.front();
+  core::Layer& dst = m_document.layerAt(dstIdx);
+  dst.setKind(core::LayerKind::Raster);
+  dst.clearVectorPaths();
+  dst.buffer() = std::move(merged);
+  dst.setOpacity(1.0F);
+  dst.setVisible(true);
+
+  for (std::size_t ri = visibleIndices.size() - 1; ri > 0; --ri) {
+    m_document.removeLayer(visibleIndices[ri]);
+  }
+  m_document.setActiveLayer(dstIdx);
+  m_selectedLayerIds.clear();
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::wrapActiveLayerInFolder() {
+  if (m_document.layerCount() == 0) {
+    return false;
+  }
+  const std::size_t activeIdx = m_document.activeLayerIndex();
+  core::Layer& active = m_document.layerAt(activeIdx);
+
+  // 同じ親に新しいフォルダを追加
+  ++m_layerCounter;
+  const uint32_t prevParentId = active.parentId();
+  const std::size_t folderIdx = m_document.addFolderLayer("Group " + std::to_string(m_layerCounter));
+  m_document.layerAt(folderIdx).setParentId(prevParentId);
+
+  // アクティブレイヤーをフォルダの子にする
+  const uint32_t folderId = m_document.layerAt(folderIdx).id();
+  m_document.layerAt(activeIdx).setParentId(folderId);
+
+  m_pendingStroke.reset();
+  rerender();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::createSelectionFromLayer(std::size_t index) {
+  if (index >= m_document.layerCount()) {
+    return false;
+  }
+  const core::Layer& layer = m_document.layerAt(index);
+  const core::PixelBuffer& buf = layer.buffer();
+  const int w = buf.width();
+  const int h = buf.height();
+  if (w == 0 || h == 0) {
+    return false;
+  }
+
+  std::vector<std::uint8_t> mask(static_cast<std::size_t>(w * h));
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      mask[static_cast<std::size_t>(y * w + x)] = buf.pixel(x, y).a;
+    }
+  }
+  const core::SelectionMask before = m_document.selection();
+  if (!m_document.selection().setPixels(mask)) {
+    return false;
+  }
+  pushSelectionHistoryIfChanged(before, "レイヤーから選択範囲");
+  emit documentChanged();
+  return true;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+
 bool AppController::clearSelection() {
   const core::SelectionMask before = m_document.selection();
   if (!before.hasSelection()) {
@@ -1989,6 +2156,33 @@ bool AppController::pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer,
     }
   }
   m_document.setActiveLayer(index);
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
+bool AppController::pasteBufferAsNewRasterLayerAtOffset(
+    const core::PixelBuffer& buffer, int offsetX, int offsetY, const std::string& layerName) {
+  if (buffer.width() <= 0 || buffer.height() <= 0) {
+    return false;
+  }
+  ++m_layerCounter;
+  const std::string finalName = layerName.empty() ? ("Layer " + std::to_string(m_layerCounter)) : layerName;
+  const std::size_t newIdx = m_document.addRasterLayer(finalName);
+  core::Layer& layer = m_document.layerAt(newIdx);
+  layer.buffer().resize(buffer.width(), buffer.height(), core::Color::Transparent());
+  for (int y = 0; y < buffer.height(); ++y) {
+    for (int x = 0; x < buffer.width(); ++x) {
+      layer.buffer().setPixel(x, y, buffer.pixel(x, y));
+    }
+  }
+  layer.setOffset(offsetX, offsetY);
+  m_document.setActiveLayer(newIdx);
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
   clearStrokeHistory();
@@ -4595,6 +4789,32 @@ void AppController::connectComfyUi(const QString& urlStr) {
   }
 
   const QUrl serverUrl(urlStr);
+  m_comfyHttpUrl = urlStr;
+
+  // AiGenerationController (WorkflowBinding ベース) を接続URLで初期化
+#ifdef PAINT_DEBUG_SERVER
+  if (m_comfyHttpClient == nullptr) {
+    m_comfyHttpClient = new platform::comfy::ComfyClient(this);
+  }
+  m_comfyHttpClient->setBaseUrl(QUrl(urlStr));
+
+  if (m_aiGenCtrl == nullptr) {
+    m_aiGenCtrl = new AiGenerationController(this, m_comfyHttpClient, this);
+    connect(m_aiGenCtrl, &AiGenerationController::finished, this, [this]() {
+      m_aiGenLastError.clear();
+      emit aiGenerationComplete("inpaint");
+    });
+    connect(m_aiGenCtrl, &AiGenerationController::errorOccurred, this,
+            [this](const QString& msg) {
+      m_aiGenLastError = msg;
+      emit aiGenerationError(msg);
+    });
+    connect(m_aiGenCtrl, &AiGenerationController::started, this, [this]() {
+      emit aiProgressUpdate(0, 0, QString());
+    });
+  }
+#endif
+
   ensureComfyUiRunning(serverUrl);
   m_comfyUiClient->connectToServer(serverUrl);
 }
@@ -5755,90 +5975,77 @@ void AppController::fetchAiModels() {
 }
 
 // ── AI: インペイント ─────────────────────────────────────────────────────
-void AppController::runInpaint(const InpaintParams& params, int batchCount) {
-  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
-    emit aiGenerationError("ComfyUI に接続されていません");
+void AppController::runInpaint(const InpaintParams& params, int /*batchCount*/) {
+#ifdef PAINT_DEBUG_SERVER
+  // AiGenerationController 経由で実行 — 未初期化なら lazy init
+  if (m_comfyHttpClient == nullptr) {
+    m_comfyHttpClient = new platform::comfy::ComfyClient(this);
+    m_comfyHttpClient->setBaseUrl(QUrl(m_comfyHttpUrl));
+  }
+  if (m_aiGenCtrl == nullptr) {
+    m_aiGenCtrl = new AiGenerationController(this, m_comfyHttpClient, this);
+    connect(m_aiGenCtrl, &AiGenerationController::finished, this, [this]() {
+      m_aiGenLastError.clear();
+      emit aiGenerationComplete("inpaint");
+    });
+    connect(m_aiGenCtrl, &AiGenerationController::errorOccurred, this,
+            [this](const QString& msg) {
+      m_aiGenLastError = msg;
+      emit aiGenerationError(msg);
+    });
+    connect(m_aiGenCtrl, &AiGenerationController::started, this, [this]() {
+      emit aiProgressUpdate(0, 0, QString());
+    });
+  }
+  if (m_aiGenCtrl->isBusy()) {
+    emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
     return;
   }
 
-  // 選択範囲チェック: なければ禁止
+  // 選択範囲チェック: なければ selectionMissing を emit
   if (!m_document.selection().hasSelection()) {
     emit selectionMissing();
     return;
   }
 
-  // バッチ初期化
-  m_batchCount     = batchCount;
-  m_batchRemaining = batchCount;
-  m_batchImages.clear();
+  // ワークフローパス解決: 実行ファイルと同じディレクトリの resources/workflows/
+  const QString wfPath = QCoreApplication::applicationDirPath()
+      + "/resources/workflows/lpa_inpaint_sdxl.json";
 
-  // キャンバス合成画像を PNG に
-  rerender();
-  const QByteArray canvasPng = pixelBufferToPng(m_composited);
+  // パラメーターを WorkflowBinding で注入
+  const int seed = (params.seed < 0)
+      ? static_cast<int>(QRandomGenerator::global()->generate())
+      : params.seed;
 
-  // マスク画像を作成: 選択範囲 = 白
-  const core::SelectionMask& sel = m_document.selection();
-  const int W = m_document.canvasSize().width;
-  const int H = m_document.canvasSize().height;
-  QImage maskImg(W, H, QImage::Format_Grayscale8);
-  for (int y = 0; y < H; ++y) {
-    for (int x = 0; x < W; ++x) {
-      maskImg.setPixel(x, y, sel.contains(x, y) ? qRgb(255,255,255) : qRgb(0,0,0));
-    }
+  AiGenerationController::Request req;
+  req.workflowPath       = wfPath;
+  req.useCompositedBuffer = true;   // 合成画像 (全レイヤー) を入力
+  req.useSelectionAsMask = true;
+  req.outputLayerName    = QStringLiteral("AI インペイント");
+  req.timeoutMs          = 180000;
+  req.extraBindings = {
+    platform::comfy::WorkflowBinding::clipText("2", params.prompt),
+    platform::comfy::WorkflowBinding::clipText("3", params.negativePrompt),
+    platform::comfy::WorkflowBinding::kSampler("8")
+        .steps (params.steps)
+        .cfg   (static_cast<double>(params.cfg))
+        .denoise(static_cast<double>(params.denoise))
+        .seed  (seed),
+  };
+
+  m_aiGenCtrl->execute(req);
+#else
+  // PAINT_DEBUG_SERVER なしビルドでは旧実装にフォールバック
+  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
+    emit aiGenerationError("ComfyUI に接続されていません");
+    return;
   }
-  QByteArray maskPng;
-  QBuffer mbuf(&maskPng);
-  mbuf.open(QIODevice::WriteOnly);
-  maskImg.save(&mbuf, "PNG");
-
-  const QString inputName = "paintapp_input.png";
-  const QString maskName  = "paintapp_mask.png";
-
-  m_comfyUiClient->uploadImage(canvasPng, inputName,
-      [this, maskPng, maskName, params, inputName](const QString& savedInput) {
-    if (savedInput.isEmpty()) {
-      emit aiGenerationError("入力画像のアップロードに失敗しました");
-      return;
-    }
-    m_comfyUiClient->uploadImage(maskPng, maskName,
-        [this, params, savedInput](const QString& savedMask) {
-      if (savedMask.isEmpty()) {
-        emit aiGenerationError("マスク画像のアップロードに失敗しました");
-        return;
-      }
-
-      // ワークフロー組み立て (seed はバッチごとに変える)
-      const auto buildAndQueue = [this, params, savedInput, savedMask](int batchIdx) {
-        ComfyUiClient::InpaintRequest req;
-        req.prompt         = params.prompt;
-        req.negativePrompt = params.negativePrompt;
-        req.checkpointName = params.checkpoint;
-        req.steps          = params.steps;
-        req.cfg            = params.cfg;
-        req.denoise        = params.denoise;
-        req.seed           = (params.seed < 0)
-            ? static_cast<int>(QRandomGenerator::global()->generate())
-            : (params.seed + batchIdx);
-        QJsonObject wf = ComfyUiClient::buildInpaintWorkflow(req);
-        // LoadImage ノードのファイル名を差し替え
-        { QJsonObject n = wf.value("4").toObject();
-          QJsonObject inp = n.value("inputs").toObject();
-          inp["image"] = savedInput;  n["inputs"] = inp;  wf["4"] = n; }
-        { QJsonObject n = wf.value("5").toObject();
-          QJsonObject inp = n.value("inputs").toObject();
-          inp["image"] = savedMask;   n["inputs"] = inp;  wf["5"] = n; }
-        m_comfyUiClient->queuePrompt(wf);
-      };
-
-      m_batchFired     = 0;
-      m_batchQueueNext = [this, buildAndQueue]() {
-        buildAndQueue(++m_batchFired);
-      };
-
-      m_currentAiOp = AiOpType::Inpaint;
-      buildAndQueue(0);
-    });
-  });
+  if (!m_document.selection().hasSelection()) {
+    emit selectionMissing();
+    return;
+  }
+  emit aiGenerationError("このビルドでは AI インペイントに --debug-server が必要です");
+#endif
 }
 
 // ── AI: テキストから画像生成 ─────────────────────────────────────────────
@@ -6045,6 +6252,12 @@ AppController::DebugState AppController::debugState() const {
   s.layerCount = static_cast<int>(m_document.layerCount());
   const core::Layer* active = m_document.activeLayer();
   s.activeLayerName = active ? QString::fromStdString(active->name()) : QString();
+  for (std::size_t i = 0; i < m_document.layerCount(); ++i)
+    s.layerNames << QString::fromStdString(m_document.layerAt(i).name());
+
+  // AiGenerationController 状態
+  s.aiGenBusy      = m_aiGenCtrl ? m_aiGenCtrl->isBusy() : false;
+  s.aiGenLastError = m_aiGenLastError;
 
   // Undo
   s.undoDepth = static_cast<int>(m_undoHistory.size());
@@ -6160,6 +6373,70 @@ AppController::DebugActionResult AppController::executeDebugAction(
     return r;
   }
 
+  // ── comfy-generate ────────────────────────────────────────────────────────
+  // Triggers AiGenerationController.execute() with current layer + selection.
+  // opts:
+  //   workflowPath  : absolute path to workflow.json (required)
+  //   comfyUrl      : ComfyUI base URL (default: http://localhost:8188)
+  //   outputLayerName: name for the result layer
+  //   timeoutMs     : poll timeout in ms (default: 90000)
+  if (type == QLatin1String("comfy-generate")) {
+    const QString workflowPath = opts.value(QLatin1String("workflowPath")).toString(target);
+    if (workflowPath.isEmpty()) {
+      r.success = false;
+      r.message = QLatin1String("comfy-generate: workflowPath is required");
+      return r;
+    }
+    const QString comfyUrl = opts.value(QLatin1String("comfyUrl"))
+                                 .toString(QLatin1String("http://localhost:8188"));
+    const QString outputLayerName = opts.value(QLatin1String("outputLayerName"))
+                                        .toString(QLatin1String("AI 生成"));
+    const int timeoutMs = opts.value(QLatin1String("timeoutMs")).toInt(90000);
+
+    // 遅延初期化: ComfyClient + AiGenerationController
+    if (m_comfyHttpClient == nullptr) {
+      m_comfyHttpClient = new platform::comfy::ComfyClient(this);
+      m_comfyHttpClient->setBaseUrl(QUrl(comfyUrl));
+    }
+    if (m_aiGenCtrl == nullptr) {
+      m_aiGenCtrl = new AiGenerationController(this, m_comfyHttpClient, this);
+      connect(m_aiGenCtrl, &AiGenerationController::errorOccurred,
+              this, [this](const QString& msg) {
+                m_aiGenLastError = msg;
+              });
+      connect(m_aiGenCtrl, &AiGenerationController::finished,
+              this, [this]() {
+                m_aiGenLastError.clear();
+              });
+    }
+
+    if (m_aiGenCtrl->isBusy()) {
+      r.success = false;
+      r.message = QLatin1String("comfy-generate: AiGenerationController is busy");
+      return r;
+    }
+
+    m_aiGenLastError.clear();
+
+    AiGenerationController::Request req;
+    req.workflowPath       = workflowPath;
+    req.useActiveLayer     = true;
+    req.useSelectionAsMask = m_document.selection().hasSelection();
+    req.outputLayerName    = outputLayerName;
+    req.timeoutMs          = timeoutMs;
+    m_aiGenCtrl->execute(req);
+
+    r.success = true;
+    r.message = QLatin1String("comfy-generate: started");
+    r.data = QJsonObject{
+      {QLatin1String("workflowPath"),    workflowPath},
+      {QLatin1String("comfyUrl"),        comfyUrl},
+      {QLatin1String("useSelectionMask"), req.useSelectionAsMask},
+      {QLatin1String("outputLayerName"), outputLayerName},
+    };
+    return r;
+  }
+
   if (type == QLatin1String("list")) {
     // Return available debug actions
     QJsonArray actions;
@@ -6167,7 +6444,8 @@ AppController::DebugActionResult AppController::executeDebugAction(
             << QLatin1String("aiselect-reset")
             << QLatin1String("aiselect-set-op")
             << QLatin1String("selection-clear")
-            << QLatin1String("inject-ai-mask");
+            << QLatin1String("inject-ai-mask")
+            << QLatin1String("comfy-generate");
     r.success = true;
     r.message = QLatin1String("Available debug actions");
     r.data    = QJsonObject{{QLatin1String("actions"), actions}};
