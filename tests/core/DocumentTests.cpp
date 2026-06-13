@@ -51,7 +51,7 @@ void runDocumentTests() {
   expectTrue(vectorDoc.layerAt(vectorIndex).kind() == core::LayerKind::Vector, "addVectorLayer should create vector kind.");
   const std::size_t folderIndex = vectorDoc.addFolderLayer("Folder 1");
   expectTrue(vectorDoc.layerAt(folderIndex).kind() == core::LayerKind::Folder, "addFolderLayer should create folder kind.");
-  vectorDoc.layerAt(vectorIndex).addVectorPath(core::VectorPath {{core::Point {1, 1}, core::Point {10, 10}}, core::Color {255, 0, 0, 255}, 3, 1.0F});
+  vectorDoc.layerAt(vectorIndex).addVectorPath(core::VectorPath {{core::FPoint {1, 1}, core::FPoint {10, 10}}, core::Color {255, 0, 0, 255}, 3, 1.0F});
   expectTrue(!vectorDoc.layerAt(vectorIndex).vectorPaths().empty(), "Vector layer should keep vector paths.");
   const std::size_t duplicateIndex = vectorDoc.duplicateLayer(vectorIndex);
   expectTrue(duplicateIndex == vectorIndex + 1, "duplicateLayer should insert next to source.");

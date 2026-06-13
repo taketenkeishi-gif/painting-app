@@ -313,7 +313,7 @@ int main() {
     const core::Color movedPixel = controller.document().layerAt(0).buffer().pixel(23, 22);
     expectTrue(movedPixel.g > 0, "MoveLayer should shift painted pixels by drag delta.");
 
-    expectTrue(controller.setCurrentTool(core::ToolKind::Line), "Line tool should be selectable.");
+    expectTrue(controller.setCurrentTool(core::ToolKind::Shape), "Shape tool should be selectable.");
     controller.setBrushColor(core::Color {255, 255, 0, 255});
     controller.beginStroke(30, 30);
     controller.continueStroke(36, 36);
@@ -354,7 +354,7 @@ int main() {
             vectorBrushAttempt.a == vectorBrushBefore.a,
         "Raster-only brush should not draw on vector layer.");
 
-    controller.setCurrentTool(core::ToolKind::Line);
+    controller.setCurrentTool(core::ToolKind::Shape);
     expectTrue(controller.setCurrentSubTool("line_vector"), "Vector line sub-tool should be selectable.");
     expectTrue(controller.canUseCurrentToolOnActiveLayer(), "Vector line should be available on vector layer.");
     controller.setBrushColor(core::Color {0, 255, 255, 255});
@@ -438,7 +438,7 @@ int main() {
 
     controller.addVectorLayer();
     controller.setActiveLayer(1);
-    controller.setCurrentTool(core::ToolKind::Line);
+    controller.setCurrentTool(core::ToolKind::Shape);
     controller.setCurrentSubTool("line_vector");
     controller.beginStroke(2, 2);
     controller.continueStroke(20, 2);
