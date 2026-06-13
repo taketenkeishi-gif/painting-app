@@ -121,6 +121,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/GenerativeFillDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/UpscaleDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AiModelFolderDialog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/WorkflowBindingDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AiGenerationController.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/ComfyUiClient.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/MinimalWebSocket.cpp

@@ -6008,30 +6008,44 @@ void AppController::runInpaint(const InpaintParams& params, int /*batchCount*/) 
     return;
   }
 
-  // ワークフローパス解決: 実行ファイルと同じディレクトリの resources/workflows/
-  const QString wfPath = QCoreApplication::applicationDirPath()
-      + "/resources/workflows/lpa_inpaint_sdxl.json";
+  // ワークフローパス解決: カスタム指定があればそちら、なければ内蔵
+  const bool builtIn = params.workflowPath.isEmpty();
+  const QString wfPath = builtIn
+      ? (QCoreApplication::applicationDirPath()
+         + "/resources/workflows/lpa_inpaint_sdxl.json")
+      : params.workflowPath;
 
-  // パラメーターを WorkflowBinding で注入
   const int seed = (params.seed < 0)
       ? static_cast<int>(QRandomGenerator::global()->generate())
       : params.seed;
 
+  // ノード ID: カスタム指定 > 内蔵デフォルト > なし (バインドしない)
+  const QString posId = !params.positiveNodeId.isEmpty() ? params.positiveNodeId
+                        : (builtIn ? QStringLiteral("2") : QString());
+  const QString negId = !params.negativeNodeId.isEmpty() ? params.negativeNodeId
+                        : (builtIn ? QStringLiteral("3") : QString());
+  const QString kId   = !params.kSamplerNodeId.isEmpty() ? params.kSamplerNodeId
+                        : (builtIn ? QStringLiteral("8") : QString());
+
   AiGenerationController::Request req;
-  req.workflowPath       = wfPath;
-  req.useCompositedBuffer = true;   // 合成画像 (全レイヤー) を入力
-  req.useSelectionAsMask = true;
-  req.outputLayerName    = QStringLiteral("AI インペイント");
-  req.timeoutMs          = 180000;
-  req.extraBindings = {
-    platform::comfy::WorkflowBinding::clipText("2", params.prompt),
-    platform::comfy::WorkflowBinding::clipText("3", params.negativePrompt),
-    platform::comfy::WorkflowBinding::kSampler("8")
-        .steps (params.steps)
-        .cfg   (static_cast<double>(params.cfg))
+  req.workflowPath        = wfPath;
+  req.useCompositedBuffer = true;
+  req.useSelectionAsMask  = true;
+  req.outputLayerName     = QStringLiteral("AI インペイント");
+  req.timeoutMs           = 180000;
+  req.inputImageNodeId    = params.inputImageNodeId;
+  req.maskImageNodeId     = params.maskNodeId;
+
+  if (!posId.isEmpty())
+    req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, params.prompt);
+  if (!negId.isEmpty())
+    req.extraBindings << platform::comfy::WorkflowBinding::clipText(negId, params.negativePrompt);
+  if (!kId.isEmpty())
+    req.extraBindings << platform::comfy::WorkflowBinding::kSampler(kId)
+        .steps  (params.steps)
+        .cfg    (static_cast<double>(params.cfg))
         .denoise(static_cast<double>(params.denoise))
-        .seed  (seed),
-  };
+        .seed   (seed);
 
   m_aiGenCtrl->execute(req);
 #else

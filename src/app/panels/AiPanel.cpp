@@ -2,6 +2,7 @@
 
 #include <QButtonGroup>
 #include <QComboBox>
+#include <QCryptographicHash>
 #include <QDoubleSpinBox>
 #include <QFile>
 #include <QFileDialog>
@@ -26,6 +27,7 @@
 #include <QVBoxLayout>
 
 #include "app/bridge/AppController.h"
+#include "app/panels/WorkflowBindingDialog.h"
 
 namespace app::panels {
 
@@ -35,6 +37,7 @@ constexpr int kPreviewSize   = 160;
 constexpr int kThumbSize     = 96;
 constexpr int kMaxRecent     = 8;
 const char kSettingsKey[]    = "ai/recentWorkflows";
+const char kBindingKeyPrefix[] = "ai/binding/";
 
 QPushButton* makeBatchBtn(const QString& label, QWidget* parent) {
   auto* btn = new QPushButton(label, parent);
@@ -105,20 +108,29 @@ void AiPanel::setupUi() {
   // ── ワークフロー ──────────────────────────────────────────────────────────
   {
     auto* grp = new QGroupBox(QStringLiteral("ワークフロー"), this);
-    auto* lay = new QHBoxLayout(grp);
-    lay->setContentsMargins(6, 16, 6, 6);
-    lay->setSpacing(4);
+    auto* vlay = new QVBoxLayout(grp);
+    vlay->setContentsMargins(6, 16, 6, 6);
+    vlay->setSpacing(4);
 
     m_workflowCombo = new QComboBox(grp);
     m_workflowCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_workflowBrowse = new QPushButton(QStringLiteral("参照"), grp);
-    m_workflowBrowse->setFixedWidth(48);
+    vlay->addWidget(m_workflowCombo);
 
-    lay->addWidget(m_workflowCombo, 1);
-    lay->addWidget(m_workflowBrowse);
+    auto* btnRow = new QHBoxLayout();
+    btnRow->setSpacing(4);
+    m_workflowBrowse = new QPushButton(QStringLiteral("Import"), grp);
+    m_workflowBrowse->setToolTip(QStringLiteral("ComfyUI API 形式の workflow.json を読み込む"));
+    m_bindingButton = new QPushButton(QStringLiteral("Binding..."), grp);
+    m_bindingButton->setToolTip(QStringLiteral("ノード ID の役割割当を設定する"));
+    m_bindingButton->setEnabled(false);   // カスタム workflow 選択時のみ有効
+    btnRow->addWidget(m_workflowBrowse);
+    btnRow->addWidget(m_bindingButton);
+    btnRow->addStretch();
+    vlay->addLayout(btnRow);
+
     root->addWidget(grp);
 
-    // 最近使ったワークフローを読み込む
+    // 最近使ったワークフローと保存済みバインドを読み込む
     QSettings settings;
     m_recentWorkflows = settings.value(kSettingsKey).toStringList();
     populateWorkflowCombo();
@@ -361,6 +373,7 @@ void AiPanel::setupUi() {
   connect(m_inpaintButton,  &QPushButton::clicked, this, &AiPanel::onInpaintClicked);
   connect(m_cancelButton,   &QPushButton::clicked, this, &AiPanel::onCancelClicked);
   connect(m_workflowBrowse, &QPushButton::clicked, this, &AiPanel::onBrowseWorkflow);
+  connect(m_bindingButton,  &QPushButton::clicked, this, &AiPanel::onBindingClicked);
   connect(m_workflowCombo,  QOverload<int>::of(&QComboBox::currentIndexChanged),
           this, &AiPanel::onWorkflowSelected);
   connect(m_applyButton,    &QPushButton::clicked, this, &AiPanel::onApplyCandidate);
@@ -457,33 +470,30 @@ void AiPanel::onInpaintClicked() {
   if (m_controller == nullptr || !m_controller->isComfyUiConnected()) return;
   m_resultLabel->setText(QString());
   clearCandidates();
-
-  // 選択範囲チェックは AppController が行い、なければ selectionMissing() を emit する
-  // → onSelectionMissing() でダイアログ表示
   setGenerating(true);
 
-  const int bc = batchCount();
-  const QJsonObject wf = currentWorkflow();
+  app::bridge::AppController::InpaintParams p;
+  p.prompt         = m_promptEdit->toPlainText().trimmed();
+  p.negativePrompt = m_negEdit->toPlainText().trimmed();
+  p.checkpoint     = currentCheckpoint();
+  p.steps          = m_stepsSpinShared->value();
+  p.cfg            = static_cast<float>(m_cfgSpinShared->value());
+  p.seed           = m_seedSpinShared->value();
+  p.denoise        = static_cast<float>(m_denoiseSpin->value());
 
-  if (wf.isEmpty()) {
-    app::bridge::AppController::InpaintParams p;
-    p.prompt         = m_promptEdit->toPlainText().trimmed();
-    p.negativePrompt = m_negEdit->toPlainText().trimmed();
-    p.checkpoint     = currentCheckpoint();
-    p.steps          = m_stepsSpinShared->value();
-    p.cfg            = static_cast<float>(m_cfgSpinShared->value());
-    p.seed           = m_seedSpinShared->value();
-    p.denoise        = static_cast<float>(m_denoiseSpin->value());
-    m_controller->runInpaint(p, bc);
-  } else {
-    m_controller->runWorkflow(
-        wf,
-        m_promptEdit->toPlainText().trimmed(),
-        m_negEdit->toPlainText().trimmed(),
-        m_seedSpinShared->value(),
-        currentCheckpoint(),
-        bc);
+  // カスタムワークフローが選択されている場合はパスとバインドを注入
+  const QString wfPath = currentWorkflowPath();
+  if (!wfPath.isEmpty()) {
+    const WorkflowBindingConfig cfg = currentBindingConfig();
+    p.workflowPath      = wfPath;
+    p.inputImageNodeId  = cfg.inputImageNodeId;
+    p.maskNodeId        = cfg.maskNodeId;
+    p.positiveNodeId    = cfg.positiveNodeId;
+    p.negativeNodeId    = cfg.negativeNodeId;
+    p.kSamplerNodeId    = cfg.kSamplerNodeId;
   }
+
+  m_controller->runInpaint(p, batchCount());
 }
 
 void AiPanel::onCancelClicked() {
@@ -523,15 +533,29 @@ void AiPanel::onWorkflowSelected(int index) {
   // index 0 = "(内蔵ワークフロー)"
   if (index <= 0) {
     m_loadedWorkflow = {};
+    m_bindingButton->setEnabled(false);
     return;
   }
   const QString path = m_workflowCombo->itemData(index).toString();
-  if (path.isEmpty()) { m_loadedWorkflow = {}; return; }
+  if (path.isEmpty()) { m_loadedWorkflow = {}; m_bindingButton->setEnabled(false); return; }
 
   QFile f(path);
-  if (!f.open(QIODevice::ReadOnly)) { m_loadedWorkflow = {}; return; }
+  if (!f.open(QIODevice::ReadOnly)) { m_loadedWorkflow = {}; m_bindingButton->setEnabled(false); return; }
   const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
   m_loadedWorkflow = (doc.isNull() || !doc.isObject()) ? QJsonObject{} : doc.object();
+  m_bindingButton->setEnabled(!m_loadedWorkflow.isEmpty());
+}
+
+void AiPanel::onBindingClicked() {
+  const QString path = currentWorkflowPath();
+  if (path.isEmpty() || m_loadedWorkflow.isEmpty()) return;
+
+  const WorkflowBindingConfig current = currentBindingConfig();
+  WorkflowBindingDialog dlg(QFileInfo(path).fileName(), m_loadedWorkflow, current, this);
+  if (dlg.exec() != QDialog::Accepted) return;
+
+  const WorkflowBindingConfig cfg = dlg.result();
+  saveBindingConfig(path, cfg);
 }
 
 void AiPanel::onApplyCandidate() {
@@ -704,11 +728,16 @@ void AiPanel::addRecentWorkflow(const QString& path) {
   while (m_recentWorkflows.size() > kMaxRecent)
     m_recentWorkflows.removeLast();
 
+  // 保存済みバインドをロード（未ロードなら QSettings から）
+  if (!m_bindingConfigs.contains(path)) {
+    m_bindingConfigs.insert(path, loadBindingConfig(path));
+  }
+
   QSettings settings;
   settings.setValue(kSettingsKey, m_recentWorkflows);
   populateWorkflowCombo();
 
-  // 追加したファイルを選択
+  // 追加したファイルを選択 → onWorkflowSelected が呼ばれる
   const int idx = m_workflowCombo->findData(path);
   if (idx >= 0) m_workflowCombo->setCurrentIndex(idx);
 }
@@ -729,6 +758,50 @@ int AiPanel::batchCount() const {
 
 QJsonObject AiPanel::currentWorkflow() const {
   return m_loadedWorkflow;
+}
+
+QString AiPanel::currentWorkflowPath() const {
+  const int idx = m_workflowCombo->currentIndex();
+  if (idx <= 0) return {};
+  return m_workflowCombo->currentData().toString();
+}
+
+WorkflowBindingConfig AiPanel::currentBindingConfig() const {
+  const QString path = currentWorkflowPath();
+  if (path.isEmpty()) return {};
+  return m_bindingConfigs.value(path);
+}
+
+void AiPanel::saveBindingConfig(const QString& path, const WorkflowBindingConfig& cfg) {
+  m_bindingConfigs.insert(path, cfg);
+
+  // QSettings に永続化
+  const QString hash = QString::fromLatin1(
+      QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Md5).toHex());
+  QSettings settings;
+  settings.beginGroup(QLatin1String(kBindingKeyPrefix) + hash);
+  settings.setValue(QStringLiteral("path"),           path);
+  settings.setValue(QStringLiteral("inputImageNode"), cfg.inputImageNodeId);
+  settings.setValue(QStringLiteral("maskNode"),       cfg.maskNodeId);
+  settings.setValue(QStringLiteral("positiveNode"),   cfg.positiveNodeId);
+  settings.setValue(QStringLiteral("negativeNode"),   cfg.negativeNodeId);
+  settings.setValue(QStringLiteral("kSamplerNode"),   cfg.kSamplerNodeId);
+  settings.endGroup();
+}
+
+WorkflowBindingConfig AiPanel::loadBindingConfig(const QString& path) const {
+  const QString hash = QString::fromLatin1(
+      QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Md5).toHex());
+  QSettings settings;
+  settings.beginGroup(QLatin1String(kBindingKeyPrefix) + hash);
+  WorkflowBindingConfig cfg;
+  cfg.inputImageNodeId = settings.value(QStringLiteral("inputImageNode")).toString();
+  cfg.maskNodeId       = settings.value(QStringLiteral("maskNode")).toString();
+  cfg.positiveNodeId   = settings.value(QStringLiteral("positiveNode")).toString();
+  cfg.negativeNodeId   = settings.value(QStringLiteral("negativeNode")).toString();
+  cfg.kSamplerNodeId   = settings.value(QStringLiteral("kSamplerNode")).toString();
+  settings.endGroup();
+  return cfg;
 }
 
 void AiPanel::showCandidates(const QList<QPixmap>& pixmaps) {

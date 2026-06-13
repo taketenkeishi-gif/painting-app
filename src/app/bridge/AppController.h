@@ -52,7 +52,10 @@
 #include "core/mesh/GridMeshGenerator.h"
 #include "core/mesh/EdgeAdaptiveMeshGenerator.h"
 
+namespace platform::comfy { class ComfyClient; }
+
 namespace app::bridge {
+class AiGenerationController;
 class ComfyUiClient;
 
 struct LayerViewModel {
@@ -253,6 +256,15 @@ public:
   bool toggleActiveLayerAlphaLock();
   bool toggleActiveLayerPositionLock();
 
+  std::size_t layerCount() const noexcept { return m_document.layerCount(); }
+  std::size_t activeLayerIndex() const noexcept { return m_document.activeLayerIndex(); }
+
+  // Multi-layer operations
+  bool mergeSelectedLayers();                       ///< 選択中のレイヤーを結合
+  bool mergeVisibleLayers();                        ///< 表示レイヤーを結合
+  bool wrapActiveLayerInFolder();                   ///< アクティブレイヤーをフォルダーで包む
+  bool createSelectionFromLayer(std::size_t index); ///< レイヤーのアルファから選択範囲を作成
+
   // LayerMask Photoshop-style operations
   bool createLayerMaskFromSelection(bool invertMask = false);
   bool deleteLayerMask();
@@ -289,6 +301,8 @@ public:
   core::PixelBuffer exportSelectionOrCanvasFromComposite() const;
   void importFlattenedBuffer(const core::PixelBuffer& buffer, const std::string& layerName = "Imported");
   bool pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName = "Pasted Layer");
+  /// バッファを指定オフセットに配置した新規ラスタレイヤーとして貼り付ける（AI 高解像度化で選択領域に使用）。
+  bool pasteBufferAsNewRasterLayerAtOffset(const core::PixelBuffer& buffer, int offsetX, int offsetY, const std::string& layerName = "Pasted Layer");
   /// 貼り付けた画像をキャンバス外のピクセルも保持したまま変形モードで開く。
   /// Ctrl+V 時に呼び出す。コミット時にキャンバスにラスタライズされる。
   bool pasteBufferAsNewRasterLayerAndTransform(const core::PixelBuffer& buffer, const std::string& layerName = "貼り付けレイヤー");
@@ -541,10 +555,14 @@ public:
     int     selectionPixels {0};  // count of non-zero bytes in selection mask
     int     canvasWidth     {0};
     int     canvasHeight    {0};
-    int     layerCount      {0};
-    QString activeLayerName;
-    int     undoDepth       {0};
-    bool    canUndo         {false};
+    int          layerCount      {0};
+    QString      activeLayerName;
+    QStringList  layerNames;        // all layer names, bottom-to-top order
+    int          undoDepth       {0};
+    bool         canUndo         {false};
+    // comfy-generate 実行中フラグ
+    bool         aiGenBusy       {false};
+    QString      aiGenLastError;
   };
 
   struct DebugActionResult {
@@ -566,6 +584,13 @@ public:
     float   cfg         {7.5f};
     float   denoise     {0.75f};
     int     seed        {-1};
+    // カスタムワークフロー（空 = 内蔵 lpa_inpaint_sdxl.json）
+    QString workflowPath;
+    QString inputImageNodeId;   // 空 = 自動検出 (最初の LoadImage)
+    QString maskNodeId;         // 空 = 自動検出
+    QString positiveNodeId;     // 空 = 内蔵:"2" / カスタム:バインドなし
+    QString negativeNodeId;     // 空 = 内蔵:"3" / カスタム:バインドなし
+    QString kSamplerNodeId;     // 空 = 内蔵:"8" / カスタム:バインドなし
   };
   /// 選択範囲をマスクとしてインペイントを実行。
   /// 選択がない場合は selectionMissing() を emit して返す（全体 inpaint は禁止）。
@@ -794,6 +819,12 @@ private:
   // ── クイックマスクモード ──────────────────────────────────────────────────
   bool m_quickMaskMode {false};
   core::SelectionMask m_quickMaskSnapshot;  ///< mode 再開時の復帰用
+
+  // ── ComfyUI HTTP (platform::comfy — WorkflowBinding ベース) ──────────────
+  platform::comfy::ComfyClient*  m_comfyHttpClient {nullptr};
+  AiGenerationController*        m_aiGenCtrl       {nullptr};
+  QString                        m_comfyHttpUrl    {"http://localhost:8188"};
+  QString                        m_aiGenLastError;
 };
 
 } // namespace app::bridge
