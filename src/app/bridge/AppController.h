@@ -303,6 +303,8 @@ public:
   core::PixelBuffer exportSelectionOrCanvasFromComposite() const;
   void importFlattenedBuffer(const core::PixelBuffer& buffer, const std::string& layerName = "Imported");
   bool pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer, const std::string& layerName = "Pasted Layer");
+  /// バッファを新規ラスタレイヤーとして貼り付け、選択範囲がある場合は LayerMask として設定する（非破壊）。
+  bool pasteBufferAsNewRasterLayerWithSelectionMask(const core::PixelBuffer& buffer, const std::string& layerName = "AI 生成");
   /// バッファを指定オフセットに配置した新規ラスタレイヤーとして貼り付ける（AI 高解像度化で選択領域に使用）。
   bool pasteBufferAsNewRasterLayerAtOffset(const core::PixelBuffer& buffer, int offsetX, int offsetY, const std::string& layerName = "Pasted Layer");
   /// 貼り付けた画像をキャンバス外のピクセルも保持したまま変形モードで開く。
@@ -579,6 +581,9 @@ public:
     QString      aiLastComfyResponseBody;   ///< レスポンス本文 (全文)
     // インスタンス一本化検証用
     int          aiControllerInstanceId {-1}; ///< AiService が保持する AiGenerationController の ID
+    // レイヤーマスク観測（inpaint 非破壊適用検証用）
+    bool         activeLayerHasMask    {false}; ///< アクティブレイヤーに LayerMask があるか
+    bool         activeLayerMaskEnabled{false}; ///< LayerMask が有効か
   };
 
   struct DebugActionResult {

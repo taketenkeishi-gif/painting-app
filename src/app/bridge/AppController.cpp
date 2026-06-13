@@ -2169,6 +2169,49 @@ bool AppController::pasteBufferAsNewRasterLayer(const core::PixelBuffer& buffer,
   return true;
 }
 
+bool AppController::pasteBufferAsNewRasterLayerWithSelectionMask(
+    const core::PixelBuffer& buffer, const std::string& layerName)
+{
+  if (buffer.width() <= 0 || buffer.height() <= 0) return false;
+
+  ++m_layerCounter;
+  const std::string finalName =
+      layerName.empty() ? ("Layer " + std::to_string(m_layerCounter)) : layerName;
+  const std::size_t index = m_document.addRasterLayer(finalName);
+  core::Layer& layer = m_document.layerAt(index);
+
+  // ピクセルバッファをコピー
+  layer.buffer().fill(core::Color::Transparent());
+  for (int y = 0; y < buffer.height(); ++y)
+    for (int x = 0; x < buffer.width(); ++x)
+      if (layer.buffer().inBounds(x, y))
+        layer.buffer().setPixel(x, y, buffer.pixel(x, y));
+
+  // 選択範囲があれば LayerMask として設定（非破壊）
+  const core::SelectionMask& sel = m_document.selection();
+  if (sel.hasSelection()) {
+    const int w = m_document.canvasSize().width;
+    const int h = m_document.canvasSize().height;
+    layer.createMask(core::Color::OpaqueWhite());
+    core::PixelBuffer& maskBuf = layer.maskBuffer();
+    for (int y = 0; y < h; ++y)
+      for (int x = 0; x < w; ++x) {
+        const std::uint8_t v = sel.maskValue(x, y);
+        maskBuf.setPixel(x, y, core::Color{v, v, v, 255});
+      }
+  }
+
+  m_document.setActiveLayer(index);
+  ensureCurrentSubToolCompatibility();
+  m_pendingStroke.reset();
+  clearStrokeHistory();
+  rerender();
+  emit toolStateChanged();
+  emit layersChanged();
+  emit documentChanged();
+  return true;
+}
+
 bool AppController::pasteBufferAsNewRasterLayerAtOffset(
     const core::PixelBuffer& buffer, int offsetX, int offsetY, const std::string& layerName) {
   if (buffer.width() <= 0 || buffer.height() <= 0) {
@@ -6368,7 +6411,8 @@ void AppController::applyBatchCandidate(const QPixmap& px, const QString& layerN
           static_cast<std::uint8_t>(c.alpha())});
     }
   }
-  pasteBufferAsNewRasterLayer(std::move(buf), layerName.toStdString());
+  // 選択範囲があれば LayerMask 付きで貼り付け（非破壊 inpaint）
+  pasteBufferAsNewRasterLayerWithSelectionMask(std::move(buf), layerName.toStdString());
   emit aiGenerationComplete("apply_candidate");
 }
 
@@ -6451,7 +6495,9 @@ AppController::DebugState AppController::debugState() const {
   // Layers
   s.layerCount = static_cast<int>(m_document.layerCount());
   const core::Layer* active = m_document.activeLayer();
-  s.activeLayerName = active ? QString::fromStdString(active->name()) : QString();
+  s.activeLayerName         = active ? QString::fromStdString(active->name()) : QString();
+  s.activeLayerHasMask      = active ? active->hasMask()     : false;
+  s.activeLayerMaskEnabled  = active ? active->maskEnabled() : false;
   for (std::size_t i = 0; i < m_document.layerCount(); ++i)
     s.layerNames << QString::fromStdString(m_document.layerAt(i).name());
 
@@ -6600,6 +6646,35 @@ AppController::DebugActionResult AppController::executeDebugAction(
     clearSelection();
     r.success = true;
     r.message = QLatin1String("Selection cleared");
+    return r;
+  }
+
+  if (type == QLatin1String("selection-rect")) {
+    // 矩形選択を作成する（inpaint E2E テスト用）
+    // opts: x, y, width, height  (デフォルト: キャンバス中央 25%)
+    const int cw = m_document.canvasSize().width;
+    const int ch = m_document.canvasSize().height;
+    const int x  = opts.value(QLatin1String("x")).toInt(cw / 4);
+    const int y  = opts.value(QLatin1String("y")).toInt(ch / 4);
+    const int w  = opts.value(QLatin1String("width")).toInt(cw / 2);
+    const int h  = opts.value(QLatin1String("height")).toInt(ch / 2);
+    m_selectionEngine.applyRect(core::SelectionOp::New, core::Rect{x, y, w, h});
+    rerender();
+    emit documentChanged();
+    int pixels = 0;
+    {
+      const core::SelectionMask& sel = m_document.selection();
+      for (int sy = 0; sy < ch; ++sy)
+        for (int sx = 0; sx < cw; ++sx)
+          if (sel.maskValue(sx, sy) > 0) ++pixels;
+    }
+    r.success = true;
+    r.message = QString("selection-rect: x=%1 y=%2 w=%3 h=%4 pixels=%5")
+                    .arg(x).arg(y).arg(w).arg(h).arg(pixels);
+    r.data = QJsonObject{
+      {QLatin1String("x"), x}, {QLatin1String("y"), y},
+      {QLatin1String("width"), w}, {QLatin1String("height"), h},
+      {QLatin1String("pixels"), pixels}};
     return r;
   }
 

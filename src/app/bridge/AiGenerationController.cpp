@@ -417,7 +417,8 @@ void AiGenerationController::doApplyResult(const QByteArray& pngBytes,
         return;
     }
 
-    m_app->pasteBufferAsNewRasterLayer(buf, req.outputLayerName.toStdString());
+    // 選択範囲があれば LayerMask 付きで貼り付け（非破壊 inpaint）
+    m_app->pasteBufferAsNewRasterLayerWithSelectionMask(buf, req.outputLayerName.toStdString());
 
     m_busy = false;
     emit finished();

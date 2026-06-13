@@ -175,8 +175,10 @@ QByteArray DebugServer::endpointState() {
     canvas[QLatin1String("height")] = s.canvasHeight;
 
     QJsonObject layers;
-    layers[QLatin1String("count")]  = s.layerCount;
-    layers[QLatin1String("active")] = s.activeLayerName;
+    layers[QLatin1String("count")]          = s.layerCount;
+    layers[QLatin1String("active")]         = s.activeLayerName;
+    layers[QLatin1String("activeHasMask")]  = s.activeLayerHasMask;
+    layers[QLatin1String("activeMaskOn")]   = s.activeLayerMaskEnabled;
     QJsonArray layerNames;
     for (const QString& n : s.layerNames) layerNames.append(n);
     layers[QLatin1String("names")]  = layerNames;
