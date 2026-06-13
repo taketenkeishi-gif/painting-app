@@ -6199,6 +6199,22 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
   req.inputImageNodeId    = params.inputImageNodeId;
   req.maskImageNodeId     = params.maskNodeId;
 
+  // maskImageNodeId が未設定の場合はワークフローを解析して ImageToMask の上流ノードを特定する。
+  // 推測 fallback ではなくグラフ構造から一意に決定する。
+  if (req.maskImageNodeId.isEmpty()) {
+    bool ok = false;
+    const auto wfDoc = platform::comfy::WorkflowDocument::load(wfPath, &ok);
+    if (ok) {
+      req.maskImageNodeId = wfDoc.findMaskSourceNode();
+    }
+    if (req.maskImageNodeId.isEmpty()) {
+      emit aiGenerationError(
+          QStringLiteral("インペイント: ワークフロー内にマスクノードが見つかりません。"
+                         "ワークフロー設定でマスクノードを指定してください。"));
+      return;
+    }
+  }
+
   if (!posId.isEmpty())
     req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, params.prompt);
   if (!negId.isEmpty())
@@ -6821,6 +6837,14 @@ AppController::DebugActionResult AppController::executeDebugAction(
     req.useSelectionAsMask  = true;
     req.outputLayerName     = outputLayerName;
     req.timeoutMs           = timeoutMs;
+
+    // maskImageNodeId をワークフロー解析で解決する。
+    bool wfOk = false;
+    const auto wfDoc = platform::comfy::WorkflowDocument::load(workflowPath, &wfOk);
+    if (wfOk) {
+      req.maskImageNodeId = wfDoc.findMaskSourceNode();
+    }
+
     m_aiService->inpaint(req, batchCount);
 
     r.success = true;
@@ -6832,6 +6856,7 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("batchCount"),      batchCount},
       {QLatin1String("via"),             QLatin1String("AiService")},
       {QLatin1String("opType"),          QLatin1String("inpaint")},
+      {QLatin1String("maskImageNodeId"), req.maskImageNodeId},
     };
     return r;
   }

@@ -271,6 +271,12 @@ void AiGenerationController::doUploadMask(WorkflowDocument doc,
         return;
     }
 
+    if (req.maskImageNodeId.isEmpty()) {
+        fail("inpaint: maskImageNodeId が未設定です。"
+             "呼び出し元でマスクノードを解決してから渡してください。");
+        return;
+    }
+
     const QString maskUploadName = "lpa_mask.png";
     m_comfy->uploadImage(maskPng, maskUploadName,
         [this, doc = std::move(doc), req](QString saved, QString err) mutable {
@@ -278,19 +284,7 @@ void AiGenerationController::doUploadMask(WorkflowDocument doc,
                 fail("マスク画像のアップロードに失敗: " + err);
                 return;
             }
-            // LoadImageMask バインド適用
-            const QString maskNodeId =
-                req.maskImageNodeId.isEmpty()
-                    ? (!doc.findNodesByClass("LoadImageMask").isEmpty()
-                           ? doc.findNodesByClass("LoadImageMask").first()
-                           : QString{})
-                    : req.maskImageNodeId;
-            if (!maskNodeId.isEmpty()) {
-                doc.apply(WorkflowBinding::byClass("LoadImageMask",
-                          maskNodeId.isEmpty() ? 0 : 0)
-                         .set("image",  saved)
-                         .set("upload", QString("image")));
-            }
+            doc.apply(WorkflowBinding::loadImage(req.maskImageNodeId, saved));
             doQueue(std::move(doc), req);
         });
 }
