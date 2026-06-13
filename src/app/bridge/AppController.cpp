@@ -4846,30 +4846,6 @@ void AppController::connectComfyUi(const QString& urlStr) {
   if (m_aiService)
     m_aiService->setComfyUrl(urlStr);
 
-  // AiGenerationController (WorkflowBinding ベース — inpaint 用) を接続URLで初期化
-#ifdef PAINT_DEBUG_SERVER
-  if (m_comfyHttpClient == nullptr) {
-    m_comfyHttpClient = new platform::comfy::ComfyClient(this);
-  }
-  m_comfyHttpClient->setBaseUrl(QUrl(urlStr));
-
-  if (m_aiGenCtrl == nullptr) {
-    m_aiGenCtrl = new AiGenerationController(this, m_comfyHttpClient, this);
-    connect(m_aiGenCtrl, &AiGenerationController::finished, this, [this]() {
-      m_aiGenLastError.clear();
-      emit aiGenerationComplete("inpaint");
-    });
-    connect(m_aiGenCtrl, &AiGenerationController::errorOccurred, this,
-            [this](const QString& msg) {
-      m_aiGenLastError = msg;
-      emit aiGenerationError(msg);
-    });
-    connect(m_aiGenCtrl, &AiGenerationController::started, this, [this]() {
-      emit aiProgressUpdate(0, 0, QString());
-    });
-  }
-#endif
-
   ensureComfyUiRunning(serverUrl);
   m_comfyUiClient->connectToServer(serverUrl);
 }
@@ -6140,32 +6116,31 @@ void AppController::fetchAiModels() {
 
 // ── AI: インペイント ─────────────────────────────────────────────────────
 void AppController::runInpaint(const InpaintParams& params, int batchCount) {
-#ifdef PAINT_DEBUG_SERVER
-  // AiGenerationController 経由で実行 — 未初期化なら lazy init
-  if (m_comfyHttpClient == nullptr) {
-    m_comfyHttpClient = new platform::comfy::ComfyClient(this);
-    m_comfyHttpClient->setBaseUrl(QUrl(m_comfyHttpUrl));
-  }
-  if (m_aiGenCtrl == nullptr) {
-    m_aiGenCtrl = new AiGenerationController(this, m_comfyHttpClient, this);
-    connect(m_aiGenCtrl, &AiGenerationController::finished, this, [this]() {
-      m_aiGenLastError.clear();
-      emit aiGenerationComplete("inpaint");
+  // AiService lazy-init (generate と同じ接続方式)
+  if (m_aiService == nullptr) {
+    m_aiService = new AiService(this, this);
+    m_aiService->setComfyUrl(m_comfyHttpUrl);
+    connect(m_aiService, &AiService::generationStarted, this, [this]() {
+      emit aiProgressUpdate(0, 0, QString());
     });
-    connect(m_aiGenCtrl, &AiGenerationController::errorOccurred, this,
+    connect(m_aiService, &AiService::generationProgressUpdate, this,
+            [this](int step, int total) {
+      emit aiProgressUpdate(step, total, QString());
+    });
+    connect(m_aiService, &AiService::generationFinished, this,
+            [this](const QString& opType) {
+      m_aiGenLastError.clear();
+      emit aiGenerationComplete(opType);
+    });
+    connect(m_aiService, &AiService::generationError, this,
             [this](const QString& msg) {
       m_aiGenLastError = msg;
       emit aiGenerationError(msg);
     });
-    connect(m_aiGenCtrl, &AiGenerationController::started, this, [this]() {
-      emit aiProgressUpdate(0, 0, QString());
-    });
-    connect(m_aiGenCtrl, &AiGenerationController::batchCandidatesReady, this,
-            [this](const QList<QPixmap>& px) {
-      emit aiBatchCandidatesReady(px);
-    });
+    connect(m_aiService, &AiService::batchCandidatesReady, this,
+            &AppController::aiBatchCandidatesReady);
   }
-  if (m_aiGenCtrl->isBusy()) {
+  if (m_aiService->isBusy()) {
     emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
     return;
   }
@@ -6195,7 +6170,7 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
   const QString kId   = !params.kSamplerNodeId.isEmpty() ? params.kSamplerNodeId
                         : (builtIn ? QStringLiteral("8") : QString());
 
-  AiGenerationController::Request req;
+  AiService::GenerateRequest req;
   req.workflowPath        = wfPath;
   req.useCompositedBuffer = true;
   req.useSelectionAsMask  = true;
@@ -6215,19 +6190,7 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
         .denoise(static_cast<double>(params.denoise))
         .seed   (seed);
 
-  m_aiGenCtrl->executeBatch(req, batchCount);
-#else
-  // PAINT_DEBUG_SERVER なしビルドでは旧実装にフォールバック
-  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
-    emit aiGenerationError("ComfyUI に接続されていません");
-    return;
-  }
-  if (!m_document.selection().hasSelection()) {
-    emit selectionMissing();
-    return;
-  }
-  emit aiGenerationError("このビルドでは AI インペイントに --debug-server が必要です");
-#endif
+  m_aiService->inpaint(req, batchCount);
 }
 
 // ── AI: カスタムワークフローでテキスト→画像生成 ──────────────────────────
@@ -6507,8 +6470,8 @@ AppController::DebugState AppController::debugState() const {
   for (std::size_t i = 0; i < m_document.layerCount(); ++i)
     s.layerNames << QString::fromStdString(m_document.layerAt(i).name());
 
-  // AiGenerationController 状態
-  s.aiGenBusy      = m_aiGenCtrl ? m_aiGenCtrl->isBusy() : false;
+  // AiService 状態
+  s.aiGenBusy      = m_aiService ? m_aiService->isBusy() : false;
   s.aiGenLastError = m_aiGenLastError;
 
   // Undo
@@ -6749,6 +6712,7 @@ AppController::DebugActionResult AppController::executeDebugAction(
       });
       connect(m_aiService, &AiService::batchCandidatesReady, this,
               [this](const QList<QPixmap>& px) {
+        m_batchImages = px;  // store for apply-candidate debug action
         emit aiBatchCandidatesReady(px);
       });
     }
@@ -6780,6 +6744,73 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("outputLayerName"),  outputLayerName},
       {QLatin1String("batchCount"),       batchCount},
       {QLatin1String("via"),              QLatin1String("AiService")},
+    };
+    return r;
+  }
+
+  // ── inpaint ───────────────────────────────────────────────────────────────
+  // Triggers AiService.inpaint() — used by Dev Bridge InpaintViaAiService scenario.
+  // opts: workflowPath, comfyUrl, outputLayerName, timeoutMs, batchCount
+  if (type == QLatin1String("inpaint")) {
+    const QString workflowPath = opts.value(QLatin1String("workflowPath")).toString(target);
+    if (workflowPath.isEmpty()) {
+      r.success = false;
+      r.message = QLatin1String("inpaint: workflowPath is required");
+      return r;
+    }
+    const QString comfyUrl = opts.value(QLatin1String("comfyUrl"))
+                                 .toString(m_comfyHttpUrl);
+    const QString outputLayerName = opts.value(QLatin1String("outputLayerName"))
+                                        .toString(QLatin1String("AI インペイント"));
+    const int timeoutMs  = opts.value(QLatin1String("timeoutMs")).toInt(180000);
+    const int batchCount = opts.value(QLatin1String("batchCount")).toInt(1);
+
+    if (m_aiService == nullptr) {
+      m_aiService = new AiService(this, this);
+      connect(m_aiService, &AiService::generationStarted, this, [this]() {
+        emit aiProgressUpdate(0, 0, QString());
+      });
+      connect(m_aiService, &AiService::generationFinished, this,
+              [this](const QString& opType) {
+        m_aiGenLastError.clear();
+        emit aiGenerationComplete(opType);
+      });
+      connect(m_aiService, &AiService::generationError, this,
+              [this](const QString& msg) {
+        m_aiGenLastError = msg;
+        emit aiGenerationError(msg);
+      });
+      connect(m_aiService, &AiService::batchCandidatesReady, this,
+              [this](const QList<QPixmap>& px) {
+        emit aiBatchCandidatesReady(px);
+      });
+    }
+    m_aiService->setComfyUrl(comfyUrl);
+
+    if (m_aiService->isBusy()) {
+      r.success = false;
+      r.message = QLatin1String("inpaint: AiService is busy");
+      return r;
+    }
+
+    m_aiGenLastError.clear();
+    AiService::GenerateRequest req;
+    req.workflowPath        = workflowPath;
+    req.useCompositedBuffer = true;
+    req.useSelectionAsMask  = true;
+    req.outputLayerName     = outputLayerName;
+    req.timeoutMs           = timeoutMs;
+    m_aiService->inpaint(req, batchCount);
+
+    r.success = true;
+    r.message = QLatin1String("inpaint: started via AiService");
+    r.data = QJsonObject{
+      {QLatin1String("workflowPath"),    workflowPath},
+      {QLatin1String("comfyUrl"),        comfyUrl},
+      {QLatin1String("outputLayerName"), outputLayerName},
+      {QLatin1String("batchCount"),      batchCount},
+      {QLatin1String("via"),             QLatin1String("AiService")},
+      {QLatin1String("opType"),          QLatin1String("inpaint")},
     };
     return r;
   }
@@ -6911,6 +6942,38 @@ AppController::DebugActionResult AppController::executeDebugAction(
     r.success = true;
     r.message = QLatin1String("Available debug actions");
     r.data    = QJsonObject{{QLatin1String("actions"), actions}};
+    return r;
+  }
+
+  // ── apply-candidate ──────────────────────────────────────────────────────
+  // バッチ候補の中から指定インデックスをレイヤーとして追加する。
+  // opts:
+  //   index      : 候補インデックス (0-based, default 0)
+  //   layerName  : 追加レイヤー名 (default "AI 生成")
+  if (type == QLatin1String("apply-candidate")) {
+    const int idx = opts.value(QLatin1String("index")).toInt(0);
+    if (m_batchImages.isEmpty()) {
+      r.success = false;
+      r.message = QLatin1String("apply-candidate: no batch candidates available");
+      return r;
+    }
+    if (idx < 0 || idx >= m_batchImages.size()) {
+      r.success = false;
+      r.message = QString("apply-candidate: index %1 out of range (0..%2)")
+                      .arg(idx).arg(m_batchImages.size() - 1);
+      return r;
+    }
+    const QString lname = opts.value(QLatin1String("layerName"))
+                              .toString(QLatin1String("AI 生成"));
+    applyBatchCandidate(m_batchImages.at(idx), lname);
+    m_batchImages.clear();
+    r.success = true;
+    r.message = QString("apply-candidate: applied index %1 as layer \"%2\"").arg(idx).arg(lname);
+    const auto& s2 = debugState();
+    QJsonObject dataObj;
+    dataObj[QLatin1String("layerCount")] = s2.layerCount;
+    dataObj[QLatin1String("activeLayer")] = s2.activeLayerName;
+    r.data = dataObj;
     return r;
   }
 

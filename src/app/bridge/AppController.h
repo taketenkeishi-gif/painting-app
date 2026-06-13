@@ -55,7 +55,6 @@
 namespace platform::comfy { class ComfyClient; }
 
 namespace app::bridge {
-class AiGenerationController;
 class AiService;
 class ComfyUiClient;
 
@@ -880,9 +879,6 @@ private:
   // ── AiService (generate facade) ──────────────────────────────────────────
   AiService*  m_aiService     {nullptr};
 
-  // ── ComfyUI HTTP (platform::comfy — inpaint 用。将来 AiService に移行) ────
-  platform::comfy::ComfyClient*  m_comfyHttpClient {nullptr};
-  AiGenerationController*        m_aiGenCtrl       {nullptr};
   QString                        m_comfyHttpUrl    {"http://localhost:8188"};
   QString                        m_aiGenLastError;
 

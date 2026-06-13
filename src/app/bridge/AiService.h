@@ -48,6 +48,7 @@ public:
   };
 
   void generate(const GenerateRequest& req, int batchCount = 1);
+  void inpaint (const GenerateRequest& req, int batchCount = 1);
 
 signals:
   void generationStarted();
@@ -59,10 +60,11 @@ signals:
 private:
   void ensureInitialized();
 
-  AppController*                 m_appController {nullptr};
-  platform::comfy::ComfyClient*  m_comfyClient   {nullptr};
-  AiGenerationController*        m_genCtrl       {nullptr};
-  QString                        m_url           {"http://localhost:8188"};
+  AppController*                 m_appController   {nullptr};
+  platform::comfy::ComfyClient*  m_comfyClient     {nullptr};
+  AiGenerationController*        m_genCtrl         {nullptr};
+  QString                        m_url             {"http://localhost:8188"};
+  QString                        m_currentOpType   {"generate"};
 };
 
 } // namespace app::bridge

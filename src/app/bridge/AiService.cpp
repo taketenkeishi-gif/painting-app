@@ -32,7 +32,7 @@ void AiService::ensureInitialized() {
     connect(m_genCtrl, &AiGenerationController::progressUpdate,
             this, &AiService::generationProgressUpdate);
     connect(m_genCtrl, &AiGenerationController::finished, this, [this]() {
-      emit generationFinished(QStringLiteral("generate"));
+      emit generationFinished(m_currentOpType);
     });
     connect(m_genCtrl, &AiGenerationController::errorOccurred,
             this, &AiService::generationError);
@@ -41,22 +41,31 @@ void AiService::ensureInitialized() {
   }
 }
 
+static AiGenerationController::Request toGenCtrlRequest(const AiService::GenerateRequest& req) {
+  AiGenerationController::Request r;
+  r.workflowPath        = req.workflowPath;
+  r.workflowDoc         = req.workflowDoc;
+  r.useActiveLayer      = req.useActiveLayer;
+  r.useCompositedBuffer = req.useCompositedBuffer;
+  r.inputImageNodeId    = req.inputImageNodeId;
+  r.useSelectionAsMask  = req.useSelectionAsMask;
+  r.maskImageNodeId     = req.maskImageNodeId;
+  r.extraBindings       = req.extraBindings;
+  r.outputLayerName     = req.outputLayerName;
+  r.timeoutMs           = req.timeoutMs;
+  return r;
+}
+
 void AiService::generate(const GenerateRequest& req, int batchCount) {
   ensureInitialized();
+  m_currentOpType = QStringLiteral("generate");
+  m_genCtrl->executeBatch(toGenCtrlRequest(req), batchCount);
+}
 
-  AiGenerationController::Request genReq;
-  genReq.workflowPath        = req.workflowPath;
-  genReq.workflowDoc         = req.workflowDoc;
-  genReq.useActiveLayer      = req.useActiveLayer;
-  genReq.useCompositedBuffer = req.useCompositedBuffer;
-  genReq.inputImageNodeId    = req.inputImageNodeId;
-  genReq.useSelectionAsMask  = req.useSelectionAsMask;
-  genReq.maskImageNodeId     = req.maskImageNodeId;
-  genReq.extraBindings       = req.extraBindings;
-  genReq.outputLayerName     = req.outputLayerName;
-  genReq.timeoutMs           = req.timeoutMs;
-
-  m_genCtrl->executeBatch(genReq, batchCount);
+void AiService::inpaint(const GenerateRequest& req, int batchCount) {
+  ensureInitialized();
+  m_currentOpType = QStringLiteral("inpaint");
+  m_genCtrl->executeBatch(toGenCtrlRequest(req), batchCount);
 }
 
 } // namespace app::bridge
