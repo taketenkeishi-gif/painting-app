@@ -4,7 +4,103 @@
 
 ---
 
-## 2026-06-12 (最新) — FreeTransform UX 修正（画質・コーナーアンカー）
+## 2026-06-15 (最新) — Dev Bridge First Architecture 統合完了
+
+### 作業内容
+
+UX Fix Pass 1（shortcut / ToolSlider / AdjustmentDock）、Dev Bridge Runtime Observation 追加、
+Action Surface 拡張（5 アクション）、FirstDrawingSession シナリオ v2 の実行・検証。
+
+### 変更ファイル
+
+- `src/app/bridge/AppController.cpp` — 5 新規 debug アクション追加（`#ifdef PAINT_DEBUG_SERVER` 内）:
+  - `new-document` {width, height} — `newDocument()` 経由でキャンバス再作成
+  - `add-raster-layer` — `addRasterLayer()` 経由でレイヤー追加
+  - `set-active-layer` {index} — `setActiveLayer()` 経由でアクティブレイヤー切替
+  - `set-foreground-color` {r,g,b} — `setBrushColor()` 経由で前景色変更
+  - `export-png` {path} — `rerender()` + `QtImageConverter::toQImage()` + `QImage::save()` で PNG 書き出し
+- `C:\Users\Keishi\Portfolio\Dev_Bridge\src\projects\LayeredPaint\scenarios\FirstDrawingSession.mjs` — v2 に書き換え（5 新アクション利用）
+
+### UX Fix Pass 1（コミット c0ae0a9）
+
+| 修正項目 | Before | After |
+|---|---|---|
+| shortcut conflict | 3 件（Del キー競合等） | 0 件 |
+| ToolSlider 幅 | 12px | 48px |
+| AdjustmentDock minHeight | 22px | 422px |
+
+### Dev Bridge Runtime Observation
+
+DebugServer に 3 エンドポイント追加（`PAINT_DEBUG_SERVER` 有効時）:
+- `GET /debug/components` — UI ウィジェット一覧（type / text / visible / enabled / bounds）
+- `GET /debug/layout` — ドック配置情報（area / floating / geometry / tabbedWith）
+- `GET /debug/input` — ショートカット一覧・conflict 検出（conflictCount）
+
+### FirstDrawingSession v2 実行結果
+
+- 12 ステップ中 10 PASS / 0 FAIL / 2 NOT_REACHABLE
+- automationRate: **83%**（前回 42%）
+- NOT_REACHABLE 内訳:
+  - step 2: `set-tool` action 未実装（Brush ツール既定アクティブなので click コスト=0）
+  - step 8c: AI Inpaint（ComfyUI 接続 + プリセット設定が必要。`ai-generate-with-preset` は実装済み）
+
+### Architecture Audit 結果
+
+新規 5 アクション全件 PASS（重複ロジックなし、core 漏れなし）。
+WARNING 1 件: `export-png` は `markClean()` を呼ばない（debug 用途で意図的。`#ifdef` 保護済み）。
+
+### 完了項目
+
+- ✅ UX Fix Pass 1（shortcut conflict 解消・スライダー幅・ドック高さ）
+- ✅ Runtime Observation 3 エンドポイント（/debug/components / /debug/layout / /debug/input）
+- ✅ Action Surface 5 件（new-document / add-raster-layer / set-active-layer / set-foreground-color / export-png）
+- ✅ FirstDrawingSession v2: 10/12 PASS, automationRate 83%
+- ✅ Architecture Audit: delegate-only パターン確認、重複実装なし
+
+### 次のアクション
+
+- [ ] `set-tool` action 実装（automationRate 100% への残り 1 ステップ）
+- [ ] 機能開発継続（Vector 編集 / 選択範囲切り出し等）
+
+---
+
+## 2026-06-15 — ComfyUI AI 生成統合 E2E 完了
+
+### 作業内容
+
+ComfyUI との AI 生成経路（inpaint / txt2img）を完全非同期化し、E2E を verified。
+
+### 変更ファイル
+
+- `src/platform/comfy/ComfyProcessManager.cpp` — `waitForConnected` 完全廃止。`ensureRunning` + `onHealthCheckTick` を `connectToHost + connected/errorOccurred` シグナルによる完全非同期設計に書き換え
+- `src/app/bridge/AppController.h` — `ensureComfyProcessManager()` private メソッド追加
+- `src/app/bridge/AppController.cpp` — M1/M2/M3 修正:
+  - M1: `ensureComfyRunning` から `waitForConnected(300)` 高速パスを削除。常に async 経路に統一
+  - M2: `m_comfyProcess` 初期化 + 永続シグナル接続を `ensureComfyProcessManager()` に一本化（`failed → aiGenerationError` の重複接続リスクを排除）
+  - M3: `debugCaptureComfyPayload/Response` の出力先を `QStandardPaths::AppLocalDataLocation` に固定（CWD 依存解消）
+
+### 完了項目
+
+- ✅ `waitForConnected` 残存 0（grep 確認）
+- ✅ inpaint E2E: `selection-rect` → `ai-generate-with-preset` → `controllerInstance=1`, `activeHasMask=True`, `layers.count=2`
+- ✅ `debug_comfy_prompt.json`: `C:\Users\Keishi\AppData\Local\LayeredPaintApp\` に出力（固定パス）、ノード数 10、`node_errors` なし
+- ✅ txt2img regression: `selection-clear` 後 generate → `activeHasMask=False` 確認
+- ✅ `failed → aiGenerationError` emit: `ensureComfyProcessManager()` の永続接続1本のみ
+
+### 根本原因（修正済み）
+
+`QTcpSocket::waitForConnected` は Qt ドキュメントで「Windows メインスレッドで動作保証なし」と明記されている。
+HTTP ハンドラコンテキスト（DebugServer）と QTimer スロット（healthCheckTick）の両方から呼ばれていたため、
+ComfyUI が起動済みでも `ready` シグナルが発火せず AI 生成が開始されなかった。
+
+### 次のアクション
+
+- [ ] 機能開発へ移行（次は「選択範囲を新規レイヤーとして切り出し」または Vector 編集）
+- [ ] Architecture Cleanup Backlog（D 系: WebSocket 経路統合等）は優先度を落として並行消化
+
+---
+
+## 2026-06-12 (前セッション) — FreeTransform UX 修正（画質・コーナーアンカー）
 
 ### 作業内容
 

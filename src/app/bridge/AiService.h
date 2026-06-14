@@ -75,6 +75,9 @@ public:
   void upscale(const UpscaleRequest& req);
   void fetchUpscaleModels();
 
+  /// ComfyUI の実行中プロンプトを中断する。初期化前に呼んでも安全 (no-op)。
+  void cancel();
+
 signals:
   void generationStarted();
   void generationProgressUpdate(int step, int totalSteps);

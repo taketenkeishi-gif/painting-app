@@ -1,27 +1,14 @@
 #pragma once
 
 #include <QDialog>
-#include <QJsonObject>
 #include <QList>
 #include <QString>
+
+#include "app/ai/WorkflowPreset.h"
 
 class QComboBox;
 
 namespace app::panels {
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WorkflowBindingConfig
-//
-// ワークフロー内のノード役割 → ノード ID の対応。
-// AiPanel が保持し、QSettings に保存する。
-// ─────────────────────────────────────────────────────────────────────────────
-struct WorkflowBindingConfig {
-    QString inputImageNodeId;   // LoadImage  — キャンバス合成画像
-    QString maskNodeId;         // LoadImage  — 選択マスク
-    QString positiveNodeId;     // CLIPTextEncode — ポジティブプロンプト
-    QString negativeNodeId;     // CLIPTextEncode — ネガティブプロンプト
-    QString kSamplerNodeId;     // KSampler / KSamplerAdvanced
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkflowBindingDialog

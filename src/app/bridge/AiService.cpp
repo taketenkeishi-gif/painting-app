@@ -157,4 +157,9 @@ void AiService::fetchUpscaleModels() {
       });
 }
 
+void AiService::cancel() {
+  if (m_comfyClient)
+    m_comfyClient->interrupt();
+}
+
 } // namespace app::bridge

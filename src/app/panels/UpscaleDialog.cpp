@@ -15,7 +15,7 @@
 #include <QThread>
 #include <QVBoxLayout>
 
-#include "app/bridge/ComfyUiClient.h"
+#include "app/bridge/AiService.h"
 #include "platform/qt/QtImageConverter.h"
 
 namespace app::panels {
@@ -37,35 +37,27 @@ void UpscaleWorker::run() {
 UpscaleDialog::UpscaleDialog(
     const core::PixelBuffer& src,
     const std::vector<core::ai::UpscaleEngine::ModelInfo>& localModels,
-    app::bridge::ComfyUiClient* comfyClient,
+    app::bridge::AiService* aiService,
     QWidget* parent)
     : QDialog(parent)
     , m_src(src)
     , m_localModels(localModels)
-    , m_comfyClient(comfyClient) {
+    , m_aiService(aiService) {
     setWindowTitle(QString::fromUtf8(u8"AI 高解像度化"));
     setFixedWidth(420);
     setupUi();
     updateOutputSizeLabel();
 
-    // ComfyUI シグナル接続（接続中の場合のみ）
-    if (m_comfyClient && m_comfyClient->isConnected()) {
-        connect(m_comfyClient, &app::bridge::ComfyUiClient::executionComplete,
-                this, &UpscaleDialog::onComfyComplete);
-        connect(m_comfyClient, &app::bridge::ComfyUiClient::executionError,
-                this, &UpscaleDialog::onComfyError);
-        connect(m_comfyClient, &app::bridge::ComfyUiClient::progressUpdate,
-                this, &UpscaleDialog::onComfyProgress);
+    if (m_aiService) {
+        connect(m_aiService, &app::bridge::AiService::upscaleResult,
+                this, &UpscaleDialog::onAiUpscaleResult);
+        connect(m_aiService, &app::bridge::AiService::upscaleError,
+                this, &UpscaleDialog::onAiUpscaleError);
+        connect(m_aiService, &app::bridge::AiService::upscaleModelsReady,
+                this, &UpscaleDialog::onAiModelsReady);
 
-        // ComfyUI モデルを非同期で取得してコンボに挿入
         m_statusLabel->setText(QString::fromUtf8(u8"ComfyUI モデルを読み込み中..."));
-        m_comfyClient->fetchUpscaleModels([this](QStringList models) {
-            populateComfyModels(models);
-            const QString msg = models.isEmpty()
-                ? QString::fromUtf8(u8"ComfyUI: アップスケールモデルなし")
-                : QString::fromUtf8(u8"ComfyUI: %1 個のモデルを検出").arg(models.size());
-            m_statusLabel->setText(msg);
-        });
+        m_aiService->fetchUpscaleModels();
     }
 }
 
@@ -108,7 +100,7 @@ void UpscaleDialog::setupUi() {
         m_modelCombo->setItemData(m_modelCombo->count() - 1,
             static_cast<int>(Backend::Bilinear), Qt::UserRole + 1);
 
-        if (m_localModels.empty() && (!m_comfyClient || !m_comfyClient->isConnected())) {
+        if (m_localModels.empty() && !m_aiService) {
             m_modelCombo->setToolTip(
                 QString::fromUtf8(
                     u8"ComfyUI 接続 or ONNX モデルを\n"
@@ -349,17 +341,16 @@ void UpscaleDialog::onRunClicked() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ComfyUI 実行パス
+// ComfyUI 実行パス（AiService 経由）
 // ─────────────────────────────────────────────────────────────────────────────
 void UpscaleDialog::runViaComfyUI() {
-    if (!m_comfyClient || !m_comfyClient->isConnected()) {
-        m_statusLabel->setText(QString::fromUtf8(u8"ComfyUI に接続されていません"));
+    if (!m_aiService) {
+        m_statusLabel->setText(QString::fromUtf8(u8"AiService が利用できません"));
         return;
     }
 
     const QString modelName = m_modelCombo->currentData(Qt::UserRole).toString();
 
-    // PixelBuffer → PNG バイト列
     const QImage img = platform::qt::QtImageConverter::toQImage(m_src);
     QByteArray pngBytes;
     QBuffer buf(&pngBytes);
@@ -369,75 +360,49 @@ void UpscaleDialog::runViaComfyUI() {
 
     m_hasResult = false;
     setRunning(true);
-    m_statusLabel->setText(QString::fromUtf8(u8"ComfyUI: 画像アップロード中..."));
+    m_progressBar->setRange(0, 0);
+    m_statusLabel->setText(QString::fromUtf8(u8"ComfyUI: 処理中..."));
 
-    m_comfyClient->uploadImage(pngBytes, "lpa_upscale_in.png",
-        [this, modelName](QString savedName) {
-            if (savedName.isEmpty()) {
-                setRunning(false);
-                m_statusLabel->setText(QString::fromUtf8(u8"アップロード失敗"));
-                return;
-            }
-            m_statusLabel->setText(QString::fromUtf8(u8"ComfyUI: ワークフロー送信中..."));
-            const auto wf = app::bridge::ComfyUiClient::buildUpscaleWorkflow(savedName, modelName);
-            m_comfyClient->queuePrompt(wf, [this](QString promptId) {
-                m_comfyPromptId = promptId;
-                m_statusLabel->setText(QString::fromUtf8(u8"ComfyUI: 推論中..."));
-                m_progressBar->setRange(0, 0);   // indeterminate
-            });
-        });
+    app::bridge::AiService::UpscaleRequest req;
+    req.imagePng  = pngBytes;
+    req.modelName = modelName;
+    m_aiService->upscale(req);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ComfyUI シグナルハンドラー
+// AiService シグナルハンドラー
 // ─────────────────────────────────────────────────────────────────────────────
-void UpscaleDialog::onComfyComplete(const QString& promptId, const QStringList& outputs) {
-    if (promptId != m_comfyPromptId) return;
-    m_comfyPromptId.clear();
-
-    if (outputs.isEmpty()) {
-        setRunning(false);
-        m_statusLabel->setText(QString::fromUtf8(u8"出力画像なし"));
+void UpscaleDialog::onAiUpscaleResult(const QByteArray& pngData) {
+    setRunning(false);
+    if (pngData.isEmpty()) {
+        m_statusLabel->setText(QString::fromUtf8(u8"画像取得失敗"));
         return;
     }
-
-    m_statusLabel->setText(QString::fromUtf8(u8"ComfyUI: 画像取得中..."));
-    m_comfyClient->fetchImage(outputs.first(), QString(), "output",
-        [this](QByteArray pngData) {
-            setRunning(false);
-            if (pngData.isEmpty()) {
-                m_statusLabel->setText(QString::fromUtf8(u8"画像取得失敗"));
-                return;
-            }
-            QImage img;
-            img.loadFromData(pngData, "PNG");
-            if (img.isNull()) {
-                m_statusLabel->setText(QString::fromUtf8(u8"画像デコード失敗"));
-                return;
-            }
-            m_result   = platform::qt::QtImageConverter::fromQImage(img);
-            m_hasResult = m_result.width() > 0;
-            m_statusLabel->setText(
-                QString::fromUtf8(u8"完了: %1 × %2 px")
-                    .arg(m_result.width()).arg(m_result.height()));
-            if (m_hasResult) accept();
-        });
+    QImage img;
+    img.loadFromData(pngData, "PNG");
+    if (img.isNull()) {
+        m_statusLabel->setText(QString::fromUtf8(u8"画像デコード失敗"));
+        return;
+    }
+    m_result    = platform::qt::QtImageConverter::fromQImage(img);
+    m_hasResult = m_result.width() > 0;
+    m_statusLabel->setText(
+        QString::fromUtf8(u8"完了: %1 × %2 px")
+            .arg(m_result.width()).arg(m_result.height()));
+    if (m_hasResult) accept();
 }
 
-void UpscaleDialog::onComfyError(const QString& promptId, const QString& message) {
-    if (promptId != m_comfyPromptId && !m_comfyPromptId.isEmpty()) return;
-    m_comfyPromptId.clear();
+void UpscaleDialog::onAiUpscaleError(const QString& message) {
     setRunning(false);
     m_statusLabel->setText(QString::fromUtf8(u8"ComfyUI エラー: ") + message);
 }
 
-void UpscaleDialog::onComfyProgress(const QString& promptId, int step, int total,
-                                     const QString& /*nodeId*/) {
-    if (promptId != m_comfyPromptId) return;
-    if (total > 0) {
-        m_progressBar->setRange(0, total);
-        m_progressBar->setValue(step);
-    }
+void UpscaleDialog::onAiModelsReady(const QStringList& models) {
+    populateComfyModels(models);
+    const QString msg = models.isEmpty()
+        ? QString::fromUtf8(u8"ComfyUI: アップスケールモデルなし")
+        : QString::fromUtf8(u8"ComfyUI: %1 個のモデルを検出").arg(models.size());
+    m_statusLabel->setText(msg);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

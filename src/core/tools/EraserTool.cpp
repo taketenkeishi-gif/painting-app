@@ -4,6 +4,7 @@
 #include <cmath>
 #include <optional>
 
+#include "core/brush/StrokeProcessor.h"
 #include "core/render/RenderUtils.h"
 
 namespace core {
@@ -162,7 +163,7 @@ ToolResult EraserTool::onPointerPress(ToolContext& context, const ToolPointerEve
   m_erasing = true;
   m_lastPoint = event.fpoint;
   m_lastPressure = event.pressure;
-  m_distanceAccum = 0.0f;
+  m_strokeProcessor.beginStroke(event.fpoint);
 
   if (active->kind() == LayerKind::Vector) {
     eraseVectorStroke(*active, m_lastPoint, m_lastPoint);
@@ -191,7 +192,8 @@ ToolResult EraserTool::onPointerMove(ToolContext& context, const ToolPointerEven
   }
 
   const FPoint previous = m_lastPoint;
-  const FPoint stabilized = applyStabilization(m_lastPoint, event.fpoint);
+  const FPoint stabilized = m_strokeProcessor.applyStabilization(
+      m_lastPoint, event.fpoint, m_stabilization, m_velocityBasedCorrection);
   const float pressure = event.pressure;
   if (active->kind() == LayerKind::Vector) {
     eraseVectorStroke(*active, previous, stabilized);
@@ -217,7 +219,8 @@ ToolResult EraserTool::onPointerRelease(ToolContext& context, const ToolPointerE
   if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) return {};
   if (active->kind() == LayerKind::Raster && active->alphaLocked()) return {};
 
-  const FPoint stabilized = applyStabilization(m_lastPoint, event.fpoint);
+  const FPoint stabilized = m_strokeProcessor.applyStabilization(
+      m_lastPoint, event.fpoint, m_stabilization, m_velocityBasedCorrection);
   const float dx = stabilized.x - m_lastPoint.x;
   const float dy = stabilized.y - m_lastPoint.y;
   const bool moved = (dx * dx + dy * dy) > 0.01f;
@@ -261,7 +264,7 @@ ToolResult EraserTool::onCancel(ToolContext& context) {
   static_cast<void>(context);
   m_erasing = false;
   m_selectionMask = nullptr;
-  m_distanceAccum = 0.0f;
+  m_strokeProcessor.beginStroke({0.0f, 0.0f});
   return {};
 }
 
@@ -275,113 +278,62 @@ ToolResult EraserTool::onWheel(ToolContext& context, int deltaSteps, const ToolP
 // ---------------------------------------------------------------
 // スタビライザー（FPoint版）
 // ---------------------------------------------------------------
-FPoint EraserTool::applyStabilization(const FPoint& from, const FPoint& to) const {
-  const float stabilization = std::clamp(m_stabilization, 0.0F, 1.0F);
-  if (stabilization <= 0.001F) return to;
-
-  float response = 1.0F - stabilization * 0.85F;
-  if (m_velocityBasedCorrection) {
-    const float distance = from.lengthTo(to);
-    const float velocityFactor = std::clamp(1.0F - distance / 80.0F, 0.25F, 1.0F);
-    response *= velocityFactor;
-  }
-  response = std::clamp(response, 0.05F, 1.0F);
-  return FPoint {
-      from.x + (to.x - from.x) * response,
-      from.y + (to.y - from.y) * response};
-}
-
 // ---------------------------------------------------------------
-// ラスターストローク（subpixel + spacing accumulation）
+// ラスターストローク（StrokeProcessor 経由 CR + spacing）
 // ---------------------------------------------------------------
 void EraserTool::eraseStroke(Layer& layer, const FPoint& from, const FPoint& to, float pressure) {
+  const float p = std::clamp(pressure, 0.0f, 1.0f);
+  float sizeScale = 1.0f;
+  if (m_pressureSizeEnabled) sizeScale = m_pressureSizeMin + (1.0f - m_pressureSizeMin) * p;
+  const float fRadius = static_cast<float>(std::max(1, m_size)) * 0.5f * sizeScale;
+
   // マスク編集モード: 消去ではなく黒を描画（非表示化）
   if (m_maskEditMode) {
     PixelBuffer& maskBuf = layer.maskBuffer();
-    const float p = std::clamp(pressure, 0.0f, 1.0f);
-    float sizeScale = 1.0f;
-    if (m_pressureSizeEnabled) sizeScale = m_pressureSizeMin + (1.0f - m_pressureSizeMin) * p;
-    const float fRadius = static_cast<float>(std::max(1, m_size)) * 0.5f * sizeScale;
-    const float spacingPx = std::max(0.5f, m_spacing * fRadius * 2.0f);
-    const float dx = to.x - from.x;
-    const float dy = to.y - from.y;
-    const float segLen = std::sqrt(dx * dx + dy * dy);
-    auto paintBlack = [&](FPoint pos) {
-      const int r = static_cast<int>(std::ceil(fRadius));
-      for (int py = -r; py <= r; ++py) {
-        for (int px2 = -r; px2 <= r; ++px2) {
-          const float d2 = static_cast<float>(px2 * px2 + py * py);
-          if (d2 > fRadius * fRadius) continue;
-          const int bx = static_cast<int>(pos.x) + px2;
-          const int by = static_cast<int>(pos.y) + py;
-          if (!maskBuf.inBounds(bx, by)) continue;
-          maskBuf.setPixel(bx, by, Color {0, 0, 0, 255});
-        }
-      }
-    };
-    if (segLen < 0.001f) { paintBlack(from); return; }
-    float traveled = spacingPx - m_distanceAccum;
-    if (traveled < 0.0f) traveled = 0.0f;
-    while (traveled <= segLen + 0.001f) {
-      const float t = std::clamp(traveled / segLen, 0.0f, 1.0f);
-      paintBlack({from.x + dx * t, from.y + dy * t});
-      traveled += spacingPx;
-    }
-    m_distanceAccum = segLen - (traveled - spacingPx);
-    if (m_distanceAccum < 0.0f) m_distanceAccum = 0.0f;
+    m_strokeProcessor.feedSegment(
+        from, to,
+        m_spacing, fRadius,
+        p, p,
+        0.0f, 0.0f, 0.0f, 0.0f,
+        [&](const DabRequest& dab) {
+          ++m_debugDabCount;
+          const int r = static_cast<int>(std::ceil(fRadius));
+          for (int py = -r; py <= r; ++py) {
+            for (int px2 = -r; px2 <= r; ++px2) {
+              const float d2 = static_cast<float>(px2 * px2 + py * py);
+              if (d2 > fRadius * fRadius) continue;
+              const int bx = static_cast<int>(dab.pos.x) + px2;
+              const int by = static_cast<int>(dab.pos.y) + py;
+              if (!maskBuf.inBounds(bx, by)) continue;
+              maskBuf.setPixel(bx, by, Color {0, 0, 0, 255});
+            }
+          }
+        });
     return;
   }
 
   PixelBuffer& buffer = layer.buffer();
-
-  // 筆圧によるサイズ・不透明度スケーリング（BrushTool と同じロジック）
-  const float p = std::clamp(pressure, 0.0f, 1.0f);
-  float sizeScale = 1.0f;
-  if (m_pressureSizeEnabled) {
-    sizeScale = m_pressureSizeMin + (1.0f - m_pressureSizeMin) * p;
-  }
   float opacityScale = 1.0f;
   if (m_pressureOpacityEnabled) {
     opacityScale = m_pressureOpacityMin + (1.0f - m_pressureOpacityMin) * p;
   }
   const float effectiveOpacity = std::clamp(m_opacity * opacityScale, 0.0f, 1.0f);
 
-  const float fRadius = static_cast<float>(std::max(1, m_size)) * 0.5f * sizeScale;
-  const float spacingPx = std::max(0.5f, m_spacing * fRadius * 2.0f);
-  const float dx = to.x - from.x;
-  const float dy = to.y - from.y;
-  const float segLen = std::sqrt(dx * dx + dy * dy);
-
-  if (segLen < 0.001F) {
-    if (m_shapeType == BrushShapeType::Square) {
-      eraseSquare(buffer, from, fRadius, effectiveOpacity);
-    } else {
-      eraseCircleAA(buffer, from, fRadius, effectiveOpacity);
-    }
-    return;
-  }
-
-  float traveled = spacingPx - m_distanceAccum;
-  if (traveled < 0.0f) traveled = 0.0f;
-  if (traveled > segLen) {
-    m_distanceAccum += segLen;
-    return;
-  }
-
-  while (traveled <= segLen + 0.001f) {
-    const float t = std::clamp(traveled / segLen, 0.0f, 1.0f);
-    const FPoint pos {from.x + dx * t, from.y + dy * t};
-    if (m_shapeType == BrushShapeType::Square) {
-      eraseSquare(buffer, pos, fRadius, effectiveOpacity);
-    } else {
-      eraseCircleAA(buffer, pos, fRadius, effectiveOpacity);
-    }
-    traveled += spacingPx;
-  }
-
-  const float consumed = traveled - spacingPx;
-  m_distanceAccum = segLen - (consumed - spacingPx);
-  if (m_distanceAccum < 0.0f) m_distanceAccum = 0.0f;
+  // ── StrokeProcessor に CR / spacing / distanceAccum を委譲 ───────────────
+  m_strokeProcessor.feedSegment(
+      from, to,
+      m_spacing, fRadius,
+      p, p,       // 消しゴムはセグメント内圧力補間なし（同一値）
+      0.0f, 0.0f, // strokeT / strokeLen = 0 → テーパー無効
+      0.0f, 0.0f, // taperStart / taperEnd = 0
+      [&](const DabRequest& dab) {
+        ++m_debugDabCount;
+        if (m_shapeType == BrushShapeType::Square) {
+          eraseSquare(buffer, dab.pos, fRadius, effectiveOpacity);
+        } else {
+          eraseCircleAA(buffer, dab.pos, fRadius, effectiveOpacity);
+        }
+      });
 }
 
 // ---------------------------------------------------------------

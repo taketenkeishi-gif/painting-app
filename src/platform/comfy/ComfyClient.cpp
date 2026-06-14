@@ -292,6 +292,43 @@ void ComfyClient::fetchLoras(std::function<void(QStringList, QString)> cb) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// fetchUpscaleModels  —  GET /object_info/UpscaleModelLoader → model_name 候補
+// ─────────────────────────────────────────────────────────────────────────────
+void ComfyClient::fetchUpscaleModels(std::function<void(QStringList, QString)> cb) {
+    QNetworkReply* reply = get("/object_info/UpscaleModelLoader");
+    connect(reply, &QNetworkReply::finished, this, [reply, cb = std::move(cb)]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            cb({}, reply->errorString());
+            return;
+        }
+        const QJsonObject root =
+            QJsonDocument::fromJson(reply->readAll()).object();
+        const QJsonArray choices =
+            root.value("UpscaleModelLoader").toObject()
+                .value("input").toObject()
+                .value("required").toObject()
+                .value("model_name").toArray()
+                .at(0).toArray();
+        QStringList names;
+        names.reserve(choices.size());
+        for (const QJsonValue& v : choices) {
+            const QString s = v.toString();
+            if (!s.isEmpty()) names << s;
+        }
+        cb(names, names.isEmpty() ? QString("No upscale models found") : QString());
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// interrupt  —  POST /interrupt (fire-and-forget)
+// ─────────────────────────────────────────────────────────────────────────────
+void ComfyClient::interrupt() {
+    auto* reply = post("/interrupt", QByteArray{});
+    connect(reply, &QNetworkReply::finished, reply, &QNetworkReply::deleteLater);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // execute  —  upload → queue → wait → fetch を一括実行
 // ─────────────────────────────────────────────────────────────────────────────
 void ComfyClient::execute(const ExecuteRequest& req,

@@ -5,6 +5,9 @@
 #include <string_view>
 #include <vector>
 
+#include "core/brush/DabGenerator.h"
+#include "core/brush/DabRenderer.h"
+#include "core/brush/StrokeProcessor.h"
 #include "core/buffer/PixelBuffer.h"
 #include "core/common/FPoint.h"
 #include "core/common/Point.h"
@@ -90,8 +93,7 @@ public:
   ToolOverlayState overlay() const override;
 
 protected:
-  FPoint applyStabilization(const FPoint& from, const FPoint& to) const;
-  float computeTaperStrength(float t, float taperStart, float taperEnd) const;
+  float computeTaperStrength(float t, float taperStart, float taperEnd) const; // kept for EraserTool
   float computePressureSize(float pressure) const;
   float computePressureOpacity(float pressure) const;
   float computeVelocityFactor(float segLenPx) const noexcept;
@@ -124,7 +126,6 @@ protected:
   bool m_maskEditMode {false};
   FPoint m_lastPoint {0.0f, 0.0f};
   float m_lastPressure {1.0f};
-  mutable float m_distanceAccum {0.0f};
   float m_strokeLength {0.0f};
   std::vector<FPoint> m_vectorPoints;
 
@@ -136,15 +137,29 @@ protected:
   // スメア用: 前回の stamp 中心で採取した色
   mutable Color m_smearColor {0, 0, 0, 255};
 
-  // Catmull-Rom スプライン: 前セグメントの始点を保持
-  FPoint m_prevPoint    {0.0f, 0.0f};
-  bool   m_hasPrevPoint {false};
+  // ── DabGenerator ────────────────────────────────────────────────────────────
+  // scatter / angleJitter / dabCount ループを管理する。
+  mutable DabGenerator m_dabGenerator;
 
-  // scatter / angleJitter 用 LCG シード（ストロークごとにリセット）
-  mutable uint32_t m_dabRandSeed {0};
+  // ── DabRenderer ─────────────────────────────────────────────────────────────
+  // coverage計算・テクスチャ・wetMix/smear・buildup制御・dab pixel loop を担当。
+  mutable DabRenderer m_dabRenderer;
+
+  // ── StrokeProcessor ────────────────────────────────────────────────────────
+  // Catmull-Rom / spacing / distanceAccum / prevPoint を管理する。
+  StrokeProcessor m_strokeProcessor;
 
   /// ストローク中の選択マスク参照（hasSelection == false のとき nullptr）
   mutable const SelectionMask* m_selectionMask {nullptr};
+
+  // ── Dev_Bridge benchmark フック ────────────────────────────────────────────
+  // stampAt() 呼び出し回数のカウンター。brush-benchmark action が使用する。
+  // アルゴリズム・品質への影響ゼロ。
+public:
+  void resetDebugCounters() noexcept { m_debugDabCount = 0; }
+  int  debugDabCount()      const noexcept { return m_debugDabCount; }
+private:
+  mutable int m_debugDabCount {0};
 };
 
 } // namespace core

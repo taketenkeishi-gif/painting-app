@@ -79,6 +79,14 @@ public:
   /// callback: (loraNames, errorString)
   void fetchLoras(std::function<void(QStringList, QString)> cb);
 
+  /// ComfyUI から利用可能なアップスケールモデル名一覧を取得。
+  /// callback: (modelNames, errorString)
+  void fetchUpscaleModels(std::function<void(QStringList, QString)> cb);
+
+  /// ComfyUI の実行中プロンプトを中断する (POST /interrupt)。
+  /// 完了通知はない — fire-and-forget。
+  void interrupt();
+
   // ── 高レベル API ─────────────────────────────────────────────────────────
 
   struct ExecuteRequest {

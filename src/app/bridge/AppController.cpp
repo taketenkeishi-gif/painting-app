@@ -1,6 +1,7 @@
 ﻿#include "app/bridge/AppController.h"
 #include "app/bridge/AiService.h"
 #include "app/bridge/ComfyUiClient.h"
+#include "app/bridge/PsdExporter.h"
 #include "core/selection/providers/ClassicProvider.h"
 
 #include <algorithm>
@@ -6601,8 +6602,10 @@ AppController::DebugState AppController::debugState() const {
   s.activeLayerName         = active ? QString::fromStdString(active->name()) : QString();
   s.activeLayerHasMask      = active ? active->hasMask()     : false;
   s.activeLayerMaskEnabled  = active ? active->maskEnabled() : false;
-  for (std::size_t i = 0; i < m_document.layerCount(); ++i)
-    s.layerNames << QString::fromStdString(m_document.layerAt(i).name());
+  for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
+    s.layerNames    << QString::fromStdString(m_document.layerAt(i).name());
+    s.layerParentIds << static_cast<int>(m_document.layerAt(i).parentId());
+  }
 
   // AiService 状態
   s.aiGenBusy             = m_aiService ? m_aiService->isBusy() : false;
@@ -6646,6 +6649,20 @@ AppController::DebugState AppController::debugState() const {
   s.aiLastComfyPayload        = m_aiDbgComfyPayload;
   s.aiLastComfyHttpStatus     = m_aiDbgComfyHttpStatus;
   s.aiLastComfyResponseBody   = m_aiDbgComfyResponseBody;
+
+  // ビルドアイデンティティ
+  s.buildTimestamp = QStringLiteral(__DATE__ " " __TIME__);
+  s.executablePath = QCoreApplication::applicationFilePath();
+#ifdef NDEBUG
+  s.buildConfig = QStringLiteral("Release");
+#else
+  s.buildConfig = QStringLiteral("Debug");
+#endif
+#ifdef PAINT_GIT_COMMIT
+  s.gitCommit = QStringLiteral(PAINT_GIT_COMMIT);
+#else
+  s.gitCommit = QStringLiteral("unknown");
+#endif
 
   return s;
 }
@@ -7711,6 +7728,122 @@ void AppController::initDebugActions()
       {QLatin1String("path"),   absPath},
       {QLatin1String("width"),  img.width()},
       {QLatin1String("height"), img.height()},
+    };
+    return r;
+  });
+
+  // ── txt2img ────────────────────────────────────────────────────────────────
+  // Dev_Bridge から AiService 経由の txt2img 完走を検証するためのアクション。
+  // opts: { checkpoint, prompt, negativePrompt, width, height, steps, cfg, seed }
+  reg("txt2img", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    Txt2ImgParams params;
+    params.checkpoint     = opts.value(QLatin1String("checkpoint")).toString(QStringLiteral("v1-5-pruned-emaonly.safetensors"));
+    params.prompt         = opts.value(QLatin1String("prompt")).toString(QStringLiteral("high quality, detailed"));
+    params.negativePrompt = opts.value(QLatin1String("negativePrompt")).toString();
+    params.width          = opts.value(QLatin1String("width")).toInt(512);
+    params.height         = opts.value(QLatin1String("height")).toInt(512);
+    params.steps          = opts.value(QLatin1String("steps")).toInt(20);
+    params.cfg            = static_cast<float>(opts.value(QLatin1String("cfg")).toDouble(7.0));
+    params.seed           = opts.value(QLatin1String("seed")).toInt(-1);
+    runTextToImage(params, 1);
+    r.success = true;
+    r.message = QStringLiteral("txt2img dispatched via AiService");
+    r.data    = {
+      {QLatin1String("checkpoint"), params.checkpoint},
+      {QLatin1String("busy"),       m_aiService ? m_aiService->isBusy() : false},
+    };
+    return r;
+  });
+
+  // ── add-folder-layer ──────────────────────────────────────────────────────
+  reg("add-folder-layer", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    const std::size_t before = m_document.layerCount();
+    addFolderLayer();
+    const std::size_t after = m_document.layerCount();
+    r.success = (after > before);
+    if (!r.success) {
+      r.message = QLatin1String("add-folder-layer: layer count did not increase");
+      return r;
+    }
+    const std::size_t newIdx = m_document.activeLayerIndex();
+    const QString name = opts.value(QLatin1String("name")).toString();
+    if (!name.isEmpty()) {
+      m_document.layerAt(newIdx).setName(name.toStdString());
+      emit layersChanged();
+    }
+    r.message = QString("add-folder-layer: created '%1' at index %2 (id=%3)")
+        .arg(QString::fromStdString(m_document.layerAt(newIdx).name()))
+        .arg(newIdx)
+        .arg(m_document.layerAt(newIdx).id());
+    r.data = {
+      {QLatin1String("layerIndex"), static_cast<int>(newIdx)},
+      {QLatin1String("layerId"),    static_cast<int>(m_document.layerAt(newIdx).id())},
+      {QLatin1String("name"),       QString::fromStdString(m_document.layerAt(newIdx).name())},
+    };
+    return r;
+  });
+
+  // ── set-layer-parent ─────────────────────────────────────────────────────
+  // opts: { "layerIndex": N, "parentId": P }
+  //    or { "layerName": "...", "folderName": "..." }  名前ベース指定
+  reg("set-layer-parent", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    std::size_t layerIdx = std::size_t(-1);
+    uint32_t    parentId = 0;
+
+    if (opts.contains(QLatin1String("layerIndex"))) {
+      layerIdx = static_cast<std::size_t>(opts[QLatin1String("layerIndex")].toInt(-1));
+      parentId = static_cast<uint32_t>(opts[QLatin1String("parentId")].toInt(0));
+    } else if (opts.contains(QLatin1String("layerName"))) {
+      const std::string tgt  = opts[QLatin1String("layerName")].toString().toStdString();
+      const std::string fold = opts[QLatin1String("folderName")].toString().toStdString();
+      for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
+        if (m_document.layerAt(i).name() == tgt)   layerIdx = i;
+        if (!fold.empty() && m_document.layerAt(i).name() == fold)
+          parentId = m_document.layerAt(i).id();
+      }
+    }
+
+    if (layerIdx == std::size_t(-1) || layerIdx >= m_document.layerCount()) {
+      r.message = QLatin1String("set-layer-parent: layerIndex/layerName not found");
+      return r;
+    }
+    r.success = setLayerParent(layerIdx, parentId);
+    r.message = r.success
+        ? QString("set-layer-parent: layer[%1] parentId → %2").arg(layerIdx).arg(parentId)
+        : QLatin1String("set-layer-parent: failed (circular ref or invalid index)");
+    r.data = {
+      {QLatin1String("layerIndex"), static_cast<int>(layerIdx)},
+      {QLatin1String("parentId"),   static_cast<int>(parentId)},
+    };
+    return r;
+  });
+
+  // ── export-psd ───────────────────────────────────────────────────────────
+  reg("export-psd", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    const QString rawPath = opts[QLatin1String("path")].toString();
+    if (rawPath.isEmpty()) {
+      r.message = QLatin1String("export-psd: 'path' param required");
+      return r;
+    }
+    const QString absPath = QFileInfo(rawPath).absoluteFilePath();
+    if (!QFileInfo(absPath).dir().exists()) {
+      r.message = QString("export-psd: parent directory does not exist: %1")
+          .arg(QFileInfo(absPath).dir().absolutePath());
+      return r;
+    }
+    rerender();
+    const auto result = app::psd::exportPsd(m_document, absPath.toStdString());
+    r.success = result.success;
+    r.message = result.success
+        ? QString("export-psd: saved to %1").arg(absPath)
+        : QString("export-psd: failed — %1").arg(QString::fromStdString(result.error));
+    r.data = {
+      {QLatin1String("path"),       absPath},
+      {QLatin1String("layerCount"), static_cast<int>(m_document.layerCount())},
     };
     return r;
   });

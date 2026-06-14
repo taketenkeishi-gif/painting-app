@@ -16,7 +16,7 @@ class QRadioButton;
 class QSpinBox;
 class QThread;
 
-namespace app::bridge { class ComfyUiClient; }
+namespace app::bridge { class AiService; }
 
 namespace app::panels {
 
@@ -62,7 +62,7 @@ class UpscaleDialog : public QDialog {
 public:
     explicit UpscaleDialog(const core::PixelBuffer& src,
                            const std::vector<core::ai::UpscaleEngine::ModelInfo>& localModels,
-                           app::bridge::ComfyUiClient* comfyClient = nullptr,
+                           app::bridge::AiService* aiService = nullptr,
                            QWidget* parent = nullptr);
     ~UpscaleDialog() override;
 
@@ -76,10 +76,10 @@ private slots:
     void onModeChanged();
     void onTargetWidthChanged(int w);
     void onTargetHeightChanged(int h);
-    // ComfyUI
-    void onComfyComplete(const QString& promptId, const QStringList& outputs);
-    void onComfyError   (const QString& promptId, const QString& message);
-    void onComfyProgress(const QString& promptId, int step, int total, const QString& nodeId);
+    // AiService (ComfyUI パス)
+    void onAiUpscaleResult(const QByteArray& pngData);
+    void onAiUpscaleError (const QString& message);
+    void onAiModelsReady  (const QStringList& models);
 
 private:
     void setupUi();
@@ -92,8 +92,7 @@ private:
 
     const core::PixelBuffer& m_src;
     std::vector<core::ai::UpscaleEngine::ModelInfo> m_localModels;
-    app::bridge::ComfyUiClient* m_comfyClient {nullptr};
-    QString m_comfyPromptId;
+    app::bridge::AiService* m_aiService {nullptr};
 
     // UI
     QComboBox*    m_modelCombo   {nullptr};

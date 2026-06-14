@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
@@ -33,6 +35,7 @@
 #include <QStyle>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QDropEvent>
 #include <QListWidgetItem>
 
 #include "app/bridge/AppController.h"
@@ -56,9 +59,12 @@ constexpr int kBlendModeRole = Qt::UserRole + 11;
 constexpr int kPaperRole = Qt::UserRole + 12;
 constexpr int kActiveRole = Qt::UserRole + 13;
 constexpr int kEditTargetRole = Qt::UserRole + 14;  ///< 0=Image, 1=Mask
-constexpr int kLayerIdRole    = Qt::UserRole + 15;  ///< レイヤーの安定ID
-constexpr int kParentIdRole   = Qt::UserRole + 16;  ///< 親フォルダの安定ID（0=ルート）
-constexpr int kDepthRole      = Qt::UserRole + 17;  ///< 階層の深さ（0=ルート）
+constexpr int kLayerIdRole     = Qt::UserRole + 15;  ///< レイヤーの安定ID
+constexpr int kParentIdRole    = Qt::UserRole + 16;  ///< 親フォルダの安定ID（0=ルート）
+constexpr int kDepthRole       = Qt::UserRole + 17;  ///< 階層の深さ（0=ルート）
+constexpr int kExpandedRole    = Qt::UserRole + 18;  ///< フォルダが展開中かどうか
+constexpr int kExpandToggleRole= Qt::UserRole + 19;  ///< デリゲート→パネルへ折りたたみトグル要求
+constexpr int kEffVisibleRole  = Qt::UserRole + 20;  ///< 親チェーン込みの effective visibility
 constexpr int kIndentWidth    = 16;                 ///< 深さ1段あたりのインデント幅（px）
 
 constexpr int kLayerRowHeight = 36;
@@ -438,6 +444,18 @@ QString layerPaintName(const QModelIndex& index) {
     const int depth = index.data(kDepthRole).toInt();
     const QRect contentRect = depth > 0 ? rect.adjusted(depth * kIndentWidth, 0, 0, 0) : rect;
 
+    // フォルダ行のインデント帯に展開/折りたたみシェブロンを描画
+    const auto kind = static_cast<core::LayerKind>(index.data(kKindRole).toInt());
+    if (kind == core::LayerKind::Folder) {
+      const bool expanded = index.data(kExpandedRole).toBool();
+      const QRect chevronRect(contentRect.left(), rect.top(), kIndentWidth, rect.height());
+      QFont chevronFont = painter->font();
+      chevronFont.setPointSize(8);
+      painter->setFont(chevronFont);
+      painter->setPen(QColor(160, 175, 200));
+      painter->drawText(chevronRect, Qt::AlignCenter, expanded ? QStringLiteral("▼") : QStringLiteral("▶"));
+    }
+
     const QRect eyeRect = layerVisibilityRect(contentRect);
     const QIcon eyeIcon = visible ? app::ui::icon(QStringLiteral("visibility"))
                                   : app::ui::icon(QStringLiteral("visibility_off"));
@@ -493,6 +511,12 @@ QString layerPaintName(const QModelIndex& index) {
     painter->setPen(visible ? QColor(0xd4, 0xd4, 0xd4) : QColor(0x78, 0x78, 0x78));
     painter->drawText(layerNameRect(contentRect, hasMask), Qt::AlignVCenter | Qt::AlignLeft, layerPaintName(index));
 
+    // 親フォルダが非表示のとき: 自身は visible だが effective は hidden → 暗めのオーバーレイ
+    const bool effVisible = index.data(kEffVisibleRole).toBool();
+    if (!effVisible && visible) {
+      painter->fillRect(contentRect, QColor(0, 0, 0, 70));
+    }
+
     painter->restore();
   }
 
@@ -508,19 +532,32 @@ QString layerPaintName(const QModelIndex& index) {
     if (event->type() == QEvent::MouseButtonRelease) {
       auto* mouseEvent = static_cast<QMouseEvent*>(event);
       if (mouseEvent->button() == Qt::LeftButton) {
-        if (layerVisibilityRect(option.rect).contains(mouseEvent->pos())) {
+        // コンテンツ領域を深さに応じてインデント（paint と同じ計算）
+        const int clickDepth = index.data(kDepthRole).toInt();
+        const QRect clickContent = clickDepth > 0
+            ? option.rect.adjusted(clickDepth * kIndentWidth, 0, 0, 0)
+            : option.rect;
+
+        if (layerVisibilityRect(clickContent).contains(mouseEvent->pos())) {
           const bool visible = index.data(kVisibilityRole).toBool();
           model->setData(index, visible ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
           return true;
         }
+        // フォルダサムネイルクリック → expand/collapse トグル
+        const auto ekind = static_cast<core::LayerKind>(index.data(kKindRole).toInt());
+        if (ekind == core::LayerKind::Folder &&
+            layerThumbnailRect(clickContent).contains(mouseEvent->pos())) {
+          model->setData(index, true, kExpandToggleRole);
+          return true;
+        }
         // Mask thumbnail click → switch edit target
         if (index.data(kHasMaskRole).toBool() &&
-            layerMaskThumbnailRect(option.rect).contains(mouseEvent->pos())) {
+            layerMaskThumbnailRect(clickContent).contains(mouseEvent->pos())) {
           model->setData(index, 1, kEditTargetRole);
           return true;
         }
         // Image thumbnail click → switch edit target to image
-        if (layerThumbnailRect(option.rect).contains(mouseEvent->pos())) {
+        if (layerThumbnailRect(clickContent).contains(mouseEvent->pos())) {
           model->setData(index, 0, kEditTargetRole);
           return true;
         }

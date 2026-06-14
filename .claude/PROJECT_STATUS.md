@@ -1,8 +1,8 @@
 # プロジェクト状態 — Paint App
 
-**Last Updated:** 2026-06-12  
-**Latest Commit:** `0cc1a45` (feat: implement Roto Brush — wire object_select subtool to AiSelectTool)  
-**Current Phase:** Phase 1 実装中 + MV連携ワークフロー（AIアップスケール完了）
+**Last Updated:** 2026-06-15  
+**Latest Commit:** `c0ae0a9` (fix: UX HIGH項目修正 — shortcut conflict解消・AdjustmentDock最小高さ・ToolSlider幅拡大)  
+**Current Phase:** Phase 1 実装中 + MV連携ワークフロー（ComfyUI AI生成統合 E2E 完了）+ Dev Bridge First Architecture 統合完了
 
 ---
 
@@ -65,8 +65,10 @@
 - ❌ ネイティブフォーマット
 
 #### AI 機能
-- 🔧 **AI アップスケール**（ComfyUI + ONNX + バイリニア 3段階。ビルド確認待ち）
-- 🔧 **AI モデルフォルダ管理 UI**（QSettings 永続保存）
+- ✅ **ComfyUI AI 生成統合**（inpaint / txt2img E2E 完了。`ComfyProcessManager` async 設計）
+- ✅ **AI アップスケール**（ComfyUI + ONNX + バイリニア 3段階）
+- ✅ **AI モデルフォルダ管理 UI**（QSettings 永続保存）
+- ✅ **LoRA / Checkpoint プリセット**（WorkflowPreset + UI 接続）
 - 🔧 **Roto Brush / SAM2 基盤**（`PAINT_USE_ONNX=ON` 時有効、モデルセットアップ待ち）
 - 🔧 **Mesh Deformation（Puppet Warp）**（ワイヤーフレーム表示・変形実装済み）
 - ✅ FreeTransform ツール（高品質変換・コーナーアンカー修正済み）
@@ -109,9 +111,16 @@
 | **FreeTransform 修正** | 高品質変換・コーナーアンカー修正 | `22d3fc2` | ✅ DONE |
 | **Mesh Deformation** | Puppet Warp（ワイヤーフレーム・変形） | `8b42467`, `f3cf765` | ✅ DONE |
 | **Roto Brush** | object_select → AiSelectTool 接続 | `0cc1a45` | 🔧 ONNX モデル待ち |
-| **AI アップスケール** | ComfyUI + ONNX + バイリニア 3段階 | 未コミット | 🔧 コミット待ち |
-| **AI モデルフォルダ管理** | AiModelFolderDialog（QSettings） | 未コミット | 🔧 コミット待ち |
-| **ComfyUI アップスケール対応** | fetchUpscaleModels + buildUpscaleWorkflow | 未コミット | 🔧 コミット待ち |
+| **AI アップスケール** | ComfyUI + ONNX + バイリニア 3段階 | — | ✅ DONE |
+| **AI モデルフォルダ管理** | AiModelFolderDialog（QSettings） | — | ✅ DONE |
+| **LoRA/Checkpoint プリセット** | WorkflowPreset + UI 接続 | `0795b4b` | ✅ DONE |
+| **ComfyUI AI 生成 E2E** | inpaint（選択あり）/ txt2img（選択なし）verified | — | ✅ DONE |
+| **ComfyProcessManager async化** | waitForConnected 完全廃止、async socket 設計 | — | ✅ DONE |
+| **AppController M1/M2/M3 修正** | ensureComfyProcessManager 統一・debug path 固定 | — | ✅ DONE |
+| **UX Fix Pass 1** | shortcut conflict 3→0・ToolSlider 12px→48px・AdjustmentDock minHeight 22px→422px | `c0ae0a9` | ✅ DONE |
+| **Dev Bridge Runtime Observation** | /debug/components・/debug/layout・/debug/input 追加 | — | ✅ DONE |
+| **Action Surface Expansion** | new-document・add-raster-layer・set-active-layer・set-foreground-color・export-png | — | ✅ DONE |
+| **FirstDrawingSession v2** | automationRate 42% → 83%（12ステップ中10 PASS / 2 NOT_REACHABLE） | — | ✅ DONE |
 
 ### 過去セッション（2026-05）
 
@@ -149,10 +158,7 @@ CSP/Photoshop 互換の「レイヤーオフセット + 独立 PixelBuffer」モ
 ### 🔴 即着手可能（依存なし）
 
 1. ~~**PSD 出力 → ファイルメニュー接続**~~ ✅ 完了
-
-2. **AIアップスケール未コミット変更のコミット**
-   - 変更対象: UpscaleEngine / UpscaleDialog / AiModelFolderDialog / ComfyUiClient / MainWindow / CMakeLists.txt
-   - `cmake --build build --config Release` → 型チェック確認後にコミット
+2. ~~**ComfyUI AI 生成統合**~~ ✅ 完了（inpaint / txt2img E2E verified）
 
 3. **選択範囲を新規レイヤーとして切り出し** （〜2時間）
    - `AppController::extractSelectionToNewLayer()` を追加
@@ -220,7 +226,7 @@ CSP/Photoshop 互換の「レイヤーオフセット + 独立 PixelBuffer」モ
 |----------|--------|--------|
 | 1. 画像インポート | 80% | キャンバスリサイズオプション |
 | 2. 背景/キャラ分離 | 30% | SAM2 モデルセットアップ・自動分割 |
-| **3. AIアップスケール** | **95%** | ONNX モデル同梱（任意） |
+| **3. AIアップスケール / AI生成** | **100%** | ✅ inpaint/txt2img E2E 完了 |
 | 4. エッジ強調 | 0% | 全タスク未着手 |
 | 5. パーツ分離 | 10% | SAM2 依存・切り出しコマンド未実装 |
 | 6. カモフラージュ | 0% | LaMa モデル選定が先 |
@@ -285,6 +291,23 @@ ctest --test-dir build-tests --output-on-failure
 - **PAINT_BUILD_TESTS=ON** → GoogleTest include（CTest は CMake 4.3.1 で stable）
 - **PAINT_USE_SKIA=ON** → vcpkg SkiaB uild_TYPE= Release（Debug は巨大）
 - **PAINT_USE_ONNX=ON** → `<exe>/models/` に `.onnx` ファイル必須
+
+---
+
+## Architecture Cleanup Backlog
+
+Architecture Audit (2026-06-14) で記録された技術的負債。
+機能開発の合間に段階的に解消する。詳細は `docs/architecture.md` の Known Architecture Debt を参照。
+
+| 項目 | 優先度 | 状態 | 内容 |
+|---|---|---|---|
+| Remove unused AiGenerateDialog | 🟡 Medium | ⬜ 未着手 | `AiGenerateDialog.h/cpp`（約464行）がデッドコード。インスタンス化なし |
+| Remove legacy ComfyUiClient workflow responsibilities | 🔴 High | ⬜ 未着手 | `ComfyUiClient` + `MinimalWebSocket` を除去し ComfyUI 経路を `AiService → ComfyProvider → ComfyClient` に一本化 |
+| Move Qt-dependent core files | 🔴 High | ⬜ 未着手 | `core/ai/GenerativeFillEngine` の `<QObject>/<QTimer>/<QThread>` 依存を `app/` 側に移動 |
+| Fix platform/ direct includes in panels | 🔴 High | ⬜ 未着手 | `UpscaleDialog`・`GenerativeFillDialog`・`MainWindow` が `platform/qt/QtImageConverter.h` を直接 include。bridge 経由に変更 |
+| Split AppController | 🟢 Low | ⬜ 未着手 | 約7,400行・311 public メソッドを LayerService / SelectionService 等に段階分割。最大リスク。スコープ明示後に着手 |
+
+**注意:** このバックログは即着手しない。上位の機能タスクを優先し、並行可能な場合のみ消化する。
 
 ---
 

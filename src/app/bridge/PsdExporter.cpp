@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <fstream>
 #include <cstring>
+#include <functional>
+#include <unordered_map>
+#include <vector>
 
 #include "core/document/Document.h"
 #include "core/layer/Layer.h"
@@ -63,15 +66,66 @@ static void writeLayerChannelData(std::vector<uint8_t>& buf,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PSD レイヤー出力レコード (通常 / フォルダヘッダー / グループクローズマーカー)
+// ─────────────────────────────────────────────────────────────────────────────
+enum class PsdRecordKind { Normal, Folder, GroupClose };
+struct PsdRecord {
+  PsdRecordKind kind;
+  int layerIndex; // GroupClose のとき -1
+};
+
+// doc のレイヤー階層を PSD 出力順（下から上、フォルダを再帰展開）に並べる。
+// PSD グループ順序: ... → </Layer group> close marker → 子群(下→上) → フォルダヘッダー → ...
+static std::vector<PsdRecord> buildPsdOrder(const core::Document& doc) {
+  const int n = static_cast<int>(doc.layerCount());
+  // childrenOf[parentId] = [index, ...] in bottom-to-top order
+  // doc は i=0=top, i=N-1=bottom なので、N-1 から 0 に向かってイテレートすると下→上順になる
+  std::unordered_map<uint32_t, std::vector<int>> childrenOf;
+  for (int i = n - 1; i >= 0; --i) {
+    childrenOf[doc.layerAt(i).parentId()].push_back(i);
+  }
+
+  std::vector<PsdRecord> result;
+  std::function<void(uint32_t)> visit = [&](uint32_t parentId) {
+    auto it = childrenOf.find(parentId);
+    if (it == childrenOf.end()) return;
+    for (int idx : it->second) { // 下→上順
+      const core::Layer& layer = doc.layerAt(idx);
+      if (layer.kind() == core::LayerKind::Folder) {
+        result.push_back({PsdRecordKind::GroupClose, -1}); // </Layer group>
+        visit(layer.id());                                   // 子レイヤー群
+        result.push_back({PsdRecordKind::Folder, idx});     // フォルダヘッダー
+      } else {
+        result.push_back({PsdRecordKind::Normal, idx});
+      }
+    }
+  };
+  visit(0); // root (parentId=0)
+  return result;
+}
+
+// lsct 追加レイヤー情報ブロック (フォルダ / クローズマーカー用)
+// type: 1=オープンフォルダ, 2=クローズドフォルダ, 3=バウンディングセクション除算記号
+static void writeLsct(std::vector<uint8_t>& buf, uint32_t type) {
+  writeBytes(buf, "8BIM", 4);
+  writeBytes(buf, "lsct", 4);
+  writeU32BE(buf, 4);    // データ長 = 4 bytes
+  writeU32BE(buf, type); // フォルダ種別
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PSD エクスポート本体
 // ─────────────────────────────────────────────────────────────────────────────
 ExportResult exportPsd(const core::Document& doc, const std::string& path) {
   const int W = doc.canvasSize().width;
   const int H = doc.canvasSize().height;
-  const int numLayers = static_cast<int>(doc.layerCount());
+
+  // PSD 出力順のレコードリスト (フォルダグループマーカー含む)
+  const std::vector<PsdRecord> records = buildPsdOrder(doc);
+  const int totalRecords = static_cast<int>(records.size());
 
   std::vector<uint8_t> buf;
-  buf.reserve(W * H * 4 + numLayers * 256 * 1024);
+  buf.reserve(W * H * 4 + totalRecords * 256 * 1024);
 
   // ── 1. File Header ────────────────────────────────────────────────────────
   writeBytes(buf, "8BPS", 4);   // signature
@@ -90,7 +144,6 @@ ExportResult exportPsd(const core::Document& doc, const std::string& path) {
   writeU32BE(buf, 0);
 
   // ── 4. Layer and Mask Information ────────────────────────────────────────
-  // レイヤーセクションのサイズは後で書き戻す
   const size_t layerSectionSizeOffset = buf.size();
   writeU32BE(buf, 0); // placeholder
 
@@ -102,70 +155,111 @@ ExportResult exportPsd(const core::Document& doc, const std::string& path) {
   const size_t layerInfoStart = buf.size();
 
   // レイヤー数 (負 = 最初のアルファが透明度)
-  writeI32BE(buf, -numLayers);
+  writeI32BE(buf, -totalRecords);
 
-  // 各レイヤーのレコード
-  for (int li = numLayers - 1; li >= 0; --li) { // 下から順に
-    const core::Layer& layer = doc.layerAt(li);
+  // ── Pass 1: レイヤーレコード ─────────────────────────────────────────────
+  for (const PsdRecord& rec : records) {
+    if (rec.kind == PsdRecordKind::GroupClose) {
+      // </Layer group> クローズマーカー: 0×0 バウンディングボックス
+      writeI32BE(buf, 0); // top
+      writeI32BE(buf, 0); // left
+      writeI32BE(buf, 0); // bottom
+      writeI32BE(buf, 0); // right
 
-    // レイヤー境界 (top, left, bottom, right)
-    writeI32BE(buf, 0);
-    writeI32BE(buf, 0);
-    writeI32BE(buf, H);
-    writeI32BE(buf, W);
+      writeU16BE(buf, 4); // 4 channels
+      const int16_t chanIds[4] = {-1, 0, 1, 2};
+      for (int ch = 0; ch < 4; ++ch) {
+        const int16_t cid = chanIds[ch];
+        buf.push_back(uint8_t(cid >> 8)); buf.push_back(uint8_t(cid));
+        writeU32BE(buf, 0); // channel data length placeholder
+      }
 
-    // チャンネル情報 4 チャンネル: -1 (alpha), 0 (R), 1 (G), 2 (B)
-    writeU16BE(buf, 4);
-    const int16_t chanIds[4] = {-1, 0, 1, 2};
-    for (int ch = 0; ch < 4; ++ch) {
-      const int16_t cid = chanIds[ch];
-      buf.push_back(uint8_t(cid >> 8)); buf.push_back(uint8_t(cid));
-      writeU32BE(buf, 0); // channel data length placeholder (filled later)
+      writeBytes(buf, "8BIM", 4);
+      writeBytes(buf, "norm", 4); // blend mode
+      buf.push_back(255);  // opacity
+      buf.push_back(0);    // clipping
+      buf.push_back(0);    // flags
+      buf.push_back(0);    // filler
+
+      const size_t extraSizeOffset = buf.size();
+      writeU32BE(buf, 0); // placeholder
+      const size_t extraStart = buf.size();
+
+      writeU32BE(buf, 0); // layer mask data: empty
+      writeU32BE(buf, 0); // layer blending ranges: empty
+      writePaddedStr(buf, "</Layer group>");
+      writePadded4(buf);
+      writeLsct(buf, 3); // type 3: bounding section divider
+
+      const size_t extraEnd = buf.size();
+      const uint32_t extraSize = static_cast<uint32_t>(extraEnd - extraStart);
+      buf[extraSizeOffset+0] = extraSize >> 24;
+      buf[extraSizeOffset+1] = extraSize >> 16;
+      buf[extraSizeOffset+2] = extraSize >> 8;
+      buf[extraSizeOffset+3] = extraSize;
+    } else {
+      // Normal / Folder レイヤー
+      const core::Layer& layer = doc.layerAt(rec.layerIndex);
+
+      writeI32BE(buf, 0);
+      writeI32BE(buf, 0);
+      writeI32BE(buf, H);
+      writeI32BE(buf, W);
+
+      writeU16BE(buf, 4); // 4 channels
+      const int16_t chanIds[4] = {-1, 0, 1, 2};
+      for (int ch = 0; ch < 4; ++ch) {
+        const int16_t cid = chanIds[ch];
+        buf.push_back(uint8_t(cid >> 8)); buf.push_back(uint8_t(cid));
+        writeU32BE(buf, 0); // channel data length placeholder
+      }
+
+      writeBytes(buf, "8BIM", 4);
+      const std::string bmKey = blendModeToKey(static_cast<int>(layer.blendMode()));
+      writeBytes(buf, bmKey.c_str(), 4);
+
+      buf.push_back(static_cast<uint8_t>(std::clamp(int(layer.opacity() * 255.f), 0, 255)));
+      buf.push_back(0); // clipping
+      uint8_t flags = 0;
+      if (!layer.visible()) flags |= 0x02;
+      buf.push_back(flags);
+      buf.push_back(0); // filler
+
+      const size_t extraSizeOffset = buf.size();
+      writeU32BE(buf, 0); // placeholder
+      const size_t extraStart = buf.size();
+
+      writeU32BE(buf, 0); // layer mask data: empty
+      writeU32BE(buf, 0); // layer blending ranges: empty
+      writePaddedStr(buf, layer.name());
+      writePadded4(buf);
+
+      // フォルダヘッダーには lsct type=1 (open) を付加してグループを宣言する
+      if (rec.kind == PsdRecordKind::Folder) {
+        writeLsct(buf, 1);
+      }
+
+      const size_t extraEnd = buf.size();
+      const uint32_t extraSize = static_cast<uint32_t>(extraEnd - extraStart);
+      buf[extraSizeOffset+0] = extraSize >> 24;
+      buf[extraSizeOffset+1] = extraSize >> 16;
+      buf[extraSizeOffset+2] = extraSize >> 8;
+      buf[extraSizeOffset+3] = extraSize;
     }
-
-    // ブレンドモードシグネチャ
-    writeBytes(buf, "8BIM", 4);
-    const std::string bmKey = blendModeToKey(static_cast<int>(layer.blendMode()));
-    writeBytes(buf, bmKey.c_str(), 4);
-
-    // 不透明度・クリッピング・フラグ
-    buf.push_back(static_cast<uint8_t>(std::clamp(int(layer.opacity() * 255.f), 0, 255)));
-    buf.push_back(0); // clipping (0=base)
-    uint8_t flags = 0;
-    if (!layer.visible()) flags |= 0x02;
-    buf.push_back(flags);
-    buf.push_back(0); // filler
-
-    // Extra data: name + padding
-    const size_t extraSizeOffset = buf.size();
-    writeU32BE(buf, 0); // placeholder
-    const size_t extraStart = buf.size();
-
-    // Layer mask data (empty)
-    writeU32BE(buf, 0);
-    // Layer blending ranges (empty)
-    writeU32BE(buf, 0);
-    // Pascal string (layer name)
-    writePaddedStr(buf, layer.name());
-    writePadded4(buf);
-
-    // Extra data size を書き戻す
-    const size_t extraEnd = buf.size();
-    const uint32_t extraSize = static_cast<uint32_t>(extraEnd - extraStart);
-    buf[extraSizeOffset+0] = extraSize >> 24;
-    buf[extraSizeOffset+1] = extraSize >> 16;
-    buf[extraSizeOffset+2] = extraSize >> 8;
-    buf[extraSizeOffset+3] = extraSize;
   }
 
-  // Channel image data for each layer (圧縮: PackBits = 1)
-  for (int li = numLayers - 1; li >= 0; --li) {
-    const core::Layer& layer = doc.layerAt(li);
-    // 圧縮方式
-    writeU16BE(buf, 1); // PackBits
-
-    writeLayerChannelData(buf, layer.buffer(),
-                          layer.offsetX(), layer.offsetY(), W, H, W, H);
+  // ── Pass 2: チャンネル画像データ ─────────────────────────────────────────
+  for (const PsdRecord& rec : records) {
+    if (rec.kind == PsdRecordKind::GroupClose) {
+      // 0×0 マーカー: チャンネルごとに圧縮方式ワードのみ (行データなし)
+      for (int ch = 0; ch < 4; ++ch)
+        writeU16BE(buf, 1); // PackBits, 0 rows
+    } else {
+      const core::Layer& layer = doc.layerAt(rec.layerIndex);
+      writeU16BE(buf, 1); // PackBits
+      writeLayerChannelData(buf, layer.buffer(),
+                            layer.offsetX(), layer.offsetY(), W, H, W, H);
+    }
   }
 
   // Layer info セクションサイズを書き戻す
@@ -192,10 +286,8 @@ ExportResult exportPsd(const core::Document& doc, const std::string& path) {
   // ── 5. 合成済み画像データ (Raw = 0 圧縮) ─────────────────────────────────
   writeU16BE(buf, 0); // 圧縮方式: Raw
 
-  // 合成レンダリング
   core::Renderer renderer;
   core::PixelBuffer composite = renderer.composite(doc);
-  // チャンネル順: R G B A (各チャンネル全行)
   const int chanOrder[4] = {0, 1, 2, 3};
   for (int ch = 0; ch < 4; ++ch) {
     for (int y = 0; y < H; ++y) {
@@ -217,7 +309,7 @@ ExportResult exportPsd(const core::Document& doc, const std::string& path) {
   ofs.write(reinterpret_cast<const char*>(buf.data()),
             static_cast<std::streamsize>(buf.size()));
   if (!ofs) return {false, "Write error"};
-  return {true, {}};
+  return {true, ""};
 }
 
 } // namespace app::psd

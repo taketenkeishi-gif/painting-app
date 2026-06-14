@@ -41,6 +41,159 @@
 
 ---
 
+### ADR-011: ComfyProcessManager — waitForConnected 廃止・完全非同期設計
+
+**決定日:** 2026-06-15  
+**状態:** IMPLEMENTED・E2E VERIFIED
+
+**決定:**
+
+`QTcpSocket::waitForConnected` を `ComfyProcessManager` および `AppController` から完全廃止し、
+`connectToHost + connected/errorOccurred` シグナルによる完全非同期設計に移行した。
+
+**理由:**
+
+Qt ドキュメントに「Windows では Qt イベントループを持たないスレッドから `waitForXxx` を呼ぶと
+動作が保証されない」と明記されている。LayeredPaintApp では:
+
+- `DebugServer` の HTTP ハンドラ（Qt メインスレッド上の QTcpServer コールバック）
+- `QTimer::timeout` スロット（QTimer ポーリング）
+
+の両方から `waitForConnected(300〜400)` を呼んでいたため、ComfyUI が起動済みでも
+タイムアウトが返り `ready` シグナルが発火しないケースが再現した。
+
+**変更内容:**
+
+| 変更前 | 変更後 |
+|---|---|
+| `quickCheck.waitForConnected(400)` → bool で即時判定 | `quickCheck->connectToHost()` + `connected` シグナルで非同期判定 |
+| `m_retries` tick 内で `waitForConnected(400)` | 同上（`onHealthCheckTick` も完全非同期） |
+| `ensureComfyRunning` 内で `waitForConnected(300)` 高速パス | 廃止。`ComfyProcessManager::ensureRunning` の `ready` シグナルに一本化 |
+
+**副次修正（同時実施）:**
+
+- `m_comfyProcess` の初期化 + 永続シグナル接続を `ensureComfyProcessManager()` に統一
+  （`ensureComfyUiRunning` / `ensureComfyRunning` 両方から呼ばれていた重複接続リスクを排除）
+- `debugCaptureComfyPayload/Response` の出力先を `QStandardPaths::AppLocalDataLocation` に固定
+  （CWD 依存により実行ディレクトリによって保存場所が変わる問題を解消）
+
+**E2E 検証結果（2026-06-15）:**
+
+```
+inpaint: selection-rect → ai-generate-with-preset
+  → controllerInstance=1 (t+3s)
+  → activeHasMask=True
+  → layers.count=2
+  → debug_comfy_prompt.json: 10 nodes, node_errors={}
+
+txt2img regression: selection-clear → ai-generate-with-preset
+  → activeHasMask=False  ✓
+```
+
+**代替案:**
+
+- ❌ `QThread` + `moveToThread` — 非同期化はできるが、ライフタイム管理が複雑になる
+- ❌ `waitForConnected` をワーカースレッドに移動 — Qt オブジェクトのスレッド間移動は危険
+- ✅ `connectToHost + signals` — Qt が推奨するネイティブな非同期 I/O 方式
+
+**将来の注意点:**
+
+`QTcpSocket::waitForConnected` は Qt メインスレッド（イベントループ内）では使用禁止。
+新規コードで TCP 疎通確認を行う場合は必ず `connectToHost + connected/errorOccurred` を使うこと。
+
+---
+
+### ADR-012: Dev Bridge Action Surface — Delegate-Only パターン採用
+
+**決定日:** 2026-06-15  
+**状態:** IMPLEMENTED・ARCHITECTURE AUDIT PASS
+
+**決定:**
+
+DebugServer の `/debug/action` ルートから呼ばれる `AppController::executeDebugAction()` 内に
+5 件の新規アクションを追加する際、**既存のパブリックメソッドへの委譲のみ**を実装した。
+新規の Document 生成・Layer 生成・Export ロジックを debug 関数内に重複実装することを禁止した。
+
+**新規アクション一覧:**
+
+| action | 委譲先 | パラメータ |
+|---|---|---|
+| `new-document` | `AppController::newDocument(w, h, dpi)` | width, height |
+| `add-raster-layer` | `AppController::addRasterLayer()` | — |
+| `set-active-layer` | `AppController::setActiveLayer(idx)` | index |
+| `set-foreground-color` | `AppController::setBrushColor(c)` | r, g, b |
+| `export-png` | `rerender()` + `QtImageConverter::toQImage()` + `QImage::save()` | path |
+
+**理由:**
+
+- 重複ロジックを持ち込むと、通常パスと debug パスで挙動が乖離するリスクがある
+- `#ifdef PAINT_DEBUG_SERVER` で保護されているため、本番ビルドへの影響はゼロ
+- 既存メソッドが十分抽象化されているため委譲で完結できた
+
+**既知の差分（意図的）:**
+
+- `export-png` は `markClean()` / `updateWindowTitle()` を呼ばない
+  （理由: debug export は「名前を付けて保存」ではなくシナリオ検証用 dump として設計）
+- `new-document` は新規 `AppController` インスタンスを作らない（タブ追加しない）
+  （理由: debug シナリオは単一コントローラー前提。初期化コストを避ける）
+
+**`QJsonObject` API 選択:**
+
+`opts.value(key, default).toX()` のオーバーロードは存在しない（コンパイルエラー確認済み）。
+`opts[key].toX(default)` の形式で統一すること。
+
+**Architecture Audit 結果（2026-06-15）:**
+
+| 確認項目 | 結果 |
+|---|---|
+| DebugServer→AppController→既存処理 経路 | PASS |
+| 重複実装なし | PASS |
+| core 漏れなし（src/core 直接依存なし） | PASS |
+| 通常 UI への debug 分岐追加なし | PASS |
+| `export-png` の markClean 未呼出し | WARNING（意図的・低リスク）|
+
+---
+
+### ADR-010: Responsibility Ownership — 責務所有者の一意化
+
+**決定日:** 2026-06-14  
+**状態:** ACCEPTED（Architecture Audit 2026-06-14 に基づく）
+
+**決定:**
+
+横断責務はオーナーを1つに定め、二重経路・直接依存を禁止する。
+
+**責務ルール:**
+
+| 責務 | 唯一のオーナー | 禁止パターン |
+|---|---|---|
+| UI → backend通信 | `AppController` のみ (bridge 経由) | Panel / Dialog が platform 層を直接 include |
+| ComfyUI通信 | `AiService → ComfyProvider → ComfyClient` | AppController が `ComfyUiClient` を直接保持 |
+| ワークフロー JSON 構築 | `WorkflowFactory` (app/bridge) | Transport 層（ComfyClient）内での JSON 生成 |
+| Qt 非依存コア | `src/core/` — Qt include 禁止 | `core/ai/` 等が `<QObject>` を直接 include |
+
+**理由:**
+
+Architecture Audit で以下の二重経路・直接依存が確認された:
+
+- `UpscaleDialog` / `GenerativeFillDialog` / `MainWindow` が `platform/qt/QtImageConverter.h` を直接 include（bridge 層を通さない）
+- `AppController` が `ComfyUiClient`（旧 WebSocket 経路）を保持しつつ `AiService`（新 HTTP polling 経路）も並存
+- `core/ai/GenerativeFillEngine` が `<QObject>` `<QTimer>` `<QThread>` に依存（core Qt-free 原則違反）
+
+**移行方針:**
+
+段階移行。全面 rewrite 禁止。
+
+1. 新規コードは必ずこのルールに従う
+2. 既存違反は `Known Architecture Debt` に記録し、機能開発と並行して段階的に解消
+
+**代替案:**
+
+- ❌ 全面 rewrite — リスクが高い。現動作を破壊する可能性がある
+- ❌ 違反を放置 — 二重経路が増殖し、バグ原因の追跡が困難になる
+
+---
+
 ### ADR-002: ブラシエンジンは MyPaint / Skia ハイブリッド戦略
 
 **決定日:** 2026-05-xx  

@@ -100,6 +100,7 @@ private:
   bool m_compactButtons {false};
   bool m_isRefreshing {false};
   bool m_isDraggingLayer {false};
+  std::unordered_set<uint32_t> m_collapsedFolderIds; ///< 折りたたみ済みフォルダの stable ID セット
 };
 
 } // namespace app::panels

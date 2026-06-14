@@ -182,7 +182,19 @@ if(PAINT_BUILD_APP)
     # paint_comfy_platform も同じ定義が必要。ComfyClient.h の #ifdef でクラスレイアウトが
     # 変わるため、全 TU で一致させないと ABI ミスマッチによるクラッシュが起きる。
     target_compile_definitions(paint_comfy_platform PUBLIC PAINT_DEBUG_SERVER)
-    message(STATUS "Dev_Bridge debug server enabled (port 9223)")
+    # ビルドアイデンティティ: git commit hash を /debug/health に公開する
+    execute_process(
+      COMMAND git rev-parse --short HEAD
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      OUTPUT_VARIABLE PAINT_GIT_COMMIT
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET
+    )
+    if(NOT PAINT_GIT_COMMIT)
+      set(PAINT_GIT_COMMIT "unknown")
+    endif()
+    target_compile_definitions(paint_app PRIVATE PAINT_GIT_COMMIT="${PAINT_GIT_COMMIT}")
+    message(STATUS "Dev_Bridge debug server enabled (port 9223) git=${PAINT_GIT_COMMIT}")
   endif()
 
   # ── ランタイムリソース: ワークフロー JSON をビルド出力ディレクトリにコピー ──

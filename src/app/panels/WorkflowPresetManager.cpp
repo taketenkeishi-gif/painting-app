@@ -1,13 +1,10 @@
-#include "app/ai/WorkflowPresetManager.h"
+#include "app/panels/WorkflowPresetManager.h"
 
 #include <QCryptographicHash>
-#include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSettings>
-#include <QStandardPaths>
-#include <QList>
 
 namespace app::panels {
 
@@ -28,28 +25,6 @@ QString cacheSettingsKey(const QString& path) {
 } // namespace
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LoraEntry serialization
-// ─────────────────────────────────────────────────────────────────────────────
-
-QJsonObject LoraEntry::toJson() const {
-    QJsonObject obj;
-    obj[QStringLiteral("name")]          = name;
-    obj[QStringLiteral("modelStrength")] = modelStrength;
-    obj[QStringLiteral("clipStrength")]  = clipStrength;
-    obj[QStringLiteral("triggerWords")]  = triggerWords;
-    return obj;
-}
-
-LoraEntry LoraEntry::fromJson(const QJsonObject& obj) {
-    LoraEntry e;
-    e.name          = obj[QStringLiteral("name")].toString();
-    e.modelStrength = obj[QStringLiteral("modelStrength")].toDouble(1.0);
-    e.clipStrength  = obj[QStringLiteral("clipStrength")].toDouble(1.0);
-    e.triggerWords  = obj[QStringLiteral("triggerWords")].toString();
-    return e;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // WorkflowPreset serialization
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -66,24 +41,12 @@ QJsonObject WorkflowPreset::toJson() const {
     b[QStringLiteral("negativeNodeId")]   = binding.negativeNodeId;
     b[QStringLiteral("kSamplerNodeId")]   = binding.kSamplerNodeId;
     obj[QStringLiteral("binding")] = b;
-
-    // モデル設定 (省略可 — 空なら workflow.json のデフォルト値を保持)
-    if (!checkpoint.isEmpty())
-        obj[QStringLiteral("checkpoint")] = checkpoint;
-
-    if (!loras.isEmpty()) {
-        QJsonArray loraArr;
-        for (const LoraEntry& e : loras) loraArr.append(e.toJson());
-        obj[QStringLiteral("loras")] = loraArr;
-    }
-
     return obj;
 }
 
 WorkflowPreset WorkflowPreset::fromJson(const QJsonObject& obj) {
     WorkflowPreset p;
     p.name         = obj[QStringLiteral("name")].toString();
-    // type は保存値を忠実に復元する。fromJson は inferType() を呼ばない。
     p.type         = static_cast<WorkflowType>(obj[QStringLiteral("type")].toInt(0));
     p.workflowPath = obj[QStringLiteral("workflowPath")].toString();
 
@@ -93,14 +56,6 @@ WorkflowPreset WorkflowPreset::fromJson(const QJsonObject& obj) {
     p.binding.positiveNodeId   = b[QStringLiteral("positiveNodeId")].toString();
     p.binding.negativeNodeId   = b[QStringLiteral("negativeNodeId")].toString();
     p.binding.kSamplerNodeId   = b[QStringLiteral("kSamplerNodeId")].toString();
-
-    // モデル設定 (旧プリセットにはキーがないので missing = 空文字/空リスト)
-    p.checkpoint = obj[QStringLiteral("checkpoint")].toString();
-    for (const QJsonValue& v : obj[QStringLiteral("loras")].toArray()) {
-        LoraEntry e = LoraEntry::fromJson(v.toObject());
-        if (!e.isEmpty()) p.loras.append(e);
-    }
-
     return p;
 }
 
@@ -108,20 +63,8 @@ WorkflowPreset WorkflowPreset::fromJson(const QJsonObject& obj) {
 // WorkflowPresetManager
 // ─────────────────────────────────────────────────────────────────────────────
 
-// IniFormat + 明示パスで永続化。NativeFormat (registry) は組織名なし環境で
-// 書き込みが無音で失敗するケースがあるため INI に切り替えた。
-// ファイル: %APPDATA%/LayeredPaintApp/presets.ini
-static QString settingsFilePath() {
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(dir);
-    return dir + QLatin1String("/presets.ini");
-}
-static QSettings makeSettings() {
-    return QSettings(settingsFilePath(), QSettings::IniFormat);
-}
-
 void WorkflowPresetManager::load() {
-    QSettings s = makeSettings();
+    QSettings s;
 
     // ── 新フォーマット ────────────────────────────────────────────────────────
     const QByteArray raw = s.value(QLatin1String(kPresetsKey)).toByteArray();
@@ -148,28 +91,28 @@ void WorkflowPresetManager::load() {
                 QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Md5).toHex());
             s.beginGroup(QLatin1String(kLegacyBindPrefix) + hash);
             WorkflowPreset p;
-            p.name                     = QFileInfo(path).fileName();
-            p.workflowPath             = path;
-            p.binding.inputImageNodeId = s.value(QStringLiteral("inputImageNode")).toString();
-            p.binding.maskNodeId       = s.value(QStringLiteral("maskNode")).toString();
-            p.binding.positiveNodeId   = s.value(QStringLiteral("positiveNode")).toString();
-            p.binding.negativeNodeId   = s.value(QStringLiteral("negativeNode")).toString();
-            p.binding.kSamplerNodeId   = s.value(QStringLiteral("kSamplerNode")).toString();
+            p.name                    = QFileInfo(path).fileName();
+            p.workflowPath            = path;
+            p.binding.inputImageNodeId= s.value(QStringLiteral("inputImageNode")).toString();
+            p.binding.maskNodeId      = s.value(QStringLiteral("maskNode")).toString();
+            p.binding.positiveNodeId  = s.value(QStringLiteral("positiveNode")).toString();
+            p.binding.negativeNodeId  = s.value(QStringLiteral("negativeNode")).toString();
+            p.binding.kSamplerNodeId  = s.value(QStringLiteral("kSamplerNode")).toString();
             s.endGroup();
-            // 旧フォーマットには type がないので inferType() で推定する（移行時のみ）
             p.type = p.inferType();
             m_presets.append(p);
         }
 
+        // 旧形式の最終選択パスから index を復元
         const QString lastPath = s.value(QLatin1String(kLegacyLastPathKey)).toString();
         m_lastUsedIndex = indexByPath(lastPath);
 
-        if (!m_presets.isEmpty()) save();
+        if (!m_presets.isEmpty()) save();  // 新フォーマットに書き出す
     }
 }
 
 void WorkflowPresetManager::save() const {
-    QSettings s = makeSettings();
+    QSettings s;
 
     QJsonArray arr;
     for (const WorkflowPreset& p : m_presets) arr.append(p.toJson());
@@ -177,11 +120,11 @@ void WorkflowPresetManager::save() const {
                QJsonDocument(arr).toJson(QJsonDocument::Compact));
     s.setValue(QLatin1String(kLastIdxKey), m_lastUsedIndex);
 
+    // キャッシュされたワークフロー JSON を書き出す
     for (auto it = m_workflowCache.cbegin(); it != m_workflowCache.cend(); ++it) {
         s.setValue(cacheSettingsKey(it.key()),
                    QJsonDocument(it.value()).toJson(QJsonDocument::Compact));
     }
-    s.sync();
 }
 
 void WorkflowPresetManager::addOrUpdate(const WorkflowPreset& preset) {
@@ -218,7 +161,7 @@ int WorkflowPresetManager::indexByName(const QString& name) const {
 
 void WorkflowPresetManager::setLastUsedIndex(int i) {
     m_lastUsedIndex = i;
-    makeSettings().setValue(QLatin1String(kLastIdxKey), i);
+    QSettings{}.setValue(QLatin1String(kLastIdxKey), i);
 }
 
 QJsonObject WorkflowPresetManager::cachedWorkflow(const QString& path) const {

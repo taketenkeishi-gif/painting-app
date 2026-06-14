@@ -83,6 +83,55 @@
 - Tool/sub-tool/property panels surface layer-kind compatibility through enabled/disabled state, so raster/vector mismatches are visible before execution.
 - Shortcut bindings are action-driven and persisted via `QSettings`, so menu and key operations follow one command path.
 
+## Known Architecture Debt
+
+Architecture Audit (2026-06-14) で確認された既知の技術的負債。
+段階移行で解消予定。全面 rewrite 禁止。
+
+### [HIGH] AppController 肥大化
+
+- `AppController.cpp`: 約7,400行 / public メソッド 311個
+- レイヤー管理・ブラシ設定・選択・変形・AI操作・Undo/Redo が全混在
+- 将来: LayerService / SelectionService / BrushSettingsService への段階分割
+- **現状維持中**: 新機能を追加する際は既存パターンに従い、新規サービス分割はスコープを明示してから着手
+
+### [HIGH] ComfyUI 二重経路
+
+- 旧経路: `AppController` が `ComfyUiClient`（WebSocket）を直接保持
+- 新経路: `AiService → ComfyProvider → ComfyClient`（HTTP polling）
+- 正式経路: 新経路（ADR-010 に基づく）
+- 解消手順: `ComfyUiClient` と `MinimalWebSocket` を除去し、旧経路依存箇所を新経路に切り替え
+
+### [HIGH] core/ の Qt 依存
+
+- 違反ファイル: `src/core/ai/GenerativeFillEngine.h/cpp`（`<QObject>` `<QTimer>` `<QThread>` を include）
+- 方針: `src/core/` は Qt 非依存を維持する設計原則（`architecture.md` App Boundary 参照）
+- 解消手順: Qt 依存部分を `src/app/` 側に移動し、core は純粋なロジックのみ保持
+
+### [HIGH] panels/mainwindow が platform/ を直接 include
+
+- 違反箇所: `UpscaleDialog.cpp:19`, `GenerativeFillDialog.cpp:22`, `MainWindow.cpp:92`
+- 全て `platform/qt/QtImageConverter.h` を直接 include
+- 方針: Panel / Dialog は `AppController` のみ依存。platform 層への直接アクセス禁止（ADR-010）
+- 解消手順: QtImageConverter の呼び出しを bridge 層に移動
+
+### [MEDIUM] 未使用コード候補
+
+- `src/app/panels/AiGenerateDialog.h/cpp`（約464行）: インスタンス化箇所が0件。GenerativeFillDialog に置き換えられた旧ファイルの可能性
+- `ComfyUiClient` / `MinimalWebSocket`: 上記 ComfyUI 二重経路解消時に同時削除予定
+
+### 解消優先順位
+
+新機能開発をブロックしない順に解消する。
+
+1. 未使用 AiGenerateDialog 削除（安全、リスク低）
+2. ComfyUI 旧経路（ComfyUiClient）除去（新経路に一本化）
+3. panels/mainwindow の platform 直接依存を bridge 経由に変更
+4. core/ai Qt 依存を app/ 側に移動
+5. AppController 分割（最後、最大リスク）
+
+---
+
 ## Extensibility Direction
 
 - Add new sub-tools through `ToolCatalog` without touching deep UI logic.

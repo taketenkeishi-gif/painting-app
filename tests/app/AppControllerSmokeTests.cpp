@@ -449,6 +449,92 @@ int main() {
     expectTrue(controller.mergeActiveLayerDown(), "Merge down should succeed for non-bottom layer.");
     expectTrue(controller.document().layerCount() == 1, "Merge down should reduce layer count by one.");
 
+    // ── AI Inpaint Regression ────────────────────────────────────────────────
+    // Verifies that the AI generation result application path actually:
+    //   (1) selection pixels > 0
+    //   (2) layer count increases by 1
+    //   (3) composited canvas checksum changes
+    // pasteBufferAsNewRasterLayerWithSelectionMask() is the function that
+    // AppController calls when ComfyUI returns an inpaint result.
+    {
+      controller.newDocument(64, 64);
+      controller.setActiveLayer(0);
+      controller.setCurrentTool(core::ToolKind::Brush);
+      controller.setBrushColor(core::Color {100, 100, 100, 255});
+      controller.setBrushSize(20);
+      controller.beginStroke(32, 32);
+      controller.endStroke();
+
+      // Compute canvas checksum before AI result is applied
+      const core::PixelBuffer& beforeBuf = controller.compositedBuffer();
+      uint32_t checksumBefore = 0;
+      for (int y = 0; y < 64; ++y) {
+        for (int x = 0; x < 64; ++x) {
+          const core::Color px = beforeBuf.pixel(x, y);
+          checksumBefore ^= (static_cast<uint32_t>(px.r) << 24)
+                          | (static_cast<uint32_t>(px.g) << 16)
+                          | (static_cast<uint32_t>(px.b) <<  8)
+                          |  static_cast<uint32_t>(px.a);
+        }
+      }
+
+      // Create a rect selection (simulates the user area selected for inpaint)
+      controller.setCurrentTool(core::ToolKind::RectSelection);
+      controller.beginStroke(10, 10);
+      controller.continueStroke(50, 50);
+      controller.endStroke();
+
+      // (1) selection pixels > 0
+      const core::SelectionMask& sel = controller.document().selection();
+      expectTrue(sel.hasSelection(), "AI inpaint regression: selection should exist before applying result.");
+      int selPixels = 0;
+      for (int y = 0; y < 64; ++y)
+        for (int x = 0; x < 64; ++x)
+          if (sel.contains(x, y)) ++selPixels;
+      expectTrue(selPixels > 0, "AI inpaint regression: selection pixel count must be > 0.");
+
+      const std::size_t layerCountBefore = controller.document().layerCount();
+
+      // Synthesize an AI result buffer — solid bright color distinct from background.
+      // This is what AiGenerationController delivers when ComfyUI returns an image.
+      core::PixelBuffer aiResult(64, 64);
+      for (int y = 0; y < 64; ++y)
+        for (int x = 0; x < 64; ++x)
+          aiResult.setPixel(x, y, core::Color {0, 200, 255, 255});
+
+      // Apply via the same code path the AI generation controller uses.
+      expectTrue(
+          controller.pasteBufferAsNewRasterLayerWithSelectionMask(aiResult, "AI 生成"),
+          "AI inpaint regression: pasteBufferAsNewRasterLayerWithSelectionMask should succeed.");
+
+      // (2) layer count +1
+      expectTrue(
+          controller.document().layerCount() == layerCountBefore + 1,
+          "AI inpaint regression: layer count must increase by 1 after applying AI result.");
+
+      // (3) canvas checksum changed
+      const core::PixelBuffer& afterBuf = controller.compositedBuffer();
+      uint32_t checksumAfter = 0;
+      for (int y = 0; y < 64; ++y) {
+        for (int x = 0; x < 64; ++x) {
+          const core::Color px = afterBuf.pixel(x, y);
+          checksumAfter ^= (static_cast<uint32_t>(px.r) << 24)
+                         | (static_cast<uint32_t>(px.g) << 16)
+                         | (static_cast<uint32_t>(px.b) <<  8)
+                         |  static_cast<uint32_t>(px.a);
+        }
+      }
+      expectTrue(checksumAfter != checksumBefore,
+          "AI inpaint regression: composited canvas checksum must change after applying AI result.");
+
+      // Verify undo works (regression: layer addition must be in undo history)
+      expectTrue(controller.canUndo(), "AI inpaint regression: paste should create an undo entry.");
+      expectTrue(controller.undo(), "AI inpaint regression: undo should succeed.");
+      expectTrue(
+          controller.document().layerCount() == layerCountBefore,
+          "AI inpaint regression: undo should remove the AI result layer.");
+    }
+
     std::cout << "App smoke tests passed.\n";
     return 0;
   } catch (const std::exception& ex) {
