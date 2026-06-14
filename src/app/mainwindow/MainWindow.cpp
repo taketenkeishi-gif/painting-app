@@ -1162,6 +1162,7 @@ void MainWindow::setupShellLayout() {
   m_colorHistoryDock->setMinimumWidth(188);
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
   m_adjustmentDock = makeDock("調整レイヤー", m_adjustmentPanel, "AdjustmentDock");
+  m_adjustmentDock->setMinimumHeight(120);
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
   // Native title bars are kept so Qt's dock drag/float/rearrange machinery works.
@@ -1351,7 +1352,7 @@ void MainWindow::createMenus() {
   m_saveAsAction->setShortcut(QKeySequence::SaveAs);
   m_exportPngAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
   m_exportFlattenedAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_E));
-  m_exportPsdAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
+  // Ctrl+Shift+D removed: was conflicting with deselectAction (now Ctrl+D).
   m_exitAction->setShortcut(QKeySequence::Quit);
   closeAction->setShortcut(QKeySequence::Close);
   m_undoAction->setShortcut(QKeySequence::Undo);
@@ -1365,9 +1366,9 @@ void MainWindow::createMenus() {
   m_extractSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_J));
   m_addLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N));
   m_addVectorLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_N));
-  m_addFolderLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
+  m_addFolderLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
   m_duplicateLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
-  m_deleteLayerAction->setShortcut(QKeySequence::Delete);
+  m_deleteLayerAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Delete));
   m_moveLayerUpAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Up));
   m_moveLayerDownAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Down));
   m_toggleLayerVisibilityAction->setShortcut(QKeySequence(Qt::Key_V));
@@ -1380,8 +1381,8 @@ void MainWindow::createMenus() {
   m_toggleLayerAlphaLockAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_L));
   m_toggleLayerPositionLockAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_P));
   m_selectAllAction->setShortcut(QKeySequence::SelectAll);
-  m_deselectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
-  m_clearSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+  m_deselectAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+  // Ctrl+D moved to deselectAction (CSP standard); clearSelection has no default shortcut.
   m_invertSelectionAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I));
   m_quickMaskAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Q));
   m_brushSizeDownAction->setShortcut(QKeySequence(Qt::Key_BracketLeft));
@@ -4602,7 +4603,7 @@ void MainWindow::onAiUpscaleTriggered() {
                             [](const auto& a, const auto& b){ return a.path == b.path; }),
                models.end());
 
-  app::panels::UpscaleDialog dlg(src, models, m_controller->comfyUiClient(), this);
+  app::panels::UpscaleDialog dlg(src, models, m_controller->aiService(), this);
   if (dlg.exec() != QDialog::Accepted || !dlg.hasResult()) {
     return;
   }

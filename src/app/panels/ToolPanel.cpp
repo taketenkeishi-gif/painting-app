@@ -332,9 +332,9 @@ QWidget* makeQuickSliderBlock(
   sliderOut->setRange(min, max);
   sliderOut->setInvertedAppearance(false);
   sliderOut->setInvertedControls(false);
-  sliderOut->setFixedWidth(12);
+  sliderOut->setMinimumWidth(48);
   sliderOut->setMinimumHeight(120);
-  sliderOut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+  sliderOut->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Expanding);
   sliderOut->setFocusPolicy(Qt::StrongFocus);
   sliderOut->setStyleSheet(sliderStyle(QColor(120, 166, 235), opacityMode));
 
