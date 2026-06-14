@@ -277,3 +277,159 @@ cmake -DPAINT_USE_ONNX=ON -B build
 - [SPEC2.md - 実装仕様](docs/SPEC2.md)
 - [PROJECT_STATUS.md - 進捗](PROJECT_STATUS.md)
 
+---
+
+## ADR-010: 一時編集モードの History 設計原則
+
+**決定日:** 2026-06-13
+**ステータス:** ACCEPTED
+
+### 問題
+
+QuickMask モードで発生した Undo 漏れのデバッグで判明した設計原則。
+
+```
+Q ON → QuickMaskStroke × N → Q OFF
+↓
+Ctrl+Z（QM commit を Undo）
+↓
+QuickMaskStroke の undo ハンドラが
+  if (m_quickMaskMode && m_quickMaskLayer) で判定
+→ QM モードが false のため何もしない（無効化）
+```
+
+根本原因：**編集バッファのライフサイクルと History エントリの寿命が一致していなかった**。
+
+### 決定
+
+**一時編集モードは、確定（commit）時に「モード状態ごと」History エントリに保存する。**
+
+具体的に保存すべき内容：
+- edit buffer（ピクセルデータ）
+- mode state（フラグ: quickMaskMode, isTransforming など）
+- UI-visible state（selection, overlay, layer list）
+
+ピクセル diff だけを保存することを禁止する。
+
+### 適用対象（将来含む）
+
+| モード | commit エントリ | undo 時に復元すべきもの |
+|---|---|---|
+| QuickMask | `QuickMaskCommit` ✅ 実装済み | QMバッファ + QMフラグ + 選択前状態 |
+| Transform preview | `TransformCommit` (未実装) | 変形メッシュ + 変形フラグ + 元ピクセル |
+| Liquify | `LiquifyCommit` (未実装) | メッシュ + 元バッファ |
+| AI preview mask | `AiMaskCommit` (未実装) | pending mask + AI Select フラグ |
+
+### 実装済み例（QuickMask）
+
+```cpp
+// HistoryKind::QuickMaskCommit
+entry.beforeLayer     = qmSnapshot;    // QM バッファ（undo 時に復元）
+entry.beforeSelection = selBefore;     // QM 確定前の選択
+entry.afterSelection  = newSel;        // QM 確定後の選択（redo 用）
+
+// undo ハンドラ
+m_quickMaskMode = true;
+m_quickMaskLayer.emplace(*entry.beforeLayer);
+m_quickMaskSnapshot = entry.beforeSelection;
+```
+
+### Why
+
+この原則を守らないと、一時モード中のストロークすべてが「Undo できても反映されない」という Silent Failure になる。  
+ユーザーには「Ctrl+Z が効かない」に見えるが、コード上は正常にエントリをポップしているため検出が困難。
+
+### 関連
+
+- `AppController.cpp` `toggleQuickMaskMode()` OFF パス（~line 1854）
+- `HistoryKind::QuickMaskCommit` / `HistoryKind::QuickMaskStroke`
+
+---
+
+## AI アーキテクチャ
+
+### ADR-011: AI 責務レイヤー分離（UI → AiService → Provider → Transport）
+
+**決定日:** 2026-06-14
+**Status:** ACCEPTED（ComfyProvider 導入で確立）
+
+**決定:** AI 機能の呼び出し経路を 4 層に固定する。
+
+```
+UI / Panel
+    ↓
+AiService         ← 唯一の AI 呼び出し窓口（Facade）
+    ↓
+ComfyProvider     ← バックエンド選択・クライアント生成
+    ↓
+ComfyClient       ← HTTP Transport（ComfyUI 固有）
+```
+
+**禁止パターン（将来実装時も維持）:**
+
+| 禁止 | 理由 |
+|---|---|
+| Panel / Dialog → ComfyClient 直接参照 | UI が Transport 詳細を知るべきでない |
+| AppController → ComfyClient 直接参照 | AppController は AiService に委譲する |
+| Transport 層（ComfyClient）内でのワークフロー生成 | ワークフロー組み立ては上位層の責務 |
+| AiService 内での ComfyClient 直接生成 | Provider を経由することで backend 差し替えが可能になる |
+
+**理由:**
+
+- **backend 差し替え容易性:** Comfy 以外の AI backend（ローカル推論・別サービス）を追加する際、Provider 層を追加するだけで AiService／UI に変更が不要
+- **責務分散防止:** 過去に Panel が ComfyUiClient を直接保持していた経緯があり、テストと変更が困難だった
+- **巨大化防止:** AiService に全ロジックを集約しないよう Provider で分割
+
+**実装（確認済み）:**
+
+- `AiService` — generate / inpaint の Facade。`ComfyProvider` のみ参照
+- `ComfyProvider` — `ComfyClient` の生成・URL 管理を担う薄いラッパー
+- `ComfyClient` — ComfyUI HTTP API（upload / queue / poll / fetch）
+- `ComfyUiClient` — WebSocket ベースの旧クライアント（Panel 直結用途に限定）
+
+**新 AI 機能を追加するときの配置判断:**
+
+```
+ワークフロー組み立て・バインディング  → AiService / AiGenerationController
+バックエンド切り替え・クライアント管理 → Provider 層（ComfyProvider 等）
+HTTP / WebSocket 通信                → Transport 層（ComfyClient 等）
+UI への結果反映・エラー表示           → Panel が AiService シグナルを受信
+```
+
+**参考:**
+
+- `src/app/bridge/AiService.h`
+- `src/app/bridge/ComfyProvider.h`
+- `src/platform/comfy/ComfyClient.h`
+
+
+---
+
+## 2026-06-14: Task 9 — LoRA/Checkpoint プリセット E2E 検証完了
+
+**決定:** `ai-generate-with-preset` debug action は `runGenerateWithWorkflow()` を呼ばず `m_aiService->generate()` を直接呼ぶ
+
+**理由:**
+
+- `ensureComfyRunning()` の TCP 300ms タイムアウトが Windows 環境でしばしば失敗し、非同期パスに落ちる
+- 非同期パス（ready シグナル経由）は動作するが遅延が大きく検証ループが詰まる
+- debug action は検証目的のみ。production の `ensureComfyRunning` ロジックは変更不要
+
+**修正内容（AppController.cpp）:**
+
+1. `runGenerateWithWorkflow` 内の `seed` 生成: `generate() & 0x7FFFFFFFu` — 負の値防止
+2. `ai-generate-with-preset` ハンドラー: `m_aiService->generate(req, 1)` を直接呼ぶ（`runGenerateWithWorkflow` バイパス）
+
+**E2E 検証結果（VERIFIED）:**
+
+| 検証項目 | 値 |
+|---------|---|
+| CheckpointLoaderSimple.ckpt_name | illustriousXL20_v20.safetensors |
+| LoraLoader.lora_name | style\UMI_style#3.safetensors |
+| LoraLoader strength_model/clip | 0.55 / 0.66 |
+| CLIPTextEncode (positive) text | test_prompt_marker lora_test_marker |
+| CLIPTextEncode (negative) text | bad quality |
+| KSampler.seed | 42（正値確認） |
+| AI レイヤー追加 | "AI Generated" レイヤー生成 |
+
+**参考:** `src/app/bridge/AppController.cpp` — `ai-generate-with-preset` handler

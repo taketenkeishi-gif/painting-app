@@ -30,10 +30,12 @@
 #include <QUrl>
 
 #include "platform/qt/QtImageConverter.h"
+#include "platform/comfy/ComfyProcessManager.h"
 
 #ifdef PAINT_DEBUG_SERVER
 #  include "app/bridge/AiGenerationController.h"
 #  include "platform/comfy/ComfyClient.h"
+#  include "app/ai/WorkflowPresetManager.h"
 #endif
 
 namespace app::bridge {
@@ -242,6 +244,53 @@ app::ui::BrushPreset presetFromJson(const QJsonObject& json, const app::ui::Brus
   preset.gradientType = json.value(QStringLiteral("gradientType")).toInt(preset.gradientType);
   preset.gradientFill = json.value(QStringLiteral("gradientFill")).toInt(preset.gradientFill);
   return preset;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LoRA / checkpoint preset ヘルパー
+// ─────────────────────────────────────────────────────────────────────────────
+
+// LoRA の triggerWords をポジティブプロンプトに結合して返す。
+QString buildAugmentedPrompt(const QString& basePrompt,
+                              const QList<app::panels::LoraEntry>& loras)
+{
+    QStringList parts;
+    if (!basePrompt.isEmpty()) parts << basePrompt;
+    for (const app::panels::LoraEntry& e : loras) {
+        const QString tw = e.triggerWords.trimmed();
+        if (!tw.isEmpty()) parts << tw;
+    }
+    return parts.join(QStringLiteral(" "));
+}
+
+// ワークフロー JSON を読み込み、checkpoint / LoRA を事前パッチした doc を返す。
+// 失敗した場合は isValid() == false の doc を返す。
+platform::comfy::WorkflowDocument applyPresetPatches(
+    const QString& wfPath,
+    const QString& checkpoint,
+    const QList<app::panels::LoraEntry>& loras)
+{
+    bool ok = false;
+    auto doc = platform::comfy::WorkflowDocument::load(wfPath, &ok);
+    if (!ok) return doc;
+
+    if (!checkpoint.isEmpty())
+        doc.applyCheckpoint(checkpoint);
+
+    if (!loras.isEmpty()) {
+        QList<platform::comfy::LoraParams> loraParams;
+        loraParams.reserve(loras.size());
+        for (const app::panels::LoraEntry& e : loras) {
+            platform::comfy::LoraParams p;
+            p.name          = e.name;
+            p.modelStrength = e.modelStrength;
+            p.clipStrength  = e.clipStrength;
+            loraParams << p;
+        }
+        doc.applyLoras(loraParams);
+    }
+
+    return doc;
 }
 
 } // namespace
@@ -4756,26 +4805,22 @@ void AppController::connectComfyUi(const QString& urlStr) {
               [this](const core::PixelBuffer& composited,
                      const std::vector<core::Point>& posPoints,
                      const std::vector<core::Point>& negPoints) {
-                if (posPoints.empty() || m_comfyUiClient == nullptr) return;
+                if (posPoints.empty()) return;
 
-                // \u5168\u30DD\u30A4\u30F3\u30C8\u3092 SAM \u30EA\u30AF\u30A8\u30B9\u30C8\u306B\u542B\u3081\u308B\uFF08ComfyUI \u5074\u304C\u5BFE\u5FDC\u3057\u3066\u3044\u308C\u3070\uFF09
                 const QImage img = platform::qt::QtImageConverter::toQImage(composited);
                 QByteArray pngBytes;
                 QBuffer buf(&pngBytes);
                 buf.open(QIODevice::WriteOnly);
                 img.save(&buf, "PNG");
-                const QString b64 = QString::fromLatin1(pngBytes.toBase64());
 
-                ComfyUiClient::SamRequest req;
-                req.imageBase64   = b64;
+                ensureAiService();
+                AiService::SelectMaskRequest req;
+                req.imagePng      = pngBytes;
                 req.pointX        = posPoints.front().x;
                 req.pointY        = posPoints.front().y;
                 req.positivePoint = true;
                 (void)negPoints;
-
-                const QJsonObject wf = ComfyUiClient::buildSamWorkflow(req);
-                m_currentAiOp = AiOpType::SamSelect;
-                m_comfyUiClient->queuePrompt(wf);
+                m_aiService->selectMask(req);
               });
         } else {
           m_aiSelectTool->setInferenceCallback(nullptr);
@@ -4823,24 +4868,7 @@ void AppController::connectComfyUi(const QString& urlStr) {
               return;
             }
 
-            if (op == AiOpType::SamSelect) {
-              m_currentAiOp = AiOpType::None;
-              const int W = img.width();
-              const int H = img.height();
-              std::vector<std::uint8_t> pixels(
-                  static_cast<std::size_t>(W) * static_cast<std::size_t>(H), 0);
-              for (int y = 0; y < H; ++y) {
-                for (int x = 0; x < W; ++x) {
-                  if (img.pixelColor(x, y).lightness() > 127) {
-                    pixels[static_cast<std::size_t>(y)*W+x] = 255;
-                  }
-                }
-              }
-              core::SelectionMask mask(W, H);
-              mask.setPixels(pixels);
-              applyAiSelectResult(std::move(mask));
-
-            } else if (op == AiOpType::Inpaint
+            if (op == AiOpType::Inpaint
                     || op == AiOpType::TextToImage
                     || op == AiOpType::CustomWorkflow) {
               // \u30D0\u30C3\u30C1\u53CE\u96C6
@@ -4898,84 +4926,71 @@ bool AppController::isComfyUiConnected() const noexcept {
 }
 
 void AppController::ensureComfyUiRunning(const QUrl& serverUrl) {
-  const QString host = serverUrl.host().isEmpty() ? "localhost" : serverUrl.host();
-  const int port = (serverUrl.port() > 0) ? serverUrl.port() : 8188;
+  if (m_comfyProcess == nullptr) {
+    m_comfyProcess = new platform::comfy::ComfyProcessManager(this);
 
-  // ローカルホストの場合のみ自動起動
-  if (host != "localhost" && host != "127.0.0.1") {
-    return;
-  }
-
-  // ポート疎通確認
-  QTcpSocket testSocket;
-  testSocket.connectToHost(host, static_cast<quint16>(port));
-  if (testSocket.waitForConnected(1000)) {
-    return;  // サーバーが既に起動している
-  }
-
-  // サーバーが起動していなければ起動
-  if (m_comfyUiServerProcess == nullptr) {
-    m_comfyUiServerProcess = new QProcess(this);
-
-    // ComfyUI フォルダパス
-    const QString comfyPath = QStringLiteral(
-        "C:/Users/Keishi/AI_tools/ComfyUI-Portable/ComfyUI_windows_portable/ComfyUI");
-
-    // 起動パラメータ
-    QStringList args;
-
-    // サーバープロセスが終了したときのクリーンアップ
-    connect(m_comfyUiServerProcess,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [this]() {
-      if (m_comfyUiServerProcess != nullptr) {
-        m_comfyUiServerProcess->deleteLater();
-        m_comfyUiServerProcess = nullptr;
+    // サーバー起動完了 → WebSocket 接続を試みる
+    connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::ready,
+            this, [this](QUrl url) {
+      if (m_comfyUiClient && !m_comfyUiClient->isConnected()) {
+        m_comfyUiClient->connectToServer(url);
       }
+    });
+
+    // 起動失敗をユーザーに通知
+    connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::failed,
+            this, [this](const QString& reason) {
+      emit aiGenerationError(reason);
     });
   }
 
-  // 既に起動中なら何もしない
-  if (m_comfyUiServerProcess->state() == QProcess::Running) {
-    return;
-  }
-
-  // ComfyUI を起動
-  const QString comfyPath = QStringLiteral(
-      "C:/Users/Keishi/AI_tools/ComfyUI-Portable/ComfyUI_windows_portable/ComfyUI");
-  m_comfyUiServerProcess->setWorkingDirectory(comfyPath);
-  m_comfyUiServerProcess->start(
-      QStringLiteral("python"), QStringList() << QStringLiteral("main.py"),
-      QIODevice::NotOpen);
-
-  // サーバー起動待機 (タイムアウト 30秒)
-  if (m_comfyUiStartupTimer == nullptr) {
-    m_comfyUiStartupTimer = new QTimer(this);
-    connect(m_comfyUiStartupTimer, &QTimer::timeout,
-            this, &AppController::onComfyUiServerStartupTimeout);
-  }
-  m_comfyUiStartupRetries = 0;
-  m_comfyUiStartupTimer->start(500);  // 500ms ごとに疎通確認
+  m_comfyProcess->ensureRunning(serverUrl);
 }
 
-void AppController::onComfyUiServerStartupTimeout() {
-  if (m_comfyUiStartupTimer == nullptr) return;
-
-  ++m_comfyUiStartupRetries;
-  const int maxRetries = 60;  // 最大30秒
-
-  // ポート疎通確認
-  QTcpSocket testSocket;
-  testSocket.connectToHost("localhost", 8188);
-  if (testSocket.waitForConnected(500)) {
-    m_comfyUiStartupTimer->stop();
-    return;  // サーバーが起動した
+// AiService 経由の generate / inpaint 向け自動起動ヘルパー。
+// ComfyUI ポートが開いていれば即 action() を呼ぶ。
+// オフラインなら ComfyProcessManager で起動してから action() を呼ぶ。
+void AppController::ensureComfyRunning(std::function<void()> action) {
+  // ComfyProcessManager を生成（ensureComfyUiRunning 未呼び出しの場合）
+  if (!m_comfyProcess) {
+    m_comfyProcess = new platform::comfy::ComfyProcessManager(this);
+    connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::failed,
+            this, [this](const QString& reason) {
+      emit aiGenerationError(reason);
+    });
   }
 
-  // タイムアウト
-  if (m_comfyUiStartupRetries >= maxRetries) {
-    m_comfyUiStartupTimer->stop();
+  const QUrl url(m_comfyHttpUrl);
+  const QString host = url.host().isEmpty() ? QStringLiteral("localhost") : url.host();
+  const int port = url.port() > 0 ? url.port() : 8188;
+
+  // 高速パス: ポートが既に開いている → 即実行
+  {
+    QTcpSocket sock;
+    sock.connectToHost(host, static_cast<quint16>(port));
+    if (sock.waitForConnected(300)) {
+      action();
+      return;
+    }
   }
+
+  // 自動起動パス: ペンディング中は二重投入を防ぐため flag を立てる
+  m_comfyAutoStartPending = true;
+
+  // ready: flag を解除してアクション実行（一回限り）
+  connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::ready,
+          this, [this, action](QUrl) {
+    m_comfyAutoStartPending = false;
+    action();
+  }, Qt::SingleShotConnection);
+
+  // failed: flag を解除（エラーメッセージは上の永続 failed 接続が emit する）
+  connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::failed,
+          this, [this](const QString&) {
+    m_comfyAutoStartPending = false;
+  }, Qt::SingleShotConnection);
+
+  m_comfyProcess->ensureRunning(url);
 }
 
 void AppController::applyAiSelectResult(core::SelectionMask mask) {
@@ -6157,10 +6172,68 @@ void AppController::fetchAiModels() {
   });
 }
 
+// ── AI: LoRA 一覧取得 ────────────────────────────────────────────────────
+void AppController::fetchAiLoras() {
+  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
+    return;
+  }
+  m_comfyUiClient->fetchLoras([this](const QStringList& loras) {
+    emit aiLorasLoaded(loras);
+  });
+}
+
+// ── AI: selection → GenerateRequest 共通組み立て ─────────────────────────
+// runInpaint と runGenerateWithWorkflow(selection あり) の共通処理。
+// workflowPath が空の場合は内蔵 lpa_inpaint_sdxl.json を使用する。
+AiService::GenerateRequest AppController::prepareSelectionGenerationRequest(
+    const InpaintParams& params, bool* ok)
+{
+  *ok = false;
+  AiService::GenerateRequest req;
+
+  const bool builtIn = params.workflowPath.isEmpty();
+  const QString wfPath = builtIn
+      ? (QCoreApplication::applicationDirPath()
+         + QStringLiteral("/resources/workflows/lpa_inpaint_sdxl.json"))
+      : params.workflowPath;
+
+  req.workflowPath        = wfPath;
+  req.useActiveLayer      = false;
+  req.useCompositedBuffer = true;
+  req.useSelectionAsMask  = true;
+  req.timeoutMs           = 180000;
+  req.inputImageNodeId    = params.inputImageNodeId;
+  req.maskImageNodeId     = params.maskNodeId;
+
+  // maskImageNodeId が未設定 → workflow グラフ解析で一意に決定
+  if (req.maskImageNodeId.isEmpty()) {
+    bool wfOk = false;
+    const auto wfDoc = platform::comfy::WorkflowDocument::load(wfPath, &wfOk);
+    if (wfOk)
+      req.maskImageNodeId = wfDoc.findMaskSourceNode();
+    if (req.maskImageNodeId.isEmpty()) {
+      emit aiGenerationError(
+          QStringLiteral("ワークフロー内にマスクノードが見つかりません。"
+                         "ワークフロー設定でマスクノードを指定してください。"));
+      return req;
+    }
+  }
+
+  // checkpoint / LoRA パッチ
+  {
+    auto patchedDoc = applyPresetPatches(wfPath, params.checkpoint, params.loras);
+    if (patchedDoc.isValid())
+      req.workflowDoc = std::move(patchedDoc);
+  }
+
+  *ok = true;
+  return req;
+}
+
 // ── AI: インペイント ─────────────────────────────────────────────────────
 void AppController::runInpaint(const InpaintParams& params, int batchCount) {
   ensureAiService();
-  if (m_aiService->isBusy()) {
+  if (m_aiService->isBusy() || m_comfyAutoStartPending) {
     emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
     return;
   }
@@ -6171,13 +6244,13 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
     return;
   }
 
-  // ワークフローパス解決: カスタム指定があればそちら、なければ内蔵
-  const bool builtIn = params.workflowPath.isEmpty();
-  const QString wfPath = builtIn
-      ? (QCoreApplication::applicationDirPath()
-         + "/resources/workflows/lpa_inpaint_sdxl.json")
-      : params.workflowPath;
+  bool ok = false;
+  AiService::GenerateRequest req = prepareSelectionGenerationRequest(params, &ok);
+  if (!ok) return;
 
+  req.outputLayerName = QStringLiteral("AI インペイント");
+
+  const bool builtIn = params.workflowPath.isEmpty();
   const int seed = (params.seed < 0)
       ? static_cast<int>(QRandomGenerator::global()->generate())
       : params.seed;
@@ -6190,33 +6263,9 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
   const QString kId   = !params.kSamplerNodeId.isEmpty() ? params.kSamplerNodeId
                         : (builtIn ? QStringLiteral("8") : QString());
 
-  AiService::GenerateRequest req;
-  req.workflowPath        = wfPath;
-  req.useCompositedBuffer = true;
-  req.useSelectionAsMask  = true;
-  req.outputLayerName     = QStringLiteral("AI インペイント");
-  req.timeoutMs           = 180000;
-  req.inputImageNodeId    = params.inputImageNodeId;
-  req.maskImageNodeId     = params.maskNodeId;
-
-  // maskImageNodeId が未設定の場合はワークフローを解析して ImageToMask の上流ノードを特定する。
-  // 推測 fallback ではなくグラフ構造から一意に決定する。
-  if (req.maskImageNodeId.isEmpty()) {
-    bool ok = false;
-    const auto wfDoc = platform::comfy::WorkflowDocument::load(wfPath, &ok);
-    if (ok) {
-      req.maskImageNodeId = wfDoc.findMaskSourceNode();
-    }
-    if (req.maskImageNodeId.isEmpty()) {
-      emit aiGenerationError(
-          QStringLiteral("インペイント: ワークフロー内にマスクノードが見つかりません。"
-                         "ワークフロー設定でマスクノードを指定してください。"));
-      return;
-    }
-  }
-
+  const QString augmentedPrompt = buildAugmentedPrompt(params.prompt, params.loras);
   if (!posId.isEmpty())
-    req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, params.prompt);
+    req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, augmentedPrompt);
   if (!negId.isEmpty())
     req.extraBindings << platform::comfy::WorkflowBinding::clipText(negId, params.negativePrompt);
   if (!kId.isEmpty())
@@ -6226,32 +6275,73 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
         .denoise(static_cast<double>(params.denoise))
         .seed   (seed);
 
-  m_aiService->inpaint(req, batchCount);
+  ensureComfyRunning([this, req, batchCount]() mutable {
+    m_aiService->inpaint(req, batchCount);
+  });
 }
 
 // ── AI: カスタムワークフローでテキスト→画像生成 ──────────────────────────
+// 選択範囲あり → Generative Fill (canvas composite + selection mask → inpaint 経路)
+// 選択範囲なし → txt2img (入力画像・マスクなし)
 void AppController::runGenerateWithWorkflow(const InpaintParams& params,
                                             int batchCount) {
   ensureAiService();
-  if (m_aiService->isBusy()) {
+  if (m_aiService->isBusy() || m_comfyAutoStartPending) {
     emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
     return;
   }
 
+  const int seed = (params.seed < 0)
+      ? static_cast<int>(QRandomGenerator::global()->generate() & 0x7FFFFFFFu)
+      : params.seed;
+
+  const QString augmentedPrompt = buildAugmentedPrompt(params.prompt, params.loras);
+
+  // ── 選択範囲あり: Generative Fill (内蔵 inpaint ワークフロー固定) ─────────
+  if (m_document.selection().hasSelection()) {
+    bool ok = false;
+    // workflowPath / nodeId を空にして内蔵 lpa_inpaint_sdxl.json + 内蔵ノード ID を使用
+    InpaintParams inpaintParams;
+    inpaintParams.prompt         = params.prompt;
+    inpaintParams.negativePrompt = params.negativePrompt;
+    inpaintParams.checkpoint     = params.checkpoint;
+    inpaintParams.steps          = params.steps;
+    inpaintParams.cfg            = params.cfg;
+    inpaintParams.denoise        = (params.denoise > 0.f) ? params.denoise : 0.75f;
+    inpaintParams.seed           = params.seed;
+    inpaintParams.loras          = params.loras;
+    // workflowPath 空 → prepareSelectionGenerationRequest が内蔵ワークフローを使用
+    AiService::GenerateRequest req = prepareSelectionGenerationRequest(inpaintParams, &ok);
+    if (!ok) return;
+
+    req.outputLayerName = QStringLiteral("AI Generated");
+
+    // 内蔵 inpaint ワークフローのノード ID (positive=2, negative=3, kSampler=8)
+    const float denoise = (params.denoise > 0.f) ? params.denoise : 0.75f;
+    req.extraBindings << platform::comfy::WorkflowBinding::clipText(QStringLiteral("2"), augmentedPrompt);
+    req.extraBindings << platform::comfy::WorkflowBinding::clipText(QStringLiteral("3"), params.negativePrompt);
+    req.extraBindings << platform::comfy::WorkflowBinding::kSampler(QStringLiteral("8"))
+        .steps  (params.steps)
+        .cfg    (static_cast<double>(params.cfg))
+        .denoise(static_cast<double>(denoise))
+        .seed   (seed);
+
+    ensureComfyRunning([this, req, batchCount]() mutable {
+      m_aiService->inpaint(req, batchCount);
+    });
+    return;
+  }
+
+  // ── 選択範囲なし: txt2img ──────────────────────────────────────────────
   const QString wfPath = params.workflowPath;
   if (wfPath.isEmpty()) {
     emit aiGenerationError("ワークフローパスが指定されていません。");
     return;
   }
 
-  const int seed = (params.seed < 0)
-      ? static_cast<int>(QRandomGenerator::global()->generate())
-      : params.seed;
-
   const QString posId = params.positiveNodeId;
   const QString negId = params.negativeNodeId;
   const QString kId   = params.kSamplerNodeId;
-
   AiService::GenerateRequest req;
   req.workflowPath        = wfPath;
   req.useActiveLayer      = false;
@@ -6260,8 +6350,14 @@ void AppController::runGenerateWithWorkflow(const InpaintParams& params,
   req.outputLayerName     = QStringLiteral("AI Generated");
   req.timeoutMs           = 180000;
 
+  {
+    auto patchedDoc = applyPresetPatches(wfPath, params.checkpoint, params.loras);
+    if (patchedDoc.isValid())
+      req.workflowDoc = std::move(patchedDoc);
+  }
+
   if (!posId.isEmpty())
-    req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, params.prompt);
+    req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, augmentedPrompt);
   if (!negId.isEmpty())
     req.extraBindings << platform::comfy::WorkflowBinding::clipText(negId, params.negativePrompt);
   if (!kId.isEmpty())
@@ -6271,7 +6367,9 @@ void AppController::runGenerateWithWorkflow(const InpaintParams& params,
         .denoise(1.0)
         .seed   (seed);
 
-  m_aiService->generate(req, batchCount);
+  ensureComfyRunning([this, req, batchCount]() mutable {
+    m_aiService->generate(req, batchCount);
+  });
 }
 
 // ── AI: テキストから画像生成 ─────────────────────────────────────────────
@@ -6468,6 +6566,27 @@ void AppController::ensureAiService() {
           [this](const QList<QPixmap>& px) {
     m_batchImages = px;  // apply-candidate debug action 用
     emit aiBatchCandidatesReady(px);
+  });
+  connect(m_aiService, &AiService::selectMaskResult, this,
+          [this](const QByteArray& pngData) {
+    const QImage img = QImage::fromData(pngData);
+    if (img.isNull()) {
+      emit aiGenerationError("SAM結果のデコードに失敗しました");
+      return;
+    }
+    const int W = img.width(), H = img.height();
+    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(W * H), 0);
+    for (int y = 0; y < H; ++y)
+      for (int x = 0; x < W; ++x)
+        if (img.pixelColor(x, y).lightness() > 127)
+          pixels[static_cast<std::size_t>(y) * W + x] = 255;
+    core::SelectionMask mask(W, H);
+    mask.setPixels(pixels);
+    applyAiSelectResult(std::move(mask));
+  });
+  connect(m_aiService, &AiService::selectMaskError, this,
+          [this](const QString& msg) {
+    emit aiGenerationError(msg);
   });
 }
 
@@ -6984,7 +7103,8 @@ AppController::DebugActionResult AppController::executeDebugAction(
             << QLatin1String("comfy-generate")
             << QLatin1String("workflow-analyze")
             << QLatin1String("set-layer-opacity")
-            << QLatin1String("set-layer-blend-mode");
+            << QLatin1String("set-layer-blend-mode")
+            << QLatin1String("ai-generate-with-preset");
     r.success = true;
     r.message = QLatin1String("Available debug actions");
     r.data    = QJsonObject{{QLatin1String("actions"), actions}};
@@ -7020,6 +7140,115 @@ AppController::DebugActionResult AppController::executeDebugAction(
     dataObj[QLatin1String("layerCount")] = s2.layerCount;
     dataObj[QLatin1String("activeLayer")] = s2.activeLayerName;
     r.data = dataObj;
+    return r;
+  }
+
+  // ── ai-generate-with-preset ─────────────────────────────────────────────
+  // QSettingsからPresetを読み込み、runGenerateWithWorkflow経由で生成を実行する。
+  // opts:
+  //   presetIndex : 使用するプリセットのインデックス (default: lastUsedIndex)
+  //   prompt      : 追加プロンプト (省略可)
+  if (type == QLatin1String("ai-generate-with-preset")) {
+    app::panels::WorkflowPresetManager mgr;
+    mgr.load();
+
+    const int presetCount = mgr.presets().size();
+    if (presetCount == 0) {
+      r.success = false;
+      r.message = QLatin1String("ai-generate-with-preset: no presets found in QSettings");
+      return r;
+    }
+
+    const int defaultIdx = (mgr.lastUsedIndex() >= 0 && mgr.lastUsedIndex() < presetCount)
+                           ? mgr.lastUsedIndex() : 0;
+    const int presetIdx  = opts.value(QLatin1String("presetIndex")).toInt(defaultIdx);
+    if (presetIdx < 0 || presetIdx >= presetCount) {
+      r.success = false;
+      r.message = QString("ai-generate-with-preset: index %1 out of range (0..%2)")
+                      .arg(presetIdx).arg(presetCount - 1);
+      return r;
+    }
+
+    const app::panels::WorkflowPreset& preset = mgr.presets().at(presetIdx);
+    if (!preset.isValid()) {
+      r.success = false;
+      r.message = QLatin1String("ai-generate-with-preset: preset has no workflowPath");
+      return r;
+    }
+
+    InpaintParams params;
+    params.workflowPath      = preset.workflowPath;
+    params.checkpoint        = preset.checkpoint;
+    params.loras             = preset.loras;
+    params.positiveNodeId    = preset.binding.positiveNodeId;
+    params.negativeNodeId    = preset.binding.negativeNodeId;
+    params.kSamplerNodeId    = preset.binding.kSamplerNodeId;
+    params.prompt            = opts.value(QLatin1String("prompt")).toString();
+    params.negativePrompt    = opts.value(QLatin1String("negativePrompt")).toString();
+    params.seed              = opts.value(QLatin1String("seed")).toInt(-1);
+    params.steps             = opts.value(QLatin1String("steps")).toInt(5);
+    params.cfg               = static_cast<float>(opts.value(QLatin1String("cfg")).toDouble(7.0));
+
+    // loras の triggerWords をまとめてレポート
+    QJsonArray loraArr;
+    for (const auto& e : preset.loras) {
+      loraArr.append(QJsonObject{
+        {QLatin1String("name"),          e.name},
+        {QLatin1String("modelStrength"), e.modelStrength},
+        {QLatin1String("clipStrength"),  e.clipStrength},
+        {QLatin1String("triggerWords"),  e.triggerWords},
+      });
+    }
+
+    // debug用: ensureComfyRunning(TCPタイムアウト)をバイパスし直接generate
+    ensureAiService();
+    m_aiService->setComfyUrl(m_comfyHttpUrl);
+    if (m_aiService->isBusy()) {
+      r.success = false;
+      r.message = QLatin1String("ai-generate-with-preset: AiService is busy");
+      return r;
+    }
+    {
+      const int seed = (params.seed < 0)
+          ? static_cast<int>(QRandomGenerator::global()->generate() & 0x7FFFFFFFu)
+          : params.seed;
+      const QString augPrompt = buildAugmentedPrompt(params.prompt, params.loras);
+      AiService::GenerateRequest req;
+      req.workflowPath    = preset.workflowPath;
+      req.useActiveLayer  = false;
+      req.useSelectionAsMask = false;
+      req.outputLayerName = QStringLiteral("AI Generated");
+      req.timeoutMs       = 180000;
+      {
+        auto patchedDoc = applyPresetPatches(preset.workflowPath, preset.checkpoint, preset.loras);
+        if (patchedDoc.isValid()) req.workflowDoc = std::move(patchedDoc);
+      }
+      const QString posId = preset.binding.positiveNodeId;
+      const QString negId = preset.binding.negativeNodeId;
+      const QString kId   = preset.binding.kSamplerNodeId;
+      if (!posId.isEmpty())
+        req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, augPrompt);
+      if (!negId.isEmpty())
+        req.extraBindings << platform::comfy::WorkflowBinding::clipText(negId, params.negativePrompt);
+      if (!kId.isEmpty())
+        req.extraBindings << platform::comfy::WorkflowBinding::kSampler(kId)
+            .steps(params.steps).cfg(static_cast<double>(params.cfg)).denoise(1.0).seed(seed);
+      m_aiService->generate(req, 1);
+    }
+
+    r.success = true;
+    r.message = QString("ai-generate-with-preset: started preset[%1] \"%2\"")
+                    .arg(presetIdx).arg(preset.name);
+    r.data = QJsonObject{
+      {QLatin1String("presetIndex"),   presetIdx},
+      {QLatin1String("presetName"),    preset.name},
+      {QLatin1String("workflowPath"),  preset.workflowPath},
+      {QLatin1String("checkpoint"),    preset.checkpoint},
+      {QLatin1String("loras"),         loraArr},
+      {QLatin1String("positiveNodeId"),preset.binding.positiveNodeId},
+      {QLatin1String("negativeNodeId"),preset.binding.negativeNodeId},
+      {QLatin1String("kSamplerNodeId"),preset.binding.kSamplerNodeId},
+    };
     return r;
   }
 
