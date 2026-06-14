@@ -334,6 +334,27 @@ void ComfyUiClient::fetchCheckpoints(std::function<void(QStringList)> callback) 
   });
 }
 
+void ComfyUiClient::fetchLoras(std::function<void(QStringList)> callback) {
+  QNetworkReply* reply = get("/object_info/LoraLoader");
+  connect(reply, &QNetworkReply::finished, this, [reply, callback]() {
+    reply->deleteLater();
+    QStringList names;
+    if (reply->error() == QNetworkReply::NoError) {
+      const QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+      const QJsonArray loraArr = obj.value("LoraLoader").toObject()
+                                    .value("input").toObject()
+                                    .value("required").toObject()
+                                    .value("lora_name").toArray()
+                                    .first().toArray();
+      for (const QJsonValue& v : loraArr) {
+        const QString s = v.toString();
+        if (!s.isEmpty()) names << s;
+      }
+    }
+    callback(names);
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ワークフローパラメーター注入
 // ─────────────────────────────────────────────────────────────────────────────
@@ -456,110 +477,6 @@ QJsonObject ComfyUiClient::buildInpaintWorkflow(const InpaintRequest& req) {
     n.insert("inputs", inp);
     wf.insert("9", n); }
   return wf;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 組み込みワークフロー: SAM2 オブジェクト選択
-// ─────────────────────────────────────────────────────────────────────────────
-QJsonObject ComfyUiClient::buildSamWorkflow(const SamRequest& req) {
-  QJsonObject wf;
-
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("image",  "sam_input.png");
-    inp.insert("upload", "image");
-    n.insert("class_type", "LoadImage");
-    n.insert("inputs", inp);
-    wf.insert("1", n); }
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("model",  req.samModel);
-    inp.insert("device", "cuda");
-    n.insert("class_type", "SAM2ModelLoader");
-    n.insert("inputs", inp);
-    wf.insert("2", n); }
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("sam2_model", QJsonArray{QJsonArray{"2"}, 0});
-    inp.insert("image",      QJsonArray{QJsonArray{"1"}, 0});
-    inp.insert("coordinates_positive",
-               req.positivePoint
-                   ? QString("[[%1, %2]]").arg(req.pointX).arg(req.pointY)
-                   : QString("[]"));
-    inp.insert("coordinates_negative",
-               req.positivePoint
-                   ? QString("[]")
-                   : QString("[[%1, %2]]").arg(req.pointX).arg(req.pointY));
-    inp.insert("mask_hint_threshold", 0.5);
-    n.insert("class_type", "SAM2Segmentation");
-    n.insert("inputs", inp);
-    wf.insert("3", n); }
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("mask", QJsonArray{QJsonArray{"3"}, 0});
-    n.insert("class_type", "MaskToImage");
-    n.insert("inputs", inp);
-    wf.insert("4", n); }
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("images",          QJsonArray{QJsonArray{"4"}, 0});
-    inp.insert("filename_prefix", "paintapp_sam");
-    n.insert("class_type", "SaveImage");
-    n.insert("inputs", inp);
-    wf.insert("5", n); }
-  return wf;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// fetchUpscaleModels
-// ─────────────────────────────────────────────────────────────────────────────
-void ComfyUiClient::fetchUpscaleModels(std::function<void(QStringList)> callback) {
-  auto* reply = get("/object_info/UpscaleModelLoader");
-  connect(reply, &QNetworkReply::finished, this, [reply, cb = std::move(callback)]() {
-    QStringList models;
-    if (reply->error() == QNetworkReply::NoError) {
-      const QJsonObject root = QJsonDocument::fromJson(reply->readAll()).object();
-      // {"UpscaleModelLoader": {"input": {"required": {"model_name": [[name,...], {}]}}}}
-      const QJsonArray names =
-          root["UpscaleModelLoader"].toObject()
-              ["input"].toObject()
-              ["required"].toObject()
-              ["model_name"].toArray()
-              .first().toArray();
-      for (const QJsonValue& v : names) {
-        const QString s = v.toString();
-        if (!s.isEmpty()) models << s;
-      }
-    }
-    if (cb) cb(models);
-    reply->deleteLater();
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// buildUpscaleWorkflow
-// ─────────────────────────────────────────────────────────────────────────────
-QJsonObject ComfyUiClient::buildUpscaleWorkflow(const QString& inputFilename,
-                                                  const QString& modelName) {
-  // Node 1: LoadImage
-  QJsonObject n1, i1;
-  i1["image"]  = inputFilename;
-  i1["upload"] = QString("image");
-  n1["class_type"] = "LoadImage";  n1["inputs"] = i1;
-
-  // Node 2: UpscaleModelLoader
-  QJsonObject n2, i2;
-  i2["model_name"] = modelName;
-  n2["class_type"] = "UpscaleModelLoader";  n2["inputs"] = i2;
-
-  // Node 3: ImageUpscaleWithModel
-  QJsonObject n3, i3;
-  i3["upscale_model"] = QJsonArray{QJsonArray{"2"}, 0};
-  i3["image"]         = QJsonArray{QJsonArray{"1"}, 0};
-  n3["class_type"] = "ImageUpscaleWithModel";  n3["inputs"] = i3;
-
-  // Node 4: SaveImage
-  QJsonObject n4, i4;
-  i4["images"]          = QJsonArray{QJsonArray{"3"}, 0};
-  i4["filename_prefix"] = QString("lpa_upscale_");
-  n4["class_type"] = "SaveImage";  n4["inputs"] = i4;
-
-  return QJsonObject{{"1", n1}, {"2", n2}, {"3", n3}, {"4", n4}};
 }
 
 } // namespace app::bridge

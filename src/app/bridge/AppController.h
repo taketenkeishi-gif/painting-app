@@ -16,9 +16,8 @@
 #include <QList>
 #include <QObject>
 #include <QPixmap>
-#include <QProcess>
-#include <QTimer>
 
+#include "app/ai/WorkflowPreset.h"
 #include "app/ui/ToolDescriptor.h"
 #include "app/ui/UiState.h"
 #include "core/ai/OnnxSegEngine.h"
@@ -53,9 +52,11 @@
 #include "core/mesh/EdgeAdaptiveMeshGenerator.h"
 
 namespace platform::comfy { class ComfyClient; }
+namespace platform::comfy { class ComfyProcessManager; }
+
+#include "app/bridge/AiService.h"
 
 namespace app::bridge {
-class AiService;
 class ComfyUiClient;
 
 struct LayerViewModel {
@@ -512,10 +513,12 @@ public:
 
   // ── AI / ComfyUI ──────────────────────────────────────────────────────────
   ComfyUiClient* comfyUiClient() noexcept { return m_comfyUiClient; }
+  AiService*     aiService()     noexcept;
   void connectComfyUi(const QString& url = "http://localhost:8188");
   bool isComfyUiConnected() const noexcept;
   void applyAiSelectResult(core::SelectionMask mask);
   void fetchAiModels();
+  void fetchAiLoras();
 
   // ── ONNX ローカル推論 ─────────────────────────────────────────────────
   bool isOnnxLoaded() const noexcept;
@@ -617,13 +620,16 @@ public:
     QString positiveNodeId;     // 空 = 内蔵:"2" / カスタム:バインドなし
     QString negativeNodeId;     // 空 = 内蔵:"3" / カスタム:バインドなし
     QString kSamplerNodeId;     // 空 = 内蔵:"8" / カスタム:バインドなし
+    // モデル設定 (空 = workflow.json のデフォルト値を使う)
+    QList<app::panels::LoraEntry> loras;
   };
   /// 選択範囲をマスクとしてインペイントを実行。
   /// 選択がない場合は selectionMissing() を emit して返す（全体 inpaint は禁止）。
   void runInpaint(const InpaintParams& params, int batchCount = 1);
 
   /// カスタムワークフローでテキスト→画像生成 (AiGenerationController 経由)。
-  /// 選択不要・入力画像不要。InpaintParams の mask/inputImage 系フィールドは無視する。
+  /// 選択範囲がある場合は Generative Fill として動作（canvas composite + selection mask を送信）。
+  /// 選択範囲がない場合は txt2img（入力画像・マスクなし）として動作。
   void runGenerateWithWorkflow(const InpaintParams& params, int batchCount = 1);
 
   struct Txt2ImgParams {
@@ -635,6 +641,8 @@ public:
     int     steps       {20};
     float   cfg         {7.5f};
     int     seed        {-1};
+    // モデル設定 (空 = workflow.json のデフォルト値を使う)
+    QList<app::panels::LoraEntry> loras;
   };
   /// テキストから新規レイヤーに画像を生成
   void runTextToImage(const Txt2ImgParams& params, int batchCount = 1);
@@ -664,6 +672,7 @@ signals:
   void aiSelectionRefined();   ///< ComfyUI / ONNX 推論で選択が更新されたとき
   void rotoMaskApplied();      ///< Rotoブラシのストローク確定でマスクが更新されたとき
   void aiModelsLoaded(QStringList models);
+  void aiLorasLoaded(QStringList loras);
   /// step/total ステップ数 + 現在ノード ID
   void aiProgressUpdate(int step, int totalSteps, QString nodeId);
   /// KSampler 中間プレビュー画像
@@ -678,6 +687,11 @@ signals:
   void dirtyChanged(bool dirty);
 
 private:
+  /// selection あり Generate / Inpaint 共通: request を組み立てて返す。
+  /// 失敗時は aiGenerationError を emit し *ok = false。
+  AiService::GenerateRequest prepareSelectionGenerationRequest(
+      const InpaintParams& params, bool* ok);
+
   void setDirty(bool dirty) noexcept;
   void ensureAiService();
   enum class HistoryKind {
@@ -837,10 +851,12 @@ private:
 
   // ── ComfyUI サーバー管理 ────────────────────────────────────────────
   void ensureComfyUiRunning(const QUrl& serverUrl);
-  void onComfyUiServerStartupTimeout();
-  QProcess*    m_comfyUiServerProcess    {nullptr};
-  QTimer*      m_comfyUiStartupTimer     {nullptr};
-  int          m_comfyUiStartupRetries   {0};
+  // AiService 経由の generate/inpaint 実行前に ComfyUI 自動起動を行うヘルパー。
+  // ポート疎通があれば即 action()、なければ ComfyProcessManager で起動待ちしてから action()。
+  void ensureComfyRunning(std::function<void()> action);
+
+  platform::comfy::ComfyProcessManager* m_comfyProcess {nullptr};
+  bool m_comfyAutoStartPending {false};  ///< ensureComfyRunning で起動待ち中
 
   ComfyUiClient*           m_comfyUiClient      {nullptr};
   enum class AiOpType { None, SamSelect, Inpaint, TextToImage, CustomWorkflow };

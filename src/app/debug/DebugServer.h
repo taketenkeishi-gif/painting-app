@@ -50,8 +50,11 @@ private:
     // Endpoint handlers
     QByteArray endpointHealth();
     QByteArray endpointState();
+    QByteArray endpointAiState();
     QByteArray endpointPixels(int size);
+    QByteArray endpointCanvasPixels(int size);
     QByteArray endpointAction(const QByteArray& body);
+    QByteArray endpointWidgetTree();
 
     // HTTP helpers
     static QByteArray okJson(const QByteArray& json);

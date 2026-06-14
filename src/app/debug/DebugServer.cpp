@@ -152,7 +152,7 @@ QByteArray DebugServer::endpointState() {
 
     // Selection sub-object
     QJsonObject selection;
-    selection[QLatin1String("active")]  = s.selectionWidth > 0 && s.selectionHeight > 0;
+    selection[QLatin1String("active")]  = s.selectionPixels > 0;
     selection[QLatin1String("pixels")]  = s.selectionPixels;
     selection[QLatin1String("op")]      = s.selectionOp;
     selection[QLatin1String("width")]   = s.selectionWidth;

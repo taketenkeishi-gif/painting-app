@@ -5812,9 +5812,6 @@ void AppController::saveSubToolCatalogToSettings() const {
 core::ToolContext AppController::makeToolContext() {
   const bool maskMode = m_uiState.editTarget == app::ui::UiState::EditTarget::Mask;
   // QMモード中は全ツールの描画先をQMバッファに切り替える (ツール側にQM知識不要)
-  core::Layer* paintTarget = (m_quickMaskMode && m_quickMaskLayer)
-      ? &(*m_quickMaskLayer)
-      : m_document.activeLayer();
   core::ToolContext ctx {
       m_document,
       m_composited,
@@ -5822,8 +5819,7 @@ core::ToolContext AppController::makeToolContext() {
       m_secondaryColor,
       m_uiState.size,
       maskMode,
-      &m_selectionEngine,
-      paintTarget};
+      &m_selectionEngine};
   return ctx;
 }
 
@@ -6252,7 +6248,7 @@ void AppController::runInpaint(const InpaintParams& params, int batchCount) {
 
   const bool builtIn = params.workflowPath.isEmpty();
   const int seed = (params.seed < 0)
-      ? static_cast<int>(QRandomGenerator::global()->generate())
+      ? static_cast<int>(QRandomGenerator::global()->generate() & 0x7FFFFFFFu)
       : params.seed;
 
   // ノード ID: カスタム指定 > 内蔵デフォルト > なし (バインドしない)
@@ -6534,6 +6530,11 @@ void AppController::setDirty(bool dirty) noexcept {
   if (m_dirty == dirty) return;
   m_dirty = dirty;
   emit dirtyChanged(m_dirty);
+}
+
+AiService* AppController::aiService() noexcept {
+  ensureAiService();
+  return m_aiService;
 }
 
 // ── AiService 一本化ヘルパー ──────────────────────────────────────────────────

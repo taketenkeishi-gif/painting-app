@@ -83,6 +83,7 @@ add_library(paint_comfy_platform STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/platform/comfy/WorkflowDocument.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/platform/comfy/WorkflowBinding.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/platform/comfy/ComfyClient.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/platform/comfy/ComfyProcessManager.cpp
 )
 set_target_properties(paint_comfy_platform PROPERTIES AUTOMOC ON)
 target_include_directories(paint_comfy_platform PUBLIC ${PROJECT_SOURCE_DIR}/src)
@@ -123,8 +124,11 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/UpscaleDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AiModelFolderDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/WorkflowBindingDialog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/ai/WorkflowPresetManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AiGenerationController.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/AiService.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/ComfyProvider.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/WorkflowFactory.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/ComfyUiClient.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/MinimalWebSocket.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc

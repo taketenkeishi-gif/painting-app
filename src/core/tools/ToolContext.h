@@ -122,6 +122,7 @@ struct ToolContext {
   int brushSize {1};
   bool maskEditMode {false};  ///< true = brush/eraser writes to layer maskBuffer (grayscale)
   SelectionEngine* selectionEngine {nullptr};  ///< 新プロバイダーパイプライン
+  Layer*           paintTarget     {nullptr};  ///< 描画先レイヤー (nullptr = activeLayer())
 };
 
 } // namespace core

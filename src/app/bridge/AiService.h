@@ -1,9 +1,11 @@
 #pragma once
 
+#include <QByteArray>
 #include <QList>
 #include <QObject>
 #include <QPixmap>
 #include <QString>
+#include <QStringList>
 
 #include "platform/comfy/WorkflowBinding.h"
 #include "platform/comfy/WorkflowDocument.h"
@@ -51,12 +53,41 @@ public:
   void generate(const GenerateRequest& req, int batchCount = 1);
   void inpaint (const GenerateRequest& req, int batchCount = 1);
 
+  // ── selectMask (SAM) ──────────────────────────────────────────────────────
+  struct SelectMaskRequest {
+    QByteArray imagePng;
+    int        pointX        {0};
+    int        pointY        {0};
+    bool       positivePoint {true};
+    QString    samModel      {"sam2_hiera_large.pt"};
+    int        timeoutMs     {60000};
+  };
+
+  void selectMask(const SelectMaskRequest& req);
+
+  // ── upscale ───────────────────────────────────────────────────────────────
+  struct UpscaleRequest {
+    QByteArray imagePng;
+    QString    modelName;
+    int        timeoutMs {120000};
+  };
+
+  void upscale(const UpscaleRequest& req);
+  void fetchUpscaleModels();
+
 signals:
   void generationStarted();
   void generationProgressUpdate(int step, int totalSteps);
   void generationFinished(const QString& opType);
   void generationError(const QString& message);
   void batchCandidatesReady(const QList<QPixmap>& candidates);
+
+  void selectMaskResult(QByteArray maskPng);
+  void selectMaskError (QString message);
+
+  void upscaleResult(QByteArray imagePng);
+  void upscaleError (QString message);
+  void upscaleModelsReady(QStringList models);
 
 private:
   void ensureInitialized();
