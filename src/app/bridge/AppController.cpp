@@ -1,4 +1,4 @@
-#include "app/bridge/AppController.h"
+﻿#include "app/bridge/AppController.h"
 #include "app/bridge/AiService.h"
 #include "app/bridge/ComfyUiClient.h"
 #include "core/selection/providers/ClassicProvider.h"
@@ -14,6 +14,8 @@
 
 #include <QBuffer>
 #include <QDebug>
+#include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
 #include <QPainter>
@@ -26,6 +28,7 @@
 #include <QTcpSocket>
 #include <QRandomGenerator>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QString>
 #include <QUrl>
 
@@ -439,6 +442,9 @@ AppController::AppController(QObject* parent)
 
   setBrushColor(core::Color::OpaqueBlack());
   applyUiStateToTools();
+#ifdef PAINT_USE_SKIA
+  m_renderer.setCache(&m_skiaLayerCache);
+#endif
   rerender();
 
   connect(this, &AppController::documentChanged, this, [this]() { setDirty(true); });
@@ -458,6 +464,10 @@ AppController::AppController(QObject* parent)
   } else {
     qDebug() << "[OnnxSeg] Model files not found:" << encPath << decPath;
   }
+
+#ifdef PAINT_DEBUG_SERVER
+  initDebugActions();
+#endif
 }
 
 CanvasOverlayViewModel AppController::canvasOverlay() const {
@@ -2226,6 +2236,8 @@ bool AppController::pasteBufferAsNewRasterLayerWithSelectionMask(
   ++m_layerCounter;
   const std::string finalName =
       layerName.empty() ? ("Layer " + std::to_string(m_layerCounter)) : layerName;
+  // addRasterLayer の前にアクティブレイヤーを記録する（undo時の復元先）
+  const std::size_t prevActiveIndex = m_document.activeLayerIndex();
   const std::size_t index = m_document.addRasterLayer(finalName);
   core::Layer& layer = m_document.layerAt(index);
 
@@ -2253,7 +2265,20 @@ bool AppController::pasteBufferAsNewRasterLayerWithSelectionMask(
   m_document.setActiveLayer(index);
   ensureCurrentSubToolCompatibility();
   m_pendingStroke.reset();
-  clearStrokeHistory();
+
+  // アンドゥ履歴に登録（LayerAdd エントリ）
+  // NOTE: clearStrokeHistory() は呼ばない — AI貼り付け前の操作をundoで辿れるようにする
+  {
+    StrokeHistoryEntry entry;
+    entry.kind        = HistoryKind::LayerAdd;
+    entry.actionName  = "AI 結果貼り付け";
+    entry.layerIndex  = index;
+    entry.afterLayer  = m_document.layerAt(index);
+    entry.beforeIndex = prevActiveIndex;  // addRasterLayer 前のアクティブレイヤー
+    entry.afterIndex  = index;
+    pushHistoryEntry(std::move(entry));
+  }
+
   rerender();
   emit toolStateChanged();
   emit layersChanged();
@@ -4925,56 +4950,41 @@ bool AppController::isComfyUiConnected() const noexcept {
   return m_comfyUiClient != nullptr && m_comfyUiClient->isConnected();
 }
 
+// m_comfyProcess の1回限り初期化 + 永続シグナル接続。
+// failed → aiGenerationError と ready → WebSocket 再接続をここで確立する。
+// ensureComfyUiRunning / ensureComfyRunning の両方から呼ばれる。
+void AppController::ensureComfyProcessManager() {
+  if (m_comfyProcess) return;
+
+  m_comfyProcess = new platform::comfy::ComfyProcessManager(this);
+
+  // 起動失敗をユーザーに通知（永続接続・ここのみ）
+  connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::failed,
+          this, [this](const QString& reason) {
+    emit aiGenerationError(reason);
+  });
+
+  // 起動完了 → WebSocket 再接続（m_comfyUiClient が存在する場合のみ有効）
+  connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::ready,
+          this, [this](QUrl url) {
+    if (m_comfyUiClient && !m_comfyUiClient->isConnected())
+      m_comfyUiClient->connectToServer(url);
+  });
+}
+
 void AppController::ensureComfyUiRunning(const QUrl& serverUrl) {
-  if (m_comfyProcess == nullptr) {
-    m_comfyProcess = new platform::comfy::ComfyProcessManager(this);
-
-    // サーバー起動完了 → WebSocket 接続を試みる
-    connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::ready,
-            this, [this](QUrl url) {
-      if (m_comfyUiClient && !m_comfyUiClient->isConnected()) {
-        m_comfyUiClient->connectToServer(url);
-      }
-    });
-
-    // 起動失敗をユーザーに通知
-    connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::failed,
-            this, [this](const QString& reason) {
-      emit aiGenerationError(reason);
-    });
-  }
-
+  ensureComfyProcessManager();
   m_comfyProcess->ensureRunning(serverUrl);
 }
 
 // AiService 経由の generate / inpaint 向け自動起動ヘルパー。
-// ComfyUI ポートが開いていれば即 action() を呼ぶ。
-// オフラインなら ComfyProcessManager で起動してから action() を呼ぶ。
+// ComfyProcessManager が非同期でポート疎通確認 → ready signal で action() を呼ぶ。
 void AppController::ensureComfyRunning(std::function<void()> action) {
-  // ComfyProcessManager を生成（ensureComfyUiRunning 未呼び出しの場合）
-  if (!m_comfyProcess) {
-    m_comfyProcess = new platform::comfy::ComfyProcessManager(this);
-    connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::failed,
-            this, [this](const QString& reason) {
-      emit aiGenerationError(reason);
-    });
-  }
+  ensureComfyProcessManager();
 
   const QUrl url(m_comfyHttpUrl);
-  const QString host = url.host().isEmpty() ? QStringLiteral("localhost") : url.host();
-  const int port = url.port() > 0 ? url.port() : 8188;
 
-  // 高速パス: ポートが既に開いている → 即実行
-  {
-    QTcpSocket sock;
-    sock.connectToHost(host, static_cast<quint16>(port));
-    if (sock.waitForConnected(300)) {
-      action();
-      return;
-    }
-  }
-
-  // 自動起動パス: ペンディング中は二重投入を防ぐため flag を立てる
+  // 常に非同期パス: ComfyProcessManager が疎通確認 (快速/起動) → ready emit
   m_comfyAutoStartPending = true;
 
   // ready: flag を解除してアクション実行（一回限り）
@@ -4984,7 +4994,7 @@ void AppController::ensureComfyRunning(std::function<void()> action) {
     action();
   }, Qt::SingleShotConnection);
 
-  // failed: flag を解除（エラーメッセージは上の永続 failed 接続が emit する）
+  // failed: flag を解除（エラーメッセージは永続 failed 接続が emit する）
   connect(m_comfyProcess, &platform::comfy::ComfyProcessManager::failed,
           this, [this](const QString&) {
     m_comfyAutoStartPending = false;
@@ -6119,6 +6129,9 @@ static void overlayQuickMask(core::PixelBuffer& dst, const core::Layer& qmLayer,
 }
 
 void AppController::rerender() {
+#ifdef PAINT_USE_SKIA
+  m_skiaLayerCache.invalidateAll();
+#endif
   m_composited = m_renderer.composite(m_document);
   if (m_quickMaskMode && m_quickMaskLayer) {
     overlayQuickMask(m_composited, *m_quickMaskLayer);
@@ -6132,6 +6145,10 @@ void AppController::rerenderDirty(const core::Rect& dirtyRect) {
     rerender();
     return;
   }
+#ifdef PAINT_USE_SKIA
+  if (const core::Layer* al = m_document.activeLayer())
+    m_skiaLayerCache.markDirty(al->id());
+#endif
   m_renderer.compositeInto(m_document, m_composited, dirtyRect);
   m_lastCompositeDirtyRect = dirtyRect;
   // QM中: dirty領域のみoverlay適用 (compositeIntoで新鮮なベース → 二重overlayなし)
@@ -6152,9 +6169,8 @@ static QByteArray pixelBufferToPng(const core::PixelBuffer& buf) {
 
 // ── AI: キャンセル ───────────────────────────────────────────────────────
 void AppController::cancelAiGeneration() {
-  if (m_comfyUiClient != nullptr) {
-    m_comfyUiClient->interruptExecution();
-  }
+  if (m_aiService != nullptr)
+    m_aiService->cancel();
   m_currentAiOp = AiOpType::None;
 }
 
@@ -6307,6 +6323,8 @@ void AppController::runGenerateWithWorkflow(const InpaintParams& params,
     inpaintParams.seed           = params.seed;
     inpaintParams.loras          = params.loras;
     // workflowPath 空 → prepareSelectionGenerationRequest が内蔵ワークフローを使用
+    // 内蔵 lpa_inpaint_sdxl.json: 画像=4, マスク=5, positive=2, negative=3, kSampler=8
+    inpaintParams.maskNodeId = QStringLiteral("5");
     AiService::GenerateRequest req = prepareSelectionGenerationRequest(inpaintParams, &ok);
     if (!ok) return;
 
@@ -6368,141 +6386,90 @@ void AppController::runGenerateWithWorkflow(const InpaintParams& params,
   });
 }
 
-// ── AI: テキストから画像生成 ─────────────────────────────────────────────
+// ── AI: テキストから画像生成 (AiService 経由) ────────────────────────────
 void AppController::runTextToImage(const Txt2ImgParams& params, int batchCount) {
-  if (m_comfyUiClient == nullptr) {
-    emit aiGenerationError("ComfyUI クライアントが初期化されていません");
-    return;
-  }
-  if (!m_comfyUiClient->isConnected()) {
-    emit aiGenerationError("ComfyUI に接続されていません");
+  ensureAiService();
+  if (m_aiService->isBusy() || m_comfyAutoStartPending) {
+    emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
     return;
   }
 
+  // ── ワークフロー JSON 構築 (node 1-7) ────────────────────────────────────
   QJsonObject wf;
-  // 1: Checkpoint
-  {
-    QJsonObject n; QJsonObject inp;
+  { QJsonObject n, inp;
     inp["ckpt_name"] = params.checkpoint;
-    n["class_type"] = "CheckpointLoaderSimple";
-    n["inputs"] = inp;
-    wf["1"] = n;
-  }
-  // 2: Positive
-  {
-    QJsonObject n; QJsonObject inp;
+    n["class_type"] = "CheckpointLoaderSimple"; n["inputs"] = inp; wf["1"] = n; }
+  { QJsonObject n, inp;
     inp["text"] = params.prompt.isEmpty() ? "high quality, detailed" : params.prompt;
     inp["clip"] = QJsonArray{QJsonArray{"1"}, 1};
-    n["class_type"] = "CLIPTextEncode";
-    n["inputs"] = inp;
-    wf["2"] = n;
-  }
-  // 3: Negative
-  {
-    QJsonObject n; QJsonObject inp;
+    n["class_type"] = "CLIPTextEncode"; n["inputs"] = inp; wf["2"] = n; }
+  { QJsonObject n, inp;
     inp["text"] = params.negativePrompt.isEmpty() ? "blurry, low quality" : params.negativePrompt;
     inp["clip"] = QJsonArray{QJsonArray{"1"}, 1};
-    n["class_type"] = "CLIPTextEncode";
-    n["inputs"] = inp;
-    wf["3"] = n;
-  }
-  // 4: Empty latent
-  {
-    QJsonObject n; QJsonObject inp;
-    inp["width"]  = params.width;
-    inp["height"] = params.height;
-    inp["batch_size"] = 1;
-    n["class_type"] = "EmptyLatentImage";
-    n["inputs"] = inp;
-    wf["4"] = n;
-  }
-  // 5: KSampler
-  {
-    QJsonObject n; QJsonObject inp;
+    n["class_type"] = "CLIPTextEncode"; n["inputs"] = inp; wf["3"] = n; }
+  { QJsonObject n, inp;
+    inp["width"] = params.width; inp["height"] = params.height; inp["batch_size"] = 1;
+    n["class_type"] = "EmptyLatentImage"; n["inputs"] = inp; wf["4"] = n; }
+  { QJsonObject n, inp;
     inp["model"]        = QJsonArray{QJsonArray{"1"}, 0};
     inp["positive"]     = QJsonArray{QJsonArray{"2"}, 0};
     inp["negative"]     = QJsonArray{QJsonArray{"3"}, 0};
     inp["latent_image"] = QJsonArray{QJsonArray{"4"}, 0};
-    inp["seed"]         = params.seed < 0 ? static_cast<int>(QRandomGenerator::global()->generate()) : params.seed;
-    inp["steps"]        = params.steps;
-    inp["cfg"]          = static_cast<double>(params.cfg);
-    inp["sampler_name"] = "euler";
-    inp["scheduler"]    = "normal";
-    inp["denoise"]      = 1.0;
-    n["class_type"] = "KSampler";
-    n["inputs"] = inp;
-    wf["5"] = n;
-  }
-  // 6: VAE decode
-  {
-    QJsonObject n; QJsonObject inp;
+    inp["seed"] = params.seed < 0
+        ? static_cast<int>(QRandomGenerator::global()->generate() & 0x7FFFFFFFu)
+        : params.seed;
+    inp["steps"] = params.steps; inp["cfg"] = static_cast<double>(params.cfg);
+    inp["sampler_name"] = "euler"; inp["scheduler"] = "normal"; inp["denoise"] = 1.0;
+    n["class_type"] = "KSampler"; n["inputs"] = inp; wf["5"] = n; }
+  { QJsonObject n, inp;
     inp["samples"] = QJsonArray{QJsonArray{"5"}, 0};
     inp["vae"]     = QJsonArray{QJsonArray{"1"}, 2};
-    n["class_type"] = "VAEDecode";
-    n["inputs"] = inp;
-    wf["6"] = n;
-  }
-  // 7: Save
-  {
-    QJsonObject n; QJsonObject inp;
-    inp["images"]          = QJsonArray{QJsonArray{"6"}, 0};
+    n["class_type"] = "VAEDecode"; n["inputs"] = inp; wf["6"] = n; }
+  { QJsonObject n, inp;
+    inp["images"] = QJsonArray{QJsonArray{"6"}, 0};
     inp["filename_prefix"] = "paintapp_txt2img";
-    n["class_type"] = "SaveImage";
-    n["inputs"] = inp;
-    wf["7"] = n;
-  }
+    n["class_type"] = "SaveImage"; n["inputs"] = inp; wf["7"] = n; }
 
-  // バッチ初期化
-  m_batchCount     = batchCount;
-  m_batchRemaining = batchCount;
-  m_batchImages.clear();
-  m_currentAiOp = AiOpType::TextToImage;
+  AiService::GenerateRequest req;
+  req.workflowDoc        = platform::comfy::WorkflowDocument::fromJson(wf);
+  req.useActiveLayer     = false;
+  req.useSelectionAsMask = false;
+  req.outputLayerName    = QStringLiteral("AI 生成");
+  req.timeoutMs          = 90000;
 
-  // バッチ 2 枚目以降: seed を変えて再キュー
-  m_batchFired     = 0;
-  m_batchQueueNext = [this, wf]() mutable {
-    ++m_batchFired;
-    QJsonObject wfNext = wf;
-    QJsonObject n5 = wfNext.value("5").toObject();
-    QJsonObject inp5 = n5.value("inputs").toObject();
-    inp5["seed"] = static_cast<int>(QRandomGenerator::global()->generate());
-    n5["inputs"] = inp5; wfNext["5"] = n5;
-    m_comfyUiClient->queuePrompt(wfNext);
-  };
-
-  m_comfyUiClient->queuePrompt(wf);
+  ensureComfyRunning([this, req, batchCount]() mutable {
+    m_aiService->generate(req, batchCount);
+  });
 }
 
-// ── AI: カスタムワークフロー ─────────────────────────────────────────────
+// ── AI: カスタムワークフロー (AiService 経由) ────────────────────────────
 void AppController::runWorkflow(const QJsonObject& workflow,
                                 const QString& positivePrompt,
                                 const QString& negativePrompt,
                                 int seed, const QString& checkpoint,
                                 int batchCount) {
-  if (m_comfyUiClient == nullptr || !m_comfyUiClient->isConnected()) {
-    emit aiGenerationError("ComfyUI に接続されていません");
+  ensureAiService();
+  if (m_aiService->isBusy() || m_comfyAutoStartPending) {
+    emit aiGenerationError("AI 生成が実行中です。完了を待ってから再試行してください。");
     return;
   }
-  m_batchCount     = batchCount;
-  m_batchRemaining = batchCount;
-  m_batchImages.clear();
-  m_currentAiOp    = AiOpType::CustomWorkflow;
 
-  m_batchFired     = 0;
-  const auto queueOne = [this, workflow, positivePrompt, negativePrompt,
-                          checkpoint, seed]() {
-    const int thisSeed = (seed < 0)
-        ? static_cast<int>(QRandomGenerator::global()->generate())
-        : (seed + m_batchFired);
-    QJsonObject wf = ComfyUiClient::injectWorkflowParams(
-        workflow, positivePrompt, negativePrompt, thisSeed, checkpoint);
-    m_comfyUiClient->queuePrompt(wf);
-  };
+  const int thisSeed = (seed < 0)
+      ? static_cast<int>(QRandomGenerator::global()->generate() & 0x7FFFFFFFu)
+      : seed;
+  const QJsonObject injected = ComfyUiClient::injectWorkflowParams(
+      workflow, positivePrompt, negativePrompt, thisSeed, checkpoint);
 
-  m_batchQueueNext = [this, queueOne]() {
-    ++m_batchFired; queueOne();
-  };
-  queueOne();
+  AiService::GenerateRequest req;
+  req.workflowDoc        = platform::comfy::WorkflowDocument::fromJson(injected);
+  req.useActiveLayer     = false;
+  req.useSelectionAsMask = false;
+  req.outputLayerName    = QStringLiteral("AI 生成");
+  req.timeoutMs          = 90000;
+
+  ensureComfyRunning([this, req, batchCount]() mutable {
+    m_aiService->generate(req, batchCount);
+  });
 }
 
 // ── AI: バッチ候補を新規レイヤーとして適用 ───────────────────────────────
@@ -6689,33 +6656,371 @@ void AppController::debugCaptureQueuedWorkflow(const QJsonObject& wf) {
 
 void AppController::debugCaptureComfyPayload(const QByteArray& payload) {
   m_aiDbgComfyPayload = payload;
-  // payload 全体をファイルへ保存（Dev_Bridge 8KB 制限外でも確認可能）
-  {
-    QFile f(QStringLiteral("debug_comfy_prompt.json"));
-    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
-      f.write(payload);
-  }
+  // AppLocalDataLocation に固定: CWD に依存せず常に同じ場所へ書き出す
+  const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+  QDir().mkpath(dir);
+  QFile f(dir + QStringLiteral("/debug_comfy_prompt.json"));
+  if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    f.write(payload);
 }
 
 void AppController::debugCaptureComfyResponse(int httpStatus, const QByteArray& body) {
   m_aiDbgComfyHttpStatus   = httpStatus;
   m_aiDbgComfyResponseBody = QString::fromUtf8(body);
-  // レスポンス全文をファイルへも保存（Dev_Bridge 外からの確認用）
-  {
-    QFile f(QStringLiteral("debug_comfy_response.json"));
-    if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
-      f.write(body);
-  }
+  const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+  QDir().mkpath(dir);
+  QFile f(dir + QStringLiteral("/debug_comfy_response.json"));
+  if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    f.write(body);
 }
+
 
 AppController::DebugActionResult AppController::executeDebugAction(
     const QString& type, const QString& target, const QJsonObject& opts)
 {
-  DebugActionResult r;
+  return m_debugRegistry.dispatch(type, target, opts);
+}
 
-  if (type == QLatin1String("sim-brush-stroke")) {
-    // Simulate a short brush stroke at center of canvas.
-    // Used by Dev_Bridge to verify quickMask redirect without mouse events.
+void AppController::initDebugActions()
+{
+  using R = DebugActionResult;
+  auto reg = [this](const char* name, app::debug::DebugHandler fn) {
+    m_debugRegistry.registerAction(QLatin1String(name), std::move(fn));
+  };
+
+  // ── brush-benchmark ────────────────────────────────────────────────────────
+  reg("brush-benchmark", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    const QString outDir = opts.value(QLatin1String("outputDir"))
+                               .toString(QStringLiteral("debug_output"));
+    QDir().mkpath(outDir);
+
+    const core::BrushSettings savedSettings = m_brushTool->settings();
+    const int W = m_document.canvasSize().width;
+    const int H = m_document.canvasSize().height;
+    const int cx = W / 2, cy = H / 2;
+
+    auto clearLayer = [&]() {
+      core::Layer* layer = m_document.activeLayer();
+      if (!layer) return;
+      auto& buf = layer->buffer();
+      for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W; ++x)
+          buf.setPixel(x, y, {255, 255, 255, 255});
+      rerender();
+    };
+
+    auto savePng = [&](const QString& filename) -> bool {
+      QImage img = platform::qt::QtImageConverter::toQImage(m_composited);
+      return img.save(outDir + QLatin1Char('/') + filename);
+    };
+
+    auto applyBrush = [&](int sz, float op, float hard, float sp) {
+      m_brushTool->setSize(sz);
+      m_brushTool->setOpacity(op);
+      m_brushTool->setHardness(hard);
+      m_brushTool->setSpacing(sp);
+      m_brushTool->setPressureSizeEnabled(false);
+      m_brushTool->setPressureOpacityEnabled(false);
+    };
+
+    QJsonArray results;
+
+    // Test 1: brush_size5_fast
+    {
+      clearLayer();
+      applyBrush(5, 1.0f, 0.8f, 0.1f);
+      m_brushTool->resetDebugCounters();
+      const int steps = 80;
+      QElapsedTimer t; t.start();
+      beginStroke(cx - steps * 2, cy);
+      for (int i = 1; i <= steps; ++i)
+        continueStroke(cx - steps * 2 + i * 4, cy);
+      endStroke();
+      const qint64 strokeMs = t.elapsed();
+      QElapsedTimer tr; tr.start();
+      rerender();
+      const qint64 renderMs = tr.elapsed();
+      const bool saved = savePng(QStringLiteral("brush_size5_fast.png"));
+      results.append(QJsonObject{
+        {QLatin1String("test"),         QStringLiteral("brush_size5_fast")},
+        {QLatin1String("inputSamples"), steps + 1},
+        {QLatin1String("dabCount"),     m_brushTool->debugDabCount()},
+        {QLatin1String("strokeMs"),     static_cast<qint64>(strokeMs)},
+        {QLatin1String("renderMs"),     static_cast<qint64>(renderMs)},
+        {QLatin1String("pngSaved"),     saved}});
+    }
+
+    // Test 2: brush_size50_curve
+    {
+      clearLayer();
+      applyBrush(50, 0.8f, 0.6f, 0.15f);
+      m_brushTool->resetDebugCounters();
+      const int cSteps = 40;
+      QElapsedTimer t; t.start();
+      beginStroke(cx - 80, cy);
+      for (int i = 1; i <= cSteps; ++i) {
+        const float a = 3.14159265f * i / cSteps;
+        continueStrokeF(cx - 80 + i * 4, static_cast<float>(cy) + 40.0f * std::sin(a), 1.0f, 0.0f, 0.0f);
+      }
+      for (int i = 1; i <= cSteps; ++i) {
+        const float a = 3.14159265f + 3.14159265f * i / cSteps;
+        continueStrokeF(static_cast<float>(cx + i * 4), static_cast<float>(cy) + 40.0f * std::sin(a), 1.0f, 0.0f, 0.0f);
+      }
+      endStroke();
+      const qint64 strokeMs = t.elapsed();
+      QElapsedTimer tr; tr.start();
+      rerender();
+      const qint64 renderMs = tr.elapsed();
+      const bool saved = savePng(QStringLiteral("brush_size50_curve.png"));
+      results.append(QJsonObject{
+        {QLatin1String("test"),         QStringLiteral("brush_size50_curve")},
+        {QLatin1String("inputSamples"), cSteps * 2 + 1},
+        {QLatin1String("dabCount"),     m_brushTool->debugDabCount()},
+        {QLatin1String("strokeMs"),     static_cast<qint64>(strokeMs)},
+        {QLatin1String("renderMs"),     static_cast<qint64>(renderMs)},
+        {QLatin1String("pngSaved"),     saved}});
+    }
+
+    // Test 3: brush_size200_large
+    {
+      clearLayer();
+      applyBrush(200, 1.0f, 0.5f, 0.2f);
+      m_brushTool->resetDebugCounters();
+      const int steps = 20;
+      QElapsedTimer t; t.start();
+      beginStroke(cx - 40, cy);
+      for (int i = 1; i <= steps; ++i)
+        continueStroke(cx - 40 + i * 4, cy);
+      endStroke();
+      const qint64 strokeMs = t.elapsed();
+      QElapsedTimer tr; tr.start();
+      rerender();
+      const qint64 renderMs = tr.elapsed();
+      const bool saved = savePng(QStringLiteral("brush_size200_large.png"));
+      results.append(QJsonObject{
+        {QLatin1String("test"),         QStringLiteral("brush_size200_large")},
+        {QLatin1String("inputSamples"), steps + 1},
+        {QLatin1String("dabCount"),     m_brushTool->debugDabCount()},
+        {QLatin1String("strokeMs"),     static_cast<qint64>(strokeMs)},
+        {QLatin1String("renderMs"),     static_cast<qint64>(renderMs)},
+        {QLatin1String("pngSaved"),     saved}});
+    }
+
+    // Test 4: brush_opacity_stack
+    {
+      clearLayer();
+      applyBrush(30, 0.3f, 0.7f, 0.1f);
+      m_brushTool->resetDebugCounters();
+      int totalInputs = 0;
+      QElapsedTimer t; t.start();
+      for (int pass = 0; pass < 5; ++pass) {
+        const int y0 = cy - 20 + pass * 10;
+        beginStroke(cx - 60, y0);
+        for (int i = 1; i <= 30; ++i)
+          continueStroke(cx - 60 + i * 4, y0);
+        endStroke();
+        totalInputs += 31;
+      }
+      const qint64 strokeMs = t.elapsed();
+      QElapsedTimer tr; tr.start();
+      rerender();
+      const qint64 renderMs = tr.elapsed();
+      const bool saved = savePng(QStringLiteral("brush_opacity_stack.png"));
+      results.append(QJsonObject{
+        {QLatin1String("test"),         QStringLiteral("brush_opacity_stack")},
+        {QLatin1String("inputSamples"), totalInputs},
+        {QLatin1String("dabCount"),     m_brushTool->debugDabCount()},
+        {QLatin1String("strokeMs"),     static_cast<qint64>(strokeMs)},
+        {QLatin1String("renderMs"),     static_cast<qint64>(renderMs)},
+        {QLatin1String("pngSaved"),     saved}});
+    }
+
+    m_brushTool->setSize(savedSettings.size);
+    m_brushTool->setOpacity(savedSettings.opacity);
+    m_brushTool->setHardness(savedSettings.hardness);
+    m_brushTool->setSpacing(savedSettings.spacing);
+    m_brushTool->setPressureSizeEnabled(savedSettings.dynamics.pressureSize);
+    m_brushTool->setPressureOpacityEnabled(savedSettings.dynamics.pressureOpacity);
+
+    const QJsonObject summary{
+      {QLatin1String("tests"),     results},
+      {QLatin1String("outputDir"), outDir},
+      {QLatin1String("canvasW"),   W},
+      {QLatin1String("canvasH"),   H}};
+    QFile jsonFile(outDir + QStringLiteral("/brush_benchmark.json"));
+    if (jsonFile.open(QIODevice::WriteOnly | QIODevice::Text))
+      jsonFile.write(QJsonDocument(summary).toJson());
+
+    r.success = true;
+    r.message = QString("brush-benchmark: %1 tests → %2").arg(results.size()).arg(outDir);
+    r.data = summary;
+    return r;
+  });
+
+  // ── eraser-benchmark ────────────────────────────────────────────────────────
+  reg("eraser-benchmark", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    const QString outDir = opts.value(QLatin1String("outputDir"))
+                               .toString(QStringLiteral("debug_output"));
+    QDir().mkpath(outDir);
+
+    const core::ToolKind savedTool = m_toolManager.activeToolKind();
+    m_toolManager.setActiveTool(core::ToolKind::Eraser);
+
+    const int W = m_document.canvasSize().width;
+    const int H = m_document.canvasSize().height;
+    const int cx = W / 2, cy = H / 2;
+
+    auto fillLayer = [&](core::Color c) {
+      core::Layer* layer = m_document.activeLayer();
+      if (!layer) return;
+      auto& buf = layer->buffer();
+      for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W; ++x)
+          buf.setPixel(x, y, c);
+      rerender();
+    };
+
+    auto savePng = [&](const QString& filename) -> bool {
+      QImage img = platform::qt::QtImageConverter::toQImage(m_composited);
+      return img.save(outDir + QLatin1Char('/') + filename);
+    };
+
+    auto countErasedPixels = [&]() -> int {
+      core::Layer* layer = m_document.activeLayer();
+      if (!layer) return 0;
+      const auto& buf = layer->buffer();
+      int count = 0;
+      for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W; ++x)
+          if (buf.pixel(x, y).a < 128) ++count;
+      return count;
+    };
+
+    auto applyEraser = [&](int sz, float op, float hard, float sp) {
+      m_eraserTool->setSize(sz);
+      m_eraserTool->setOpacity(op);
+      m_eraserTool->setHardness(hard);
+      m_eraserTool->setSpacing(sp);
+      m_eraserTool->setPressureSizeEnabled(false);
+      m_eraserTool->setPressureOpacityEnabled(false);
+    };
+
+    QJsonArray results;
+
+    // Test 1: eraser_size20_line
+    {
+      fillLayer({255, 255, 255, 255});
+      applyEraser(20, 1.0f, 0.8f, 0.1f);
+      m_eraserTool->resetDebugCounters();
+      const int steps = 60;
+      QElapsedTimer t; t.start();
+      beginStroke(cx - steps * 3, cy);
+      for (int i = 1; i <= steps; ++i)
+        continueStroke(cx - steps * 3 + i * 6, cy);
+      endStroke();
+      const qint64 strokeMs = t.elapsed();
+      QElapsedTimer tr; tr.start();
+      rerender();
+      const qint64 renderMs = tr.elapsed();
+      const int erasedPx = countErasedPixels();
+      const bool saved = savePng(QStringLiteral("eraser_size20_line.png"));
+      results.append(QJsonObject{
+        {QLatin1String("test"),         QStringLiteral("eraser_size20_line")},
+        {QLatin1String("inputSamples"), steps + 1},
+        {QLatin1String("dabCount"),     m_eraserTool->debugDabCount()},
+        {QLatin1String("erasedPixels"), erasedPx},
+        {QLatin1String("strokeMs"),     strokeMs},
+        {QLatin1String("renderMs"),     renderMs},
+        {QLatin1String("pngSaved"),     saved}});
+    }
+
+    // Test 2: eraser_size50_curve
+    {
+      fillLayer({255, 0, 0, 255});
+      applyEraser(50, 1.0f, 0.7f, 0.1f);
+      m_eraserTool->resetDebugCounters();
+      const int steps = 80;
+      QElapsedTimer t; t.start();
+      beginStroke(cx - 200, cy - 100);
+      for (int i = 1; i <= steps; ++i) {
+        const float fi = static_cast<float>(i) / steps;
+        const float x  = cx - 200 + fi * 400;
+        const float y  = cy + std::sin(fi * 3.14159f * 2.0f) * 80.0f;
+        continueStrokeF(x, y, 1.0f, 0.0f, 0.0f);
+      }
+      endStroke();
+      const qint64 strokeMs = t.elapsed();
+      QElapsedTimer tr; tr.start();
+      rerender();
+      const qint64 renderMs = tr.elapsed();
+      const int erasedPx = countErasedPixels();
+      const bool saved = savePng(QStringLiteral("eraser_size50_curve.png"));
+      results.append(QJsonObject{
+        {QLatin1String("test"),         QStringLiteral("eraser_size50_curve")},
+        {QLatin1String("inputSamples"), steps + 1},
+        {QLatin1String("dabCount"),     m_eraserTool->debugDabCount()},
+        {QLatin1String("erasedPixels"), erasedPx},
+        {QLatin1String("strokeMs"),     strokeMs},
+        {QLatin1String("renderMs"),     renderMs},
+        {QLatin1String("pngSaved"),     saved}});
+    }
+
+    // Test 3: eraser_pressure
+    {
+      fillLayer({0, 0, 255, 255});
+      applyEraser(30, 1.0f, 0.8f, 0.1f);
+      m_eraserTool->setPressureSizeEnabled(true);
+      m_eraserTool->setPressureSizeMin(0.1f);
+      m_eraserTool->resetDebugCounters();
+      const int steps = 40;
+      QElapsedTimer t; t.start();
+      beginStrokeF(static_cast<float>(cx - 120), static_cast<float>(cy), 0.1f, 0.0f, 0.0f);
+      for (int i = 1; i <= steps; ++i) {
+        const float fi       = static_cast<float>(i) / steps;
+        const float pressure = 0.1f + fi * 0.9f;
+        continueStrokeF(static_cast<float>(cx - 120 + i * 6),
+                        static_cast<float>(cy), pressure, 0.0f, 0.0f);
+      }
+      endStroke();
+      const qint64 strokeMs = t.elapsed();
+      QElapsedTimer tr; tr.start();
+      rerender();
+      const qint64 renderMs = tr.elapsed();
+      const int erasedPx = countErasedPixels();
+      const bool saved = savePng(QStringLiteral("eraser_pressure.png"));
+      results.append(QJsonObject{
+        {QLatin1String("test"),         QStringLiteral("eraser_pressure")},
+        {QLatin1String("inputSamples"), steps + 1},
+        {QLatin1String("dabCount"),     m_eraserTool->debugDabCount()},
+        {QLatin1String("erasedPixels"), erasedPx},
+        {QLatin1String("strokeMs"),     strokeMs},
+        {QLatin1String("renderMs"),     renderMs},
+        {QLatin1String("pngSaved"),     saved}});
+    }
+
+    m_toolManager.setActiveTool(savedTool);
+
+    QJsonObject summary{
+      {QLatin1String("canvasW"),   W},
+      {QLatin1String("canvasH"),   H},
+      {QLatin1String("outputDir"), outDir},
+      {QLatin1String("tests"),     results}};
+
+    QFile jsonFile(outDir + QLatin1String("/eraser_benchmark_results.json"));
+    if (jsonFile.open(QIODevice::WriteOnly))
+      jsonFile.write(QJsonDocument(summary).toJson());
+
+    r.success = true;
+    r.message = QString("eraser-benchmark: %1 tests → %2").arg(results.size()).arg(outDir);
+    r.data = summary;
+    return r;
+  });
+
+  // ── sim-brush-stroke ────────────────────────────────────────────────────────
+  reg("sim-brush-stroke", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
     const int W = m_document.canvasSize().width;
     const int H = m_document.canvasSize().height;
     const int cx = W / 2, cy = H / 2;
@@ -6728,9 +7033,11 @@ AppController::DebugActionResult AppController::executeDebugAction(
     r.message = QString("Brush stroke simulated at (%1,%2) → (%3,%4)")
                     .arg(cx).arg(cy).arg(cx+40).arg(cy+40);
     return r;
-  }
+  });
 
-  if (type == QLatin1String("toggle-quick-mask")) {
+  // ── toggle-quick-mask ────────────────────────────────────────────────────────
+  reg("toggle-quick-mask", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
     const bool ok = toggleQuickMaskMode();
     r.success = ok;
     r.message = m_quickMaskMode ? QLatin1String("QuickMask ON") : QLatin1String("QuickMask OFF");
@@ -6738,10 +7045,11 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("quickMaskMode"), m_quickMaskMode}
     };
     return r;
-  }
+  });
 
-  if (type == QLatin1String("aiselect-confirm")) {
-    // Confirm pending AI mask (same as pressing Enter in AI Select mode)
+  // ── aiselect-confirm ────────────────────────────────────────────────────────
+  reg("aiselect-confirm", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
     if (!m_hasPendingAiMask) {
       r.success = false;
       r.message = QLatin1String("No pending AI mask to confirm");
@@ -6751,20 +7059,22 @@ AppController::DebugActionResult AppController::executeDebugAction(
     r.success = true;
     r.message = QLatin1String("AI select mask confirmed");
     return r;
-  }
+  });
 
-  if (type == QLatin1String("aiselect-reset")) {
-    // Clear pending mask and roto strokes (no selection change)
+  // ── aiselect-reset ────────────────────────────────────────────────────────
+  reg("aiselect-reset", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
     m_hasPendingAiMask = false;
     m_pendingAiMask    = core::SelectionMask();
     if (m_aiSelectTool) m_aiSelectTool->clearRotoStrokes();
     r.success = true;
     r.message = QLatin1String("AI select state reset");
     return r;
-  }
+  });
 
-  if (type == QLatin1String("aiselect-set-op")) {
-    // Set Add / Subtract / New on AiSelectTool settings
+  // ── aiselect-set-op ────────────────────────────────────────────────────────
+  reg("aiselect-set-op", [this](const QString& target, const QJsonObject& opts) -> R {
+    R r;
     const QString op = opts.value(QLatin1String("op")).toString(target);
     if (op == QLatin1String("Add")) {
       setSelectionOp(core::SelectionOp::Add);
@@ -6776,18 +7086,20 @@ AppController::DebugActionResult AppController::executeDebugAction(
     r.success = true;
     r.message = QLatin1String("Selection op set to ") + op;
     return r;
-  }
+  });
 
-  if (type == QLatin1String("selection-clear")) {
+  // ── selection-clear ────────────────────────────────────────────────────────
+  reg("selection-clear", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
     clearSelection();
     r.success = true;
     r.message = QLatin1String("Selection cleared");
     return r;
-  }
+  });
 
-  if (type == QLatin1String("selection-rect")) {
-    // 矩形選択を作成する（inpaint E2E テスト用）
-    // opts: x, y, width, height  (デフォルト: キャンバス中央 25%)
+  // ── selection-rect ────────────────────────────────────────────────────────
+  reg("selection-rect", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
     const int cw = m_document.canvasSize().width;
     const int ch = m_document.canvasSize().height;
     const int x  = opts.value(QLatin1String("x")).toInt(cw / 4);
@@ -6812,12 +7124,11 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("width"), w}, {QLatin1String("height"), h},
       {QLatin1String("pixels"), pixels}};
     return r;
-  }
+  });
 
-  if (type == QLatin1String("inject-ai-mask")) {
-    // Synthetic pending AI mask for deterministic scenario testing.
-    // Sets m_pendingAiMask / m_hasPendingAiMask via the same applyAiSelectResult()
-    // path as real SAM/ONNX inference — confirmAiSelectMask() is the unit under test.
+  // ── inject-ai-mask ────────────────────────────────────────────────────────
+  reg("inject-ai-mask", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
     const QJsonObject maskObj = opts.value(QLatin1String("mask")).toObject();
     const int W         = maskObj.value(QLatin1String("width")).toInt(512);
     const int H         = maskObj.value(QLatin1String("height")).toInt(512);
@@ -6830,7 +7141,6 @@ AppController::DebugActionResult AppController::executeDebugAction(
     int filledCount = 0;
 
     if (shape == QLatin1String("circle")) {
-      // Radius from area: A = π·r²  →  r = sqrt(targetPx / π)
       const double r2 = static_cast<double>(targetPx) / M_PI;
       for (int y = 0; y < H; ++y) {
         for (int x = 0; x < W; ++x) {
@@ -6843,7 +7153,6 @@ AppController::DebugActionResult AppController::executeDebugAction(
         }
       }
     } else {
-      // Square fallback
       const int half = static_cast<int>(std::sqrt(static_cast<double>(targetPx))) / 2;
       for (int y = std::max(0, cy - half); y <= std::min(H - 1, cy + half); ++y)
         for (int x = std::max(0, cx - half); x <= std::min(W - 1, cx + half); ++x) {
@@ -6869,65 +7178,63 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("actualPixels"),    filledCount}
     };
     return r;
-  }
+  });
 
   // ── comfy-generate / generate ────────────────────────────────────────────
-  // Triggers AiService.generate() with current layer + selection.
-  // opts:
-  //   workflowPath  : absolute path to workflow.json (required)
-  //   comfyUrl      : ComfyUI base URL (default: http://localhost:8188)
-  //   outputLayerName: name for the result layer
-  //   timeoutMs     : poll timeout in ms (default: 90000)
-  if (type == QLatin1String("comfy-generate") || type == QLatin1String("generate")) {
-    const QString workflowPath = opts.value(QLatin1String("workflowPath")).toString(target);
-    if (workflowPath.isEmpty()) {
-      r.success = false;
-      r.message = QLatin1String("generate: workflowPath is required");
+  {
+    auto generateHandler = [this](const QString& target, const QJsonObject& opts) -> R {
+      R r;
+      const QString workflowPath = opts.value(QLatin1String("workflowPath")).toString(target);
+      if (workflowPath.isEmpty()) {
+        r.success = false;
+        r.message = QLatin1String("generate: workflowPath is required");
+        return r;
+      }
+      const QString comfyUrl = opts.value(QLatin1String("comfyUrl"))
+                                   .toString(m_comfyHttpUrl);
+      const QString outputLayerName = opts.value(QLatin1String("outputLayerName"))
+                                          .toString(QLatin1String("AI 生成"));
+      const int timeoutMs = opts.value(QLatin1String("timeoutMs")).toInt(90000);
+
+      ensureAiService();
+      m_aiService->setComfyUrl(comfyUrl);
+
+      if (m_aiService->isBusy()) {
+        r.success = false;
+        r.message = QLatin1String("generate: AiService is busy");
+        return r;
+      }
+
+      const int batchCount = opts.value(QLatin1String("batchCount")).toInt(1);
+      m_aiGenLastError.clear();
+
+      AiService::GenerateRequest req;
+      req.workflowPath       = workflowPath;
+      req.useActiveLayer     = true;
+      req.useSelectionAsMask = m_document.selection().hasSelection();
+      req.outputLayerName    = outputLayerName;
+      req.timeoutMs          = timeoutMs;
+      m_aiService->generate(req, batchCount);
+
+      r.success = true;
+      r.message = QLatin1String("generate: started via AiService");
+      r.data = QJsonObject{
+        {QLatin1String("workflowPath"),     workflowPath},
+        {QLatin1String("comfyUrl"),         comfyUrl},
+        {QLatin1String("useSelectionMask"), req.useSelectionAsMask},
+        {QLatin1String("outputLayerName"),  outputLayerName},
+        {QLatin1String("batchCount"),       batchCount},
+        {QLatin1String("via"),              QLatin1String("AiService")},
+      };
       return r;
-    }
-    const QString comfyUrl = opts.value(QLatin1String("comfyUrl"))
-                                 .toString(m_comfyHttpUrl);
-    const QString outputLayerName = opts.value(QLatin1String("outputLayerName"))
-                                        .toString(QLatin1String("AI 生成"));
-    const int timeoutMs = opts.value(QLatin1String("timeoutMs")).toInt(90000);
-
-    ensureAiService();
-    m_aiService->setComfyUrl(comfyUrl);
-
-    if (m_aiService->isBusy()) {
-      r.success = false;
-      r.message = QLatin1String("generate: AiService is busy");
-      return r;
-    }
-
-    const int batchCount = opts.value(QLatin1String("batchCount")).toInt(1);
-    m_aiGenLastError.clear();
-
-    AiService::GenerateRequest req;
-    req.workflowPath       = workflowPath;
-    req.useActiveLayer     = true;
-    req.useSelectionAsMask = m_document.selection().hasSelection();
-    req.outputLayerName    = outputLayerName;
-    req.timeoutMs          = timeoutMs;
-    m_aiService->generate(req, batchCount);
-
-    r.success = true;
-    r.message = QLatin1String("generate: started via AiService");
-    r.data = QJsonObject{
-      {QLatin1String("workflowPath"),     workflowPath},
-      {QLatin1String("comfyUrl"),         comfyUrl},
-      {QLatin1String("useSelectionMask"), req.useSelectionAsMask},
-      {QLatin1String("outputLayerName"),  outputLayerName},
-      {QLatin1String("batchCount"),       batchCount},
-      {QLatin1String("via"),              QLatin1String("AiService")},
     };
-    return r;
+    reg("comfy-generate", generateHandler);
+    reg("generate",       generateHandler);
   }
 
   // ── inpaint ───────────────────────────────────────────────────────────────
-  // Triggers AiService.inpaint() — used by Dev Bridge InpaintViaAiService scenario.
-  // opts: workflowPath, comfyUrl, outputLayerName, timeoutMs, batchCount
-  if (type == QLatin1String("inpaint")) {
+  reg("inpaint", [this](const QString& target, const QJsonObject& opts) -> R {
+    R r;
     const QString workflowPath = opts.value(QLatin1String("workflowPath")).toString(target);
     if (workflowPath.isEmpty()) {
       r.success = false;
@@ -6958,7 +7265,6 @@ AppController::DebugActionResult AppController::executeDebugAction(
     req.outputLayerName     = outputLayerName;
     req.timeoutMs           = timeoutMs;
 
-    // maskImageNodeId をワークフロー解析で解決する。
     bool wfOk = false;
     const auto wfDoc = platform::comfy::WorkflowDocument::load(workflowPath, &wfOk);
     if (wfOk) {
@@ -6979,13 +7285,11 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("maskImageNodeId"), req.maskImageNodeId},
     };
     return r;
-  }
+  });
 
   // ── workflow-analyze ──────────────────────────────────────────────────────
-  // workflow.json を読み込み、sampler/prompt/checkpoint ノードを検出して保存する。
-  // opts:
-  //   workflowPath : 解析対象 JSON ファイルの絶対パス（target でも可）
-  if (type == QLatin1String("workflow-analyze")) {
+  reg("workflow-analyze", [this](const QString& target, const QJsonObject& opts) -> R {
+    R r;
     const QString path = opts.value(QLatin1String("workflowPath")).toString(target);
     if (path.isEmpty()) {
       r.success = false;
@@ -7001,7 +7305,6 @@ AppController::DebugActionResult AppController::executeDebugAction(
       return r;
     }
 
-    // ノード検出ヘルパー
     auto toArr = [&doc](const QStringList& ids) {
       QJsonArray a;
       for (const QString& id : ids) {
@@ -7026,27 +7329,33 @@ AppController::DebugActionResult AppController::executeDebugAction(
     r.message = QLatin1String("workflow analyzed");
     r.data    = nodes;
     return r;
-  }
+  });
 
-  if (type == QLatin1String("undo")) {
+  // ── undo ────────────────────────────────────────────────────────────────────
+  reg("undo", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
     const bool ok = undo();
     r.success = ok;
     r.message = ok ? QLatin1String("undo OK") : QLatin1String("undo failed (nothing to undo)");
     const auto& s2 = debugState();
     r.data = QJsonObject{{QLatin1String("undoDepth"), s2.undoDepth}, {QLatin1String("canUndo"), s2.canUndo}};
     return r;
-  }
+  });
 
-  if (type == QLatin1String("redo")) {
+  // ── redo ────────────────────────────────────────────────────────────────────
+  reg("redo", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
     const bool ok = redo();
     r.success = ok;
     r.message = ok ? QLatin1String("redo OK") : QLatin1String("redo failed (nothing to redo)");
     const auto& s2 = debugState();
     r.data = QJsonObject{{QLatin1String("undoDepth"), s2.undoDepth}};
     return r;
-  }
+  });
 
-  if (type == QLatin1String("resize-canvas")) {
+  // ── resize-canvas ────────────────────────────────────────────────────────────
+  reg("resize-canvas", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
     const int w = opts.value(QLatin1String("width")).toInt(m_document.canvasSize().width);
     const int h = opts.value(QLatin1String("height")).toInt(m_document.canvasSize().height);
     const int ox = opts.value(QLatin1String("offsetX")).toInt(0);
@@ -7059,10 +7368,11 @@ AppController::DebugActionResult AppController::executeDebugAction(
     resizeData[QLatin1String("height")] = m_document.canvasSize().height;
     r.data = resizeData;
     return r;
-  }
+  });
 
-  if (type == QLatin1String("set-layer-opacity")) {
-    // Set opacity on a layer by index. Used to verify executeLayerAttributeEdit Undo.
+  // ── set-layer-opacity ────────────────────────────────────────────────────────
+  reg("set-layer-opacity", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
     const int index   = opts.value(QLatin1String("index")).toInt(0);
     const int opacity = opts.value(QLatin1String("opacity")).toInt(100);
     setLayerOpacity(static_cast<std::size_t>(index), opacity);
@@ -7073,10 +7383,11 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("canUndo"),   !m_undoHistory.empty()},
     };
     return r;
-  }
+  });
 
-  if (type == QLatin1String("set-layer-blend-mode")) {
-    // Set blend mode on a layer by index. Used to verify executeLayerAttributeEdit Undo.
+  // ── set-layer-blend-mode ──────────────────────────────────────────────────────
+  reg("set-layer-blend-mode", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
     const int index = opts.value(QLatin1String("index")).toInt(0);
     const QString modeStr = opts.value(QLatin1String("mode")).toString(QLatin1String("Multiply"));
     core::BlendMode mode = core::BlendMode::Multiply;
@@ -7091,10 +7402,11 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("canUndo"),   !m_undoHistory.empty()},
     };
     return r;
-  }
+  });
 
-  if (type == QLatin1String("list")) {
-    // Return available debug actions
+  // ── list ────────────────────────────────────────────────────────────────────
+  reg("list", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
     QJsonArray actions;
     actions << QLatin1String("aiselect-confirm")
             << QLatin1String("aiselect-reset")
@@ -7110,14 +7422,11 @@ AppController::DebugActionResult AppController::executeDebugAction(
     r.message = QLatin1String("Available debug actions");
     r.data    = QJsonObject{{QLatin1String("actions"), actions}};
     return r;
-  }
+  });
 
-  // ── apply-candidate ──────────────────────────────────────────────────────
-  // バッチ候補の中から指定インデックスをレイヤーとして追加する。
-  // opts:
-  //   index      : 候補インデックス (0-based, default 0)
-  //   layerName  : 追加レイヤー名 (default "AI 生成")
-  if (type == QLatin1String("apply-candidate")) {
+  // ── apply-candidate ──────────────────────────────────────────────────────────
+  reg("apply-candidate", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
     const int idx = opts.value(QLatin1String("index")).toInt(0);
     if (m_batchImages.isEmpty()) {
       r.success = false;
@@ -7138,25 +7447,22 @@ AppController::DebugActionResult AppController::executeDebugAction(
     r.message = QString("apply-candidate: applied index %1 as layer \"%2\"").arg(idx).arg(lname);
     const auto& s2 = debugState();
     QJsonObject dataObj;
-    dataObj[QLatin1String("layerCount")] = s2.layerCount;
+    dataObj[QLatin1String("layerCount")]  = s2.layerCount;
     dataObj[QLatin1String("activeLayer")] = s2.activeLayerName;
     r.data = dataObj;
     return r;
-  }
+  });
 
-  // ── ai-generate-with-preset ─────────────────────────────────────────────
-  // QSettingsからPresetを読み込み、runGenerateWithWorkflow経由で生成を実行する。
-  // opts:
-  //   presetIndex : 使用するプリセットのインデックス (default: lastUsedIndex)
-  //   prompt      : 追加プロンプト (省略可)
-  if (type == QLatin1String("ai-generate-with-preset")) {
+  // ── ai-generate-with-preset ──────────────────────────────────────────────────
+  reg("ai-generate-with-preset", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
     app::panels::WorkflowPresetManager mgr;
     mgr.load();
 
     const int presetCount = mgr.presets().size();
     if (presetCount == 0) {
       r.success = false;
-      r.message = QLatin1String("ai-generate-with-preset: no presets found in QSettings");
+      r.message = QStringLiteral("ai-generate-with-preset: no presets found");
       return r;
     }
 
@@ -7190,7 +7496,6 @@ AppController::DebugActionResult AppController::executeDebugAction(
     params.steps             = opts.value(QLatin1String("steps")).toInt(5);
     params.cfg               = static_cast<float>(opts.value(QLatin1String("cfg")).toDouble(7.0));
 
-    // loras の triggerWords をまとめてレポート
     QJsonArray loraArr;
     for (const auto& e : preset.loras) {
       loraArr.append(QJsonObject{
@@ -7201,41 +7506,7 @@ AppController::DebugActionResult AppController::executeDebugAction(
       });
     }
 
-    // debug用: ensureComfyRunning(TCPタイムアウト)をバイパスし直接generate
-    ensureAiService();
-    m_aiService->setComfyUrl(m_comfyHttpUrl);
-    if (m_aiService->isBusy()) {
-      r.success = false;
-      r.message = QLatin1String("ai-generate-with-preset: AiService is busy");
-      return r;
-    }
-    {
-      const int seed = (params.seed < 0)
-          ? static_cast<int>(QRandomGenerator::global()->generate() & 0x7FFFFFFFu)
-          : params.seed;
-      const QString augPrompt = buildAugmentedPrompt(params.prompt, params.loras);
-      AiService::GenerateRequest req;
-      req.workflowPath    = preset.workflowPath;
-      req.useActiveLayer  = false;
-      req.useSelectionAsMask = false;
-      req.outputLayerName = QStringLiteral("AI Generated");
-      req.timeoutMs       = 180000;
-      {
-        auto patchedDoc = applyPresetPatches(preset.workflowPath, preset.checkpoint, preset.loras);
-        if (patchedDoc.isValid()) req.workflowDoc = std::move(patchedDoc);
-      }
-      const QString posId = preset.binding.positiveNodeId;
-      const QString negId = preset.binding.negativeNodeId;
-      const QString kId   = preset.binding.kSamplerNodeId;
-      if (!posId.isEmpty())
-        req.extraBindings << platform::comfy::WorkflowBinding::clipText(posId, augPrompt);
-      if (!negId.isEmpty())
-        req.extraBindings << platform::comfy::WorkflowBinding::clipText(negId, params.negativePrompt);
-      if (!kId.isEmpty())
-        req.extraBindings << platform::comfy::WorkflowBinding::kSampler(kId)
-            .steps(params.steps).cfg(static_cast<double>(params.cfg)).denoise(1.0).seed(seed);
-      m_aiService->generate(req, 1);
-    }
+    runGenerateWithWorkflow(params, 1);
 
     r.success = true;
     r.message = QString("ai-generate-with-preset: started preset[%1] \"%2\"")
@@ -7251,11 +7522,198 @@ AppController::DebugActionResult AppController::executeDebugAction(
       {QLatin1String("kSamplerNodeId"),preset.binding.kSamplerNodeId},
     };
     return r;
-  }
+  });
 
-  r.success = false;
-  r.message = QLatin1String("Unknown debug action: ") + type;
-  return r;
+  // ── ai-inpaint-regression ────────────────────────────────────────────────────
+  reg("ai-inpaint-regression", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
+    const int cw = m_document.canvasSize().width;
+    const int ch = m_document.canvasSize().height;
+
+    const int selX = cw / 4, selY = ch / 4;
+    const int selW = cw / 2, selH = ch / 2;
+    m_selectionEngine.applyRect(core::SelectionOp::New, core::Rect{selX, selY, selW, selH});
+    rerender();
+
+    int selPixels = 0;
+    {
+      const core::SelectionMask& sel = m_document.selection();
+      for (int sy = 0; sy < ch; ++sy)
+        for (int sx = 0; sx < cw; ++sx)
+          if (sel.maskValue(sx, sy) > 0) ++selPixels;
+    }
+    if (selPixels == 0) {
+      r.success = false;
+      r.message = QLatin1String("ai-inpaint-regression FAIL: selection pixels == 0");
+      return r;
+    }
+
+    const std::size_t layersBefore = m_document.layerCount();
+
+    core::PixelBuffer aiResult(cw, ch);
+    for (int y = 0; y < ch; ++y)
+      for (int x = 0; x < cw; ++x)
+        aiResult.setPixel(x, y, core::Color{0, 200, 255, 255});
+
+    const bool applied = pasteBufferAsNewRasterLayerWithSelectionMask(aiResult, "AI 生成 (regression)");
+    if (!applied) {
+      r.success = false;
+      r.message = QLatin1String("ai-inpaint-regression FAIL: pasteBufferAsNewRasterLayerWithSelectionMask returned false");
+      return r;
+    }
+
+    const std::size_t layersAfter = m_document.layerCount();
+    if (layersAfter != layersBefore + 1) {
+      r.success = false;
+      r.message = QString("ai-inpaint-regression FAIL: expected layerCount=%1, got %2")
+                      .arg(layersBefore + 1).arg(layersAfter);
+      return r;
+    }
+
+    const int midX = selX + selW / 2;
+    const int midY = selY + selH / 2;
+    const core::Color newPx = m_document.layerAt(layersAfter - 1).buffer().pixel(midX, midY);
+    const bool pixelWriteOk = (newPx.r == 0 && newPx.g == 200 && newPx.b == 255 && newPx.a == 255);
+    if (!pixelWriteOk) {
+      r.success = false;
+      r.message = QString("ai-inpaint-regression FAIL: new layer pixel at (%1,%2) = {%3,%4,%5,%6}, expected {0,200,255,255}")
+                      .arg(midX).arg(midY).arg(newPx.r).arg(newPx.g).arg(newPx.b).arg(newPx.a);
+      return r;
+    }
+
+    const bool undoOk = undo();
+    const std::size_t layersUndo = m_document.layerCount();
+
+    r.success = true;
+    r.message = QString("ai-inpaint-regression PASS: selPx=%1 layers %2→%3 pixel={0,200,255,255}✓ undo=%4→%5")
+                    .arg(selPixels)
+                    .arg(layersBefore).arg(layersAfter)
+                    .arg(undoOk ? "ok" : "fail")
+                    .arg(layersUndo);
+    r.data = QJsonObject{
+      {QLatin1String("selectionPixels"),  selPixels},
+      {QLatin1String("layersBefore"),     static_cast<int>(layersBefore)},
+      {QLatin1String("layersAfter"),      static_cast<int>(layersAfter)},
+      {QLatin1String("pixelWriteOk"),     pixelWriteOk},
+      {QLatin1String("newLayerPixel"),    QJsonObject{
+        {QLatin1String("r"), newPx.r},
+        {QLatin1String("g"), newPx.g},
+        {QLatin1String("b"), newPx.b},
+        {QLatin1String("a"), newPx.a},
+      }},
+      {QLatin1String("undoOk"),           undoOk},
+      {QLatin1String("layersAfterUndo"),  static_cast<int>(layersUndo)},
+    };
+    return r;
+  });
+
+  // ── new-document ──────────────────────────────────────────────────────────────
+  reg("new-document", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    int w = opts[QLatin1String("width")].toInt(800);
+    int h = opts[QLatin1String("height")].toInt(600);
+    newDocument(w, h, 72);
+    auto cs = m_document.canvasSize();
+    r.success = true;
+    r.message = QString("new-document: %1x%2").arg(w).arg(h);
+    r.data = {
+      {QLatin1String("width"),  static_cast<int>(cs.width)},
+      {QLatin1String("height"), static_cast<int>(cs.height)},
+    };
+    return r;
+  });
+
+  // ── add-raster-layer ──────────────────────────────────────────────────────────
+  reg("add-raster-layer", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
+    std::size_t before = m_document.layerCount();
+    addRasterLayer();
+    std::size_t after = m_document.layerCount();
+    r.success = (after > before);
+    r.message = r.success
+      ? QString("add-raster-layer: layerCount %1 → %2").arg(before).arg(after)
+      : QLatin1String("add-raster-layer: layerCount did not increase");
+    r.data = {
+      {QLatin1String("layerCountBefore"), static_cast<int>(before)},
+      {QLatin1String("layerCountAfter"),  static_cast<int>(after)},
+    };
+    return r;
+  });
+
+  // ── set-active-layer ──────────────────────────────────────────────────────────
+  reg("set-active-layer", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    int idx = opts[QLatin1String("index")].toInt(-1);
+    if (idx < 0) {
+      r.success = false;
+      r.message = QLatin1String("set-active-layer: 'index' param required (>= 0)");
+      return r;
+    }
+    auto total = static_cast<int>(m_document.layerCount());
+    if (idx >= total) {
+      r.success = false;
+      r.message = QString("set-active-layer: index %1 out of range (layerCount=%2)").arg(idx).arg(total);
+      return r;
+    }
+    setActiveLayer(static_cast<std::size_t>(idx));
+    r.success = true;
+    r.message = QString("set-active-layer: activeIndex=%1").arg(idx);
+    r.data = {{QLatin1String("activeIndex"), idx}};
+    return r;
+  });
+
+  // ── set-foreground-color ──────────────────────────────────────────────────────
+  reg("set-foreground-color", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    int red   = qBound(0, opts[QLatin1String("r")].toInt(0), 255);
+    int green = qBound(0, opts[QLatin1String("g")].toInt(0), 255);
+    int blue  = qBound(0, opts[QLatin1String("b")].toInt(0), 255);
+    core::Color c;
+    c.r = static_cast<uint8_t>(red);
+    c.g = static_cast<uint8_t>(green);
+    c.b = static_cast<uint8_t>(blue);
+    c.a = 255;
+    setBrushColor(c);
+    r.success = true;
+    r.message = QString("set-foreground-color: rgb(%1,%2,%3)").arg(red).arg(green).arg(blue);
+    r.data = {
+      {QLatin1String("r"), red},
+      {QLatin1String("g"), green},
+      {QLatin1String("b"), blue},
+    };
+    return r;
+  });
+
+  // ── export-png ────────────────────────────────────────────────────────────────
+  reg("export-png", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    QString path = opts[QLatin1String("path")].toString();
+    if (path.isEmpty()) {
+      r.success = false;
+      r.message = QLatin1String("export-png: 'path' param required");
+      return r;
+    }
+    QString absPath = QDir::isAbsolutePath(path) ? path : QDir::current().absoluteFilePath(path);
+    QFileInfo fi(absPath);
+    if (!fi.dir().exists()) {
+      r.success = false;
+      r.message = QString("export-png: parent directory does not exist: %1").arg(fi.dir().absolutePath());
+      return r;
+    }
+    rerender();
+    QImage img = platform::qt::QtImageConverter::toQImage(m_composited);
+    bool saved = img.save(absPath, "PNG");
+    r.success = saved;
+    r.message = saved
+      ? QString("export-png: saved to %1 (%2x%3)").arg(absPath).arg(img.width()).arg(img.height())
+      : QString("export-png: QImage::save failed for %1").arg(absPath);
+    r.data = {
+      {QLatin1String("path"),   absPath},
+      {QLatin1String("width"),  img.width()},
+      {QLatin1String("height"), img.height()},
+    };
+    return r;
+  });
 }
 
 #endif // PAINT_DEBUG_SERVER

@@ -14,10 +14,16 @@
 
 namespace platform::skia {
 
+class SkiaLayerCache;
+
 class SkiaRenderer {
 public:
   SkiaRenderer() = default;
   ~SkiaRenderer() = default;
+
+  // Optional per-layer bitmap cache. Set once by AppController at startup.
+  // If null, every composite call blits all layers (original behaviour).
+  void setCache(SkiaLayerCache* cache) noexcept { m_cache = cache; }
 
   // Full composite — mirrors core::Renderer::composite().
   core::PixelBuffer composite(const core::Document& document) const;
@@ -26,6 +32,9 @@ public:
   void compositeInto(const core::Document& document,
                      core::PixelBuffer& target,
                      const core::Rect& dirtyRect) const;
+
+private:
+  SkiaLayerCache* m_cache {nullptr};
 };
 
 } // namespace platform::skia

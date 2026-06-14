@@ -1,6 +1,7 @@
 #ifdef PAINT_USE_SKIA
 
 #include "platform/skia/SkiaRenderer.h"
+#include "platform/skia/SkiaLayerCache.h"
 #include "platform/skia/SkiaPixelBuffer.h"
 
 // Skia headers
@@ -52,8 +53,7 @@ SkBlendMode toSkBlend(core::BlendMode mode) noexcept {
   }
 }
 
-// ── Rasterise one layer's PixelBuffer into an SkBitmap ────────────────────
-//    (blit; future work: keep SkBitmaps per-layer to skip this copy)
+// ── Rasterise one layer's PixelBuffer into an SkBitmap (fallback: no cache)
 SkBitmap layerToSkBitmap(const core::PixelBuffer& buf) {
   const int w = buf.width(), h = buf.height();
   SkBitmap bm;
@@ -119,15 +119,21 @@ void SkiaRenderer::compositeInto(const core::Document& document,
     if (layer.kind() == core::LayerKind::Folder) continue;
     if (layer.isPaperLayer()) continue;
 
-    // For now: blit the CPU buffer into an SkBitmap and draw it.
-    // Phase 0-3 will keep per-layer SkBitmaps to avoid this copy.
-    SkBitmap layerBm = layerToSkBitmap(layer.buffer());
+    // Use cached SkBitmap when available; otherwise blit from CPU buffer.
+    SkBitmap tempBm;
+    const SkBitmap* layerBm;
+    if (m_cache) {
+      layerBm = &m_cache->getBitmap(layer.id(), layer.buffer());
+    } else {
+      tempBm = layerToSkBitmap(layer.buffer());
+      layerBm = &tempBm;
+    }
 
     SkPaint paint;
     paint.setBlendMode(toSkBlend(layer.blendMode()));
     paint.setAlphaf(std::clamp(layer.opacity(), 0.0f, 1.0f));
 
-    canvas.drawImage(layerBm.asImage(), 0.0f, 0.0f, {}, &paint);
+    canvas.drawImage(layerBm->asImage(), 0.0f, 0.0f, {}, &paint);
   }
 
   // Read the dirty rect back into target

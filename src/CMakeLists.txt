@@ -1,4 +1,7 @@
 set(CORE_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/brush/DabGenerator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/brush/DabRenderer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/core/brush/StrokeProcessor.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/buffer/PixelBuffer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/document/Document.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/core/layer/Layer.cpp
@@ -69,6 +72,7 @@ if(PAINT_USE_SKIA)
   add_library(paint_skia_platform STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/skia/SkiaPixelBuffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/skia/SkiaRenderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/skia/SkiaLayerCache.cpp
   )
   target_compile_definitions(paint_skia_platform PUBLIC PAINT_USE_SKIA)
   target_include_directories(paint_skia_platform PUBLIC ${PROJECT_SOURCE_DIR}/src)
@@ -172,6 +176,7 @@ if(PAINT_BUILD_APP)
   if(PAINT_DEBUG_SERVER)
     target_sources(paint_app PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/app/debug/DebugServer.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/app/debug/DebugActionRegistry.cpp
     )
     target_compile_definitions(paint_app PRIVATE PAINT_DEBUG_SERVER)
     # paint_comfy_platform も同じ定義が必要。ComfyClient.h の #ifdef でクラスレイアウトが

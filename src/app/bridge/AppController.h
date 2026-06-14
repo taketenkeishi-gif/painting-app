@@ -29,6 +29,7 @@
 #include "platform/skia/SkiaIntegration.h"
 #ifdef PAINT_USE_SKIA
 #  include "platform/skia/SkiaRenderer.h"
+#  include "platform/skia/SkiaLayerCache.h"
 #endif
 #include "core/tools/AiSelectTool.h"
 #include "core/tools/BrushTool.h"
@@ -55,6 +56,10 @@ namespace platform::comfy { class ComfyClient; }
 namespace platform::comfy { class ComfyProcessManager; }
 
 #include "app/bridge/AiService.h"
+
+#ifdef PAINT_DEBUG_SERVER
+#  include "app/debug/DebugActionRegistry.h"
+#endif
 
 namespace app::bridge {
 class ComfyUiClient;
@@ -589,11 +594,9 @@ public:
     bool         activeLayerMaskEnabled{false}; ///< LayerMask が有効か
   };
 
-  struct DebugActionResult {
-    bool        success {false};
-    QString     message;
-    QJsonObject data;
-  };
+  // DebugActionResult は app::debug 名前空間で定義されたものを使う。
+  // 外部呼び出し側から見た型名 AppController::DebugActionResult は維持される。
+  using DebugActionResult = app::debug::DebugActionResult;
 
   DebugState         debugState() const;
   DebugActionResult  executeDebugAction(const QString& type, const QString& target,
@@ -800,6 +803,7 @@ private:
   core::Document m_document;
 #ifdef PAINT_USE_SKIA
   platform::skia::SkiaRenderer m_renderer;
+  platform::skia::SkiaLayerCache m_skiaLayerCache;
 #else
   core::Renderer m_renderer;
 #endif
@@ -850,9 +854,10 @@ private:
   bool                m_hasPendingAiMask {false};
 
   // ── ComfyUI サーバー管理 ────────────────────────────────────────────
+  // m_comfyProcess の1回限り初期化 + 永続シグナル接続。重複呼び出しは無視。
+  void ensureComfyProcessManager();
   void ensureComfyUiRunning(const QUrl& serverUrl);
   // AiService 経由の generate/inpaint 実行前に ComfyUI 自動起動を行うヘルパー。
-  // ポート疎通があれば即 action()、なければ ComfyProcessManager で起動待ちしてから action()。
   void ensureComfyRunning(std::function<void()> action);
 
   platform::comfy::ComfyProcessManager* m_comfyProcess {nullptr};
@@ -914,6 +919,10 @@ private:
   QByteArray   m_aiDbgComfyPayload;
   int          m_aiDbgComfyHttpStatus {0};
   QString      m_aiDbgComfyResponseBody;
+
+  // ── DebugActionRegistry ───────────────────────────────────────────────────
+  app::debug::DebugActionRegistry m_debugRegistry;
+  void initDebugActions();  ///< コンストラクタ末尾で呼ばれ、全 action ハンドラーを登録する。
 #endif
 };
 
