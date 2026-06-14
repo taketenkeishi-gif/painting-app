@@ -586,3 +586,48 @@ UI への結果反映・エラー表示           → Panel が AiService シグ
 | AI レイヤー追加 | "AI Generated" レイヤー生成 |
 
 **参考:** `src/app/bridge/AppController.cpp` — `ai-generate-with-preset` handler
+
+---
+
+## 2026-06-15: ADR-020 — main を製品本流確定・origin/master legacy化
+
+**決定日:** 2026-06-15  
+**状態:** CONFIRMED
+
+### 決定
+
+`main` ブランチを LayeredPaintApp の唯一の製品本流として確定する。
+`origin/master` は旧UI系統として legacy 扱いとし、今後一切の merge/cherry-pick を禁止する。
+
+### 根拠
+
+全機能カテゴリ（Canvas / Layer / Tool / AI）の read-only 比較を実施した結果:
+
+| カテゴリ | origin/master が main より優れる機能 | main が origin/master より優れる機能 |
+|---------|-----------------------------------|------------------------------------|
+| Canvas | ゼロ | FreeTransform/Roto/AiSelect/Mesh/Text overlay、null-safe SelectionOverlay |
+| Layer | ゼロ | TextLayer、Layer offset、Stable ID、multi-selection、folder collapse |
+| Tool | ゼロ | DabEngine分離アーキ、PressureCurve、Scatter/AngleJitter/DabCount |
+| AI | ゼロ | ComfyProcessManager、WorkflowFactory、AiService、GenerativeFill |
+
+origin/master が main に勝る機能は確認されなかった。
+
+### Merge禁止の理由
+
+- origin/master と main は共通祖先を持たない（unrelated histories）
+- `--allow-unrelated-histories` merge を試行した結果 65件の add/add コンフリクトが発生
+- main は origin/master の全機能を包含している
+
+### 今後の方針
+
+- **比較基準:** `golden-core-main-2026-06-15` タグ（commit: 現HEAD）
+- **origin/master の扱い:** UI値参照のみ許可（コード移植禁止）
+- **UI regression修正:** origin/master比較ではなく golden タグとの差分で管理
+
+### タグ
+
+```
+golden-core-main-2026-06-15 — AI/Brush/Layer/Canvas機能統合済み基盤
+backup-before-shortcut-restore — ショートカット修正前
+backup-ai-line-before-rebase   — AI機能rebase前
+```

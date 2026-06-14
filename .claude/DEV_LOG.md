@@ -4,7 +4,39 @@
 
 ---
 
-## 2026-06-15 (最新) — Dev Bridge First Architecture 統合完了
+## 2026-06-15 (最新) — 本流確定・UI Regression監査完了
+
+### 作業内容
+
+1. **全git履歴監査** — 全branch/tag/reflogからHEAD未包含commitを抽出・分類
+2. **統合可能性検証** — integration-testブランチでorigin/master + mainの--allow-unrelated-historiesを試行 → 65件 add/add コンフリクト確認 → aborted
+3. **機能差分比較（全カテゴリ）** — Canvas / Layer / Tool / AI の read-only 比較完了
+4. **本流確定** — main を唯一の製品本流として確定（ADR-020）
+5. **golden タグ作成** — `golden-core-main-2026-06-15`（AI/Brush/Layer/Canvas機能統合済み基盤）
+6. **UI Regression監査** — LayerPanel/menu/shortcut/canvas/toolpanel 全項目静的解析 → 問題なし
+
+### 完了項目
+
+- ✅ git audit: 43件のorigin/master未包含commit確認
+- ✅ integration test: unrelated histories確認 → merge戦略廃棄
+- ✅ 機能比較: origin/masterがmainより優れる機能=ゼロ 確認
+- ✅ tag: golden-core-main-2026-06-15 作成
+- ✅ DECISIONS.md: ADR-020 (本流確定・merge禁止) 追記
+- ✅ UI Regression監査: 全5項目問題なし
+
+### 結論
+
+origin/master はレガシー参照専用。今後の比較基準は golden-core-main-2026-06-15 タグ。
+
+### 次のアクション
+
+- [ ] UI regressionをランタイム目視確認（アプリ起動して確認）
+- [ ] ベクター編集: ストローク選択・移動・削除（優先 TODO #1）
+- [ ] フォルダレイヤーネスト構造
+
+---
+
+## 2026-06-15 (前回) — Dev Bridge First Architecture 統合完了
 
 ### 作業内容
 
