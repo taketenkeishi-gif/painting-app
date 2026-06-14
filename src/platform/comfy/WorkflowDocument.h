@@ -1,11 +1,24 @@
 #pragma once
 
 #include <QJsonObject>
+#include <QList>
 #include <QStringList>
 
 #include "platform/comfy/WorkflowBinding.h"
 
 namespace platform::comfy {
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LoraParams — LoraLoader ノードへのパッチに必要な最小情報
+//
+// app::panels::LoraEntry と同型だが platform 層に依存関係を持ち込まないため分離。
+// 呼び出し元 (AppController / AiPanel) が LoraEntry → LoraParams 変換して渡す。
+// ─────────────────────────────────────────────────────────────────────────────
+struct LoraParams {
+    QString name;
+    double  modelStrength { 1.0 };
+    double  clipStrength  { 1.0 };
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkflowDocument
@@ -40,6 +53,15 @@ public:
 
     /// WorkflowBinding を適用。対象ノードが見つからない場合は false。
     bool apply(const WorkflowBinding& binding);
+
+    /// CheckpointLoader 系ノードすべてに ckpt_name をパッチ。
+    /// 空文字を渡した場合は何もしない。
+    void applyCheckpoint(const QString& ckptName);
+
+    /// LoraLoader ノードにパッチを適用する。
+    /// ノード検出順 = loras のインデックス順。ノード数が loras より少ない場合は余分をスキップ。
+    /// loras が空なら何もしない。
+    void applyLoras(const QList<LoraParams>& loras);
 
     /// 直接パッチ (escape hatch)
     bool setInput(const QString& nodeId, const QString& key, const QJsonValue& value);

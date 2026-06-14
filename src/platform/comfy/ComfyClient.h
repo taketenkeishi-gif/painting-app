@@ -75,6 +75,10 @@ public:
                   const QString& type,
                   std::function<void(QByteArray, QString)> cb);
 
+  /// ComfyUI から利用可能な LoRA ファイル名一覧を取得。
+  /// callback: (loraNames, errorString)
+  void fetchLoras(std::function<void(QStringList, QString)> cb);
+
   // ── 高レベル API ─────────────────────────────────────────────────────────
 
   struct ExecuteRequest {
@@ -112,6 +116,17 @@ private:
   QUrl                  m_baseUrl   {"http://localhost:8188"};
   QString               m_clientId  {QUuid::createUuid().toString(QUuid::WithoutBraces)};
   QNetworkAccessManager m_nam       {this};
+
+#ifdef PAINT_DEBUG_SERVER
+public:
+  QByteArray dbgLastPayload()        const { return m_dbgLastPayload; }
+  QByteArray dbgLastResponseBody()   const { return m_dbgLastResponseBody; }
+  int        dbgLastResponseStatus() const { return m_dbgLastResponseStatus; }
+private:
+  QByteArray m_dbgLastPayload;
+  QByteArray m_dbgLastResponseBody;
+  int        m_dbgLastResponseStatus {0};
+#endif
 };
 
 } // namespace platform::comfy

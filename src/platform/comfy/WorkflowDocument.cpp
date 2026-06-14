@@ -458,4 +458,37 @@ QString WorkflowDocument::readCheckpointName() const {
     return {};
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// applyCheckpoint  —  CheckpointLoader 系ノードに ckpt_name をパッチ
+// ─────────────────────────────────────────────────────────────────────────────
+void WorkflowDocument::applyCheckpoint(const QString& ckptName) {
+    if (ckptName.isEmpty()) return;
+    static const QStringList kFields{"ckpt_name", "checkpoint", "model_name"};
+    const QStringList nodes = findCheckpointNodes();
+    for (const QString& nid : nodes) {
+        const QJsonObject inp = nodeInputs(nid);
+        for (const QString& f : kFields) {
+            if (inp.contains(f)) {
+                setInput(nid, f, ckptName);
+                break;
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// applyLoras  —  LoraLoader ノード群にパッチ
+// ─────────────────────────────────────────────────────────────────────────────
+void WorkflowDocument::applyLoras(const QList<LoraParams>& loras) {
+    if (loras.isEmpty()) return;
+    const QStringList nodes = findNodesByClass(QStringLiteral("LoraLoader"));
+    for (int i = 0; i < loras.size() && i < nodes.size(); ++i) {
+        const LoraParams& e  = loras.at(i);
+        const QString&    nid = nodes.at(i);
+        setInput(nid, QStringLiteral("lora_name"),      e.name);
+        setInput(nid, QStringLiteral("strength_model"), e.modelStrength);
+        setInput(nid, QStringLiteral("strength_clip"),  e.clipStrength);
+    }
+}
+
 } // namespace platform::comfy

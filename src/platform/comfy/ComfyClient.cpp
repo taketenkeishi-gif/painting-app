@@ -101,15 +101,26 @@ void ComfyClient::queueWorkflow(const WorkflowDocument& doc,
     const QByteArray bodyBytes =
         QJsonDocument(body).toJson(QJsonDocument::Compact);
 
+#ifdef PAINT_DEBUG_SERVER
+    m_dbgLastPayload = bodyBytes;
+#endif
+
     QNetworkReply* reply = post("/prompt", bodyBytes);
-    connect(reply, &QNetworkReply::finished, this, [reply, cb = std::move(cb)]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, cb = std::move(cb)]() mutable {
+        // rawBody を先に読む（error 時も HTTP レスポンス本文を取得するため）
+        const QByteArray rawBody = reply->readAll();
+        const int httpStatus =
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         reply->deleteLater();
+#ifdef PAINT_DEBUG_SERVER
+        m_dbgLastResponseStatus = httpStatus;
+        m_dbgLastResponseBody   = rawBody;
+#endif
         if (reply->error() != QNetworkReply::NoError) {
             cb({}, reply->errorString());
             return;
         }
-        const QJsonObject resp =
-            QJsonDocument::fromJson(reply->readAll()).object();
+        const QJsonObject resp = QJsonDocument::fromJson(rawBody).object();
         const QString id = resp.value("prompt_id").toString();
         if (id.isEmpty()) {
             const QString detail = resp.value("error").toString();
@@ -228,6 +239,7 @@ void ComfyClient::fetchImage(const QString& filename,
     url.setQuery(q);
 
     QNetworkRequest req(url);
+    req.setTransferTimeout(30000);
     QNetworkReply* reply = m_nam.get(req);
     connect(reply, &QNetworkReply::finished, this, [reply, cb = std::move(cb)]() {
         reply->deleteLater();
@@ -240,6 +252,41 @@ void ComfyClient::fetchImage(const QString& filename,
             cb({}, "Empty response from /view");
         } else {
             cb(data, {});
+        }
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// fetchLoras  —  GET /object_info/LoraLoader → lora_name の候補一覧
+// ─────────────────────────────────────────────────────────────────────────────
+void ComfyClient::fetchLoras(std::function<void(QStringList, QString)> cb) {
+    QNetworkReply* reply = get("/object_info/LoraLoader");
+    connect(reply, &QNetworkReply::finished, this, [reply, cb = std::move(cb)]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            cb({}, reply->errorString());
+            return;
+        }
+        // レスポンス: { "LoraLoader": { "input": { "required": { "lora_name": [["a.safetensors",...], "LORA_MODEL"] } } } }
+        const QJsonObject root =
+            QJsonDocument::fromJson(reply->readAll()).object();
+        const QJsonArray choices =
+            root.value("LoraLoader").toObject()
+                .value("input").toObject()
+                .value("required").toObject()
+                .value("lora_name").toArray()
+                .at(0).toArray();
+
+        QStringList names;
+        names.reserve(choices.size());
+        for (const QJsonValue& v : choices) {
+            const QString s = v.toString();
+            if (!s.isEmpty()) names << s;
+        }
+        if (names.isEmpty()) {
+            cb({}, "No LoRA models found in /object_info/LoraLoader");
+        } else {
+            cb(names, {});
         }
     });
 }

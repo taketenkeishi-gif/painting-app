@@ -1,7 +1,6 @@
 #include "app/bridge/AiGenerationController.h"
 
 #include <QBuffer>
-#include <QFile>
 #include <QImage>
 #include <QRandomGenerator>
 
@@ -86,15 +85,6 @@ QByteArray AiGenerationController::selectionToPng(AppController* ac) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// execute  — エントリポイント
-// ─────────────────────────────────────────────────────────────────────────────
-static void aiTrace(const char* msg) {
-    QFile f(QStringLiteral("debug_generate_trace.txt"));
-    f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
-    f.write(QByteArray(msg) + "\n");
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // workflow ロード + バインド適用ヘルパー
 // ─────────────────────────────────────────────────────────────────────────────
 bool AiGenerationController::loadWorkflowDoc(const Request& req,
@@ -120,7 +110,6 @@ bool AiGenerationController::loadWorkflowDoc(const Request& req,
 }
 
 void AiGenerationController::execute(const Request& req) {
-    aiTrace("execute: entered");
     if (m_busy) {
         emit errorOccurred("AI 生成が実行中です。完了を待ってから再試行してください。");
         return;
@@ -133,11 +122,9 @@ void AiGenerationController::execute(const Request& req) {
     WorkflowDocument doc;
     if (!loadWorkflowDoc(req, doc)) return;
 
-    aiTrace("execute: loading workflow ok, applying bindings");
     m_batchTotal = 1;
     m_busy = true;
     emit started();
-    aiTrace("execute: started emitted");
 
     if (req.useActiveLayer || req.useCompositedBuffer) {
         doUploadInputImage(std::move(doc), req);
@@ -257,9 +244,7 @@ void AiGenerationController::doUploadInputImage(WorkflowDocument doc,
 void AiGenerationController::doUploadMask(WorkflowDocument doc,
                                             const Request&   req,
                                             const QString& /*savedImageName*/) {
-    aiTrace("doUploadMask: entered");
     if (!req.useSelectionAsMask) {
-        aiTrace("doUploadMask: skipping mask, going to doQueue");
         doQueue(std::move(doc), req);
         return;
     }
@@ -293,35 +278,20 @@ void AiGenerationController::doUploadMask(WorkflowDocument doc,
 // ステップ 3: キュー投入
 // ─────────────────────────────────────────────────────────────────────────────
 void AiGenerationController::doQueue(WorkflowDocument doc, const Request& req) {
-    aiTrace("doQueue: entered");
 #ifdef PAINT_DEBUG_SERVER
-    // 送信直前に workflow JSON を Dev_Bridge 観測バッファへ記録する。
-    aiTrace("doQueue: capturing queued workflow");
     m_app->debugCaptureQueuedWorkflow(doc.toJson());
-    aiTrace("doQueue: calling queueWorkflow");
 #endif
     m_comfy->queueWorkflow(doc,
         [this, req](QString promptId, QString err) mutable {
-            aiTrace("doQueue cb: fired");
 #ifdef PAINT_DEBUG_SERVER
-            // POST /prompt 結果（成功・失敗問わず）をキャプチャして Dev_Bridge へ公開する。
-            aiTrace("doQueue cb: getting payload bytes");
-            const QByteArray dbgPl = m_comfy->dbgLastPayload();
-            aiTrace("doQueue cb: calling debugCaptureComfyPayload");
-            m_app->debugCaptureComfyPayload(dbgPl);
-            aiTrace("doQueue cb: getting response bytes");
-            const int dbgStatus = m_comfy->dbgLastResponseStatus();
-            const QByteArray dbgBody = m_comfy->dbgLastResponseBody();
-            aiTrace("doQueue cb: calling debugCaptureComfyResponse");
-            m_app->debugCaptureComfyResponse(dbgStatus, dbgBody);
-            aiTrace("doQueue cb: capture done");
+            m_app->debugCaptureComfyPayload(m_comfy->dbgLastPayload());
+            m_app->debugCaptureComfyResponse(
+                m_comfy->dbgLastResponseStatus(), m_comfy->dbgLastResponseBody());
 #endif
             if (!err.isEmpty()) {
-                aiTrace("doQueue cb: error path");
                 fail("ワークフロー投入に失敗: " + err);
                 return;
             }
-            aiTrace("doQueue cb: success, calling doWait");
             doWait(promptId, req);
         });
 }
