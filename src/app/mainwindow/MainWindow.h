@@ -41,7 +41,6 @@ namespace app::canvasview {
 class CanvasWidget;
 }
 namespace app::panels {
-class AdjustmentPropertyPanel;
 class AiPanel;
 class LayerPanel;
 class SubToolPanel;
@@ -203,7 +202,6 @@ private:
   // ────────────────────────────────────────────────────────────────────────────
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
-  app::panels::AdjustmentPropertyPanel* m_adjustmentPanel {nullptr};
   app::panels::AiPanel*         m_aiPanel         {nullptr};
   app::panels::LayerPanel* m_layerPanel {nullptr};
   app::panels::ToolPanel* m_toolPanel {nullptr};
@@ -224,7 +222,6 @@ private:
   QDockWidget* m_colorDock {nullptr};
   QDockWidget* m_colorSliderDock {nullptr};
   QDockWidget* m_colorHistoryDock {nullptr};
-  QDockWidget* m_adjustmentDock {nullptr};
   QDockWidget* m_aiDock    {nullptr};
   QDockWidget* m_layerDock {nullptr};
   QDockWidget* m_infoDock {nullptr};

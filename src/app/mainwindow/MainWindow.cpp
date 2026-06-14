@@ -76,7 +76,7 @@
 #include "app/bridge/LpaImporter.h"
 #include "app/bridge/PsdExporter.h"
 #include "app/canvasview/CanvasWidget.h"
-#include "app/panels/AdjustmentPropertyPanel.h"
+// AdjustmentPropertyPanel removed — dock excluded from layout
 #include "app/panels/AiPanel.h"
 #include "app/ui/Theme.h"
 #include "app/panels/AiModelFolderDialog.h"
@@ -170,7 +170,7 @@ public:
   explicit DockTitleBar(const QString& title, QDockWidget* dock)
       : QWidget(dock), m_dock(dock), m_ownTitle(title)
   {
-    setFixedHeight(24);
+    setFixedHeight(22);
     setMouseTracking(true);
     // QDockWidget のイベントフィルタがドラッグを検知できるよう
     // このウィジェット自身はマウスイベントを素通しさせる
@@ -185,7 +185,7 @@ public:
     // QDockWidget event filter picks them up → dock-drag mode (shows drop
     // indicators, allows re-docking). DO NOT consume events here.
     m_grip = new QWidget(this);
-    m_grip->setFixedSize(18, 22);
+    m_grip->setFixedSize(14, 22);
     m_grip->setAttribute(Qt::WA_TransparentForMouseEvents, true);
     m_layout->addWidget(m_grip);
 
@@ -661,7 +661,6 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
       m_controller(new app::bridge::AppController(this)),
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
-      m_adjustmentPanel(new app::panels::AdjustmentPropertyPanel(this)),
       m_aiPanel(new app::panels::AiPanel(this)),
       m_layerPanel(new app::panels::LayerPanel(this)),
       m_toolPanel(new app::panels::ToolPanel(this)),
@@ -686,7 +685,6 @@ MainWindow::MainWindow(QWidget* parent)
   // ── 最初のドキュメントは setupShellLayout() 内で QDockWidget として生成 ──
 
   m_canvasWidget->setController(m_controller);
-  m_adjustmentPanel->setController(m_controller);
   m_aiPanel->setController(m_controller);
   m_layerPanel->setController(m_controller);
   m_toolPanel->setController(m_controller);
@@ -754,8 +752,7 @@ void MainWindow::setupShellLayout() {
   m_alphaSpin = new QSpinBox(colorPanel);
   m_colorWheelWidget = new app::panels::ColorWheelWidget(colorPanel);
   m_colorWheelWidget->setMinimumSize(104, 104);
-  // Swatch widget: 48x48 for high-quality CSP-like display
-  m_colorSwatchWidget->setFixedSize(48, 48);
+  m_colorSwatchWidget->setFixedSize(40, 40);
   swapColorButton->setFixedSize(18, 18);
   resetColorButton->setFixedSize(18, 18);
   swapColorButton->setIcon(app::ui::icon("swap"));
@@ -821,8 +818,8 @@ void MainWindow::setupShellLayout() {
 
   auto* colorButtons = new QHBoxLayout();
   colorButtons->setContentsMargins(0, 0, 0, 0);
-  colorButtons->setSpacing(4);
-  colorButtons->addWidget(m_colorSwatchWidget, 0, Qt::AlignTop | Qt::AlignLeft);
+  colorButtons->setSpacing(2);
+  colorButtons->addWidget(m_colorSwatchWidget, 0, Qt::AlignVCenter);
   colorButtons->addLayout(rightVBox, 0);
   colorButtons->addStretch(1);
   auto addHsvRow = [this, colorPanel](const QString& label, QSlider* slider, QSpinBox* spin) {
@@ -1162,8 +1159,6 @@ void MainWindow::setupShellLayout() {
   m_colorHistoryDock = makeDock("カラーヒストリー", makeScrollable(historyWidget), "ColorHistoryDock");
   m_colorHistoryDock->setMinimumWidth(188);
   m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
-  m_adjustmentDock = makeDock("調整レイヤー", m_adjustmentPanel, "AdjustmentDock");
-  m_adjustmentDock->setMinimumHeight(120);
   m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
   // Native title bars are kept so Qt's dock drag/float/rearrange machinery works.
@@ -1192,10 +1187,8 @@ void MainWindow::setupShellLayout() {
   // All three panels tabified together — same pattern as MinimalDockTest.
   // No vertical split: splitDockWidget after tabifyDockWidget breaks drop-zone detection.
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
-  addDockWidget(Qt::RightDockWidgetArea, m_adjustmentDock);
   addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
   addDockWidget(Qt::RightDockWidgetArea, m_infoDock);
-  tabifyDockWidget(m_layerDock, m_adjustmentDock);
   tabifyDockWidget(m_layerDock, m_aiDock);
   tabifyDockWidget(m_layerDock, m_infoDock);
 
@@ -1215,7 +1208,7 @@ void MainWindow::setupShellLayout() {
   const QList<QDockWidget*> allDocks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock
+      m_layerDock, m_aiDock, m_infoDock
   };
   for (auto* dock : allDocks) {
     if (!dock) continue;
@@ -1603,9 +1596,6 @@ void MainWindow::createMenus() {
   }
   if (m_layerDock != nullptr) {
     windowMenu->addAction(m_layerDock->toggleViewAction());
-  }
-  if (m_adjustmentDock != nullptr) {
-    windowMenu->addAction(m_adjustmentDock->toggleViewAction());
   }
   if (m_aiDock != nullptr) {
     windowMenu->addAction(m_aiDock->toggleViewAction());
@@ -2088,7 +2078,7 @@ void MainWindow::updateDockTitleBars() {
   const QList<QDockWidget*> docks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_adjustmentDock, m_aiDock, m_infoDock
+      m_layerDock, m_aiDock, m_infoDock
   };
   for (auto* dock : docks) {
     if (!dock) continue;
@@ -2713,7 +2703,6 @@ void MainWindow::switchToDocument(int index) {
 
   // 全パネルを新しいコントローラに接続
   m_canvasWidget->setController(m_controller);
-  m_adjustmentPanel->setController(m_controller);
   m_aiPanel->setController(m_controller);
   m_layerPanel->setController(m_controller);
   m_toolPanel->setController(m_controller);

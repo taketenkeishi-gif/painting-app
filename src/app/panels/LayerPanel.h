@@ -58,8 +58,6 @@ private slots:
   void onBlendModeChanged(int index);
   void onFilterTextChanged(const QString& text);
   void onLayerContextMenuRequested(const QPoint& pos);
-  void onQuickAddClicked();
-  void onQuickRemoveClicked();
   /// QListWidget の選択セットが変わったとき（Ctrl/Shift クリック含む）
   void onLayerItemSelectionChanged();
 
@@ -95,8 +93,6 @@ private:
   QGroupBox* m_stateGroup {nullptr};
   QGridLayout* m_primaryGrid {nullptr};
   QGridLayout* m_stateGrid {nullptr};
-  QPushButton* m_quickAddButton {nullptr};
-  QPushButton* m_quickRemoveButton {nullptr};
   bool m_compactButtons {false};
   bool m_isRefreshing {false};
   bool m_isDraggingLayer {false};

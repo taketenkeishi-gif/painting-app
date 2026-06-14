@@ -622,13 +622,49 @@ QString layerPaintName(const QModelIndex& index) {
   }
 };
 
+/// フォルダ行の中央にドロップしたとき reparent コールバックを呼ぶ QListWidget 派生クラス
+class CustomLayerList : public QListWidget {
+public:
+  explicit CustomLayerList(QWidget* parent = nullptr) : QListWidget(parent) {}
+  std::function<bool(int fromRow, uint32_t targetFolderId)> onFolderDrop;
+
+protected:
+  void dropEvent(QDropEvent* e) override {
+    const QPoint pos = e->position().toPoint();
+    QListWidgetItem* targetItem = itemAt(pos);
+    if (targetItem != nullptr) {
+      const QRect itemRect = visualItemRect(targetItem);
+      const int margin = itemRect.height() / 5;
+      const bool onItemCenter = (pos.y() >= itemRect.top() + margin &&
+                                 pos.y() <= itemRect.bottom() - margin);
+      if (onItemCenter) {
+        const auto kind = static_cast<core::LayerKind>(targetItem->data(kKindRole).toInt());
+        if (kind == core::LayerKind::Folder && onFolderDrop) {
+          const QList<QListWidgetItem*> sel = selectedItems();
+          if (!sel.isEmpty()) {
+            const int fromRow = row(sel.first());
+            const int toRow   = row(targetItem);
+            if (fromRow != toRow) {
+              const uint32_t folderId = static_cast<uint32_t>(targetItem->data(kLayerIdRole).toUInt());
+              onFolderDrop(fromRow, folderId);
+              e->acceptProposedAction();
+              return;
+            }
+          }
+        }
+      }
+    }
+    QListWidget::dropEvent(e);
+  }
+};
+
 } // namespace
 
 LayerPanel::LayerPanel(QWidget* parent)
     : QWidget(parent),
       m_headerLabel(nullptr), // removed: must not exist with text matching dock windowTitle "レイヤー"
       m_filterEdit(new QLineEdit(this)),
-      m_layerList(new QListWidget(this)),
+      m_layerList(new CustomLayerList(this)),
       m_opacityLabel(new QLabel(QStringLiteral("不透明度: 100%"), this)),
       m_opacitySlider(new AlphaSlider(Qt::Horizontal, this)),
       m_opacitySpin(new QSpinBox(this)),
@@ -649,9 +685,7 @@ LayerPanel::LayerPanel(QWidget* parent)
       m_primaryGroup(new QGroupBox(QString(), this)),
       m_stateGroup(new QGroupBox(QString(), this)),
       m_primaryGrid(new QGridLayout()),
-      m_stateGrid(new QGridLayout()),
-      m_quickAddButton(new QPushButton(QStringLiteral("+"), this)),
-      m_quickRemoveButton(new QPushButton(QStringLiteral("-"), this)) {
+      m_stateGrid(new QGridLayout()) {
   // m_headerLabel is nullptr — not created
   m_primaryGroup->setTitle(QString());
   m_stateGroup->setTitle(QString());
@@ -873,35 +907,6 @@ LayerPanel::LayerPanel(QWidget* parent)
   layout->addWidget(m_primaryGroup);
   layout->addWidget(m_stateGroup);
 
-  auto styleQuickButton = [](QPushButton* btn) {
-    btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    btn->setMinimumHeight(28);
-    btn->setFocusPolicy(Qt::NoFocus);
-    btn->setStyleSheet(QStringLiteral(
-        "QPushButton {"
-        " padding: 2px 6px;"
-        " border: 1px solid #2a2e3e;"
-        " border-radius: 4px;"
-        " background: #272c3c;"
-        " color: #c5cde0;"
-        " font-size: 14px;"
-        "}"
-        "QPushButton:hover { background: #2f3447; border-color: #4a5370; color: #edf0f9; }"
-        "QPushButton:pressed { background: #1d3a7a; border-color: #4e8ef7; color: #edf0f9; }"
-        "QPushButton:disabled { color: #4a5268; border-color: #252a38; background: #1a1d27; }"));
-  };
-  styleQuickButton(m_quickAddButton);
-  styleQuickButton(m_quickRemoveButton);
-  m_quickAddButton->setToolTip(QStringLiteral("新規レイヤーを追加 (+)"));
-  m_quickRemoveButton->setToolTip(QStringLiteral("選択中のレイヤーを削除 (-)"));
-
-  auto* quickButtonRow = new QHBoxLayout();
-  quickButtonRow->setContentsMargins(0, 0, 0, 0);
-  quickButtonRow->setSpacing(4);
-  quickButtonRow->addWidget(m_quickAddButton);
-  quickButtonRow->addWidget(m_quickRemoveButton);
-  layout->addLayout(quickButtonRow);
-
   setLayout(layout);
 
   connect(m_addRasterButton, &QPushButton::clicked, this, &LayerPanel::onAddRasterLayerClicked);
@@ -917,8 +922,6 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_lockButton, &QPushButton::clicked, this, &LayerPanel::onToggleLockClicked);
   connect(m_lockAlphaButton, &QPushButton::clicked, this, &LayerPanel::onToggleAlphaLockClicked);
   connect(m_lockPositionButton, &QPushButton::clicked, this, &LayerPanel::onTogglePositionLockClicked);
-  connect(m_quickAddButton, &QPushButton::clicked, this, &LayerPanel::onQuickAddClicked);
-  connect(m_quickRemoveButton, &QPushButton::clicked, this, &LayerPanel::onQuickRemoveClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
   connect(m_layerList, &QListWidget::itemSelectionChanged, this, &LayerPanel::onLayerItemSelectionChanged);
@@ -935,6 +938,19 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_layerList->model(), &QAbstractItemModel::dataChanged,
           this, [this](const QModelIndex& topLeft, const QModelIndex&, const QVector<int>& roles) {
     if (m_controller == nullptr || m_isRefreshing) return;
+    if (roles.contains(kExpandToggleRole)) {
+      const QListWidgetItem* item = m_layerList->item(topLeft.row());
+      if (item != nullptr) {
+        const uint32_t fid = static_cast<uint32_t>(item->data(kLayerIdRole).toUInt());
+        if (m_collapsedFolderIds.count(fid)) {
+          m_collapsedFolderIds.erase(fid);
+        } else {
+          m_collapsedFolderIds.insert(fid);
+        }
+        QTimer::singleShot(0, this, &LayerPanel::refreshLayers);
+      }
+      return;
+    }
     if (!roles.contains(kEditTargetRole)) return;
     const QListWidgetItem* item = m_layerList->item(topLeft.row());
     if (item == nullptr) return;
@@ -1044,6 +1060,17 @@ void LayerPanel::applyButtonCompactMode(bool compact) {
   }
 
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &LayerPanel::refreshLayers);
+
+  // フォルダへのドロップで reparent
+  if (auto* customList = static_cast<CustomLayerList*>(m_layerList)) {
+    customList->onFolderDrop = [this](int fromRow, uint32_t folderId) -> bool {
+      if (m_controller == nullptr) return false;
+      const std::size_t layerIdx = layerIndexFromRow(fromRow);
+      m_controller->setLayerParent(layerIdx, folderId);
+      return true;
+    };
+  }
+
   connect(m_controller, &app::bridge::AppController::documentChanged, this, [this]() {
     if (m_isRefreshing) {
       return;
@@ -1151,6 +1178,46 @@ void LayerPanel::refreshLayers() {
     }
   }
 
+  // ── 折りたたみによる非表示セット ────────────────────────────────────────
+  std::unordered_set<uint32_t> hiddenByCollapse;
+  for (const auto& m : models) {
+    if (m.paperLayer || m.layerId == 0) continue;
+    uint32_t cur = m.parentId;
+    bool hidden = false;
+    const int kGuard = static_cast<int>(models.size()) + 1;
+    int guard = 0;
+    while (cur != 0 && !hidden && guard < kGuard) {
+      if (m_collapsedFolderIds.count(cur)) { hidden = true; }
+      const auto pit = parentOf.find(cur);
+      cur = (pit != parentOf.end()) ? pit->second : 0;
+      ++guard;
+    }
+    if (hidden) hiddenByCollapse.insert(m.layerId);
+  }
+
+  // ── 親チェーンを含む effective visibility マップ ──────────────────────
+  std::unordered_map<uint32_t, bool> effectivelyVisible;
+  effectivelyVisible.reserve(models.size());
+  for (const auto& m : models) {
+    if (m.paperLayer) continue;
+    effectivelyVisible[m.layerId] = m.visible;
+  }
+  for (const auto& m : models) {
+    if (m.paperLayer || m.layerId == 0) continue;
+    bool ev = effectivelyVisible[m.layerId];
+    uint32_t cur = m.parentId;
+    const int kGuard2 = static_cast<int>(models.size()) + 1;
+    int guard2 = 0;
+    while (cur != 0 && ev && guard2 < kGuard2) {
+      const auto it = effectivelyVisible.find(cur);
+      if (it != effectivelyVisible.end() && !it->second) ev = false;
+      const auto pit = parentOf.find(cur);
+      cur = (pit != parentOf.end()) ? pit->second : 0;
+      ++guard2;
+    }
+    effectivelyVisible[m.layerId] = ev;
+  }
+
   for (std::size_t layerIndex = models.size(); layerIndex-- > 0;) {
     const auto& model = models[layerIndex];
     if (hasFilter) {
@@ -1158,6 +1225,10 @@ void LayerPanel::refreshLayers() {
       if (!layerName.contains(filterText, Qt::CaseInsensitive) && !(model.paperLayer && QStringLiteral("用紙").contains(filterText))) {
         continue;
       }
+    }
+    // 折りたたまれたフォルダ内のレイヤーはスキップ
+    if (!model.paperLayer && model.layerId != 0 && hiddenByCollapse.count(model.layerId)) {
+      continue;
     }
 
     auto* item = new QListWidgetItem(m_layerList);
@@ -1207,6 +1278,16 @@ void LayerPanel::refreshLayers() {
     item->setData(kLayerIdRole,  static_cast<uint>(model.layerId));
     item->setData(kParentIdRole, static_cast<uint>(model.parentId));
     item->setData(kDepthRole,    itemDepth);
+
+    // フォルダ展開状態（Folder 以外は常に true）
+    const bool isExpanded = (model.kind != core::LayerKind::Folder) ||
+                            !m_collapsedFolderIds.count(model.layerId);
+    item->setData(kExpandedRole, isExpanded);
+    // 親チェーンを含む effective visibility
+    const bool effVis = (!model.paperLayer && model.layerId != 0)
+        ? (effectivelyVisible.count(model.layerId) ? effectivelyVisible.at(model.layerId) : model.visible)
+        : model.visible;
+    item->setData(kEffVisibleRole, effVis);
 
     const QString stateSummary = QStringLiteral("表示:%1  クリップ:%2  マスク:%3  ロック:%4")
                                      .arg(model.visible ? QStringLiteral("ON") : QStringLiteral("OFF"))
@@ -1407,49 +1488,6 @@ void LayerPanel::onTogglePositionLockClicked() {
     return;
   }
   m_controller->toggleActiveLayerPositionLock();
-}
-
-void LayerPanel::onQuickAddClicked() {
-  if (m_controller == nullptr) {
-    return;
-  }
-  m_controller->addLayer();
-}
-
-void LayerPanel::onQuickRemoveClicked() {
-  if (m_controller == nullptr) {
-    return;
-  }
-
-  const QList<QListWidgetItem*> selectedItems = m_layerList->selectedItems();
-
-  if (selectedItems.size() > 1) {
-    std::vector<uint32_t> idsToDelete;
-    idsToDelete.reserve(static_cast<std::size_t>(selectedItems.size()));
-    for (QListWidgetItem* selItem : selectedItems) {
-      if (selItem->data(kPaperRole).toBool()) {
-        continue;
-      }
-      const auto lid = static_cast<uint32_t>(selItem->data(kLayerIdRole).toUInt());
-      if (lid != 0) {
-        idsToDelete.push_back(lid);
-      }
-    }
-    if (!idsToDelete.empty()) {
-      m_controller->removeLayersByIds(idsToDelete);
-    }
-    return;
-  }
-
-  QListWidgetItem* currentItem = m_layerList->currentItem();
-  if (currentItem == nullptr) {
-    return;
-  }
-  const int layerIndex = currentItem->data(kLayerIndexRole).toInt();
-  if (layerIndex < 0) {
-    return;
-  }
-  m_controller->removeLayer(static_cast<std::size_t>(layerIndex));
 }
 
 void LayerPanel::onCurrentLayerChanged(int row) {
@@ -1805,7 +1843,6 @@ void LayerPanel::refreshButtonState() {
     m_lockButton->setEnabled(false);
     m_lockAlphaButton->setEnabled(false);
     m_lockPositionButton->setEnabled(false);
-    m_quickRemoveButton->setEnabled(false);
     return;
   }
 
@@ -1878,7 +1915,6 @@ void LayerPanel::refreshButtonState() {
   m_lockButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
   m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
   m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
-  m_quickRemoveButton->setEnabled(hasSelection && !paperSelected);
 
   // トグル状態をボタンの checked 状態に反映（setChecked は clicked を emit しない）
   {

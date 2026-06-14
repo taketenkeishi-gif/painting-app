@@ -117,7 +117,6 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/mainwindow/DocumentWorkspace.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/CanvasWidget.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/canvasview/SelectionOverlayRenderer.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AdjustmentPropertyPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/AiPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/LayerPanel.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/ToolPanel.cpp
