@@ -56,6 +56,12 @@ private:
     QByteArray endpointAction(const QByteArray& body);
     QByteArray endpointWidgetTree();
 
+    // Dev Bridge Architecture — UI observability surface
+    QByteArray endpointComponents();   // /debug/components — interactive widget list + bounds
+    QByteArray endpointLayout();       // /debug/layout     — dock positions, sizes, tab groups
+    QByteArray endpointInput();        // /debug/input      — registered shortcuts + collision map
+    QByteArray endpointSkiaCache();    // /debug/skia-cache — SkiaLayerCache blit/hit counters
+
     // HTTP helpers
     static QByteArray okJson(const QByteArray& json);
     static QByteArray errorJson(int code, const QString& message);

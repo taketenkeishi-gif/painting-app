@@ -2,6 +2,7 @@
 
 #ifdef PAINT_USE_SKIA
 
+#include <atomic>
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
@@ -26,12 +27,20 @@ public:
   void invalidateAll();
   void evict(uint32_t layerId);  // call on layer deletion
 
+  // Debug counters — read from DebugServer / tests.
+  uint64_t blitCount()  const noexcept { return m_blitCount.load(); }
+  uint64_t hitCount()   const noexcept { return m_hitCount.load(); }
+  void     resetStats() noexcept { m_blitCount = 0; m_hitCount = 0; }
+
 private:
   struct Entry {
     SkBitmap bitmap;
     bool dirty {true};
   };
   std::unordered_map<uint32_t, Entry> m_cache;
+
+  std::atomic<uint64_t> m_blitCount {0};
+  std::atomic<uint64_t> m_hitCount  {0};
 
   static void blitFromBuffer(SkBitmap& bm, const core::PixelBuffer& buf);
 };

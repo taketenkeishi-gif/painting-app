@@ -13,7 +13,14 @@
 #include <QBuffer>
 #include <QDebug>
 #include <QAbstractSlider>
+#include <QAction>
+#include <QComboBox>
+#include <QDockWidget>
 #include <QFrame>
+#include <QKeySequence>
+#include <QListWidget>
+#include <QMainWindow>
+#include <QMap>
 #include <QPushButton>
 #include <QWidget>
 
@@ -116,6 +123,10 @@ QByteArray DebugServer::routeGet(const QString& path, const QString& query) {
         }
         return endpointPixels(size);
     }
+    if (path == QLatin1String("/debug/components"))    return endpointComponents();
+    if (path == QLatin1String("/debug/layout"))        return endpointLayout();
+    if (path == QLatin1String("/debug/input"))         return endpointInput();
+    if (path == QLatin1String("/debug/skia-cache"))    return endpointSkiaCache();
     if (path == QLatin1String("/debug/canvas-pixels")) {
         int size = 16;
         for (const QString& kv : query.split('&')) {
@@ -138,10 +149,15 @@ QByteArray DebugServer::routePost(const QString& path, const QByteArray& body) {
 // ── Endpoint: /debug/health ──────────────────────────────────────────────────
 
 QByteArray DebugServer::endpointHealth() {
+    const app::bridge::AppController::DebugState s = m_controller->debugState();
     QJsonObject obj;
-    obj[QLatin1String("running")]  = true;
-    obj[QLatin1String("version")]  = QLatin1String("1.0");
-    obj[QLatin1String("appName")]  = QLatin1String("LayeredPaint");
+    obj[QLatin1String("running")]        = true;
+    obj[QLatin1String("version")]        = QLatin1String("1.0");
+    obj[QLatin1String("appName")]        = QLatin1String("LayeredPaint");
+    obj[QLatin1String("buildTimestamp")] = s.buildTimestamp;
+    obj[QLatin1String("executablePath")] = s.executablePath;
+    obj[QLatin1String("buildConfig")]    = s.buildConfig;
+    obj[QLatin1String("gitCommit")]      = s.gitCommit;
     return okJson(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
 
@@ -182,6 +198,10 @@ QByteArray DebugServer::endpointState() {
     QJsonArray layerNames;
     for (const QString& n : s.layerNames) layerNames.append(n);
     layers[QLatin1String("names")]  = layerNames;
+
+    QJsonArray layerParentIds;
+    for (int pid : s.layerParentIds) layerParentIds.append(pid);
+    layers[QLatin1String("parentIds")] = layerParentIds;
 
     QJsonObject aiGen;
     aiGen[QLatin1String("busy")]               = s.aiGenBusy;
@@ -394,6 +414,270 @@ QByteArray DebugServer::endpointWidgetTree() {
         if (w->isVisible())
             roots.append(dumpWidget(w));
     return okJson(QJsonDocument(roots).toJson(QJsonDocument::Indented));
+}
+
+// ── Endpoint: /debug/components ──────────────────────────────────────────────
+//
+// Returns interactive UI widgets currently in the QObject tree, with screen
+// bounds and state.  Used by Dev Bridge UXDiagnosisEngine to correlate
+// component positions with UX audit findings without Computer Use.
+//
+// Scans all visible QDockWidget children for:
+//   QPushButton, QSlider, QListWidget, QComboBox
+//
+// id strategy (no objectNames on most buttons):
+//   {dockSuffix}.{buttonText}   for buttons  (text verbatim, space→"_")
+//   {dockSuffix}.slider_{n}     for sliders
+//   {dockSuffix}.list           for list widgets
+//   {dockSuffix}.combo_{n}      for combo boxes
+
+namespace {
+
+static QMainWindow* findMainWindow() {
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (auto* mw = qobject_cast<QMainWindow*>(w))
+            return mw;
+    }
+    return nullptr;
+}
+
+static QJsonObject componentBounds(QWidget* w) {
+    const QPoint g = w->mapToGlobal(QPoint(0, 0));
+    QJsonObject b;
+    b[QLatin1String("x")]      = g.x();
+    b[QLatin1String("y")]      = g.y();
+    b[QLatin1String("width")]  = w->width();
+    b[QLatin1String("height")] = w->height();
+    return b;
+}
+
+static QString dockPrefix(QDockWidget* dock) {
+    QString name = dock->objectName();
+    name.remove(QLatin1String("Dock"), Qt::CaseInsensitive);
+    return name.toLower();
+}
+
+static QString textSlug(const QString& text) {
+    QString slug;
+    for (const QChar c : text) {
+        if (c == ' ' || c == '_') slug += QLatin1Char('_');
+        else                      slug += c;
+    }
+    return slug.isEmpty() ? QLatin1String("unnamed") : slug;
+}
+
+} // namespace
+
+QByteArray DebugServer::endpointComponents() {
+    QJsonObject root;
+    root[QLatin1String("window")] = QLatin1String("MainWindow");
+
+    QJsonArray components;
+
+    for (QWidget* top : QApplication::topLevelWidgets()) {
+        if (!top->isVisible()) continue;
+
+        for (QDockWidget* dock : top->findChildren<QDockWidget*>()) {
+            const QString prefix = dockPrefix(dock);
+            int sliderN = 0, comboN = 0;
+
+            // QPushButton
+            for (QPushButton* btn : dock->findChildren<QPushButton*>()) {
+                const QString id = prefix + QLatin1Char('.')
+                    + (btn->objectName().isEmpty()
+                           ? textSlug(btn->text())
+                           : btn->objectName().toLower());
+                QJsonObject obj;
+                obj[QLatin1String("id")]      = id;
+                obj[QLatin1String("type")]    = QLatin1String("button");
+                obj[QLatin1String("text")]    = btn->text();
+                obj[QLatin1String("visible")] = btn->isVisible();
+                obj[QLatin1String("enabled")] = btn->isEnabled();
+                obj[QLatin1String("bounds")]  = componentBounds(btn);
+                components.append(obj);
+            }
+
+            // QSlider (skips QAbstractSlider base)
+            for (QSlider* sl : dock->findChildren<QSlider*>()) {
+                const QString id = prefix + QLatin1String(".slider_")
+                    + QString::number(sliderN++);
+                QJsonObject obj;
+                obj[QLatin1String("id")]          = id;
+                obj[QLatin1String("type")]        = QLatin1String("slider");
+                obj[QLatin1String("text")]        = QString();
+                obj[QLatin1String("visible")]     = sl->isVisible();
+                obj[QLatin1String("enabled")]     = sl->isEnabled();
+                obj[QLatin1String("bounds")]      = componentBounds(sl);
+                obj[QLatin1String("min")]         = sl->minimum();
+                obj[QLatin1String("max")]         = sl->maximum();
+                obj[QLatin1String("value")]       = sl->value();
+                obj[QLatin1String("orientation")] = (sl->orientation() == Qt::Horizontal)
+                    ? QLatin1String("H") : QLatin1String("V");
+                components.append(obj);
+            }
+
+            // QListWidget
+            for (QListWidget* lw : dock->findChildren<QListWidget*>()) {
+                const QString id = prefix + QLatin1String(".list");
+                QJsonObject obj;
+                obj[QLatin1String("id")]        = id;
+                obj[QLatin1String("type")]      = QLatin1String("listwidget");
+                obj[QLatin1String("text")]      = QString();
+                obj[QLatin1String("visible")]   = lw->isVisible();
+                obj[QLatin1String("enabled")]   = lw->isEnabled();
+                obj[QLatin1String("bounds")]    = componentBounds(lw);
+                obj[QLatin1String("itemCount")] = lw->count();
+                QJsonArray items;
+                const int cap = qMin(lw->count(), 30);
+                for (int i = 0; i < cap; ++i)
+                    items.append(lw->item(i)->text());
+                obj[QLatin1String("items")] = items;
+                components.append(obj);
+            }
+
+            // QComboBox
+            for (QComboBox* cb : dock->findChildren<QComboBox*>()) {
+                const QString id = prefix + QLatin1String(".combo_")
+                    + QString::number(comboN++);
+                QJsonObject obj;
+                obj[QLatin1String("id")]           = id;
+                obj[QLatin1String("type")]         = QLatin1String("combobox");
+                obj[QLatin1String("text")]         = cb->currentText();
+                obj[QLatin1String("visible")]      = cb->isVisible();
+                obj[QLatin1String("enabled")]      = cb->isEnabled();
+                obj[QLatin1String("bounds")]       = componentBounds(cb);
+                obj[QLatin1String("currentIndex")] = cb->currentIndex();
+                obj[QLatin1String("count")]        = cb->count();
+                components.append(obj);
+            }
+        }
+    }
+
+    root[QLatin1String("components")] = components;
+    return okJson(QJsonDocument(root).toJson(QJsonDocument::Indented));
+}
+
+// ── Endpoint: /debug/layout ──────────────────────────────────────────────────
+//
+// Returns dock widget positions, sizes, area assignment, float state, and
+// tab groupings.  Used to verify that dock layout matches design intent.
+
+QByteArray DebugServer::endpointLayout() {
+    QMainWindow* mw = findMainWindow();
+    if (!mw) {
+        return errorJson(503, "MainWindow not available");
+    }
+
+    QJsonArray docks;
+    for (QDockWidget* dock : mw->findChildren<QDockWidget*>()) {
+        QJsonObject d;
+        d[QLatin1String("name")]     = dock->objectName();
+        d[QLatin1String("title")]    = dock->windowTitle();
+        d[QLatin1String("visible")]  = dock->isVisible();
+        d[QLatin1String("floating")] = dock->isFloating();
+
+        const QPoint g = dock->mapToGlobal(QPoint(0, 0));
+        QJsonObject geom;
+        geom[QLatin1String("x")]      = g.x();
+        geom[QLatin1String("y")]      = g.y();
+        geom[QLatin1String("width")]  = dock->width();
+        geom[QLatin1String("height")] = dock->height();
+        d[QLatin1String("geometry")] = geom;
+
+        const Qt::DockWidgetArea area = mw->dockWidgetArea(dock);
+        QString areaStr;
+        switch (area) {
+            case Qt::LeftDockWidgetArea:   areaStr = QLatin1String("left");   break;
+            case Qt::RightDockWidgetArea:  areaStr = QLatin1String("right");  break;
+            case Qt::TopDockWidgetArea:    areaStr = QLatin1String("top");    break;
+            case Qt::BottomDockWidgetArea: areaStr = QLatin1String("bottom"); break;
+            default:                       areaStr = QLatin1String("none");   break;
+        }
+        d[QLatin1String("area")] = areaStr;
+
+        const QList<QDockWidget*> tabbed = mw->tabifiedDockWidgets(dock);
+        if (!tabbed.isEmpty()) {
+            QJsonArray tabs;
+            for (QDockWidget* t : tabbed)
+                tabs.append(t->objectName());
+            d[QLatin1String("tabbedWith")] = tabs;
+        }
+
+        docks.append(d);
+    }
+
+    QJsonObject root;
+    root[QLatin1String("docks")] = docks;
+    return okJson(QJsonDocument(root).toJson(QJsonDocument::Indented));
+}
+
+// ── Endpoint: /debug/input ───────────────────────────────────────────────────
+//
+// Returns all registered QAction shortcuts, grouped by key sequence.
+// Entries with actions.length > 1 indicate shortcut collisions.
+//
+// Example collision:
+//   { "key": "Del", "conflict": true,
+//     "actions": [
+//       { "action": "deletePixels", "text": "選択範囲を削除" },
+//       { "action": "deleteLayer",  "text": "レイヤーを削除" }
+//     ] }
+
+QByteArray DebugServer::endpointInput() {
+    QMainWindow* mw = findMainWindow();
+    const QList<QAction*> actions = mw
+        ? mw->findChildren<QAction*>()
+        : QList<QAction*>{};
+
+    // Group by key sequence string
+    QMap<QString, QJsonArray> byKey;
+    for (QAction* action : actions) {
+        for (const QKeySequence& seq : action->shortcuts()) {
+            if (seq.isEmpty()) continue;
+            const QString key = seq.toString(QKeySequence::NativeText);
+            QJsonObject entry;
+            // Prefer objectName; fall back to display text
+            entry[QLatin1String("action")] = action->objectName().isEmpty()
+                ? action->text().remove(QLatin1Char('&'))
+                : action->objectName();
+            entry[QLatin1String("text")]   = action->text().remove(QLatin1Char('&'));
+            byKey[key].append(entry);
+        }
+    }
+
+    int conflictCount = 0;
+    QJsonArray shortcuts;
+    for (auto it = byKey.constBegin(); it != byKey.constEnd(); ++it) {
+        const bool conflict = it.value().size() > 1;
+        QJsonObject s;
+        s[QLatin1String("key")]      = it.key();
+        s[QLatin1String("actions")]  = it.value();
+        s[QLatin1String("conflict")] = conflict;
+        shortcuts.append(s);
+        if (conflict) ++conflictCount;
+    }
+
+    QJsonObject root;
+    root[QLatin1String("shortcuts")]    = shortcuts;
+    root[QLatin1String("totalActions")] = static_cast<int>(actions.size());
+    root[QLatin1String("conflictCount")] = conflictCount;
+    return okJson(QJsonDocument(root).toJson(QJsonDocument::Indented));
+}
+
+// ── /debug/skia-cache ────────────────────────────────────────────────────────
+QByteArray DebugServer::endpointSkiaCache() {
+    QJsonObject obj;
+#ifdef PAINT_USE_SKIA
+    const auto& cache = m_controller->skiaLayerCache();
+    obj[QLatin1String("enabled")]    = true;
+    obj[QLatin1String("blit_count")] = static_cast<qint64>(cache.blitCount());
+    obj[QLatin1String("hit_count")]  = static_cast<qint64>(cache.hitCount());
+#else
+    obj[QLatin1String("enabled")]    = false;
+    obj[QLatin1String("blit_count")] = 0;
+    obj[QLatin1String("hit_count")]  = 0;
+#endif
+    return okJson(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
 
 // ── HTTP response helpers ────────────────────────────────────────────────────

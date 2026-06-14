@@ -209,6 +209,10 @@ public:
   bool isDirty() const noexcept { return m_dirty; }
   void markClean() noexcept { setDirty(false); }
   CanvasOverlayViewModel canvasOverlay() const;
+#ifdef PAINT_USE_SKIA
+  const platform::skia::SkiaLayerCache& skiaLayerCache() const noexcept { return m_skiaLayerCache; }
+  platform::skia::SkiaLayerCache& skiaLayerCache() noexcept { return m_skiaLayerCache; }
+#endif
 
   std::vector<LayerViewModel> layerViewModels() const;
 
@@ -569,7 +573,8 @@ public:
     int     canvasHeight    {0};
     int          layerCount      {0};
     QString      activeLayerName;
-    QStringList  layerNames;        // all layer names, bottom-to-top order
+    QStringList  layerNames;        // all layer names, index 0 = top
+    QList<int>   layerParentIds;    // parentId for each layer, same order as layerNames
     int          undoDepth       {0};
     bool         canUndo         {false};
     // comfy-generate 実行中フラグ
@@ -592,6 +597,11 @@ public:
     // レイヤーマスク観測（inpaint 非破壊適用検証用）
     bool         activeLayerHasMask    {false}; ///< アクティブレイヤーに LayerMask があるか
     bool         activeLayerMaskEnabled{false}; ///< LayerMask が有効か
+    // ビルドアイデンティティ — /debug/health で公開
+    QString buildTimestamp;  ///< __DATE__ " " __TIME__ at compile time
+    QString executablePath;  ///< QCoreApplication::applicationFilePath()
+    QString buildConfig;     ///< "Release" or "Debug"
+    QString gitCommit;       ///< PAINT_GIT_COMMIT macro (unknown if not set)
   };
 
   // DebugActionResult は app::debug 名前空間で定義されたものを使う。
