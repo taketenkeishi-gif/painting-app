@@ -597,6 +597,11 @@ public:
     // レイヤーマスク観測（inpaint 非破壊適用検証用）
     bool         activeLayerHasMask    {false}; ///< アクティブレイヤーに LayerMask があるか
     bool         activeLayerMaskEnabled{false}; ///< LayerMask が有効か
+    // Per-layer state arrays (same order as layerNames)
+    QList<bool>  layerLocked;        ///< Layer::locked() for each layer
+    QList<bool>  layerHasMask;       ///< Layer::hasMask() for each layer
+    QList<bool>  layerSelected;      ///< in m_selectedLayerIds for each layer
+    int          editTargetMode {0}; ///< 0=Image, 1=Mask (from UiState::EditTarget)
     // ビルドアイデンティティ — /debug/health で公開
     QString buildTimestamp;  ///< __DATE__ " " __TIME__ at compile time
     QString executablePath;  ///< QCoreApplication::applicationFilePath()

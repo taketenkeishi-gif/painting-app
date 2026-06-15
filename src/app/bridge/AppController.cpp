@@ -6603,9 +6603,14 @@ AppController::DebugState AppController::debugState() const {
   s.activeLayerHasMask      = active ? active->hasMask()     : false;
   s.activeLayerMaskEnabled  = active ? active->maskEnabled() : false;
   for (std::size_t i = 0; i < m_document.layerCount(); ++i) {
-    s.layerNames    << QString::fromStdString(m_document.layerAt(i).name());
-    s.layerParentIds << static_cast<int>(m_document.layerAt(i).parentId());
+    const auto& lay = m_document.layerAt(i);
+    s.layerNames     << QString::fromStdString(lay.name());
+    s.layerParentIds << static_cast<int>(lay.parentId());
+    s.layerLocked    << lay.locked();
+    s.layerHasMask   << lay.hasMask();
+    s.layerSelected  << (m_selectedLayerIds.count(lay.id()) > 0);
   }
+  s.editTargetMode = (m_uiState.editTarget == app::ui::UiState::EditTarget::Mask) ? 1 : 0;
 
   // AiService 状態
   s.aiGenBusy             = m_aiService ? m_aiService->isBusy() : false;
@@ -7844,6 +7849,120 @@ void AppController::initDebugActions()
     r.data = {
       {QLatin1String("path"),       absPath},
       {QLatin1String("layerCount"), static_cast<int>(m_document.layerCount())},
+    };
+    return r;
+  });
+
+  // ── rename-layer ──────────────────────────────────────────────────────────────
+  reg("rename-layer", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    int idx = opts[QLatin1String("index")].toInt(-1);
+    QString name = opts[QLatin1String("name")].toString();
+    if (idx < 0 || name.isEmpty()) {
+      r.message = QLatin1String("rename-layer: 'index' (>=0) and 'name' params required");
+      return r;
+    }
+    auto total = static_cast<int>(m_document.layerCount());
+    if (idx >= total) {
+      r.message = QString("rename-layer: index %1 out of range (layerCount=%2)").arg(idx).arg(total);
+      return r;
+    }
+    bool ok = renameLayer(static_cast<std::size_t>(idx), name.toStdString());
+    r.success = ok;
+    r.message = ok
+      ? QString("rename-layer: index=%1 → \"%2\"").arg(idx).arg(name)
+      : QString("rename-layer: renameLayer(%1) failed").arg(idx);
+    r.data = {{QLatin1String("index"), idx}, {QLatin1String("name"), name}};
+    return r;
+  });
+
+  // ── add-layer-mask ────────────────────────────────────────────────────────────
+  reg("add-layer-mask", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
+    const core::Layer* active = m_document.activeLayer();
+    if (!active) {
+      r.message = QLatin1String("add-layer-mask: no active layer");
+      return r;
+    }
+    bool hadMask = active->hasMask();
+    bool ok = toggleActiveLayerMask();
+    const core::Layer* after = m_document.activeLayer();
+    r.success = ok;
+    r.message = ok
+      ? QString("add-layer-mask: hasMask %1 → %2").arg(hadMask).arg(after ? after->hasMask() : hadMask)
+      : QLatin1String("add-layer-mask: toggleActiveLayerMask() failed");
+    r.data = {
+      {QLatin1String("hadMask"),  hadMask},
+      {QLatin1String("hasMask"),  after ? after->hasMask() : hadMask},
+    };
+    return r;
+  });
+
+  // ── set-layer-lock ────────────────────────────────────────────────────────────
+  reg("set-layer-lock", [this](const QString& /*target*/, const QJsonObject& /*opts*/) -> R {
+    R r;
+    const core::Layer* active = m_document.activeLayer();
+    if (!active) {
+      r.message = QLatin1String("set-layer-lock: no active layer");
+      return r;
+    }
+    bool wasLocked = active->locked();
+    bool ok = toggleActiveLayerLock();
+    const core::Layer* after = m_document.activeLayer();
+    r.success = ok;
+    r.message = ok
+      ? QString("set-layer-lock: locked %1 → %2").arg(wasLocked).arg(after ? after->locked() : wasLocked)
+      : QLatin1String("set-layer-lock: toggleActiveLayerLock() failed");
+    r.data = {
+      {QLatin1String("wasLocked"), wasLocked},
+      {QLatin1String("locked"),    after ? after->locked() : wasLocked},
+    };
+    return r;
+  });
+
+  // ── set-edit-target ───────────────────────────────────────────────────────────
+  reg("set-edit-target", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    int mode = opts[QLatin1String("mode")].toInt(-1);
+    if (mode != 0 && mode != 1) {
+      r.message = QLatin1String("set-edit-target: 'mode' param required (0=Image, 1=Mask)");
+      return r;
+    }
+    auto newTarget = (mode == 1)
+      ? app::ui::UiState::EditTarget::Mask
+      : app::ui::UiState::EditTarget::Image;
+    setEditTarget(newTarget);
+    int actual = (m_uiState.editTarget == app::ui::UiState::EditTarget::Mask) ? 1 : 0;
+    r.success = (actual == mode);
+    r.message = QString("set-edit-target: editTargetMode=%1").arg(actual);
+    r.data = {{QLatin1String("editTargetMode"), actual}};
+    return r;
+  });
+
+  // ── select-layers ─────────────────────────────────────────────────────────────
+  reg("select-layers", [this](const QString& /*target*/, const QJsonObject& opts) -> R {
+    R r;
+    QJsonArray idxArr = opts[QLatin1String("indices")].toArray();
+    if (idxArr.isEmpty()) {
+      r.message = QLatin1String("select-layers: 'indices' array required (e.g. [0,1])");
+      return r;
+    }
+    std::unordered_set<uint32_t> ids;
+    auto total = m_document.layerCount();
+    QJsonArray resolved;
+    for (const QJsonValue& v : idxArr) {
+      int idx = v.toInt(-1);
+      if (idx < 0 || static_cast<std::size_t>(idx) >= total) continue;
+      uint32_t lid = m_document.layerAt(static_cast<std::size_t>(idx)).id();
+      ids.insert(lid);
+      resolved.append(idx);
+    }
+    setSelectedLayerIds(ids);
+    r.success = true;
+    r.message = QString("select-layers: selectedCount=%1").arg(static_cast<int>(ids.size()));
+    r.data = {
+      {QLatin1String("selectedCount"), static_cast<int>(ids.size())},
+      {QLatin1String("selectedIndices"), resolved},
     };
     return r;
   });

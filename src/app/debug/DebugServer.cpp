@@ -203,6 +203,20 @@ QByteArray DebugServer::endpointState() {
     for (int pid : s.layerParentIds) layerParentIds.append(pid);
     layers[QLatin1String("parentIds")] = layerParentIds;
 
+    QJsonArray layerLocked;
+    for (bool v : s.layerLocked) layerLocked.append(v);
+    layers[QLatin1String("locked")] = layerLocked;
+
+    QJsonArray layerHasMask;
+    for (bool v : s.layerHasMask) layerHasMask.append(v);
+    layers[QLatin1String("hasMask")] = layerHasMask;
+
+    QJsonArray layerSelected;
+    for (bool v : s.layerSelected) layerSelected.append(v);
+    layers[QLatin1String("selected")] = layerSelected;
+
+    layers[QLatin1String("editTarget")] = s.editTargetMode;
+
     QJsonObject aiGen;
     aiGen[QLatin1String("busy")]               = s.aiGenBusy;
     aiGen[QLatin1String("lastError")]          = s.aiGenLastError;
@@ -493,6 +507,10 @@ QByteArray DebugServer::endpointComponents() {
                 obj[QLatin1String("text")]    = btn->text();
                 obj[QLatin1String("visible")] = btn->isVisible();
                 obj[QLatin1String("enabled")] = btn->isEnabled();
+                if (btn->isCheckable()) {
+                    obj[QLatin1String("checkable")] = true;
+                    obj[QLatin1String("checked")]   = btn->isChecked();
+                }
                 obj[QLatin1String("bounds")]  = componentBounds(btn);
                 components.append(obj);
             }

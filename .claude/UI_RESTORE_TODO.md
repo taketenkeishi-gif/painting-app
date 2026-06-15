@@ -1,7 +1,7 @@
 # UI Restore TODO
 
 **作成日:** 2026-06-15  
-**最終更新:** 2026-06-15  
+**最終更新:** 2026-06-15 (LP-02〜LP-06 Dev_Bridge coverage追加・DEV_BRIDGE_VERIFIED昇格)  
 **目的:** 過去実装済み機能の復元管理。新規設計は禁止。  
 **基準commit/tag:** `golden-core-main-2026-06-15` (8edd409)
 
@@ -15,6 +15,9 @@
 | `ALREADY_PRESENT` | 調査の結果、現HEADに既に実装済みと確認 |
 | `RESTORED` | コード変更完了・ビルド成功。Runtime確認待ち |
 | `VERIFIED` | Dev Bridge / 目視で動作確認済み |
+| `DEV_BRIDGE_VERIFIED` | Dev_Bridge action/state で動作変化を確認済み |
+| `NEEDS_VISUAL_CONFIRM` | Dev_Bridge action/state で到達不能。ユーザー目視確認待ち |
+| `RUNTIME_FAIL` | Runtime実行で動作不確認 |
 
 ---
 
@@ -46,9 +49,9 @@ Restore Loop 実行中に全項目をソース確認した結果、
 
 | 項目 | 内容 |
 |------|------|
-| **状態** | `ALREADY_PRESENT` |
-| **確認内容** | createEditor/setEditorData/setModelData/updateEditorGeometry 全て実装済み |
-| **確認commit** | HEAD (05332ff) |
+| **状態** | `DEV_BRIDGE_VERIFIED` |
+| **静的確認** | createEditor/setEditorData/setModelData/updateEditorGeometry 全て実装済み (HEAD 05332ff) |
+| **Dev_Bridge確認** | `rename-layer` action 追加済み。index=0, name="TestLayer" → layers.names[0]="TestLayer" 変化確認 (2026-06-15) |
 
 ---
 
@@ -56,9 +59,9 @@ Restore Loop 実行中に全項目をソース確認した結果、
 
 | 項目 | 内容 |
 |------|------|
-| **状態** | `ALREADY_PRESENT` |
-| **確認内容** | kHasMaskRole/kMaskEnabledRole/maskThumbnailPixmap/赤X描画 全て実装済み |
-| **確認commit** | HEAD (05332ff) |
+| **状態** | `DEV_BRIDGE_VERIFIED` |
+| **静的確認** | kHasMaskRole/kMaskEnabledRole/maskThumbnailPixmap/赤X描画 全て実装済み (HEAD 05332ff) |
+| **Dev_Bridge確認** | `add-layer-mask` action 追加済み。layers.hasMask[0]: false→true 変化確認。activeHasMask=true 一致確認 (2026-06-15) |
 
 ---
 
@@ -66,9 +69,9 @@ Restore Loop 実行中に全項目をソース確認した結果、
 
 | 項目 | 内容 |
 |------|------|
-| **状態** | `ALREADY_PRESENT` |
-| **確認内容** | kEditTargetRole (0=Image, 1=Mask) / Shift+クリック検出 実装済み |
-| **確認commit** | HEAD (05332ff) |
+| **状態** | `DEV_BRIDGE_VERIFIED` |
+| **静的確認** | kEditTargetRole (0=Image, 1=Mask) / Shift+クリック検出 実装済み (HEAD 05332ff) |
+| **Dev_Bridge確認** | `set-edit-target` action 追加済み (mode=0/1)。layers.editTarget: 0→1 変化確認 (2026-06-15) |
 
 ---
 
@@ -76,9 +79,9 @@ Restore Loop 実行中に全項目をソース確認した結果、
 
 | 項目 | 内容 |
 |------|------|
-| **状態** | `ALREADY_PRESENT` |
-| **確認内容** | setSelectionMode(ExtendedSelection) / onLayerItemSelectionChanged() 実装済み |
-| **確認commit** | HEAD (05332ff) |
+| **状態** | `DEV_BRIDGE_VERIFIED` |
+| **静的確認** | setSelectionMode(ExtendedSelection) / onLayerItemSelectionChanged() 実装済み (HEAD 05332ff) |
+| **Dev_Bridge確認** | `select-layers` action 追加済み (indices=[0,1])。layers.selected: [false,false]→[true,true] 変化確認 (2026-06-15) |
 
 ---
 
@@ -86,9 +89,9 @@ Restore Loop 実行中に全項目をソース確認した結果、
 
 | 項目 | 内容 |
 |------|------|
-| **状態** | `ALREADY_PRESENT` |
-| **確認内容** | setCheckable(true)/setChecked() が clip/lock/lockAlpha/lockPosition 全ボタンに実装済み |
-| **確認commit** | HEAD (05332ff) |
+| **状態** | `DEV_BRIDGE_VERIFIED` |
+| **静的確認** | setCheckable(true)/setChecked() が clip/lock/lockAlpha/lockPosition 全ボタンに実装済み (HEAD 05332ff) |
+| **Dev_Bridge確認** | `set-layer-lock` action 追加済み。layers.locked[0]: false→true 変化確認。`/debug/components` dock-button に `checkable`/`checked` 出力追加 (16個の checkable button 確認) (2026-06-15) |
 
 ---
 
