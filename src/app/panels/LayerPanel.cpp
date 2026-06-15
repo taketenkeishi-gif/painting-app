@@ -67,7 +67,7 @@ constexpr int kExpandToggleRole= Qt::UserRole + 19;  ///< デリゲート→パ�
 constexpr int kEffVisibleRole  = Qt::UserRole + 20;  ///< 親チェーン込みの effective visibility
 constexpr int kIndentWidth    = 16;                 ///< 深さ1段あたりのインデント幅（px）
 
-constexpr int kLayerRowHeight = 36;
+constexpr int kLayerRowHeight = 32;
 constexpr int kLayerThumbWidth = 34;
 constexpr int kLayerThumbHeight = 26;
 constexpr int kMaskThumbWidth = 26;
@@ -710,7 +710,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setMinimumHeight(140);
   m_layerList->setStyleSheet(
       "QListWidget { background: #13151c; border: none; border-top: 1px solid #2a2e3e; outline: none; }"
-      "QListWidget::item { min-height: 32px; padding: 2px 6px; border-bottom: 1px solid #1e2230; }"
+      "QListWidget::item { min-height: 28px; padding: 2px 6px; border-bottom: 1px solid #1e2230; }"
       "QListWidget::item:hover { background: #272c3c; }"
       "QListWidget::item:selected { background: #1d3a7a; color: #edf0f9; border-left: 2px solid #4e8ef7; }"
       "QListWidget::item:drop { border-top: 2px solid #4e8ef7; background: #1e2a4a; }"
