@@ -1,7 +1,7 @@
 # プロジェクト状態 — Paint App
 
 **Last Updated:** 2026-06-15  
-**Latest Commit:** `c0ae0a9` (fix: UX HIGH項目修正 — shortcut conflict解消・AdjustmentDock最小高さ・ToolSlider幅拡大)  
+**Latest Commit:** `6f37557` (feat(dev-bridge): Layer UI coverage追加 — LP-02〜LP-06 DEV_BRIDGE_VERIFIED)  
 **Current Phase:** UI Restore（過去実装済み機能の復元フェーズ）
 
 > **UI Restore フェーズについて:**  
@@ -9,6 +9,29 @@
 > 過去commitで実装済みだった機能がa937467等の「UI密度復元」セッションで削除されていることを確認。  
 > 復元対象リスト: [`.claude/UI_RESTORE_TODO.md`](UI_RESTORE_TODO.md)  
 > 禁止: 新規設計 / CSP参考再設計 / リファクタ
+>
+> **中間地点タグ:** `ui-restore-verified-layer-2026-06-15` (6f37557)  
+> LayerPanel LP-02〜LP-06: DEV_BRIDGE_VERIFIED。CW-01: RESTORED。
+
+---
+
+## UI Restore 進捗 (2026-06-15)
+
+| セクション | 状態 | 詳細 |
+|---|---|---|
+| **LP-01** フォルダ展開/折りたたみ | `ALREADY_PRESENT` | ソース確認済み |
+| **LP-02** レイヤー名インライン編集 | `DEV_BRIDGE_VERIFIED` | rename-layer action で確認 |
+| **LP-03** マスクサムネイル | `DEV_BRIDGE_VERIFIED` | add-layer-mask action で確認 |
+| **LP-04** イメージ/マスク編集ターゲット | `DEV_BRIDGE_VERIFIED` | set-edit-target action で確認 |
+| **LP-05** 複数レイヤー選択 | `DEV_BRIDGE_VERIFIED` | select-layers action で確認 |
+| **LP-06** checkableロックボタン | `DEV_BRIDGE_VERIFIED` | set-layer-lock + components checked で確認 |
+| **LP-07** ブレンドモード全種 | `ALREADY_PRESENT` | ソース確認済み |
+| **MW-01〜MW-04** DockTitleBar | `ALREADY_PRESENT` | ソース確認済み |
+| **CW-01** ズーム補間 | `RESTORED` | commit 971e66a。目視確認待ち |
+| **CW-02〜CW-05** Canvas機能 | `ALREADY_PRESENT` | ソース確認済み |
+| **TU-01〜TU-04** Tool UI | `ALREADY_PRESENT` | ソース確認済み |
+| **SC-01** shortcut conflict | `VERIFIED` | Dev Bridge conflictCount=0 |
+| **SC-02** QuickMask Alt+Q | `ALREADY_PRESENT` | ソース確認済み |
 
 ---
 
@@ -127,6 +150,8 @@
 | **Dev Bridge Runtime Observation** | /debug/components・/debug/layout・/debug/input 追加 | — | ✅ DONE |
 | **Action Surface Expansion** | new-document・add-raster-layer・set-active-layer・set-foreground-color・export-png | — | ✅ DONE |
 | **FirstDrawingSession v2** | automationRate 42% → 83%（12ステップ中10 PASS / 2 NOT_REACHABLE） | — | ✅ DONE |
+| **UI Restore: CW-01** | ズーム適応スムース補間復元 | `971e66a` | ✅ DONE |
+| **UI Restore: LayerPanel Coverage** | rename-layer/add-layer-mask/set-layer-lock/set-edit-target/select-layers actions + per-layer state fields | `6f37557` | ✅ DONE |
 
 ### 過去セッション（2026-05）
 
