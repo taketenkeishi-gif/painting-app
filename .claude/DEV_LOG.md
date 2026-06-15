@@ -4,7 +4,53 @@
 
 ---
 
-## 2026-06-15 (最新) — 本流確定・UI Regression監査完了
+## 2026-06-15 (最新) — UI Restore TODO 作成・Regression原因特定
+
+### 作業内容
+
+1. **過去実装欠落監査** — 全commit/tag/branchのgit diffでUI/UX実装の欠落を網羅的に抽出
+2. **UI_RESTORE_TODO.md 作成** — 19項目（LP×7 / MW×4 / CW×5 / TU×4 / SC×2）を登録
+3. **PROJECT_STATUS.md 更新** — Current Phase を "UI Restore" に変更
+
+### Regression原因分析
+
+**主因: `a937467`「UI密度をorigin/master基準に復元」セッション**
+
+このセッションで以下が意図的または副作用として削除された:
+
+| 削除された機能 | 影響度 |
+|---------------|--------|
+| フォルダ展開/折りたたみ（LP-01） | 高 — 階層操作不可 |
+| マスクサムネイル表示（LP-03/LP-04） | 高 — プロ向けワークフロー欠損 |
+| ブレンドモード全30+種（LP-07） | 高 — 3種のみに縮小 |
+| quickAdd/quickRemoveボタン行 | 中 |
+| レイヤー名インライン編集（LP-02） | 中 |
+| checkableロックボタン（LP-06） | 中 |
+| 複数レイヤー選択（LP-05） | 中 |
+
+**副因: 760c942より後のCanvasWidget / SubToolPanel 整理**
+
+- スムース補間切り替え（CW-01）削除
+- 選択サブツール専用アイコン（TU-01）削除
+- SubToolPanelカード型レイアウト（TU-02）削除
+- ToolPanelレスポンシブ列数（TU-03）削除
+
+### 完了項目
+
+- ✅ UI_RESTORE_TODO.md 作成（19項目 + SC-01 VERIFIED）
+- ✅ PROJECT_STATUS.md: Current Phase → "UI Restore"
+- ✅ DEV_LOG.md: Regression原因記録
+
+### 次のアクション
+
+- [ ] LP-07（ブレンドモード全種）: 低難度・高影響 → 最初に復元推奨
+- [ ] LP-06（checkableボタン）: setCheckable(true) 4行追加のみ
+- [ ] CW-01（スムース補間）: 1行の条件分岐追加のみ
+- [ ] LP-01（フォルダ階層）: 中難度・高影響 → LP-07/06後
+
+---
+
+## 2026-06-15 (前回) — 本流確定・UI Regression監査完了
 
 ### 作業内容
 

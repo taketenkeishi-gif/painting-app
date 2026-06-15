@@ -2,7 +2,13 @@
 
 **Last Updated:** 2026-06-15  
 **Latest Commit:** `c0ae0a9` (fix: UX HIGH項目修正 — shortcut conflict解消・AdjustmentDock最小高さ・ToolSlider幅拡大)  
-**Current Phase:** Phase 1 実装中 + MV連携ワークフロー（ComfyUI AI生成統合 E2E 完了）+ Dev Bridge First Architecture 統合完了
+**Current Phase:** UI Restore（過去実装済み機能の復元フェーズ）
+
+> **UI Restore フェーズについて:**  
+> `golden-core-main-2026-06-15` タグ時点での regression 調査完了。  
+> 過去commitで実装済みだった機能がa937467等の「UI密度復元」セッションで削除されていることを確認。  
+> 復元対象リスト: [`.claude/UI_RESTORE_TODO.md`](UI_RESTORE_TODO.md)  
+> 禁止: 新規設計 / CSP参考再設計 / リファクタ
 
 ---
 
