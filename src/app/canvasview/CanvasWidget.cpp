@@ -303,10 +303,11 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
 
   drawCheckerboard(painter, target, static_cast<int>(std::lround(std::clamp(state.zoom * 10.0, 8.0, 24.0))));
 
-  // すべてのズーム倍率でニアレストネイバー補間を使用（ピクセルパーフェクト表示）
-  // これにより低倍率でもピクセルが正確に表示される
-  painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+  // ズーム倍率 8x未満はバイリニア補間; 8x以上はニアレストネイバー（ピクセルパーフェクト）
+  const bool smooth = (state.zoom < 8.0);
+  painter.setRenderHint(QPainter::SmoothPixmapTransform, smooth);
   painter.drawImage(target, m_image);
+  painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
   // Canvas border — slightly brighter when transformed for clarity
   painter.setPen(QPen(transformed ? QColor(120, 130, 150) : QColor(72, 80, 96), 1.0));
   painter.drawRect(target.adjusted(0, 0, -1, -1));
