@@ -44,6 +44,22 @@ const SkBitmap& SkiaLayerCache::getBitmap(uint32_t layerId,
   return entry.bitmap;
 }
 
+void SkiaLayerCache::patchPixel(uint32_t layerId, int x, int y,
+                                const core::Color& c) noexcept
+{
+  auto& entry = m_cache[layerId];
+  if (entry.bitmap.width() == 0) return;  // not yet allocated — skip
+  if (!entry.bitmap.bounds().contains(x, y)) return;
+  *entry.bitmap.getAddr32(x, y) = SkColorSetARGB(c.a, c.r, c.g, c.b);
+  entry.dirty = false;  // keep clean: this patch IS the latest state
+  const uint64_t n = ++m_patchCount;
+  // Log every 500th patch to avoid flooding (brush stroke can be thousands of pixels)
+  if (n == 1 || n % 500 == 0)
+    qDebug() << "[SkiaLayerCache] PATCH  layer" << layerId
+             << "patch_count=" << n
+             << "blits_so_far=" << m_blitCount.load();
+}
+
 void SkiaLayerCache::markDirty(uint32_t layerId)
 {
   m_cache[layerId].dirty = true;

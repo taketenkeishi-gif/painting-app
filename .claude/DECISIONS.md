@@ -631,3 +631,14 @@ golden-core-main-2026-06-15 — AI/Brush/Layer/Canvas機能統合済み基盤
 backup-before-shortcut-restore — ショートカット修正前
 backup-ai-line-before-rebase   — AI機能rebase前
 ```
+
+## 2026-06-16: src/app/ui/system/ DesignSystem ヘッダー群追加
+
+**決定:** src/app/ui/system/ に DesignSystem, UiMetrics, UiMotion, UiResponsive, UiTheme ヘッダーを追加
+
+**理由:** UI テーマ・メトリクス・モーション・レスポンシブ設計の共通基盤として分離。
+ToolPanel / LayerPanel 等の UI コンポーネントが参照するデザイントークン定義。
+
+**代替案:** MainWindow.cpp に直接埋め込む（可読性が下がるため不採用）
+
+**影響範囲:** src/app/ 配下の UI コンポーネント全般（将来的に参照）

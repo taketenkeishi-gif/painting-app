@@ -1,8 +1,8 @@
 # プロジェクト状態 — Paint App
 
-**Last Updated:** 2026-06-15  
-**Latest Commit:** `6f37557` (feat(dev-bridge): Layer UI coverage追加 — LP-02〜LP-06 DEV_BRIDGE_VERIFIED)  
-**Current Phase:** UI Restore（過去実装済み機能の復元フェーズ）
+**Last Updated:** 2026-06-16  
+**Latest Commit:** `1c7595a` (checkpoint: stable ui baseline before workspace rebuild)  
+**Current Phase:** UI Restore（過去実装済み機能の復元フェーズ）+ Phase 4.2 Skia brush sync DONE
 
 > **UI Restore フェーズについて:**  
 > `golden-core-main-2026-06-15` タグ時点での regression 調査完了。  
@@ -47,6 +47,27 @@
 | **0-2. ブラシ品質向上** | `DONE` | `98f89c0` | velocity dynamics, texture grain, wet-mix, AA 描画 |
 | **0-3. ベクターレイヤー AA** | `PARTIAL` | `4a4beba` | VectorPath float 化完了、レイブプレビュー実装、ラスタライズ実装 |
 | **0-4. AA 制御実装** | `PARTIAL` | — | フラグは定義済み、UI 公開未実装 |
+
+### Phase 4 — Skia brush pipeline 最適化
+
+**進捗度:** Phase 4.1 + 4.2 DONE
+
+| 項目 | 状態 | 日付 | 詳細 |
+|---|---|---|---|
+| **4.1 SkiaLayerCache Runtime 検証** | `DONE` | 2026-06-16 | getBitmap BLIT/HIT, markDirty, invalidateAll を DebugServer で実測確認 |
+| **4.2 Skia brush sync 設計・実装** | `DONE` | 2026-06-16 | PixelWriteCb + patchPixel incremental sync。ストローク中 full blit = 0 を証明 |
+| **4.3 Skia GPU composite への切り替え** | `TODO` | — | SkSurface(GPU) への移行。現状は SkBitmap(CPU raster) |
+
+**ADR:** [ADR-002-skia-brush-sync.md](../docs/adr/ADR-002-skia-brush-sync.md)
+
+**build-skia に追加した新規ファイル:**
+- `SkiaLayerCache::patchPixel()` — pixel 単位 SkBitmap 更新
+- `SkiaLayerCache::patchCount()` — デバッグカウンター
+- `BrushTool::PixelWriteCb` / `setPixelWriteCallback()` — core 側コールバック口
+- `AppController::attachSkiaPatchCallback()` / `detachSkiaPatchCallback()` — 接続層
+- `AppController::skiaPatchActive()` — DebugServer 向け accessor
+- `initDebugActions`: `reset-skia-stats` / `brush-stroke` アクション追加
+- `/debug/skia-cache`: `patch_count` / `patch_active` フィールド追加
 
 ### Phase 1 — 標準機能の完全実装
 

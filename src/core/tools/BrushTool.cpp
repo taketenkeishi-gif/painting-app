@@ -179,11 +179,13 @@ void BrushTool::blendPixel(
   if (m_settings.eraseMode) {
     const float eraseStr = std::clamp((static_cast<float>(src.a) / 255.0f) * alphaScale, 0.0f, 1.0f);
     const float keep = 1.0f - eraseStr;
-    buffer.setPixel(x, y, Color {
+    const Color erased {
         static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.r) * keep)),
         static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.g) * keep)),
         static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.b) * keep)),
-        static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))});
+        static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))};
+    buffer.setPixel(x, y, erased);
+    if (m_pixelWriteCb) m_pixelWriteCb(x, y, erased);
     return;
   }
 
@@ -410,11 +412,13 @@ void BrushTool::blendPixel(
       break;
   }
 
-  buffer.setPixel(x, y, Color {
+  const Color blended {
       static_cast<std::uint8_t>(std::lround(std::clamp(outR, 0.0f, 1.0f) * 255.0f)),
       static_cast<std::uint8_t>(std::lround(std::clamp(outG, 0.0f, 1.0f) * 255.0f)),
       static_cast<std::uint8_t>(std::lround(std::clamp(outB, 0.0f, 1.0f) * 255.0f)),
-      static_cast<std::uint8_t>(std::lround(std::clamp(outA, 0.0f, 1.0f) * 255.0f))});
+      static_cast<std::uint8_t>(std::lround(std::clamp(outA, 0.0f, 1.0f) * 255.0f))};
+  buffer.setPixel(x, y, blended);
+  if (m_pixelWriteCb) m_pixelWriteCb(x, y, blended);
 }
 
 // ---------------------------------------------------------------

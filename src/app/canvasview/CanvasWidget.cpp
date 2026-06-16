@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <unordered_map>
 
 #include <QApplication>
@@ -1482,33 +1483,67 @@ void CanvasWidget::refreshFromController() {
   if (m_controller == nullptr) {
     return;
   }
-  const core::PixelBuffer& composited = m_controller->compositedBuffer();
+
   const std::optional<core::Rect> dirtyRect = m_controller->consumeDirtyCompositeRect();
-  const bool canPatchRegion =
-      dirtyRect.has_value() &&
-      !m_image.isNull() &&
-      m_image.width() == composited.width() &&
-      m_image.height() == composited.height();
-  if (!canPatchRegion) {
-    m_image = platform::qt::QtImageConverter::toQImage(composited);
-  } else {
-    const core::Rect dirty = *dirtyRect;
-    const int x0 = std::clamp(dirty.x, 0, composited.width());
-    const int y0 = std::clamp(dirty.y, 0, composited.height());
-    const int x1 = std::clamp(dirty.x + dirty.width, 0, composited.width());
-    const int y1 = std::clamp(dirty.y + dirty.height, 0, composited.height());
-    for (int y = y0; y < y1; ++y) {
-      auto* scanLine = m_image.scanLine(y);
-      for (int x = x0; x < x1; ++x) {
-        const core::Color color = composited.pixel(x, y);
-        const int offset = x * 4;
-        scanLine[offset + 0] = color.r;
-        scanLine[offset + 1] = color.g;
-        scanLine[offset + 2] = color.b;
-        scanLine[offset + 3] = color.a;
+  bool patchedRegion = false;
+
+  // ── Image update ──────────────────────────────────────────────────────────
+#ifdef PAINT_USE_SKIA
+  {
+    // Fast path: read QImage directly (no PixelBuffer readback)
+    const QImage& skiaImg = m_controller->compositedQImage();
+    if (!skiaImg.isNull()) {
+      const bool canPatch = dirtyRect.has_value() &&
+                            !m_image.isNull() &&
+                            m_image.size() == skiaImg.size();
+      if (!canPatch) {
+        m_image = skiaImg.copy();
+      } else {
+        const core::Rect d = *dirtyRect;
+        const int x0 = std::clamp(d.x, 0, skiaImg.width());
+        const int y0 = std::clamp(d.y, 0, skiaImg.height());
+        const int x1 = std::clamp(d.x + d.width,  0, skiaImg.width());
+        const int y1 = std::clamp(d.y + d.height, 0, skiaImg.height());
+        for (int y = y0; y < y1; ++y)
+          std::memcpy(m_image.scanLine(y)           + x0 * 4,
+                      skiaImg.constScanLine(y) + x0 * 4,
+                      static_cast<std::size_t>(x1 - x0) * 4);
+        patchedRegion = true;
+      }
+      goto shared_tail;
+    }
+  }
+#endif
+  {
+    // Original PixelBuffer path (PAINT_USE_SKIA=OFF, or QImage not yet ready)
+    const core::PixelBuffer& composited = m_controller->compositedBuffer();
+    const bool canPatch = dirtyRect.has_value() &&
+                          !m_image.isNull() &&
+                          m_image.width() == composited.width() &&
+                          m_image.height() == composited.height();
+    if (!canPatch) {
+      m_image = platform::qt::QtImageConverter::toQImage(composited);
+    } else {
+      patchedRegion = true;
+      const core::Rect dirty = *dirtyRect;
+      const int x0 = std::clamp(dirty.x, 0, composited.width());
+      const int y0 = std::clamp(dirty.y, 0, composited.height());
+      const int x1 = std::clamp(dirty.x + dirty.width,  0, composited.width());
+      const int y1 = std::clamp(dirty.y + dirty.height, 0, composited.height());
+      for (int y = y0; y < y1; ++y) {
+        auto* sl = m_image.scanLine(y);
+        for (int x = x0; x < x1; ++x) {
+          const core::Color c = composited.pixel(x, y);
+          sl[x*4+0] = c.r; sl[x*4+1] = c.g; sl[x*4+2] = c.b; sl[x*4+3] = c.a;
+        }
       }
     }
   }
+#ifdef PAINT_USE_SKIA
+shared_tail:;
+#endif
+
+  // ── Shared tail ───────────────────────────────────────────────────────────
   updateZoomStatusLabel(this);
   const auto& state = stateFor(this);
   updateCursorForState(state.hasMousePos ? mapToCanvas(state.lastMousePos) : std::optional<core::Point> {});
@@ -1522,7 +1557,7 @@ void CanvasWidget::refreshFromController() {
       m_marchingTimer->stop();
     }
   }
-  if (canPatchRegion) {
+  if (patchedRegion && dirtyRect.has_value()) {
     const core::Rect dirty = *dirtyRect;
     const QRect target = canvasRect();
     const int x = static_cast<int>(std::floor(target.x() + static_cast<double>(dirty.x) * state.zoom)) - 2;

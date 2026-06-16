@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <functional>
 #include <string_view>
 #include <vector>
 
@@ -82,6 +83,12 @@ public:
 
   const BrushSettings& settings() const noexcept { return m_settings; }
 
+  // Called after every blendPixel write with the final pixel color.
+  // Platform code wires this to SkiaLayerCache::patchPixel().
+  using PixelWriteCb = std::function<void(int x, int y, const Color& c)>;
+  void setPixelWriteCallback(PixelWriteCb cb) noexcept { m_pixelWriteCb = std::move(cb); }
+  void clearPixelWriteCallback() noexcept { m_pixelWriteCb = nullptr; }
+
   ToolKind kind() const noexcept override { return ToolKind::Brush; }
   std::string_view displayName() const noexcept override { return "Brush"; }
 
@@ -151,6 +158,8 @@ protected:
 
   /// ストローク中の選択マスク参照（hasSelection == false のとき nullptr）
   mutable const SelectionMask* m_selectionMask {nullptr};
+
+  mutable PixelWriteCb m_pixelWriteCb;
 
   // ── Dev_Bridge benchmark フック ────────────────────────────────────────────
   // stampAt() 呼び出し回数のカウンター。brush-benchmark action が使用する。

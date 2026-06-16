@@ -76,7 +76,7 @@ if(PAINT_USE_SKIA)
   )
   target_compile_definitions(paint_skia_platform PUBLIC PAINT_USE_SKIA)
   target_include_directories(paint_skia_platform PUBLIC ${PROJECT_SOURCE_DIR}/src)
-  target_link_libraries(paint_skia_platform PUBLIC paint_core unofficial::skia::skia)
+  target_link_libraries(paint_skia_platform PUBLIC paint_core unofficial::skia::skia Qt6::Gui)
   if(MSVC)
     target_compile_options(paint_skia_platform PRIVATE /utf-8)
   endif()
@@ -136,6 +136,7 @@ set(APP_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/app/bridge/MinimalWebSocket.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/app/resources/icons.qrc
   ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/MeshDeformPanel.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/app/panels/RotoBrushPanel.cpp
 )
 
 

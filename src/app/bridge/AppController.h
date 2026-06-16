@@ -203,7 +203,10 @@ public:
   explicit AppController(QObject* parent = nullptr);
 
   const core::Document& document() const noexcept { return m_document; }
-  const core::PixelBuffer& compositedBuffer() const noexcept { return m_composited; }
+  // Returns the composited PixelBuffer (used by export/AI/clipboard paths).
+  // When PAINT_USE_SKIA is active the buffer is rebuilt lazily on first call
+  // after a display-only composite; display uses compositedQImage() instead.
+  const core::PixelBuffer& compositedBuffer() const noexcept;
   const core::SelectionMask& documentSelection() const noexcept { return m_document.selection(); }
   std::uint64_t compositeRevision() const noexcept { return m_compositeRevision; }
   bool isDirty() const noexcept { return m_dirty; }
@@ -212,6 +215,9 @@ public:
 #ifdef PAINT_USE_SKIA
   const platform::skia::SkiaLayerCache& skiaLayerCache() const noexcept { return m_skiaLayerCache; }
   platform::skia::SkiaLayerCache& skiaLayerCache() noexcept { return m_skiaLayerCache; }
+  bool skiaPatchActive() const noexcept { return m_skiaPatchActive; }
+  // Fast display QImage — updated every rerenderDirty/rerender without readback.
+  const QImage& compositedQImage() const noexcept { return m_compositedImage; }
 #endif
 
   std::vector<LayerViewModel> layerViewModels() const;
@@ -819,10 +825,16 @@ private:
 #ifdef PAINT_USE_SKIA
   platform::skia::SkiaRenderer m_renderer;
   platform::skia::SkiaLayerCache m_skiaLayerCache;
+  // QImage display buffer — eagerly updated by rerenderDirty/rerender
+  QImage m_compositedImage;
+  // PixelBuffer is updated lazily (only when compositedBuffer() is called by
+  // export/AI/clipboard paths, not on every display refresh)
+  mutable core::PixelBuffer m_composited;
+  mutable bool m_compositedBufferDirty {false};
 #else
   core::Renderer m_renderer;
-#endif
   core::PixelBuffer m_composited;
+#endif
 
   core::SelectionEngine m_selectionEngine;
   core::ToolManager m_toolManager;
@@ -896,6 +908,11 @@ private:
   core::ToolKind m_activeCategoryKind {core::ToolKind::Brush};
 
   bool m_stroking {false};
+#ifdef PAINT_USE_SKIA
+  bool m_skiaPatchActive {false};
+  void attachSkiaPatchCallback();
+  void detachSkiaPatchCallback();
+#endif
   std::size_t m_layerCounter {1};
   std::optional<PendingStrokeState> m_pendingStroke;
   core::Point m_lastPointer {0, 0};

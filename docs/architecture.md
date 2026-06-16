@@ -137,3 +137,6 @@ Architecture Audit (2026-06-14) で確認された既知の技術的負債。
 - Add new sub-tools through `ToolCatalog` without touching deep UI logic.
 - Add new property controls by extending descriptor keys and `ToolPropertyPanel` bindings.
 - Current structure is prepared for future external definition loading (JSON) without changing core behavior contracts.
+
+## src/app/ui/system/ (2026-06-16)
+DesignSystem ヘッダー群 (DesignSystem.h / UiMetrics.h / UiMotion.h / UiResponsive.h / UiTheme.h) を追加。UI テーマ・スペーシング・モーション定数の共通基盤。

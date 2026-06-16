@@ -8,6 +8,8 @@
 
 #ifdef PAINT_USE_SKIA
 
+#include <QImage>
+
 #include "core/buffer/PixelBuffer.h"
 #include "core/common/Rect.h"
 #include "core/document/Document.h"
@@ -32,6 +34,14 @@ public:
   void compositeInto(const core::Document& document,
                      core::PixelBuffer& target,
                      const core::Rect& dirtyRect) const;
+
+  // Fast display path: composite dirty rect directly into a QImage.
+  // Skips the SkBitmap→PixelBuffer readback; saves one O(W×H) copy per frame.
+  // target is resized/reallocated if it doesn't match the canvas dimensions.
+  // Format is always QImage::Format_RGBA8888.
+  void compositeIntoQImage(const core::Document& document,
+                            QImage& target,
+                            const core::Rect& dirtyRect) const;
 
 private:
   SkiaLayerCache* m_cache {nullptr};

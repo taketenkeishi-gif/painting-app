@@ -6129,9 +6129,20 @@ static void overlayQuickMask(core::PixelBuffer& dst, const core::Layer& qmLayer,
   }
 }
 
+const core::PixelBuffer& AppController::compositedBuffer() const noexcept {
+#ifdef PAINT_USE_SKIA
+  if (m_compositedBufferDirty) {
+    m_composited = m_renderer.composite(m_document);
+    m_compositedBufferDirty = false;
+  }
+#endif
+  return m_composited;
+}
+
 void AppController::rerender() {
 #ifdef PAINT_USE_SKIA
   m_skiaLayerCache.invalidateAll();
+  m_compositedBufferDirty = true;
 #endif
   m_composited = m_renderer.composite(m_document);
   if (m_quickMaskMode && m_quickMaskLayer) {

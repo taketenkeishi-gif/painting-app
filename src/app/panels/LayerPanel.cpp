@@ -35,8 +35,10 @@
 #include <QStyle>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QDataStream>
 #include <QDropEvent>
 #include <QListWidgetItem>
+#include <QMimeData>
 
 #include "app/bridge/AppController.h"
 #include "app/ui/IconLoader.h"
@@ -184,8 +186,25 @@ QIcon layerThumbnailIcon(
       painter.drawLine(QPointF(3.0, thumbH - 4.0), QPointF(thumbW - 3.0, 3.5));
       painter.end();
     } else if (layer.kind() == core::LayerKind::Folder) {
+      // フォルダ形状アイコン（タブ付きファイルフォルダ）
       QPainter painter(&image);
-      painter.fillRect(QRect(1, 2, thumbW - 2, thumbH - 4), QColor(102, 118, 142, 80));
+      painter.setRenderHint(QPainter::Antialiasing, false);
+      // タブ部分（左上の小さな突起）
+      const QColor tabColor(120, 90, 32, 240);
+      const QColor bodyColor(96, 72, 24, 240);
+      const QColor shineColor(155, 120, 48, 200);
+      const QColor borderColor(48, 36, 10, 220);
+      painter.fillRect(QRect(2, 2, 13, 4), tabColor);
+      painter.fillRect(QRect(14, 4, thumbW - 5, 1), tabColor);  // タブと本体の継ぎ目
+      // 本体
+      painter.fillRect(QRect(2, 5, thumbW - 4, thumbH - 8), bodyColor);
+      // 内側ハイライトライン（立体感）
+      painter.fillRect(QRect(3, 6, thumbW - 6, 1), shineColor);
+      // 輪郭
+      painter.setPen(QPen(borderColor, 1));
+      painter.setBrush(Qt::NoBrush);
+      painter.drawRect(QRect(2, 5, thumbW - 5, thumbH - 9));
+      painter.drawRect(QRect(2, 2, 12, 3));
       painter.end();
     }
   }
@@ -402,7 +421,8 @@ QRect layerStatusRect(const QRect& rect) {
 struct LayerRowRects {
   QRect content;    // インデント後の全コンテンツ領域
   QRect indent;     // 深さインデント帯 (depth=0 なら zero-width)
-  QRect eye;        // 表示アイコン（左ゾーン1）
+  QRect expand;     // フォルダ展開/折りたたみ三角スロット（常に確保）
+  QRect eye;        // 表示アイコン（左ゾーン）
   QRect thumb;      // サムネイル
   QRect mask;       // マスクサムネイル（isNull() = マスクなし）
   QRect name;       // 名前テキスト領域
@@ -419,6 +439,11 @@ LayerRowRects computeRowRects(const QRect& itemRect, int depth, bool hasMask) {
 
   const int cy = itemRect.top() + itemRect.height() / 2;
   int x = r.content.left() + 2;  // 2px left margin
+
+  // ── 左ゾーン: expand triangle（フォルダ展開/折りたたみ）─────────────────────
+  const int expandS = DS::layer::kExpandSlotW;          // 12px
+  r.expand = QRect(x, cy - expandS / 2, expandS, expandS);
+  x += expandS + 2;
 
   // ── 左ゾーン: eye ───────────────────────────────────────────────────────────
   const int eyeS  = DS::icon::kMedium;                 // 16px
@@ -523,25 +548,31 @@ QString layerPaintName(const QModelIndex& index) {
       painter->fillRect(QRect(rr.thumb.left() - 3, rr.thumb.top(), 2, rr.thumb.height()), clipSecondary);
     }
 
-    // ── 左ゾーン 1: 目玉アイコン（表示/非表示）─────────────────────────────
+    // ── フォルダ行: 薄い背景色で区別 ─────────────────────────────────────────
+    if (kind == core::LayerKind::Folder && !active && !selected) {
+      QColor folderRowTint(60, 48, 20, 18);
+      painter->fillRect(rect, folderRowTint);
+    }
+
+    // ── 左ゾーン: expand triangle（フォルダのみ有効）────────────────────────
+    if (kind == core::LayerKind::Folder) {
+      const bool expanded = index.data(kExpandedRole).toBool();
+      QFont expandFont = painter->font();
+      expandFont.setPixelSize(10);
+      painter->setFont(expandFont);
+      painter->setPen(QColor(DS::layer::kChevron));
+      painter->drawText(rr.expand, Qt::AlignCenter,
+                        expanded ? QStringLiteral("▼") : QStringLiteral("▶"));
+    }
+
+    // ── 左ゾーン: 目玉アイコン（表示/非表示）─────────────────────────────────
     const QIcon eyeIcon = visible ? app::ui::icon(QStringLiteral("visibility"))
                                   : app::ui::icon(QStringLiteral("visibility_off"));
     eyeIcon.paint(painter, rr.eye, Qt::AlignCenter, QIcon::Normal);
 
-        // ── 中央: メインサムネイル───────────────────────────────────────────────
+    // ── 中央: メインサムネイル───────────────────────────────────────────────
     const QIcon thumbnail = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
     thumbnail.paint(painter, rr.thumb, Qt::AlignCenter, QIcon::Normal);
-
-    // フォルダ展開/折りたたみ chevron をサムネイル右下にオーバーレイ
-    if (kind == core::LayerKind::Folder) {
-      const bool expanded = index.data(kExpandedRole).toBool();
-      QFont chFont = painter->font();
-      chFont.setPointSize(6);
-      painter->setFont(chFont);
-      painter->setPen(QColor(DS::layer::kChevron));
-      const QRect badge(rr.thumb.right() - 10, rr.thumb.bottom() - 10, 10, 10);
-      painter->drawText(badge, Qt::AlignCenter, expanded ? QStringLiteral("▼") : QStringLiteral("▶"));
-    }
     // サムネイル枠（編集中は青ハイライト）
     painter->setBrush(Qt::NoBrush);
     if (editingImage && !isPaper) {
@@ -644,10 +675,10 @@ QString layerPaintName(const QModelIndex& index) {
           return true;
         }
 
-        // フォルダ展開/折りたたみ（chevron スロット または thumb クリック）
+        // フォルダ展開/折りたたみ（expand スロット または thumb クリック）
         const auto ekind = static_cast<core::LayerKind>(index.data(kKindRole).toInt());
         if (ekind == core::LayerKind::Folder &&
-            rr.thumb.contains(pos)) {
+            (rr.expand.contains(pos) || rr.thumb.contains(pos))) {
           model->setData(index, true, kExpandToggleRole);
           return true;
         }
@@ -730,26 +761,99 @@ public:
   std::function<bool(int fromRow, uint32_t targetFolderId)> onFolderDrop;
 
 protected:
-  void dropEvent(QDropEvent* e) override {
+  int m_dropFolderRow = -1;  // ドラッグ中にハイライトするフォルダ行（-1=なし）
+
+  // MIME データからドラッグ元の行番号を取得（InternalMove 時は常にこちらが信頼できる）
+  int sourceRowFromMime(const QMimeData* mime) const {
+    if (mime == nullptr) return -1;
+    const QString fmt = QStringLiteral("application/x-qabstractitemmodeldatalist");
+    if (!mime->hasFormat(fmt)) return -1;
+    QByteArray data = mime->data(fmt);
+    QDataStream stream(&data, QIODevice::ReadOnly);
+    if (stream.atEnd()) return -1;
+    int r = -1, c = -1;
+    QMap<int, QVariant> v;
+    stream >> r >> c >> v;
+    return r;
+  }
+
+  void dragMoveEvent(QDragMoveEvent* e) override {
     const QPoint pos = e->position().toPoint();
     QListWidgetItem* targetItem = itemAt(pos);
+    int newDropRow = -1;
+
     if (targetItem != nullptr) {
+      const QRect itemRect = visualItemRect(targetItem);
+      const int margin = itemRect.height() / 5;
+      const bool onCenter = (pos.y() >= itemRect.top() + margin &&
+                             pos.y() <= itemRect.bottom() - margin);
+      if (onCenter) {
+        const auto kind = static_cast<core::LayerKind>(targetItem->data(kKindRole).toInt());
+        if (kind == core::LayerKind::Folder) {
+          newDropRow = row(targetItem);
+        }
+      }
+    }
+
+    if (newDropRow != m_dropFolderRow) {
+      m_dropFolderRow = newDropRow;
+      viewport()->update();
+    }
+    QListWidget::dragMoveEvent(e);
+  }
+
+  void dragLeaveEvent(QDragLeaveEvent* e) override {
+    m_dropFolderRow = -1;
+    viewport()->update();
+    QListWidget::dragLeaveEvent(e);
+  }
+
+  void paintEvent(QPaintEvent* e) override {
+    QListWidget::paintEvent(e);
+    // フォルダドロップターゲットを青枠でハイライト
+    if (m_dropFolderRow >= 0) {
+      QListWidgetItem* item = this->item(m_dropFolderRow);
+      if (item != nullptr) {
+        QPainter painter(viewport());
+        const QRect r = visualItemRect(item).adjusted(1, 1, -2, -2);
+        QColor fillColor(0x24, 0x31, 0x42);  // kListDropBg #243142
+        fillColor.setAlpha(50);
+        painter.fillRect(r, fillColor);
+        painter.setPen(QPen(QColor(0x7f, 0xb3, 0xff), 2));  // kListDropBorder #7fb3ff
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(r);
+      }
+    }
+  }
+
+  void dropEvent(QDropEvent* e) override {
+    const QPoint pos = e->position().toPoint();
+    m_dropFolderRow = -1;
+    viewport()->update();
+
+    QListWidgetItem* targetItem = itemAt(pos);
+    if (targetItem != nullptr && onFolderDrop) {
       const QRect itemRect = visualItemRect(targetItem);
       const int margin = itemRect.height() / 5;
       const bool onItemCenter = (pos.y() >= itemRect.top() + margin &&
                                  pos.y() <= itemRect.bottom() - margin);
       if (onItemCenter) {
         const auto kind = static_cast<core::LayerKind>(targetItem->data(kKindRole).toInt());
-        if (kind == core::LayerKind::Folder && onFolderDrop) {
-          const QList<QListWidgetItem*> sel = selectedItems();
-          if (!sel.isEmpty()) {
-            const int fromRow = row(sel.first());
-            const int toRow   = row(targetItem);
+        if (kind == core::LayerKind::Folder) {
+          // MIME データから取得（selectedItems() より信頼性が高い）
+          int fromRow = sourceRowFromMime(e->mimeData());
+          if (fromRow < 0) {
+            const QList<QListWidgetItem*> sel = selectedItems();
+            if (!sel.isEmpty()) fromRow = row(sel.first());
+          }
+          if (fromRow >= 0) {
+            const int toRow = row(targetItem);
             if (fromRow != toRow) {
               const uint32_t folderId = static_cast<uint32_t>(targetItem->data(kLayerIdRole).toUInt());
-              onFolderDrop(fromRow, folderId);
-              e->acceptProposedAction();
-              return;
+              if (onFolderDrop(fromRow, folderId)) {
+                e->acceptProposedAction();
+                return;
+              }
             }
           }
         }

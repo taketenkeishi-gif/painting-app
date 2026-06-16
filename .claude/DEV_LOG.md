@@ -52,8 +52,76 @@
 
 ### 次のアクション
 
-- [ ] Phase 4.3: SkSurface(GPU) composite への移行（現状は SkBitmap CPU raster）
+- [x] Phase 4.3: 表示経路 SkBitmap→PixelBuffer readback 削除 → **完了（下記）**
 - [ ] UI Restore フェーズの継続（CW-01 目視確認など）
+
+---
+
+## 2026-06-16 — Phase 4.3: 表示経路コピー削減（SkBitmap→QImage fast path）
+
+### 作業内容
+
+#### Phase 4.3: 設計レビュー
+
+採用方式: **SkBitmap→QImage 直接コピー**（中間 PixelBuffer readback を削除）
+
+検討・却下した方式:
+- GPU SkSurface → `makeImageSnapshot()` → QPixmap: Qt6 QOpenGL 初期化が必要。現状 QWidget ベースで導入コスト高すぎ → **却下**
+- QOpenGLWidget 化: canvasview の大規模リファクタ → **禁止（scope外）**
+- QImage キャッシュのみ: PixelBuffer との sync が複雑化 → **却下（lazy rebuild 方式に統合）**
+
+#### Phase 4.3: 実装
+
+**SkiaRenderer (`src/platform/skia/`)**
+- `compositeIntoQImage(document, QImage&, dirtyRect)` 追加
+- compositeInto() と同じ layer blend ループ、最後の readback を `SkColorGetR/G/B/A → QImage::Format_RGBA8888` に変更
+- `src/CMakeLists.txt`: `paint_skia_platform` に `Qt6::Gui` 追加
+
+**AppController (`src/app/bridge/`)**
+- `m_compositedImage` (QImage) 追加
+- `m_composited` / `m_compositedBufferDirty` を mutable に変更（lazy rebuild）
+- `compositedBuffer()`: lazy rebuild（PAINT_USE_SKIA 時は dirty フラグ管理）
+- `compositedQImage() const noexcept` 追加
+- `rerender()`: 通常パスは `compositeIntoQImage()` → m_compositedImage に直書き; quickmask のみ PixelBuffer 経由
+- `rerenderDirty()`: 通常パスは `compositeIntoQImage()` dirtyRect 更新; size guard を `m_compositedImage.width()` に変更
+
+**CanvasWidget (`src/app/canvasview/`)**
+- `refreshFromController()`: `compositedQImage()` 読み取り → memcpy でスキャンライン patch
+- `goto shared_tail` パターンで SKIA fast path と PixelBuffer fallback の共通後処理を共有
+
+#### Runtime 検証（RUNTIME_VERIFIED）
+
+| 測定 | blit_count | hit_count | patch_count |
+|------|-----------|-----------|-------------|
+| reset-skia-stats | 0 | 0 | 0 |
+| brush-stroke (50,50)→(250,150) | **1** | 33 | 3059 |
+| undo | 4 | 36 | 3059 |
+| redo | 7 | 39 | 3059 |
+| brush-stroke (300,100)→(400,200) | **1** | 33 | 1972 |
+
+`blit_count=1` per stroke（endStroke commit のみ）。ストローク中の SkBitmap→PixelBuffer readback = **0回**。
+
+`compositeIntoQImage()` 経由の表示更新は blit_count に計上されないことも確認
+（= PixelBuffer readback ではなく QImage への直接書き込みが動いている証拠）。
+
+### 完了項目
+
+- ✅ Phase 4.3: `compositeIntoQImage()` 実装
+- ✅ Phase 4.3: lazy PixelBuffer（mutable + dirty flag）
+- ✅ Phase 4.3: CanvasWidget fast path（goto shared_tail）
+- ✅ CMakeLists.txt: Qt6::Gui リンク追加
+- ✅ RUNTIME_VERIFIED: blit_count=1/stroke（2ストローク計測）
+
+### 未確認項目（ユーザー目視確認待ち）
+
+- [ ] 表示出力の一致（色化け・アーティファクトなし）
+- [ ] レイヤーブレンドモード（Multiply / Screen 等）の正常動作
+- [ ] PAINT_USE_SKIA=OFF ビルド（standard build/ の動作維持）
+
+### 次のアクション
+
+- ユーザー目視確認後: git commit
+- Phase 4.3 完了後: GPU composite（SkSurface）検討、または UI Restore フェーズへ
 
 ---
 
