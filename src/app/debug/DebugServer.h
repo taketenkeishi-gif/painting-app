@@ -49,6 +49,7 @@ private:
 
     // Endpoint handlers
     QByteArray endpointHealth();
+    QByteArray endpointRuntimeIdentity();  // /runtime/identity — process_id + exe + commit
     QByteArray endpointState();
     QByteArray endpointAiState();
     QByteArray endpointPixels(int size);

@@ -5,6 +5,8 @@
 #include "app/bridge/AppController.h"
 
 #include <QApplication>
+#include <QCoreApplication>
+#include <QDir>
 #include <QTcpSocket>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -107,7 +109,8 @@ void DebugServer::handleRequest(QTcpSocket* socket, const QByteArray& raw) {
 }
 
 QByteArray DebugServer::routeGet(const QString& path, const QString& query) {
-    if (path == QLatin1String("/debug/health"))       return endpointHealth();
+    if (path == QLatin1String("/debug/health"))        return endpointHealth();
+    if (path == QLatin1String("/runtime/identity"))   return endpointRuntimeIdentity();
     if (path == QLatin1String("/debug/state"))        return endpointState();
     if (path == QLatin1String("/debug/ai-state"))     return endpointAiState();
     if (path == QLatin1String("/debug/widget-tree"))  return endpointWidgetTree();
@@ -158,6 +161,21 @@ QByteArray DebugServer::endpointHealth() {
     obj[QLatin1String("executablePath")] = s.executablePath;
     obj[QLatin1String("buildConfig")]    = s.buildConfig;
     obj[QLatin1String("gitCommit")]      = s.gitCommit;
+    return okJson(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+// ── Endpoint: /runtime/identity ─────────────────────────────────────────────
+// Dev_Bridge fingerprint() expects snake_case field names.
+
+QByteArray DebugServer::endpointRuntimeIdentity() {
+    const app::bridge::AppController::DebugState s = m_controller->debugState();
+    QJsonObject obj;
+    obj[QLatin1String("running_exe_path")] = s.executablePath;
+    obj[QLatin1String("compiled_commit")]  = s.gitCommit;
+    obj[QLatin1String("build_timestamp")]  = s.buildTimestamp;
+    obj[QLatin1String("process_id")]       = static_cast<qint64>(QCoreApplication::applicationPid());
+    obj[QLatin1String("working_dir")]      = QDir::currentPath();
+    obj[QLatin1String("build_config")]     = s.buildConfig;
     return okJson(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
 
@@ -687,9 +705,11 @@ QByteArray DebugServer::endpointSkiaCache() {
     QJsonObject obj;
 #ifdef PAINT_USE_SKIA
     const auto& cache = m_controller->skiaLayerCache();
-    obj[QLatin1String("enabled")]    = true;
-    obj[QLatin1String("blit_count")] = static_cast<qint64>(cache.blitCount());
-    obj[QLatin1String("hit_count")]  = static_cast<qint64>(cache.hitCount());
+    obj[QLatin1String("enabled")]      = true;
+    obj[QLatin1String("blit_count")]   = static_cast<qint64>(cache.blitCount());
+    obj[QLatin1String("hit_count")]    = static_cast<qint64>(cache.hitCount());
+    obj[QLatin1String("patch_count")]  = static_cast<qint64>(cache.patchCount());
+    obj[QLatin1String("patch_active")] = m_controller->skiaPatchActive();
 #else
     obj[QLatin1String("enabled")]    = false;
     obj[QLatin1String("blit_count")] = 0;
