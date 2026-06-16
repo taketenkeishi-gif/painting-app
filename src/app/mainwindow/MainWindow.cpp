@@ -170,7 +170,7 @@ public:
   explicit DockTitleBar(const QString& title, QDockWidget* dock)
       : QWidget(dock), m_dock(dock), m_ownTitle(title)
   {
-    setFixedHeight(22);
+    setFixedHeight(17);
     setMouseTracking(true);
     // QDockWidget のイベントフィルタがドラッグを検知できるよう
     // このウィジェット自身はマウスイベントを素通しさせる
@@ -185,7 +185,7 @@ public:
     // QDockWidget event filter picks them up → dock-drag mode (shows drop
     // indicators, allows re-docking). DO NOT consume events here.
     m_grip = new QWidget(this);
-    m_grip->setFixedSize(14, 22);
+    m_grip->setFixedSize(14, 17);
     m_grip->setAttribute(Qt::WA_TransparentForMouseEvents, true);
     m_layout->addWidget(m_grip);
 
@@ -201,7 +201,7 @@ public:
 
     // ── Float button ──────────────────────────────────────────────────
     m_floatBtn = new QPushButton("⧉", this);
-    m_floatBtn->setFixedSize(20, 22);
+    m_floatBtn->setFixedSize(20, 17);
     m_floatBtn->setFlat(true);
     m_floatBtn->setFocusPolicy(Qt::NoFocus);
     m_floatBtn->setToolTip("フロート / ドック切替");
@@ -214,7 +214,7 @@ public:
 
     // ── Close button ──────────────────────────────────────────────────
     m_closeBtn = new QPushButton("×", this);
-    m_closeBtn->setFixedSize(20, 22);
+    m_closeBtn->setFixedSize(20, 17);
     m_closeBtn->setFlat(true);
     m_closeBtn->setFocusPolicy(Qt::NoFocus);
     m_closeBtn->setToolTip("閉じる");
@@ -265,7 +265,7 @@ public:
       auto* btn = new QPushButton(sib->windowTitle(), this);
       btn->setFlat(true);
       btn->setFocusPolicy(Qt::NoFocus);
-      btn->setFixedHeight(22);
+      btn->setFixedHeight(17);
       btn->setMinimumWidth(0);   // allow shrinking below text width
       btn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
       applyTabStyle(btn, sib == m_dock);
@@ -1184,13 +1184,12 @@ void MainWindow::setupShellLayout() {
   m_colorDock->raise();
 
   // ── Right dock area ────────────────────────────────────────────────────────
-  // All three panels tabified together — same pattern as MinimalDockTest.
-  // No vertical split: splitDockWidget after tabifyDockWidget breaks drop-zone detection.
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
   addDockWidget(Qt::RightDockWidgetArea, m_infoDock);
   tabifyDockWidget(m_layerDock, m_aiDock);
-  tabifyDockWidget(m_layerDock, m_infoDock);
+  splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
+  resizeDocks({m_layerDock, m_infoDock}, {620, 210}, Qt::Vertical);
 
   // ── 最初のドキュメント ────────────────────────────────────────────────────
   {
@@ -2062,12 +2061,26 @@ void MainWindow::createToolBar() {
 }
 
 void MainWindow::adjustRightDockLayout() {
-  // No-op: right docks are now fully tabified (no vertical split).
-  // Removed resizeDocks/setMaximumHeight calls that interfered with dock drag.
+  if (m_layerDock == nullptr || m_infoDock == nullptr) {
+    return;
+  }
+
+  const int availableHeight = std::max(240, height() - menuBar()->height() - statusBar()->height());
+  if (availableHeight < 680) {
+    m_infoDock->setMaximumHeight(150);
+    resizeDocks({m_layerDock, m_infoDock}, {availableHeight - 160, 140}, Qt::Vertical);
+  } else {
+    m_infoDock->setMaximumHeight(QWIDGETSIZE_MAX);
+    resizeDocks({m_layerDock, m_infoDock},
+                {static_cast<int>(availableHeight * 0.72),
+                 static_cast<int>(availableHeight * 0.28)},
+                Qt::Vertical);
+  }
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
   QMainWindow::resizeEvent(event);
+  adjustRightDockLayout();
   relayoutColorHistoryGrid();
 }
 

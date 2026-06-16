@@ -67,11 +67,11 @@ constexpr int kExpandToggleRole= Qt::UserRole + 19;  ///< デリゲート→パ�
 constexpr int kEffVisibleRole  = Qt::UserRole + 20;  ///< 親チェーン込みの effective visibility
 constexpr int kIndentWidth    = 16;                 ///< 深さ1段あたりのインデント幅（px）
 
-constexpr int kLayerRowHeight = 32;
+constexpr int kLayerRowHeight = 28;
 constexpr int kLayerThumbWidth = 34;
-constexpr int kLayerThumbHeight = 26;
+constexpr int kLayerThumbHeight = 22;
 constexpr int kMaskThumbWidth = 26;
-constexpr int kMaskThumbHeight = 26;
+constexpr int kMaskThumbHeight = 22;
 constexpr int kThumbGap = 3;
 constexpr int kVisibilitySlotWidth = 20;
 constexpr int kActiveSlotWidth = 16;
@@ -704,16 +704,14 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
   m_layerList->setDefaultDropAction(Qt::MoveAction);
   m_layerList->setContextMenuPolicy(Qt::CustomContextMenu);
-  m_layerList->setSpacing(0);
+  m_layerList->setSpacing(1);
   m_layerList->setUniformItemSizes(true);
   m_layerList->setItemDelegate(new LayerItemDelegate(m_layerList));
   m_layerList->setMinimumHeight(140);
   m_layerList->setStyleSheet(
-      "QListWidget { background: #13151c; border: none; border-top: 1px solid #2a2e3e; outline: none; }"
-      "QListWidget::item { min-height: 28px; padding: 2px 6px; border-bottom: 1px solid #1e2230; }"
-      "QListWidget::item:hover { background: #272c3c; }"
-      "QListWidget::item:selected { background: #1d3a7a; color: #edf0f9; border-left: 2px solid #4e8ef7; }"
-      "QListWidget::item:drop { border-top: 2px solid #4e8ef7; background: #1e2a4a; }"
+      "QListWidget::item { min-height: 26px; padding: 2px 4px; border-bottom: 1px solid #313844; }"
+      "QListWidget::item:selected { background: #2e4f79; color: #ffffff; }"
+      "QListWidget::item:drop { border-top: 2px solid #7fb3ff; background: #243142; }"
       "QListWidget::indicator { width: 14px; height: 14px; }"
       "QListWidget::indicator:checked { image: url(:/icons/16/visibility.svg); }"
       "QListWidget::indicator:unchecked { image: url(:/icons/16/visibility_off.svg); }");
@@ -805,14 +803,14 @@ LayerPanel::LayerPanel(QWidget* parent)
         "QPushButton {"
         " margin: 0px;"
         " padding: 0px;"
-        " border: 1px solid #2a2e3e;"
-        " border-radius: 4px;"
-        " background: #272c3c;"
-        " color: #c5cde0;"
+        " border: 1px solid #3a4658;"
+        " border-radius: 3px;"
+        " background: #202a36;"
+        " color: #d8e2f0;"
         "}"
-        "QPushButton:hover { background: #2f3447; border-color: #4a5370; color: #edf0f9; }"
-        "QPushButton:pressed { background: #1d3a7a; border-color: #4e8ef7; color: #edf0f9; }"
-        "QPushButton:disabled { color: #4a5268; border-color: #252a38; background: #1a1d27; }"));
+        "QPushButton:hover { background: #263446; border-color: #55708f; }"
+        "QPushButton:pressed { background: #2e4f79; border-color: #7fb3ff; }"
+        "QPushButton:disabled { color: #5f6b7a; border-color: #2c3542; background: #18212c; }"));
   };
 
   for (QPushButton* button : QList<QPushButton*> {
@@ -843,7 +841,7 @@ LayerPanel::LayerPanel(QWidget* parent)
         "QGroupBox {"
         " margin-top: 12px;"
         " padding: 5px 4px 4px 4px;"
-        " border: 1px solid #2a2e3e;"
+        " border: 1px solid #354052;"
         " border-radius: 4px;"
         " background: transparent;"
         "}"
@@ -852,16 +850,13 @@ LayerPanel::LayerPanel(QWidget* parent)
         " subcontrol-position: top left;"
         " left: 6px;"
         " padding: 0px 3px;"
-        " color: #5a6480;"
-        " font-size: 10px;"
-        " font-weight: 700;"
-        " letter-spacing: 0.5px;"
+        " color: #d8e2f0;"
         "}"));
 
     grid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    grid->setContentsMargins(4, 3, 4, 4);
-    grid->setHorizontalSpacing(4);
-    grid->setVerticalSpacing(4);
+    grid->setContentsMargins(2, 2, 2, 2);
+    grid->setHorizontalSpacing(3);
+    grid->setVerticalSpacing(3);
     for (int col = 0; col < 8; ++col) {
       grid->setColumnStretch(col, 0);
     }
