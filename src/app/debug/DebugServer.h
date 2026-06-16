@@ -49,6 +49,7 @@ private:
 
     // Endpoint handlers
     QByteArray endpointHealth();
+    QByteArray endpointScreenshot();       // /debug/screenshot — full window PNG as base64
     QByteArray endpointRuntimeIdentity();  // /runtime/identity — process_id + exe + commit
     QByteArray endpointState();
     QByteArray endpointAiState();

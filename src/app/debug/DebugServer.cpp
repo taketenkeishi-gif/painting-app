@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <QImage>
 #include <QBuffer>
+#include <QPixmap>
 #include <QDebug>
 #include <QAbstractSlider>
 #include <QAction>
@@ -110,6 +111,7 @@ void DebugServer::handleRequest(QTcpSocket* socket, const QByteArray& raw) {
 
 QByteArray DebugServer::routeGet(const QString& path, const QString& query) {
     if (path == QLatin1String("/debug/health"))        return endpointHealth();
+    if (path == QLatin1String("/debug/screenshot"))   return endpointScreenshot();
     if (path == QLatin1String("/runtime/identity"))   return endpointRuntimeIdentity();
     if (path == QLatin1String("/debug/state"))        return endpointState();
     if (path == QLatin1String("/debug/ai-state"))     return endpointAiState();
@@ -154,13 +156,42 @@ QByteArray DebugServer::routePost(const QString& path, const QByteArray& body) {
 QByteArray DebugServer::endpointHealth() {
     const app::bridge::AppController::DebugState s = m_controller->debugState();
     QJsonObject obj;
-    obj[QLatin1String("running")]        = true;
-    obj[QLatin1String("version")]        = QLatin1String("1.0");
-    obj[QLatin1String("appName")]        = QLatin1String("LayeredPaint");
-    obj[QLatin1String("buildTimestamp")] = s.buildTimestamp;
-    obj[QLatin1String("executablePath")] = s.executablePath;
-    obj[QLatin1String("buildConfig")]    = s.buildConfig;
-    obj[QLatin1String("gitCommit")]      = s.gitCommit;
+    obj[QLatin1String("running")]          = true;
+    obj[QLatin1String("version")]          = QLatin1String("1.0");
+    obj[QLatin1String("appName")]          = QLatin1String("LayeredPaint");
+    obj[QLatin1String("buildTimestamp")]   = s.buildTimestamp;
+    obj[QLatin1String("executablePath")]   = s.executablePath;
+    obj[QLatin1String("buildConfig")]      = s.buildConfig;
+    obj[QLatin1String("gitCommit")]        = s.gitCommit;
+    // snake_case aliases — required by Dev_Bridge fingerprint() fallback path
+    obj[QLatin1String("process_id")]       = static_cast<qint64>(QCoreApplication::applicationPid());
+    obj[QLatin1String("executable_path")] = s.executablePath;
+    obj[QLatin1String("git_commit")]       = s.gitCommit;
+    obj[QLatin1String("build_id")]         = s.buildTimestamp;
+    return okJson(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+// ── Endpoint: /debug/screenshot ─────────────────────────────────────────────
+// Returns { data: "<base64 PNG>" } — consumed by HttpDebugAdapter.screenshot()
+
+QByteArray DebugServer::endpointScreenshot() {
+    QWidget* mainWin = nullptr;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (qobject_cast<QMainWindow*>(w)) { mainWin = w; break; }
+    }
+    if (!mainWin) {
+        return errorJson(503, "No main window available");
+    }
+    const QPixmap px = mainWin->grab();
+    QByteArray pngBytes;
+    {
+        QBuffer buf(&pngBytes);
+        buf.open(QIODevice::WriteOnly);
+        px.save(&buf, "PNG");
+    }
+    const QByteArray b64 = pngBytes.toBase64();
+    QJsonObject obj;
+    obj[QLatin1String("data")] = QLatin1String(b64);
     return okJson(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
 
