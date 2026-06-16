@@ -1,4 +1,4 @@
-#include "app/mainwindow/MainWindow.h"
+﻿#include "app/mainwindow/MainWindow.h"
 #include <QPainter>
 #include <QPainterPath>
 
@@ -78,6 +78,7 @@
 #include "app/canvasview/CanvasWidget.h"
 // AdjustmentPropertyPanel removed — dock excluded from layout
 #include "app/panels/AiPanel.h"
+#include "app/panels/RotoBrushPanel.h"
 #include "app/ui/Theme.h"
 #include "app/panels/AiModelFolderDialog.h"
 #include "app/panels/GenerativeFillDialog.h"
@@ -662,6 +663,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_controller(new app::bridge::AppController(this)),
       m_canvasWidget(new app::canvasview::CanvasWidget(this)),
       m_aiPanel(new app::panels::AiPanel(this)),
+      m_rotoBrushPanel(new app::panels::RotoBrushPanel(m_controller, this)),
       m_layerPanel(new app::panels::LayerPanel(this)),
       m_toolPanel(new app::panels::ToolPanel(this)),
       m_quickSliderPanel(new app::panels::ToolPanel(this)),
@@ -1158,8 +1160,9 @@ void MainWindow::setupShellLayout() {
   m_colorSliderDock->setMinimumWidth(188);
   m_colorHistoryDock = makeDock("カラーヒストリー", makeScrollable(historyWidget), "ColorHistoryDock");
   m_colorHistoryDock->setMinimumWidth(188);
-  m_layerDock = makeDock("レイヤー", m_layerPanel, "LayerDock");
-  m_aiDock = makeDock("AI 生成", m_aiPanel, "AiDock");
+  m_layerDock      = makeDock("レイヤー",       m_layerPanel,      "LayerDock");
+  m_aiDock         = makeDock("AI 生成",        m_aiPanel,         "AiDock");
+  m_rotoBrushDock  = makeDock("ロトブラシ",     m_rotoBrushPanel,  "RotoBrushDock");
   m_infoDock = makeDock("情報", infoPanel, "InfoDock");
   // Native title bars are kept so Qt's dock drag/float/rearrange machinery works.
   // They are styled compact and dark via QSS in applyUiChrome().
@@ -1186,8 +1189,10 @@ void MainWindow::setupShellLayout() {
   // ── Right dock area ────────────────────────────────────────────────────────
   addDockWidget(Qt::RightDockWidgetArea, m_layerDock);
   addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
+  addDockWidget(Qt::RightDockWidgetArea, m_rotoBrushDock);
   addDockWidget(Qt::RightDockWidgetArea, m_infoDock);
   tabifyDockWidget(m_layerDock, m_aiDock);
+  tabifyDockWidget(m_aiDock, m_rotoBrushDock);
   splitDockWidget(m_layerDock, m_infoDock, Qt::Vertical);
   resizeDocks({m_layerDock, m_infoDock}, {620, 210}, Qt::Vertical);
 
@@ -1207,7 +1212,7 @@ void MainWindow::setupShellLayout() {
   const QList<QDockWidget*> allDocks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_aiDock, m_infoDock
+      m_layerDock, m_aiDock, m_rotoBrushDock, m_infoDock
   };
   for (auto* dock : allDocks) {
     if (!dock) continue;
@@ -1598,6 +1603,9 @@ void MainWindow::createMenus() {
   }
   if (m_aiDock != nullptr) {
     windowMenu->addAction(m_aiDock->toggleViewAction());
+  }
+  if (m_rotoBrushDock != nullptr) {
+    windowMenu->addAction(m_rotoBrushDock->toggleViewAction());
   }
   if (m_infoDock != nullptr) {
     windowMenu->addAction(m_infoDock->toggleViewAction());
@@ -2091,7 +2099,7 @@ void MainWindow::updateDockTitleBars() {
   const QList<QDockWidget*> docks = {
       m_toolDock, m_toolSliderDock, m_subToolDock, m_toolPropertyDock,
       m_colorDock, m_colorSliderDock, m_colorHistoryDock,
-      m_layerDock, m_aiDock, m_infoDock
+      m_layerDock, m_aiDock, m_rotoBrushDock, m_infoDock
   };
   for (auto* dock : docks) {
     if (!dock) continue;
@@ -2352,27 +2360,6 @@ void MainWindow::applyUiChrome() {
       "QSpinBox::down-arrow { image: none; width: 0; height: 0;"
       "  border-left: 4px solid transparent; border-right: 4px solid transparent;"
       "  border-top: 5px solid #7a86a3; }"
-      "QComboBox {"
-      "  background: #13151c;"
-      "  border: 1px solid #363d54;"
-      "  border-radius: 4px;"
-      "  color: #c5cde0;"
-      "  min-height: 24px;"
-      "  padding: 0 8px;"
-      "}"
-      "QComboBox:focus { border-color: #4e8ef7; }"
-      "QComboBox::drop-down { border: none; width: 20px; }"
-      "QComboBox::down-arrow {"
-      "  image: none; width: 0; height: 0;"
-      "  border-left: 4px solid transparent; border-right: 4px solid transparent;"
-      "  border-top: 5px solid #7a86a3;"
-      "}"
-      "QComboBox QAbstractItemView {"
-      "  background: #21253a; border: 1px solid #363d54; color: #c5cde0;"
-      "  selection-background-color: #1d3a7a; selection-color: #edf0f9;"
-      "  outline: none; padding: 2px;"
-      "}"
-
       // ── Check boxes ───────────────────────────────────────────────
       "QCheckBox { color: #c5cde0; spacing: 6px; }"
       "QCheckBox::indicator {"

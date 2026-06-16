@@ -43,6 +43,7 @@ class CanvasWidget;
 namespace app::panels {
 class AiPanel;
 class LayerPanel;
+class RotoBrushPanel;
 class SubToolPanel;
 class ToolPanel;
 class ToolPropertyPanel;
@@ -203,6 +204,7 @@ private:
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
   app::panels::AiPanel*         m_aiPanel         {nullptr};
+  app::panels::RotoBrushPanel*  m_rotoBrushPanel  {nullptr};
   app::panels::LayerPanel* m_layerPanel {nullptr};
   app::panels::ToolPanel* m_toolPanel {nullptr};
   app::panels::ToolPanel* m_quickSliderPanel {nullptr};
@@ -222,9 +224,10 @@ private:
   QDockWidget* m_colorDock {nullptr};
   QDockWidget* m_colorSliderDock {nullptr};
   QDockWidget* m_colorHistoryDock {nullptr};
-  QDockWidget* m_aiDock    {nullptr};
-  QDockWidget* m_layerDock {nullptr};
-  QDockWidget* m_infoDock {nullptr};
+  QDockWidget* m_aiDock         {nullptr};
+  QDockWidget* m_rotoBrushDock  {nullptr};
+  QDockWidget* m_layerDock      {nullptr};
+  QDockWidget* m_infoDock       {nullptr};
   QToolBar* m_quickToolBar {nullptr};
   QLabel* m_currentToolLabel {nullptr};
   QLabel* m_currentSubToolLabel {nullptr};

@@ -4,7 +4,82 @@
 
 ---
 
-## 2026-06-15 (最新) — UI Restore TODO 作成・Regression原因特定
+## 2026-06-16 — Phase 4.1 + 4.2: Skia brush sync 設計・実装・Runtime検証
+
+### 作業内容
+
+#### Session 1: SkiaLayerCache Runtime 検証（Phase 4.1）
+- PAINT_USE_SKIA=ON build (build-skia/) でログ観測
+- getBitmap: BLIT / HIT / markDirty / invalidateAll / evict の動作を qDebug で確認
+- `DebugServer /debug/skia-cache`: blit_count / hit_count をリアルタイム計測
+- 結論: rerenderDirty でアクティブレイヤーのみ markDirty → blit、非アクティブは HIT
+
+#### Session 2: 設計レビュー（Phase 4.2 前工程）
+- DabRenderer / BrushTool::blendPixel / SkiaLayerCache / SkiaRenderer 分析
+- SkCanvas Brush Renderer（Skia native draw）を検討 → 不採用
+  - buildup=false（strokeAccum）/ wet-mix / smear / 独自ブレンドモードを再実装不可
+- **採用方式決定: PixelBuffer Authoritative + SkBitmap Incremental Patch**
+
+#### Session 3: 実装（Phase 4.2）
+- `BrushTool::PixelWriteCb` / `setPixelWriteCallback()` を public に追加
+- `blendPixel` の erase / normal blend 両出口に `m_pixelWriteCb(x, y, blended)` 追加
+- `SkiaLayerCache::patchPixel()` 追加 — 1px だけ SkBitmap を更新、dirty=false 維持
+- `AppController::attachSkiaPatchCallback()` / `detachSkiaPatchCallback()` — beginStroke/endStroke フック
+- `rerenderDirty()` に `m_skiaPatchActive` ガード追加 — ストローク中 markDirty をスキップ
+
+**ビルドエラー修正:** PixelWriteCb が protected に入っていた → public に移動
+
+#### Session 4: Runtime 検証（Phase 4.2 完了確認）
+- `SkiaLayerCache::patchCount()` / `/debug/skia-cache` に `patch_count` / `patch_active` 追加
+- `reset-skia-stats` / `brush-stroke` debug action 追加
+- Runtime 計測結果:
+
+| 測定 | blit_count | hit_count | patch_count |
+|------|-----------|-----------|-------------|
+| brush-stroke (50,50)→(250,150) | **1** | 20 | 3059 |
+| undo | 2 | 0 | 0 |
+| redo | 2 | 0 | 0 |
+
+**完了条件達成:** ストローク中 full PixelBuffer→SkBitmap copy = **0回**
+
+### 完了項目
+
+- ✅ ADR-002-skia-brush-sync.md 作成
+- ✅ Phase 4.1: SkiaLayerCache runtime 動作確認
+- ✅ Phase 4.2: incremental patch 実装 + USER_SCENARIO_VERIFIED
+- ✅ PROJECT_STATUS.md 更新
+- ✅ DEV_LOG.md 記録
+
+### 次のアクション
+
+- [ ] Phase 4.3: SkSurface(GPU) composite への移行（現状は SkBitmap CPU raster）
+- [ ] UI Restore フェーズの継続（CW-01 目視確認など）
+
+---
+
+## 2026-06-16 (以前) — Checkpoint before LayerPanel/Canvas rebuild
+
+### 作業内容
+
+チェックポイント記録。LayerPanel / Canvas UI シェル再構築前の安定ベースラインを確保。
+
+### 確認済み状態
+
+- **Dev Bridge**: READY
+- **Runtime screenshot**: PASS
+- **Build**: PASS
+
+### コミット
+
+`1c7595a` — checkpoint: stable ui baseline before workspace rebuild
+
+### 次のアクション
+
+- UI シェルのみ再構築（core / AppController アーキテクチャは維持）
+
+---
+
+## 2026-06-15 — UI Restore TODO 作成・Regression原因特定
 
 ### 作業内容
 

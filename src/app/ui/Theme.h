@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QString>
 
@@ -155,13 +155,18 @@ inline QString globalPanelQss() {
     // ── QComboBox ─────────────────────────────────────────────────────────
     "QComboBox {"
     "  background: #1f232e; border: 1px solid #2a2e3e;"
-    "  border-radius: 3px; padding: 2px 6px;"
+    "  border-radius: 0px; padding: 2px 6px;"
     "  min-height: 22px; color: #c8ccd6;"
     "}"
     "QComboBox:hover { border-color: #3a4252; }"
     "QComboBox:focus { border-color: #4e8ef7; }"
-    "QComboBox::drop-down { border: none; width: 18px; }"
-    "QComboBox::down-arrow { width: 8px; height: 8px; }"
+    "QComboBox::drop-down { border: none; width: 20px; }"
+    "QComboBox::down-arrow {"
+    "  image: none; width: 0; height: 0;"
+    "  border-left: 4px solid transparent;"
+    "  border-right: 4px solid transparent;"
+    "  border-top: 5px solid #8890a0;"
+    "}"
     "QComboBox QAbstractItemView {"
     "  background: #1a1d26; border: 1px solid #2a2e3e;"
     "  selection-background-color: #1e5b94; color: #d4d4d4;"
