@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <string_view>
 
+#include "core/brush/StrokeProcessor.h"
 #include "core/common/FPoint.h"
 #include "core/common/Point.h"
 #include "core/layer/Layer.h"
+#include "core/selection/SelectionMask.h"
 #include "core/tools/ITool.h"
 #include "core/tools/ToolTypes.h"
 
@@ -42,7 +44,6 @@ public:
   ToolResult onWheel(ToolContext& context, int deltaSteps, const ToolPointerEvent& event) override;
 
 private:
-  FPoint applyStabilization(const FPoint& from, const FPoint& to) const;
   void eraseStroke(Layer& layer, const FPoint& from, const FPoint& to, float pressure = 1.0f);
   void eraseVectorStroke(Layer& layer, const FPoint& from, const FPoint& to) const;
   static float distancePointToSegment(FPoint p, FPoint a, FPoint b) noexcept;
@@ -70,9 +71,19 @@ private:
 
   bool m_erasing {false};
   bool m_maskEditMode {false};
+  mutable const SelectionMask* m_selectionMask {nullptr};
   FPoint m_lastPoint {0.0f, 0.0f};
   float m_lastPressure {1.0f};
-  mutable float m_distanceAccum {0.0f};
+
+  // spacing / CR 状態管理を StrokeProcessor に委譲
+  StrokeProcessor m_strokeProcessor;
+
+  // ── Dev_Bridge benchmark フック ────────────────────────────────────────────
+public:
+  void resetDebugCounters() noexcept { m_debugDabCount = 0; }
+  int  debugDabCount()      const noexcept { return m_debugDabCount; }
+private:
+  mutable int m_debugDabCount {0};
 };
 
 } // namespace core

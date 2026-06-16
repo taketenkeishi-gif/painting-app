@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <unordered_set>
 
 #include <QListWidget>
 #include <QPushButton>
@@ -56,6 +58,8 @@ private slots:
   void onBlendModeChanged(int index);
   void onFilterTextChanged(const QString& text);
   void onLayerContextMenuRequested(const QPoint& pos);
+  /// QListWidget の選択セットが変わったとき（Ctrl/Shift クリック含む）
+  void onLayerItemSelectionChanged();
 
 private:
   std::size_t layerIndexFromRow(int row) const;
@@ -92,6 +96,7 @@ private:
   bool m_compactButtons {false};
   bool m_isRefreshing {false};
   bool m_isDraggingLayer {false};
+  std::unordered_set<uint32_t> m_collapsedFolderIds; ///< 折りたたみ済みフォルダの stable ID セット
 };
 
 } // namespace app::panels

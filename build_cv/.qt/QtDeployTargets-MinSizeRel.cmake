@@ -1,0 +1,7 @@
+set(__QT_DEPLOY_TARGET_paint_core_FILE C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/MinSizeRel/paint_core.lib)
+set(__QT_DEPLOY_TARGET_paint_core_TYPE STATIC_LIBRARY)
+set(__QT_DEPLOY_TARGET_paint_qt_platform_FILE C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/MinSizeRel/paint_qt_platform.lib)
+set(__QT_DEPLOY_TARGET_paint_qt_platform_TYPE STATIC_LIBRARY)
+set(__QT_DEPLOY_TARGET_paint_app_FILE C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/MinSizeRel/LayeredPaintApp.exe)
+set(__QT_DEPLOY_TARGET_paint_app_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_paint_app_RUNTIME_DLLS C:/Qt/6.7.2/msvc2019_64/bin/Qt6Widgets.dll;C:/Qt/6.7.2/msvc2019_64/bin/Qt6Network.dll;C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/bin/opencv_photo4.dll;C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/bin/opencv_imgproc4.dll;C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/bin/opencv_core4.dll;C:/Qt/6.7.2/msvc2019_64/bin/Qt6Gui.dll;C:/Qt/6.7.2/msvc2019_64/bin/Qt6Core.dll)

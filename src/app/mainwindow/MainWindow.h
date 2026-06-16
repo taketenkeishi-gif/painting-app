@@ -6,6 +6,7 @@
 #include <QMainWindow>
 #include <QColor>
 #include <QByteArray>
+#include <QPoint>
 #include <QString>
 #include <QStringList>
 
@@ -13,15 +14,21 @@
 #include "core/tools/ToolType.h"
 
 class QAction;
+class QCloseEvent;
 class QLabel;
 class QMenu;
 class QKeySequence;
 class QDockWidget;
+class QMdiArea;
+class QMdiSubWindow;
+class QVBoxLayout;
 class QPushButton;
 class QGridLayout;
 class QSpinBox;
 class QSplitter;
 class QSlider;
+class QStackedWidget;
+class QTabBar;
 class QTabWidget;
 class QToolBar;
 class QWidget;
@@ -36,6 +43,7 @@ class CanvasWidget;
 namespace app::panels {
 class AiPanel;
 class LayerPanel;
+class RotoBrushPanel;
 class SubToolPanel;
 class ToolPanel;
 class ToolPropertyPanel;
@@ -44,14 +52,22 @@ class ColorWheelWidget;
 
 namespace app::mainwindow {
 
+class DocumentWorkspace;
+
 class MainWindow : public QMainWindow {
   Q_OBJECT
 
 public:
   explicit MainWindow(QWidget* parent = nullptr);
 
+#ifdef PAINT_DEBUG_SERVER
+  /// Expose controller pointer for DebugServer initialization in main().
+  app::bridge::AppController* controller() const noexcept { return m_controller; }
+#endif
+
 protected:
   void resizeEvent(QResizeEvent* event) override;
+  void closeEvent(QCloseEvent* event) override;
 
 private slots:
   void onNewCanvas();
@@ -64,6 +80,7 @@ private slots:
   void onSaveAsTriggered();
   void onExportPngTriggered();
   void onExportFlattenedTriggered();
+  void onExportPsdTriggered();
   void onUndoTriggered();
   void onRedoTriggered();
   void onCutTriggered();
@@ -71,6 +88,7 @@ private slots:
   void onPasteTriggered();
   void onDeletePixelsTriggered();
   void onFillTriggered();
+  void onExtractSelectionToNewLayerTriggered();
   void onSetToolTriggered();
   void onSelectAllTriggered();
   void onDeselectTriggered();
@@ -115,8 +133,30 @@ private slots:
   void onComfyUiStateChanged(bool connected);
   void onBrightnessContrastTriggered();
   void onHueSatLightTriggered();
+  void onAiUpscaleTriggered();
+  void onAiModelFolderTriggered();
+  void onAppSettingsTriggered();
 
 private:
+  // ── マルチドキュメント ──────────────────────────────────────────────────
+  struct DocumentEntry {
+    app::bridge::AppController*    controller   {nullptr};
+    QString                        filePath;
+    app::canvasview::CanvasWidget* canvasWidget  {nullptr};
+    // subWindow は FloatingDocumentWindow 使用時のみ非 nullptr
+    QMdiSubWindow*                 subWindow     {nullptr};
+  };
+  void connectController(app::bridge::AppController* ctrl);
+  void disconnectController(app::bridge::AppController* ctrl);
+  void addDocumentEntry(app::bridge::AppController* ctrl, const QString& filePath);
+  void switchToDocument(int index);
+  void closeDocumentAt(int index);
+  void updateDocumentTabLabels();
+  QString tabLabelForDocument(int index) const;
+  void checkMemoryAndWarn();
+  void connectCanvasSignals(app::canvasview::CanvasWidget* canvas);
+  void connectWorkspaceSignals(DocumentWorkspace* ws);
+  // ────────────────────────────────────────────────────────────────────────
   void setupShellLayout();
   void createMenus();
   void createToolBar();
@@ -137,6 +177,8 @@ private:
   void relayoutColorHistoryGrid();
   bool openImageFile(const QString& path);
   bool saveImageFile(const QString& path);
+  bool openLpaFile(const QString& path);
+  bool saveLpaFile(const QString& path);
   void pushRecentFile(const QString& path);
   void rebuildRecentFilesMenu();
   void rebuildWorkspaceLayoutsMenu();
@@ -148,11 +190,21 @@ private:
   void saveShortcutOverride(const QString& commandId, const QKeySequence& sequence);
   QAction* createToolAction(QMenu* toolMenu, core::ToolKind kind, const QString& text, const QKeySequence& shortcut);
   void auditUIMetrics();
+  void updateWindowTitle();
   void updateDockTitleBars();
+  void setupStatusBar();
 
+  // ── マルチドキュメント状態 ──────────────────────────────────────────────
+  std::vector<DocumentEntry> m_documents;
+  int m_activeDocIndex {-1};
+  // ────────────────────────────────────────────────────────────────────────
+  // ── ドキュメントワークスペース ──────────────────────────────────────────────
+  DocumentWorkspace*                       m_workspace {nullptr};
+  // ────────────────────────────────────────────────────────────────────────────
   app::bridge::AppController* m_controller {nullptr};
   app::canvasview::CanvasWidget* m_canvasWidget {nullptr};
-  app::panels::AiPanel*    m_aiPanel    {nullptr};
+  app::panels::AiPanel*         m_aiPanel         {nullptr};
+  app::panels::RotoBrushPanel*  m_rotoBrushPanel  {nullptr};
   app::panels::LayerPanel* m_layerPanel {nullptr};
   app::panels::ToolPanel* m_toolPanel {nullptr};
   app::panels::ToolPanel* m_quickSliderPanel {nullptr};
@@ -172,9 +224,10 @@ private:
   QDockWidget* m_colorDock {nullptr};
   QDockWidget* m_colorSliderDock {nullptr};
   QDockWidget* m_colorHistoryDock {nullptr};
-  QDockWidget* m_aiDock    {nullptr};
-  QDockWidget* m_layerDock {nullptr};
-  QDockWidget* m_infoDock {nullptr};
+  QDockWidget* m_aiDock         {nullptr};
+  QDockWidget* m_rotoBrushDock  {nullptr};
+  QDockWidget* m_layerDock      {nullptr};
+  QDockWidget* m_infoDock       {nullptr};
   QToolBar* m_quickToolBar {nullptr};
   QLabel* m_currentToolLabel {nullptr};
   QLabel* m_currentSubToolLabel {nullptr};
@@ -184,6 +237,7 @@ private:
   QLabel* m_colorStatusLabel {nullptr};
   QLabel* m_sizeStatusLabel {nullptr};
   QLabel* m_zoomStatusLabel {nullptr};
+  QLabel* m_cursorPosStatusLabel {nullptr};
   QLabel* m_activeLayerStatusLabel {nullptr};
   QLabel* m_selectionStatusLabel {nullptr};
   QLabel* m_navigatorImageLabel {nullptr};
@@ -216,6 +270,7 @@ private:
   QAction* m_saveAsAction {nullptr};
   QAction* m_exportPngAction {nullptr};
   QAction* m_exportFlattenedAction {nullptr};
+  QAction* m_exportPsdAction {nullptr};
   QAction* m_exitAction {nullptr};
   QAction* m_undoAction {nullptr};
   QAction* m_redoAction {nullptr};
@@ -225,6 +280,7 @@ private:
   QAction* m_deletePixelsAction {nullptr};
   QAction* m_fillAction {nullptr};
   QAction* m_clearAction {nullptr};
+  QAction* m_extractSelectionAction {nullptr};
   QAction* m_addLayerAction {nullptr};
   QAction* m_addRasterLayerAction {nullptr};
   QAction* m_addVectorLayerAction {nullptr};
@@ -274,23 +330,29 @@ private:
   QAction* m_transparentColorAction {nullptr};
   QAction* m_generativeFillAction   {nullptr};
   QAction* m_connectComfyUiAction   {nullptr};
+  QAction* m_aiUpscaleAction        {nullptr};
+  QAction* m_aiModelFolderAction    {nullptr};
   // 画像調整
   QAction* m_brightnessContrastAction {nullptr};
   QAction* m_hueSatLightAction        {nullptr};
   QLabel*  m_comfyUiStatusLabel    {nullptr};
   QAction* m_clearRecentFilesAction {nullptr};
+  QAction* m_appSettingsAction {nullptr};
+  QAction* m_closeDocumentAction {nullptr};
   // キャンバス表示
   QAction* m_resetRotationAction       {nullptr};
   QAction* m_mirrorViewAction          {nullptr};
   // 選択範囲
   QAction* m_expandSelectionAction     {nullptr};
   QAction* m_contractSelectionAction   {nullptr};
+  QAction* m_quickMaskAction           {nullptr};
   // フィルター
   QAction* m_gaussianBlurAction        {nullptr};
   QAction* m_motionBlurAction          {nullptr};
   // 変形
   QAction* m_transformAction           {nullptr};
   QAction* m_freeTransformAction       {nullptr};
+  QAction* m_meshDeformAction          {nullptr};
   QMenu* m_recentFilesMenu {nullptr};
   QMenu* m_workspaceLayoutsMenu {nullptr};
   std::map<core::ToolKind, QAction*> m_toolActions;

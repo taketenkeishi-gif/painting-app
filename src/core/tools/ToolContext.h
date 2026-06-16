@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "core/buffer/PixelBuffer.h"
@@ -47,10 +49,17 @@ struct ToolOverlayState {
   bool polygonClosed {false};           // draw as closed polygon vs open path
   std::vector<Point> polygonPoints;
 
-  // 多角形ラッソ: クリック頂点リスト + マウス追従線
+  // 多角形ラッソ: ベジェ対応ノードリスト + マウス追従線
+  struct PolyLassoNodeView {
+    FPoint anchor;
+    FPoint handleOut;  ///< アウトハンドル（アンカー相対）。(0,0) = コーナー
+  };
   bool hasPolyLasso {false};
-  std::vector<Point> polyLassoVertices;  // 確定頂点
-  Point polyLassoMouse {0, 0};           // 現在マウス位置
+  std::vector<PolyLassoNodeView> polyLassoNodes;   ///< 確定ノード
+  FPoint polyLassoMouse {0, 0};                    ///< 現在マウス位置
+  bool   polyLassoIsDragging   {false};            ///< ハンドルドラッグ中
+  FPoint polyLassoDragAnchor   {0, 0};             ///< ドラッグ中アンカー
+  FPoint polyLassoDragHandle   {0, 0};             ///< ドラッグ中ハンドル（アンカー相対）
 
   // ベクターストロークのライブプレビュー（描画中のみ有効）
   bool hasVectorPreview {false};
@@ -58,7 +67,43 @@ struct ToolOverlayState {
   Color vectorPreviewColor {0, 0, 0, 255};
   float vectorPreviewWidth {2.0f};
 
+  // ベクター制御点編集オーバーレイ（VectorEditTool使用中）
+  bool hasVectorEdit {false};
+  std::vector<FPoint> vectorEditPoints;        ///< 全制御点（パス順に平坦化）
+  std::vector<int>    vectorEditPointPath;     ///< 各点が属するパスインデックス
+  std::vector<bool>   vectorEditPointSelected; ///< 各点の選択状態
+
+  // テキストツール編集オーバーレイ
+  bool        hasTextEdit      {false};
+  Point       textEditOrigin   {0, 0};  ///< 配置原点（キャンバス座標）
+  std::string textEditContent;          ///< 現在入力中のテキスト
+
   OverlayCursorHint cursorHint {OverlayCursorHint::Default};
+
+  // FreeTransformTool 変形ボックス
+  bool   hasTransformBox       {false};
+  FPoint transformCorners[4]   {};   // TL TR BR BL (canvas px)
+  FPoint transformHandles[9]   {};   // 0-7: スケール, 8: 回転
+  int    transformActiveHandle {-1};
+
+  // MeshDeformTool ワイヤーフレームオーバーレイ
+  bool hasMeshDeform {false};
+  std::vector<core::FPoint> meshDeformVertices;      ///< deformed vertex positions
+  std::vector<std::array<int, 3>> meshDeformTris;    ///< triangle index triples
+  std::vector<core::FPoint> meshDeformPinCurrents;   ///< current pin positions
+  std::vector<core::FPoint> meshDeformPinOriginals;  ///< original pin positions
+  int meshDeformActivePin {-1};                      ///< highlighted pin index
+
+  // Rotoブラシ FG/BG ストロークオーバーレイ (AiSelectTool RotoBrush モード)
+  struct RotoStroke {
+    bool  isForeground {true};  ///< true=前景(緑), false=背景(赤)
+    std::vector<FPoint> points;
+  };
+  bool                    hasRotoStrokes  {false};
+  std::vector<RotoStroke> rotoStrokes;             ///< 確定済みストローク
+  std::vector<FPoint>     rotoActiveStroke;        ///< 描画中ストローク
+  bool                    rotoActiveFg   {true};   ///< 描画中ストロークが前景か
+  float                   rotoBrushRadius {8.f};   ///< 表示用ブラシ半径(px)
 };
 
 struct ToolResult {
@@ -77,6 +122,7 @@ struct ToolContext {
   int brushSize {1};
   bool maskEditMode {false};  ///< true = brush/eraser writes to layer maskBuffer (grayscale)
   SelectionEngine* selectionEngine {nullptr};  ///< 新プロバイダーパイプライン
+  Layer*           paintTarget     {nullptr};  ///< 描画先レイヤー (nullptr = activeLayer())
 };
 
 } // namespace core

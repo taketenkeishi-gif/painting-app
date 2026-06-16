@@ -14,8 +14,8 @@ const char* toolKindDisplayName(ToolKind kind) noexcept {
       return "Hand";
     case ToolKind::Zoom:
       return "Zoom";
-    case ToolKind::Line:
-      return "Line";
+    case ToolKind::Shape:
+      return "Shape";
     case ToolKind::RectSelection:
       return "Rect Selection";
     case ToolKind::MoveLayer:
@@ -26,6 +26,12 @@ const char* toolKindDisplayName(ToolKind kind) noexcept {
       return "AI Select";
     case ToolKind::Gradient:
       return "Gradient";
+    case ToolKind::FreeTransform:
+      return "Free Transform";
+    case ToolKind::VectorEdit:
+      return "Vector Edit";
+    case ToolKind::Text:
+      return "Text";
     default:
       return "Unknown";
   }

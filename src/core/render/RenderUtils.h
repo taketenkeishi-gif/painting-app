@@ -26,4 +26,10 @@ inline float brushCoverage(float dist, float hardness, float radiusPx, bool anti
   return std::exp(-5.0f * t * t);
 }
 
+// BT.601 輝度係数（HSL ブレンドモード・マスク編集で共用）
+// BrushTool::blendPixel の HSL モードと DabRenderer のマスク編集パスで使用。
+inline float luminanceBT601(float r, float g, float b) noexcept {
+  return 0.299f * r + 0.587f * g + 0.114f * b;
+}
+
 } // namespace core

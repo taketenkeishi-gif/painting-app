@@ -1,0 +1,64 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": { "ckpt_name": "animagineXLV31_v31.safetensors" }
+  },
+  "2": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["1", 1],
+      "text": "1girl, best quality, masterpiece"
+    }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["1", 1],
+      "text": "worst quality, low quality, blurry"
+    }
+  },
+  "4": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "lpa_input.png", "upload": "image" }
+  },
+  "5": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "lpa_mask.png", "upload": "image" }
+  },
+  "6": {
+    "class_type": "ImageToMask",
+    "inputs": { "image": ["5", 0], "channel": "red" }
+  },
+  "7": {
+    "class_type": "VAEEncodeForInpaint",
+    "inputs": {
+      "pixels": ["4", 0],
+      "vae": ["1", 2],
+      "mask": ["6", 0],
+      "grow_mask_by": 6
+    }
+  },
+  "8": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["1", 0],
+      "positive": ["2", 0],
+      "negative": ["3", 0],
+      "latent_image": ["7", 0],
+      "seed": 42,
+      "steps": 20,
+      "cfg": 7.0,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 0.8
+    }
+  },
+  "9": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["8", 0], "vae": ["1", 2] }
+  },
+  "10": {
+    "class_type": "SaveImage",
+    "inputs": { "images": ["9", 0], "filename_prefix": "lpa_result_" }
+  }
+}

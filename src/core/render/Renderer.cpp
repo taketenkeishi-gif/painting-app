@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 #include "core/layer/Layer.h"
@@ -419,11 +421,26 @@ static Color applyAdjustment(const AdjustmentParams& p, Color src) {
   };
 }
 
-Color applyLayerMask(const Layer& layer, int x, int y, Color src) {
+// ── オフセット対応ヘルパー ──────────────────────────────────────────────────
+
+/// バッファのローカル座標 (bx, by) で安全にピクセルを取得する。
+/// 範囲外の場合は Transparent を返す。
+inline Color sampleBuffer(const PixelBuffer& buf, int bx, int by) noexcept {
+  if (bx < 0 || by < 0 || bx >= buf.width() || by >= buf.height()) {
+    return Color::Transparent();
+  }
+  return buf.pixel(bx, by);
+}
+
+/// マスクをバッファローカル座標 (bx, by) で適用する。
+/// マスクなし → src をそのまま返す。
+/// マスクあり・範囲外 → 完全透明（Photoshop 互換: オフセット外はマスクされる）。
+Color applyLayerMask(const Layer& layer, int bx, int by, Color src) {
   if (!layer.hasMask() || !layer.maskEnabled()) {
     return src;
   }
-  const Color mask = layer.maskBuffer().pixel(x, y);
+  // マスクバッファの範囲外はアルファ=0（マスクが効いて透明）として扱う
+  const Color mask = sampleBuffer(layer.maskBuffer(), bx, by);
   const float maskAlpha = static_cast<float>(mask.a) / 255.0f;
   src.a = static_cast<std::uint8_t>(std::lround(static_cast<float>(src.a) * std::clamp(maskAlpha, 0.0f, 1.0f)));
   return src;
@@ -460,6 +477,7 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
     return;
   }
 
+  // ── ベクターレイヤー事前ラスタライズ（フォルダ内も含む全ベクターが対象）──
   std::vector<PixelBuffer> vectorRasters;
   vectorRasters.resize(document.layerCount());
   for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
@@ -471,20 +489,81 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
     rasterizeVectorLayer(layer, vectorRasters[layerIndex]);
   }
 
-  for (int y = area.y; y < area.y + area.height; ++y) {
-    for (int x = area.x; x < area.x + area.width; ++x) {
-      Color composed = document.paperVisible() ? document.paperColor() : Color::Transparent();
-      float belowAlpha = 0.0f;
+  // ── 親子マップ構築: parentId → Document インデックスリスト（昇順 = 合成順）──
+  // 昇順 = Document 配列の下から上 = レイヤースタックの下から上 = 正しい合成順序
+  std::unordered_map<uint32_t, std::vector<std::size_t>> childrenOf;
+  childrenOf.reserve(document.layerCount());
+  for (std::size_t i = 0; i < document.layerCount(); ++i) {
+    const Layer& l = document.layerAt(i);
+    if (!l.isPaperLayer()) {
+      childrenOf[l.parentId()].push_back(i);
+    }
+  }
 
-      for (std::size_t layerIndex = 0; layerIndex < document.layerCount(); ++layerIndex) {
-        const Layer& layer = document.layerAt(layerIndex);
-        if (!layer.visible() || layer.opacity() <= 0.0f || layer.kind() == LayerKind::Folder || layer.isPaperLayer()) {
+  // ── 再帰的グループ合成ヘルパー ──────────────────────────────────────────
+  //
+  // parentId の全直接子を `composed` に重ねる。
+  // `belowAlpha` はクリッピングマスク用のアルファ累積値（グループ内で独立）。
+  //
+  // フォルダレイヤーを検出したとき:
+  //   1. 子グループを透明ベース上に再帰的に合成
+  //   2. フォルダのマスク・opacity・blendMode を適用して親 `composed` に合成
+  //
+  // 通常レイヤー (Raster/Vector/Adjustment) は従来と同じロジックで処理。
+  //
+  // 注意: std::function は再帰ラムダに使えるが遅いため、
+  //       自己参照可能な struct に operator() を実装している。
+  struct GroupCompositor {
+    const Document& doc;
+    const std::vector<PixelBuffer>& vecRasters;
+    const std::unordered_map<uint32_t, std::vector<std::size_t>>& childrenOf;
+
+    void operator()(int x, int y, uint32_t parentId,
+                    Color& composed, float& belowAlpha) const {
+      const auto it = childrenOf.find(parentId);
+      if (it == childrenOf.end()) {
+        return;
+      }
+
+      for (const std::size_t idx : it->second) {
+        const Layer& layer = doc.layerAt(idx);
+        if (!layer.visible() || layer.opacity() <= 0.0f || layer.isPaperLayer()) {
           continue;
         }
 
+        // ── レイヤーローカル座標（オフセット変換）────────────────────────────
+        // キャンバス座標 (x, y) をバッファローカル座標 (bx, by) に変換する。
+        // offset = 0 のときは bx == x, by == y となり既存動作と完全に同一。
+        const int bx = x - layer.offsetX();
+        const int by = y - layer.offsetY();
+
+        // ── フォルダ ─────────────────────────────────────────────────────────
+        if (layer.kind() == LayerKind::Folder) {
+          // 子を透明バッファに合成してグループ画像を作る
+          Color groupColor = Color::Transparent();
+          float groupBelow = 0.0f;
+          (*this)(x, y, layer.id(), groupColor, groupBelow);
+
+          // フォルダ自身のマスクをグループ結果に適用（バッファローカル座標を使用）
+          groupColor = applyLayerMask(layer, bx, by, groupColor);
+
+          if (layer.clippedToBelow() && belowAlpha <= 0.0001f) {
+            continue;
+          }
+          // グループ全体をフォルダの opacity / blendMode で親に合成
+          composed = blendOver(composed, groupColor, layer.opacity(), layer.blendMode());
+          const float ga =
+              (static_cast<float>(groupColor.a) / 255.0f) *
+              std::clamp(layer.opacity(), 0.0f, 1.0f);
+          belowAlpha = ga + belowAlpha * (1.0f - ga);
+          continue;
+        }
+
+        // ── 調整レイヤー ──────────────────────────────────────────────────────
         if (layer.kind() == LayerKind::Adjustment) {
+          // マスクもバッファローカル座標で参照する。範囲外 = マスクなし扱い (alpha=0) → 適用なし
           const float maskAlpha = (layer.hasMask() && layer.maskEnabled())
-              ? static_cast<float>(layer.maskBuffer().pixel(x, y).a) / 255.0f
+              ? static_cast<float>(sampleBuffer(layer.maskBuffer(), bx, by).a) / 255.0f
               : 1.0f;
           const float t = std::clamp(layer.opacity() * maskAlpha, 0.0f, 1.0f);
           if (t > 0.0001f) {
@@ -493,27 +572,41 @@ void Renderer::compositeInto(const Document& document, PixelBuffer& target, cons
                 static_cast<std::uint8_t>(std::lround(composed.r + t * (adjusted.r - composed.r))),
                 static_cast<std::uint8_t>(std::lround(composed.g + t * (adjusted.g - composed.g))),
                 static_cast<std::uint8_t>(std::lround(composed.b + t * (adjusted.b - composed.b))),
-                composed.a
-            };
+                composed.a};
           }
           continue;
         }
 
+        // ── ラスター / ベクター ───────────────────────────────────────────────
+        // ベクターレイヤーの vectorRasters はキャンバス絶対座標で描画済みだが、
+        // オフセット分だけシフトして読み取ることで視覚的な移動を実現する。
         const PixelBuffer* sourceBuffer = &layer.buffer();
         if (layer.kind() == LayerKind::Vector) {
-          sourceBuffer = &vectorRasters[layerIndex];
+          sourceBuffer = &vecRasters[idx];
         }
-
-        Color src = sourceBuffer->pixel(x, y);
-        src = applyLayerMask(layer, x, y, src);
+        // sampleBuffer: 範囲外 = Transparent（オフセットによりはみ出した領域は透明）
+        Color src = sampleBuffer(*sourceBuffer, bx, by);
+        src = applyLayerMask(layer, bx, by, src);
         if (layer.clippedToBelow() && belowAlpha <= 0.0001f) {
           continue;
         }
         composed = blendOver(composed, src, layer.opacity(), layer.blendMode());
-        const float srcAlpha = (static_cast<float>(src.a) / 255.0f) * std::clamp(layer.opacity(), 0.0f, 1.0f);
-        belowAlpha = srcAlpha + belowAlpha * (1.0f - srcAlpha);
+        const float srcA =
+            (static_cast<float>(src.a) / 255.0f) * std::clamp(layer.opacity(), 0.0f, 1.0f);
+        belowAlpha = srcA + belowAlpha * (1.0f - srcA);
       }
+    }
+  };
 
+  const GroupCompositor compositor {document, vectorRasters, childrenOf};
+
+  // ── メインピクセルループ ──────────────────────────────────────────────────
+  for (int y = area.y; y < area.y + area.height; ++y) {
+    for (int x = area.x; x < area.x + area.width; ++x) {
+      Color composed = document.paperVisible() ? document.paperColor() : Color::Transparent();
+      float belowAlpha = 0.0f;
+      // parentId=0 = ルートグループ（フォルダに属さない全レイヤー）
+      compositor(x, y, 0, composed, belowAlpha);
       target.setPixel(x, y, composed);
     }
   }

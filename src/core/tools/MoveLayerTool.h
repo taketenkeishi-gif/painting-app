@@ -20,9 +20,12 @@ public:
   ToolOverlayState overlay() const override;
 
 private:
-  bool m_dragging {false};
-  Point m_start {0, 0};
-  Point m_current {0, 0};
+  bool m_dragging    {false};
+  Point m_start      {0, 0};
+  Point m_current    {0, 0};
+  /// ドラッグ開始時点のレイヤーオフセット（ラスターレイヤー移動で使用）
+  int m_baseOffsetX  {0};
+  int m_baseOffsetY  {0};
 };
 
 } // namespace core

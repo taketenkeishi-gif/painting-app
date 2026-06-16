@@ -16,11 +16,12 @@ public:
   // panOffset: canvas origin in widget coordinates (i.e. QPointF(target.x(), target.y()))
   // zoom:      canvas-to-screen scale factor
   // marchingOffset: animation phase (0..15, incremented each timer tick)
-  static void render(QPainter&                  painter,
-                     const core::SelectionMask& mask,
-                     double                     zoom,
-                     QPointF                    panOffset,
-                     int                        marchingOffset);
+  // mask: pointer to SelectionMask — null is a no-op (no ants drawn)
+  static void render(QPainter&                   painter,
+                     const core::SelectionMask*  mask,
+                     double                      zoom,
+                     QPointF                     panOffset,
+                     int                         marchingOffset);
 };
 
 } // namespace app::canvasview

@@ -1,14 +1,18 @@
 #pragma once
 
+#include <tuple>
+
 #include <QWidget>
 #include <QSet>
 
+class QHBoxLayout;
 class QLabel;
 class QPushButton;
 class QResizeEvent;
 class QSpinBox;
 class QSlider;
 class QScrollArea;
+class QVBoxLayout;
 class QWidget;
 class QCheckBox;
 class QComboBox;
@@ -33,6 +37,7 @@ private slots:
   void refreshFromController();
   void onChooseColor();
   void onSizeChanged(int size);
+  void onSizeSliderChanged(int value);
   void onOpacitySliderChanged(int value);
   void onOpacitySpinChanged(int value);
   void onHardnessSliderChanged(int value);
@@ -72,6 +77,15 @@ private slots:
   void onAutoSelectThresholdSpinChanged(int value);
   void onAutoSelectContiguousToggled(bool checked);
   void onAutoSelectReferAllLayersToggled(bool checked);
+  void onAiGranularityChanged(int index);
+  void onRotoBrushFgClicked();
+  void onRotoBrushBgClicked();
+  void onRotoBrushClearClicked();
+  void onRotoBrushConfirmClicked();
+  void onRotoBrushRadiusChanged(int value);
+  void onAiThresholdChanged(int value);
+  void onVectorApproxChanged(int value);
+  void onExpandPixelsChanged(int value);
   void onSelectionFeatherSliderChanged(int value);
   void onSelectionFeatherSpinChanged(int value);
   void onSelectionAntiAliasToggled(bool checked);
@@ -105,6 +119,20 @@ private slots:
   void onWetMixRateSliderChanged(int value);
   void onSmearToggled(bool checked);
   void onSmearRateSliderChanged(int value);
+  // Dab 散布 / 角度ジッター / 粒子数 (OSS 吸収改善)
+  void onScatterToggled(bool checked);
+  void onScatterAmountSliderChanged(int value);
+  void onAngleJitterToggled(bool checked);
+  void onAngleJitterAmountSliderChanged(int value);
+  void onDabCountSliderChanged(int value);
+  // メッシュ変形セクション
+  void onMeshDeformRowsChanged(int value);
+  void onMeshDeformColsChanged(int value);
+  void onMeshDeformModeChanged(int index);
+  void onMeshDeformGeneratorChanged(int index);
+  void onMeshDeformRegenerateClicked();
+  void onMeshDeformConfirmClicked();
+  void onMeshDeformCancelClicked();
 
 private:
   void applyResponsiveLayout();
@@ -114,6 +142,9 @@ private:
   void loadPinnedForCurrentTool();
   void savePinnedForCurrentTool() const;
   void refreshDetailToggleText();
+  std::tuple<QLabel*, QSlider*, QSpinBox*> createLabeledSlider(
+      const QString& label, int min, int max, int value);
+  void appendLabeledRow(QVBoxLayout* layout, QLabel* label, QSlider* slider, QSpinBox* spin);
 
   app::bridge::AppController* m_controller {nullptr};
   QScrollArea* m_scrollArea {nullptr};
@@ -132,6 +163,7 @@ private:
   QPushButton* m_pinConfigButton {nullptr};
   QLabel* m_colorLabel {nullptr};
   QLabel* m_sizeLabel {nullptr};
+  QSlider* m_sizeSlider {nullptr};
   QLabel* m_opacityLabel {nullptr};
   QLabel* m_hardnessLabel {nullptr};
   QLabel* m_flowLabel {nullptr};
@@ -148,6 +180,7 @@ private:
   QLabel* m_fillGapCloseLabel {nullptr};
   QLabel* m_selectionModeLabel {nullptr};
   QLabel* m_autoSelectThresholdLabel {nullptr};
+  QLabel* m_aiGranularityLabel {nullptr};
   QLabel* m_selectionFeatherLabel {nullptr};
   QPushButton* m_colorButton {nullptr};
   QSpinBox* m_sizeSpin {nullptr};
@@ -190,6 +223,21 @@ private:
   QSpinBox* m_autoSelectThresholdSpin {nullptr};
   QCheckBox* m_autoSelectContiguousCheck {nullptr};
   QCheckBox* m_autoSelectReferAllLayersCheck {nullptr};
+  QComboBox* m_aiGranularityCombo {nullptr};
+  // Rotoブラシ (AiSelect 専用)
+  QWidget*     m_rotoBrushSection      {nullptr};
+  QPushButton* m_rotoBrushFgBtn         {nullptr};
+  QPushButton* m_rotoBrushBgBtn         {nullptr};
+  QPushButton* m_rotoBrushClearBtn      {nullptr};
+  QPushButton* m_rotoBrushConfirmBtn    {nullptr};
+  QSlider*     m_rotoBrushRadiusSlider {nullptr};
+  QLabel*      m_rotoBrushRadiusLabel  {nullptr};
+  QSlider*     m_aiThresholdSlider     {nullptr};
+  QLabel*      m_aiThresholdLabel      {nullptr};
+  QSlider*     m_vectorApproxSlider    {nullptr};
+  QLabel*      m_vectorApproxLabel     {nullptr};
+  QSlider*     m_expandPixelsSlider    {nullptr};
+  QLabel*      m_expandPixelsLabel     {nullptr};
   QSlider*   m_selectionFeatherSlider {nullptr};
   QSpinBox*  m_selectionFeatherSpin {nullptr};
   QCheckBox* m_selectionAntiAliasCheck {nullptr};
@@ -233,6 +281,26 @@ private:
   QSlider*   m_wetMixRateSlider {nullptr};
   QCheckBox* m_smearCheck {nullptr};
   QSlider*   m_smearRateSlider {nullptr};
+  // Dab 散布 / 角度ジッター / 粒子数
+  QWidget*   m_dabSection {nullptr};
+  QCheckBox* m_scatterCheck {nullptr};
+  QSlider*   m_scatterAmountSlider {nullptr};
+  QCheckBox* m_angleJitterCheck {nullptr};
+  QSlider*   m_angleJitterAmountSlider {nullptr};
+  QLabel*    m_dabCountLabel {nullptr};
+  QSlider*   m_dabCountSlider {nullptr};
+  // メッシュ変形セクション
+  QWidget*     m_meshDeformSection    {nullptr};
+  QLabel*      m_meshDeformRowsLabel  {nullptr};
+  QSlider*     m_meshDeformRowsSlider {nullptr};
+  QLabel*      m_meshDeformColsLabel  {nullptr};
+  QSlider*     m_meshDeformColsSlider {nullptr};
+  QComboBox*   m_meshDeformModeCombo  {nullptr};
+  QComboBox*   m_meshDeformGenCombo   {nullptr};
+  QCheckBox*   m_meshDeformWireCheck  {nullptr};
+  QPushButton* m_meshDeformRegenBtn   {nullptr};
+  QPushButton* m_meshDeformConfirmBtn {nullptr};
+  QPushButton* m_meshDeformCancelBtn  {nullptr};
   bool m_compactLayout {false};
   bool m_showDetails {false};
   QSet<QString> m_pinnedKeys;

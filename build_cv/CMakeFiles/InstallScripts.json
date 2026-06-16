@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/Keishi/Portfolio/Painting-app/build_cv/cmake_install.cmake",
+		"C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

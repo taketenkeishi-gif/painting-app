@@ -1,6 +1,7 @@
 #ifdef PAINT_USE_SKIA
 
 #include "platform/skia/SkiaRenderer.h"
+#include "platform/skia/SkiaLayerCache.h"
 #include "platform/skia/SkiaPixelBuffer.h"
 
 // Skia headers
@@ -18,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <memory>
 
 namespace platform::skia {
@@ -52,8 +54,7 @@ SkBlendMode toSkBlend(core::BlendMode mode) noexcept {
   }
 }
 
-// ── Rasterise one layer's PixelBuffer into an SkBitmap ────────────────────
-//    (blit; future work: keep SkBitmaps per-layer to skip this copy)
+// ── Rasterise one layer's PixelBuffer into an SkBitmap (fallback: no cache)
 SkBitmap layerToSkBitmap(const core::PixelBuffer& buf) {
   const int w = buf.width(), h = buf.height();
   SkBitmap bm;
@@ -119,15 +120,21 @@ void SkiaRenderer::compositeInto(const core::Document& document,
     if (layer.kind() == core::LayerKind::Folder) continue;
     if (layer.isPaperLayer()) continue;
 
-    // For now: blit the CPU buffer into an SkBitmap and draw it.
-    // Phase 0-3 will keep per-layer SkBitmaps to avoid this copy.
-    SkBitmap layerBm = layerToSkBitmap(layer.buffer());
+    // Use cached SkBitmap when available; otherwise blit from CPU buffer.
+    SkBitmap tempBm;
+    const SkBitmap* layerBm;
+    if (m_cache) {
+      layerBm = &m_cache->getBitmap(layer.id(), layer.buffer());
+    } else {
+      tempBm = layerToSkBitmap(layer.buffer());
+      layerBm = &tempBm;
+    }
 
     SkPaint paint;
     paint.setBlendMode(toSkBlend(layer.blendMode()));
     paint.setAlphaf(std::clamp(layer.opacity(), 0.0f, 1.0f));
 
-    canvas.drawImage(layerBm.asImage(), 0.0f, 0.0f, {}, &paint);
+    canvas.drawImage(layerBm->asImage(), 0.0f, 0.0f, {}, &paint);
   }
 
   // Read the dirty rect back into target
@@ -141,6 +148,79 @@ void SkiaRenderer::compositeInto(const core::Document& document,
         static_cast<std::uint8_t>(SkColorGetA(c))
       });
     }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// compositeIntoQImage — fast display path (no PixelBuffer readback)
+// ──────────────────────────────────────────────────────────────────────────
+void SkiaRenderer::compositeIntoQImage(const core::Document& document,
+                                        QImage& target,
+                                        const core::Rect& dirtyRect) const
+{
+  const core::Size sz = document.canvasSize();
+  if (sz.width <= 0 || sz.height <= 0) return;
+
+  // Reallocate if wrong size or format
+  if (target.width() != sz.width || target.height() != sz.height ||
+      target.format() != QImage::Format_RGBA8888) {
+    target = QImage(sz.width, sz.height, QImage::Format_RGBA8888);
+    target.fill(Qt::transparent);
+  }
+
+  const int rx0 = std::clamp(dirtyRect.x, 0, sz.width);
+  const int ry0 = std::clamp(dirtyRect.y, 0, sz.height);
+  const int rx1 = std::clamp(dirtyRect.x + dirtyRect.width,  0, sz.width);
+  const int ry1 = std::clamp(dirtyRect.y + dirtyRect.height, 0, sz.height);
+  if (rx1 <= rx0 || ry1 <= ry0) return;
+  const int rw = rx1 - rx0, rh = ry1 - ry0;
+
+  // Offscreen Skia bitmap covering the dirty rect
+  SkBitmap dst;
+  dst.allocN32Pixels(rw, rh);
+  if (document.paperVisible()) {
+    const auto& p = document.paperColor();
+    dst.eraseColor(SkColorSetARGB(p.a, p.r, p.g, p.b));
+  } else {
+    dst.eraseColor(SK_ColorTRANSPARENT);
+  }
+
+  SkCanvas canvas(dst);
+  canvas.translate(static_cast<SkScalar>(-rx0), static_cast<SkScalar>(-ry0));
+
+  for (std::size_t i = 0; i < document.layerCount(); ++i) {
+    const core::Layer& layer = document.layerAt(i);
+    if (!layer.visible() || layer.opacity() <= 0.0f) continue;
+    if (layer.kind() == core::LayerKind::Folder) continue;
+    if (layer.isPaperLayer()) continue;
+
+    SkBitmap tempBm;
+    const SkBitmap* layerBm;
+    if (m_cache) {
+      layerBm = &m_cache->getBitmap(layer.id(), layer.buffer());
+    } else {
+      tempBm = layerToSkBitmap(layer.buffer());
+      layerBm = &tempBm;
+    }
+
+    SkPaint paint;
+    paint.setBlendMode(toSkBlend(layer.blendMode()));
+    paint.setAlphaf(std::clamp(layer.opacity(), 0.0f, 1.0f));
+    canvas.drawImage(layerBm->asImage(), 0.0f, 0.0f, {}, &paint);
+  }
+
+  // Copy SkBitmap scanlines → QImage (SkColorGetR/G/B/A extracts correctly
+  // regardless of kN32 endian; QImage::Format_RGBA8888 wants [R,G,B,A] bytes)
+  for (int y = 0; y < rh; ++y) {
+    const uint32_t* src = dst.getAddr32(0, y);
+    uchar* dstLine = target.scanLine(ry0 + y) + rx0 * 4;
+    for (int x = 0; x < rw; ++x) {
+      const SkColor c = src[x];
+      dstLine[x*4+0] = static_cast<uchar>(SkColorGetR(c));
+      dstLine[x*4+1] = static_cast<uchar>(SkColorGetG(c));
+      dstLine[x*4+2] = static_cast<uchar>(SkColorGetB(c));
+      dstLine[x*4+3] = static_cast<uchar>(SkColorGetA(c));
+    }
+  }
 }
 
 } // namespace platform::skia

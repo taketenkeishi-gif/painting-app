@@ -1,0 +1,80 @@
+{
+  "accounts": {
+    "A": { "base_dir": ".claude_a" },
+    "B": { "base_dir": ".claude_b" }
+  },
+  "workers": [
+    {
+      "name":              "worker-a-pm",
+      "label":             "Claude A · PM",
+      "account":           "A",
+      "config_dir":        ".claude_a",
+      "model":             "claude-sonnet-4-6",
+      "effort":            "medium",
+      "role":              "pm",
+      "task_roles":        ["pm"],
+      "instructions_file": "profiles/pm.md",
+      "enabled":           false
+    },
+    {
+      "name":              "worker-a-sonnet",
+      "label":             "Claude A · Sonnet",
+      "account":           "A",
+      "config_dir":        ".claude_a",
+      "model":             "claude-sonnet-4-6",
+      "effort":            "high",
+      "role":              "heavy",
+      "task_roles":        ["developer", "heavy"],
+      "instructions_file": "profiles/developer-heavy.md",
+      "enabled":           true
+    },
+    {
+      "name":              "worker-a-haiku",
+      "label":             "Claude A · Haiku",
+      "account":           "A",
+      "config_dir":        ".claude_a",
+      "model":             "claude-haiku-4-5-20251001",
+      "effort":            "low",
+      "role":              "light",
+      "task_roles":        ["developer", "light"],
+      "instructions_file": "profiles/developer-light.md",
+      "enabled":           false
+    },
+    {
+      "name":              "worker-b-pm",
+      "label":             "Claude B · PM",
+      "account":           "B",
+      "config_dir":        ".claude_b",
+      "model":             "claude-sonnet-4-6",
+      "effort":            "medium",
+      "role":              "pm",
+      "task_roles":        ["pm"],
+      "instructions_file": "profiles/pm.md",
+      "enabled":           false
+    },
+    {
+      "name":              "worker-b-sonnet",
+      "label":             "Claude B · Sonnet",
+      "account":           "B",
+      "config_dir":        ".claude_b",
+      "model":             "claude-sonnet-4-6",
+      "effort":            "high",
+      "role":              "heavy",
+      "task_roles":        ["developer", "heavy"],
+      "instructions_file": "profiles/developer-heavy.md",
+      "enabled":           true
+    },
+    {
+      "name":              "worker-b-haiku",
+      "label":             "Claude B · Haiku",
+      "account":           "B",
+      "config_dir":        ".claude_b",
+      "model":             "claude-haiku-4-5-20251001",
+      "effort":            "low",
+      "role":              "light",
+      "task_roles":        ["developer", "light"],
+      "instructions_file": "profiles/developer-light.md",
+      "enabled":           false
+    }
+  ]
+}

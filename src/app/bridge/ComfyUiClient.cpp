@@ -231,6 +231,7 @@ void ComfyUiClient::queuePrompt(const QJsonObject& workflow,
   connect(reply, &QNetworkReply::finished, this, [this, reply, onQueued]() {
     reply->deleteLater();
     if (reply->error() != QNetworkReply::NoError) {
+      qWarning() << "ComfyUI /prompt POST failed:" << reply->errorString();
       if (onQueued) onQueued({});
       return;
     }
@@ -327,6 +328,27 @@ void ComfyUiClient::fetchCheckpoints(std::function<void(QStringList)> callback) 
                                      .first().toArray();
       for (const QJsonValue& v : ckptArr) {
         names << v.toString();
+      }
+    }
+    callback(names);
+  });
+}
+
+void ComfyUiClient::fetchLoras(std::function<void(QStringList)> callback) {
+  QNetworkReply* reply = get("/object_info/LoraLoader");
+  connect(reply, &QNetworkReply::finished, this, [reply, callback]() {
+    reply->deleteLater();
+    QStringList names;
+    if (reply->error() == QNetworkReply::NoError) {
+      const QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+      const QJsonArray loraArr = obj.value("LoraLoader").toObject()
+                                    .value("input").toObject()
+                                    .value("required").toObject()
+                                    .value("lora_name").toArray()
+                                    .first().toArray();
+      for (const QJsonValue& v : loraArr) {
+        const QString s = v.toString();
+        if (!s.isEmpty()) names << s;
       }
     }
     callback(names);
@@ -454,53 +476,6 @@ QJsonObject ComfyUiClient::buildInpaintWorkflow(const InpaintRequest& req) {
     n.insert("class_type", "SaveImage");
     n.insert("inputs", inp);
     wf.insert("9", n); }
-  return wf;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 組み込みワークフロー: SAM2 オブジェクト選択
-// ─────────────────────────────────────────────────────────────────────────────
-QJsonObject ComfyUiClient::buildSamWorkflow(const SamRequest& req) {
-  QJsonObject wf;
-
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("image",  "sam_input.png");
-    inp.insert("upload", "image");
-    n.insert("class_type", "LoadImage");
-    n.insert("inputs", inp);
-    wf.insert("1", n); }
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("model",  req.samModel);
-    inp.insert("device", "cuda");
-    n.insert("class_type", "SAM2ModelLoader");
-    n.insert("inputs", inp);
-    wf.insert("2", n); }
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("sam2_model", QJsonArray{QJsonArray{"2"}, 0});
-    inp.insert("image",      QJsonArray{QJsonArray{"1"}, 0});
-    inp.insert("coordinates_positive",
-               req.positivePoint
-                   ? QString("[[%1, %2]]").arg(req.pointX).arg(req.pointY)
-                   : QString("[]"));
-    inp.insert("coordinates_negative",
-               req.positivePoint
-                   ? QString("[]")
-                   : QString("[[%1, %2]]").arg(req.pointX).arg(req.pointY));
-    inp.insert("mask_hint_threshold", 0.5);
-    n.insert("class_type", "SAM2Segmentation");
-    n.insert("inputs", inp);
-    wf.insert("3", n); }
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("mask", QJsonArray{QJsonArray{"3"}, 0});
-    n.insert("class_type", "MaskToImage");
-    n.insert("inputs", inp);
-    wf.insert("4", n); }
-  { QJsonObject n; QJsonObject inp;
-    inp.insert("images",          QJsonArray{QJsonArray{"4"}, 0});
-    inp.insert("filename_prefix", "paintapp_sam");
-    n.insert("class_type", "SaveImage");
-    n.insert("inputs", inp);
-    wf.insert("5", n); }
   return wf;
 }
 

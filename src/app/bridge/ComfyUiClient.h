@@ -61,14 +61,6 @@ public:
     QString checkpointName {"v1-5-pruned-emaonly.ckpt"};
   };
 
-  struct SamRequest {
-    QString imageBase64;
-    int     pointX         {0};
-    int     pointY         {0};
-    bool    positivePoint  {true};
-    QString samModel       {"sam2_hiera_large.pt"};
-  };
-
   explicit ComfyUiClient(QObject* parent = nullptr);
   ~ComfyUiClient() override;
 
@@ -102,9 +94,11 @@ public:
   /// 利用可能なチェックポイント名一覧を取得
   void fetchCheckpoints(std::function<void(QStringList)> callback);
 
+  /// 利用可能な LoRA ファイル名一覧を取得
+  void fetchLoras(std::function<void(QStringList)> callback);
+
   // ── 組み込みワークフロー ─────────────────────────────────────────────────
   static QJsonObject buildInpaintWorkflow(const InpaintRequest& req);
-  static QJsonObject buildSamWorkflow    (const SamRequest&     req);
 
   /// ワークフロー JSON に prompt/seed/checkpoint を注入して返す。
   /// CLIPTextEncode ノード(1番目=positive, 2番目=negative), KSampler, CheckpointLoader を検索。

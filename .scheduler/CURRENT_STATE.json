@@ -1,0 +1,38 @@
+﻿{
+    "scheduler_alive":  true,
+    "worker_label":  "Claude B · Sonnet",
+    "task_title":  "LayerPanel.cpp にレイヤー個別の不透明度スライダー（QSlider 0〜100）を追加する。選択レイヤー変",
+    "manager":  {
+                    "status":  "completed",
+                    "generated_total":  0
+                },
+    "rate_limit":  {
+                       "active":  true,
+                       "resume_at":  "2026-06-10T19:00:00.0000000+00:00"
+                   },
+    "mode":  "working",
+    "worker":  "worker-b-sonnet",
+    "task_id":  "task-37",
+    "phase":  "completed",
+    "current_action":  "",
+    "current_file":  "TASK_QUEUE.md",
+    "started_at":  "2026-06-08T20:31:03.0622396+09:00",
+    "insertions":  164,
+    "deletions":  149,
+    "updated_at":  "2026-06-08T20:31:26.5749660+09:00",
+    "code_snippet":  "#include \"app/panels/LayerPanel.h\"\n\n#include \u003calgorithm\u003e\n#include \u003ccmath\u003e\n\n#include \u003cQAbstractItemModel\u003e\n#include \u003cQAbstractItemView\u003e\n#include \u003cQColor\u003e\n#include \u003cQComboBox\u003e\n#include \u003cQFont\u003e\n#include \u003cQGridLayout\u003e\n#include \u003cQGroupBox\u003e\n#include \u003cQHBoxLayout\u003e\n#include \u003cQIcon\u003e\n#include \u003cQImage\u003e\n#include \u003cQItemDelegate\u003e\n#include \u003cQLabel\u003e\n#include \u003cQLineEdit\u003e\n#include \u003cQMenu\u003e\n#include \u003cQMouseEvent\u003e\n#include \u003cQPainter\u003e\n#include \u003cQPaintEvent\u003e\n#include \u003cQPixmap\u003e\n#include \u003cQStyledItemDelegate\u003e\n#include \u003cQStyleOptionSlider\u003e\n#include \u003cQVariant\u003e\n#include \u003cQResizeEvent\u003e\n#include \u003cQSignalBlocker\u003e\n#include \u003cQSizePolicy\u003e\n#include \u003cQSlider\u003e\n#include \u003cQSpinBox\u003e\n#include \u003cQStyle\u003e\n#include \u003cQTimer\u003e\n#include \u003cQVBoxLayout\u003e\n#include \u003cQListWidgetItem\u003e\n\n#include \"app/bridge/AppController.h\"\n#include \"app/ui/IconLoader.h\"\n\nnamespace app::panels {\n\nnamespace {\n\nconstexpr int kNameRole = Qt::UserRole + 1;\nconstexpr int kVisibilityRole = Qt::UserRole + 2;\nconstexpr int kKindRole = Qt::UserRole + 3;\nconstexpr int kLayerIndexRole = Qt::UserRole + 4;\nconstexpr int kClippedRole = Qt::UserRole + 5;\nconstexpr int kHasMaskRole = Qt::UserRole + 6;\nconstexpr int kMaskEnabledRole = Qt::UserRole + 7;",
+    "code_snippet_label":  "Reading LayerPanel.cpp:1-50",
+    "last_response_seconds":  24,
+    "files_changed":  [
+                          ".scheduler/CURRENT_STATE.json",
+                          ".scheduler/daemon.log",
+                          ".scheduler/worker_progress.json",
+                          ".scheduler/worker_runtime.json",
+                          ".scheduler/worker_state.json",
+                          "HANDOFF_STATE.json",
+                          "MANAGER_STATE.json",
+                          "STATUS_REPORT.md",
+                          "TASK_CONTEXT.json",
+                          "TASK_QUEUE.md"
+                      ]
+}

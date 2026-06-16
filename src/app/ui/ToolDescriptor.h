@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -145,6 +146,23 @@ struct ToolBehaviorProfile {
 };
 
 struct BrushPreset {
+  // ── コンストラクタ（旧形式互換）─────────────────────────────────────────
+  // 既存の旧フォーマット初期化リストとの互換性を保つため
+  BrushPreset() = default;
+  BrushPreset(
+      int sz, int op, int hardnss, int flw, int spc, bool aa, int stab,
+      bool pc, bool vpc, core::BrushShapeType st, core::BlendMode bm,
+      bool em, bool la, int ang, int rnd, int ts, int te,
+      TargetLayerKind tk, CursorStyle cur,
+      int snap_ang = 0, int simpl_lv = 0, int stroke_w = 0)
+      : size(sz), opacity(op), hardness(hardnss), flow(flw), spacing(spc),
+        antiAlias(aa), stabilization(stab), postCorrection(pc),
+        velocityBasedCorrection(vpc), shapeType(st), angle(ang), roundness(rnd),
+        taperStart(ts), taperEnd(te), blendMode(bm), eraseMode(em),
+        lockAlphaRespect(la), snapAngle(snap_ang), simplifyLevel(simpl_lv),
+        strokeWidth(stroke_w), targetLayerKind(tk), cursorStyle(cur) {}
+
+  // ── ストローク基本 ──────────────────────────────────────────────────────
   int size {8};
   int opacity {100};
   int hardness {100};
@@ -154,16 +172,49 @@ struct BrushPreset {
   int stabilization {0};
   bool postCorrection {false};
   bool velocityBasedCorrection {false};
+
+  // ── 形状パラメータ ──────────────────────────────────────────────────────
   core::BrushShapeType shapeType {core::BrushShapeType::Circle};
-  core::BlendMode blendMode {core::BlendMode::Normal};
-  bool eraseMode {false};
-  bool lockAlphaRespect {false};
   int angle {0};
   int roundness {100};
   int taperStart {0};
   int taperEnd {0};
+
+  // ── 筆圧応答 ──────────────────────────────────────────────────────────
+  bool velocitySize {false};
+  int velocitySizeMin {30};
+  bool velocityOpacity {false};
+  int velocityOpacityMin {30};
+
+  // ── テクスチャ＆湿潤 ──────────────────────────────────────────────────
+  bool textureGrain {false};
+  int textureStrength {60};
+  int textureScale {100};
+  bool wetMix {false};
+  int wetMixRate {50};
+  bool smear {false};
+  int smearRate {90};
+
+  // ── Dab 散布 ──────────────────────────────────────────────────────────
+  bool scatter {false};
+  int scatterAmount {50};
+  bool angleJitter {false};
+  int angleJitterAmount {180};
+  int dabCount {1};
+
+  // ── ブレンド＆書き込み ────────────────────────────────────────────────
+  core::BlendMode blendMode {core::BlendMode::Normal};
+  bool eraseMode {false};
+  bool lockAlphaRespect {false};
+  bool buildupMode {false};   // Krita積み上げ OFF / Photoshop ON
+
+  // ── ベクターストローク ────────────────────────────────────────────────
   TargetLayerKind targetLayerKind {TargetLayerKind::Both};
+
+  // ── UI ────────────────────────────────────────────────────────────────
   CursorStyle cursorStyle {CursorStyle::Default};
+
+  // ── ツール固有（Line/Curve/Fill/Selection など）────────────────────
   int snapAngle {0};
   int simplifyLevel {0};
   int strokeWidth {0};
@@ -183,7 +234,8 @@ struct BrushPreset {
   bool selectionEdgeSnap {false};
   VectorEraserMode vectorEraseMode {VectorEraserMode::TouchedOnly};
   bool vectorTrimOutside {false};
-  bool buildupMode {false};   // Krita非積み上げ / Photoshop積み上げ切替
+
+  // ── グラデーション ────────────────────────────────────────────────────
   int gradientType {0};       // 0=Linear, 1=Radial
   int gradientFill {0};       // 0=ForegroundToBackground, 1=ForegroundToTransparent
 };
@@ -195,6 +247,8 @@ struct SubToolDescriptor {
   ToolBehaviorProfile profile;
   std::vector<ToolPropertyKey> editableProperties;
   std::string guide;
+  // サブツール選択時に実際に起動する ToolKind。未設定なら親 ToolDescriptor::kind を使う。
+  std::optional<core::ToolKind> targetToolKind;
 };
 
 struct ToolDescriptor {
@@ -204,6 +258,7 @@ struct ToolDescriptor {
   std::vector<SubToolDescriptor> subTools;
   std::vector<ToolPropertyKey> availableProperties;
   std::string guide;
+  std::string shortcut;  ///< keyboard shortcut key label (e.g. "B"), empty if none
 };
 
 class ToolCatalog {

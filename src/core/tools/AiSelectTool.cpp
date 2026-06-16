@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <numeric>
+#include <unordered_set>
 #include <vector>
 
 #include "core/buffer/PixelBuffer.h"
@@ -46,7 +48,8 @@ SelectionMask AiSelectTool::runStubSegmentation(
     const PixelBuffer&         source,
     const SelectionMask&       currentSelection,
     const std::vector<Point>&  positivePoints,
-    const std::vector<Point>&  negativePoints) const
+    const std::vector<Point>&  negativePoints,
+    int                        thresholdOverride) const
 {
   const int W = source.width();
   const int H = source.height();
@@ -80,7 +83,8 @@ SelectionMask AiSelectTool::runStubSegmentation(
   const Color seedColor{ static_cast<std::uint8_t>(rM),
                           static_cast<std::uint8_t>(gM),
                           static_cast<std::uint8_t>(bM), 255 };
-  const float dynThresh = static_cast<float>(m_settings.threshold)
+  const int baseThresh  = (thresholdOverride >= 0) ? thresholdOverride : m_settings.threshold;
+  const float dynThresh = static_cast<float>(baseThresh)
                           + std::min(std::sqrt(variance)*0.5f, 40.f);
 
   // ── ステップ2: ネガティブポイントの色収集 ────────────────────────────────
@@ -181,13 +185,130 @@ SelectionMask AiSelectTool::runStubSegmentation(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Morphological close で選択マスク境界を平滑化
+// ─────────────────────────────────────────────────────────────────────────────
+SelectionMask AiSelectTool::smoothMask(const SelectionMask& src, int radius) {
+  if (radius <= 0) return src;
+  const int W = src.width(), H = src.height();
+  if (W <= 0 || H <= 0) return src;
+  const int SZ = W * H;
+  std::vector<std::uint8_t> buf(static_cast<std::size_t>(SZ), 0);
+  for (int y = 0; y < H; ++y)
+    for (int x = 0; x < W; ++x)
+      buf[static_cast<std::size_t>(y)*W+x] = src.contains(x,y) ? 255 : 0;
+
+  // dilate
+  std::vector<std::uint8_t> tmp(static_cast<std::size_t>(SZ), 0);
+  for (int y = 0; y < H; ++y)
+    for (int x = 0; x < W; ++x) {
+      bool hit = false;
+      for (int dy = -radius; dy <= radius && !hit; ++dy)
+        for (int dx = -radius; dx <= radius && !hit; ++dx) {
+          const int nx = x+dx, ny = y+dy;
+          if (nx>=0&&ny>=0&&nx<W&&ny<H && buf[static_cast<std::size_t>(ny)*W+nx]) hit=true;
+        }
+      tmp[static_cast<std::size_t>(y)*W+x] = hit ? 255 : 0;
+    }
+
+  // erode
+  std::vector<std::uint8_t> out(static_cast<std::size_t>(SZ), 0);
+  for (int y = 0; y < H; ++y)
+    for (int x = 0; x < W; ++x) {
+      bool all = true;
+      for (int dy = -radius; dy <= radius && all; ++dy)
+        for (int dx = -radius; dx <= radius && all; ++dx) {
+          const int nx = x+dx, ny = y+dy;
+          if (nx<0||ny<0||nx>=W||ny>=H||!tmp[static_cast<std::size_t>(ny)*W+nx]) all=false;
+        }
+      out[static_cast<std::size_t>(y)*W+x] = all ? 255 : 0;
+    }
+
+  SelectionMask result(W, H);
+  result.setPixels(out);
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Morphological dilation/erosion でマスクを拡張または縮小
+// ─────────────────────────────────────────────────────────────────────────────
+SelectionMask AiSelectTool::expandMask(const SelectionMask& src, int pixels) {
+  if (pixels == 0) return src;
+  const int W = src.width(), H = src.height();
+  if (W <= 0 || H <= 0) return src;
+  const int SZ = W * H;
+  std::vector<std::uint8_t> buf(static_cast<std::size_t>(SZ), 0);
+  for (int y = 0; y < H; ++y)
+    for (int x = 0; x < W; ++x)
+      buf[static_cast<std::size_t>(y)*W+x] = src.contains(x,y) ? 255 : 0;
+
+  std::vector<std::uint8_t> out(static_cast<std::size_t>(SZ), 0);
+  const int r = std::abs(pixels);
+  if (pixels > 0) {
+    // dilation: 近傍に 255 があれば 255
+    for (int y = 0; y < H; ++y)
+      for (int x = 0; x < W; ++x) {
+        bool hit = false;
+        for (int dy = -r; dy <= r && !hit; ++dy)
+          for (int dx = -r; dx <= r && !hit; ++dx) {
+            const int nx = x+dx, ny = y+dy;
+            if (nx>=0&&ny>=0&&nx<W&&ny<H && buf[static_cast<std::size_t>(ny)*W+nx]) hit=true;
+          }
+        out[static_cast<std::size_t>(y)*W+x] = hit ? 255 : 0;
+      }
+  } else {
+    // erosion: 近傍が全て 255 のとき 255
+    for (int y = 0; y < H; ++y)
+      for (int x = 0; x < W; ++x) {
+        bool all = true;
+        for (int dy = -r; dy <= r && all; ++dy)
+          for (int dx = -r; dx <= r && all; ++dx) {
+            const int nx = x+dx, ny = y+dy;
+            if (nx<0||ny<0||nx>=W||ny>=H||!buf[static_cast<std::size_t>(ny)*W+nx]) all=false;
+          }
+        out[static_cast<std::size_t>(y)*W+x] = all ? 255 : 0;
+      }
+  }
+
+  SelectionMask result(W, H);
+  result.setPixels(out);
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RotoBrush helpers
+// ─────────────────────────────────────────────────────────────────────────────
+void AiSelectTool::clearRotoStrokes() noexcept {
+  m_rotoStrokes.clear();
+  m_activeStroke.clear();
+  m_positivePoints.clear();
+  m_negativePoints.clear();
+  m_strokeActive = false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ITool implementation
 // ─────────────────────────────────────────────────────────────────────────────
 ToolResult AiSelectTool::onPointerPress(ToolContext& ctx, const ToolPointerEvent& e) {
-  const PixelBuffer& source = m_settings.referAllLayers ? ctx.composited : ctx.composited;
+  // ── RotoBrush モード ─────────────────────────────────────────────────────
+  if (m_inputMode == InputMode::RotoBrush) {
+    if (e.ctrl) {
+      clearRotoStrokes();
+      ctx.document.selection().clear();
+      ToolResult r; r.selectionChanged = true; return r;
+    }
+    // Subtract モードなら赤（BG）、それ以外（Add / New）は緑（FG）がデフォルト
+    m_paintFg = !m_settings.subtractMode;
+    m_activeStroke.clear();
+    m_activeStroke.push_back(e.fpoint);
+    m_strokeActive = true;
+    ToolResult r; r.viewportChanged = true; return r;
+  }
 
-  const bool isNegative = e.shift;  // Shift = ネガティブポイント
-  const bool isClear    = e.ctrl;   // Ctrl  = クリア
+  // ── Click モード (元の実装) ───────────────────────────────────────────────
+  const PixelBuffer& source = ctx.composited;
+
+  const bool isNegative = e.shift;
+  const bool isClear    = e.ctrl;
 
   if (isClear) {
     m_positivePoints.clear();
@@ -206,13 +327,11 @@ ToolResult AiSelectTool::onPointerPress(ToolContext& ctx, const ToolPointerEvent
     m_positivePoints.push_back(e.point);
   }
 
-  // スタブ推論を即時実行してdocumentに適用
   const SelectionMask& currentSel = ctx.document.selection();
   SelectionMask newMask = runStubSegmentation(source, currentSel,
                                               m_positivePoints, m_negativePoints);
   ctx.document.selection() = std::move(newMask);
 
-  // ComfyUI 推論リクエスト（非同期）
   if (m_inferenceCallback) {
     m_inferenceCallback(ctx.composited, m_positivePoints, m_negativePoints);
   }
@@ -221,17 +340,115 @@ ToolResult AiSelectTool::onPointerPress(ToolContext& ctx, const ToolPointerEvent
 }
 
 ToolResult AiSelectTool::onPointerMove(ToolContext& ctx, const ToolPointerEvent& e) {
-  static_cast<void>(ctx); static_cast<void>(e); return {};
+  static_cast<void>(ctx);
+  if (m_inputMode == InputMode::RotoBrush && m_strokeActive) {
+    m_activeStroke.push_back(e.fpoint);
+    ToolResult r; r.viewportChanged = true; return r;
+  }
+  return {};
 }
 
 ToolResult AiSelectTool::onPointerRelease(ToolContext& ctx, const ToolPointerEvent& e) {
-  static_cast<void>(ctx); static_cast<void>(e); return {};
+  static_cast<void>(e);
+  if (m_inputMode == InputMode::RotoBrush && m_strokeActive) {
+    m_strokeActive = false;
+    if (m_activeStroke.empty()) return {};
+
+    // ── ストロークを確定 ─────────────────────────────────────────────────
+    ToolOverlayState::RotoStroke finished;
+    finished.isForeground = m_paintFg;
+    finished.points       = std::move(m_activeStroke);
+    m_activeStroke.clear();
+    m_rotoStrokes.push_back(std::move(finished));
+
+    // ── 全確定ストロークからプロンプト点をサンプリング ────────────────────
+    // 後から描いたストロークが先のストロークを上書き（双方向）:
+    // m_rotoStrokes の末尾ほど新しいので、逆順に処理して
+    // ブラシ半径サイズのグリッドセル単位で「先取り」する。
+    m_positivePoints.clear();
+    m_negativePoints.clear();
+    {
+      const int cellSize = std::max(1, static_cast<int>(m_brushRadius));
+      std::unordered_set<std::uint64_t> claimed;
+
+      auto cellKey = [&](int x, int y) -> std::uint64_t {
+        const std::uint32_t cx = static_cast<std::uint32_t>(x / cellSize + 32768);
+        const std::uint32_t cy = static_cast<std::uint32_t>(y / cellSize + 32768);
+        return (static_cast<std::uint64_t>(cx) << 32) | static_cast<std::uint64_t>(cy);
+      };
+
+      for (auto it = m_rotoStrokes.rbegin(); it != m_rotoStrokes.rend(); ++it) {
+        const auto& stroke = *it;
+        auto addPoint = [&](const FPoint& fp) {
+          Point p {static_cast<int>(fp.x), static_cast<int>(fp.y)};
+          const auto key = cellKey(p.x, p.y);
+          if (claimed.count(key)) return;
+          claimed.insert(key);
+          (stroke.isForeground ? m_positivePoints : m_negativePoints).push_back(p);
+        };
+        for (std::size_t i = 0; i < stroke.points.size(); i += 8)
+          addPoint(stroke.points[i]);
+        if (!stroke.points.empty())
+          addPoint(stroke.points.back());
+      }
+    }
+
+    if (m_positivePoints.empty()) return {};
+
+    // ONNX 推論（非同期）— ONNX がある場合はそちらが高精度マスクを返す
+    if (m_inferenceCallback) {
+      m_inferenceCallback(ctx.composited, m_positivePoints, m_negativePoints);
+    } else {
+      // スタブフォールバック: ストロークを間引きして分散シードで BFS
+      // aiThreshold（デフォルト60）を使うことで多点シードでも孤立島を作らず
+      // ひとつの大きな領域に統合される
+      constexpr int kStride = 8;  // 8px ごとに1シードを残す
+      std::vector<Point> sampledPos, sampledNeg;
+      for (std::size_t i = 0; i < m_positivePoints.size(); i += static_cast<std::size_t>(kStride))
+        sampledPos.push_back(m_positivePoints[i]);
+      if (sampledPos.empty()) sampledPos = m_positivePoints;
+
+      for (std::size_t i = 0; i < m_negativePoints.size(); i += static_cast<std::size_t>(kStride))
+        sampledNeg.push_back(m_negativePoints[i]);
+      if (m_negativePoints.size() > 0 && sampledNeg.empty()) sampledNeg = m_negativePoints;
+
+      const SelectionMask& currentSel = ctx.document.selection();
+      SelectionMask newMask = runStubSegmentation(
+          ctx.composited, currentSel, sampledPos, sampledNeg,
+          m_settings.aiThreshold);
+      if (m_settings.vectorApprox > 0)
+        newMask = smoothMask(newMask, m_settings.vectorApprox);
+      if (m_settings.expandPixels != 0)
+        newMask = expandMask(newMask, m_settings.expandPixels);
+      if (m_settings.addMode || m_settings.subtractMode) {
+        const int W = newMask.width(), H = newMask.height();
+        std::vector<std::uint8_t> px(static_cast<std::size_t>(W * H), 0);
+        for (int y = 0; y < H; ++y)
+          for (int x = 0; x < W; ++x)
+            px[static_cast<std::size_t>(y * W + x)] = newMask.maskValue(x, y);
+        const SelectionOp op = m_settings.addMode ? SelectionOp::Add : SelectionOp::Subtract;
+        if (ctx.document.selection().width() != W || ctx.document.selection().height() != H) {
+          ctx.document.selection() = std::move(newMask);
+        } else {
+          ctx.document.selection().applyPixels(op, px);
+        }
+      } else {
+        ctx.document.selection() = std::move(newMask);
+      }
+    }
+
+    ToolResult r; r.selectionChanged = true; return r;
+  }
+  return {};
 }
 
 ToolResult AiSelectTool::onCancel(ToolContext& ctx) {
   static_cast<void>(ctx);
   m_positivePoints.clear();
   m_negativePoints.clear();
+  if (m_inputMode == InputMode::RotoBrush) {
+    clearRotoStrokes();
+  }
   return {};
 }
 
@@ -241,10 +458,20 @@ ToolResult AiSelectTool::onWheel(ToolContext& ctx, int deltaSteps, const ToolPoi
 
 ToolOverlayState AiSelectTool::overlay() const {
   ToolOverlayState state;
-  if (!m_positivePoints.empty()) {
-    state.hasPolygon    = true;
-    state.polygonClosed = false;
-    state.polygonPoints = m_positivePoints;
+  if (m_inputMode == InputMode::RotoBrush) {
+    if (!m_rotoStrokes.empty() || m_strokeActive) {
+      state.hasRotoStrokes   = true;
+      state.rotoStrokes      = m_rotoStrokes;
+      state.rotoActiveStroke = m_activeStroke;
+      state.rotoActiveFg     = m_paintFg;
+      state.rotoBrushRadius  = m_brushRadius;
+    }
+  } else {
+    if (!m_positivePoints.empty()) {
+      state.hasPolygon    = true;
+      state.polygonClosed = false;
+      state.polygonPoints = m_positivePoints;
+    }
   }
   return state;
 }

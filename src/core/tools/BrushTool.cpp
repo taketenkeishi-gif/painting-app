@@ -8,12 +8,9 @@
 #include "core/render/RenderUtils.h"
 
 namespace {
-  constexpr float kPi = 3.14159265358979f;
 
-  // ── HSL ヘルパー ─────────────────────────────────────────────────────────
-  inline float hslLuminance(float r, float g, float b) noexcept {
-    return 0.299f * r + 0.587f * g + 0.114f * b;
-  }
+  // ── HSL ヘルパー（blendPixel の HSL ブレンドモード用） ────────────────────
+  // 輝度係数は RenderUtils.h の core::luminanceBT601 を使用。
 
   inline float hslSaturation(float r, float g, float b) noexcept {
     const float cmax = std::max({r, g, b});
@@ -24,7 +21,7 @@ namespace {
   struct RGB3 { float r, g, b; };
 
   inline RGB3 clipColor(RGB3 c) noexcept {
-    const float l = hslLuminance(c.r, c.g, c.b);
+    const float l = core::luminanceBT601(c.r, c.g, c.b);
     const float n = std::min({c.r, c.g, c.b});
     const float x = std::max({c.r, c.g, c.b});
     if (n < 0.0f) {
@@ -41,15 +38,13 @@ namespace {
   }
 
   inline RGB3 setLuminance(RGB3 c, float lum) noexcept {
-    const float d = lum - hslLuminance(c.r, c.g, c.b);
+    const float d = lum - core::luminanceBT601(c.r, c.g, c.b);
     return clipColor({c.r + d, c.g + d, c.b + d});
   }
 
   inline RGB3 setSaturation(RGB3 c, float sat) noexcept {
     float& cmin_ref = c.r < c.g ? (c.r < c.b ? c.r : c.b) : (c.g < c.b ? c.g : c.b);
     float& cmax_ref = c.r > c.g ? (c.r > c.b ? c.r : c.b) : (c.g > c.b ? c.g : c.b);
-    // mid: the one that is neither min nor max
-    // We'll do it manually without reference tricks
     float vmin = std::min({c.r, c.g, c.b});
     float vmax = std::max({c.r, c.g, c.b});
     float vmid;
@@ -66,10 +61,7 @@ namespace {
       vmax = 0.0f;
     }
     vmin = 0.0f;
-    // assign back by position
     float newMin = vmin, newMid = vmid, newMax = vmax;
-    // Sort original r,g,b into min/mid/max order and rebuild
-    // Simpler: recompute from scratch
     const float or_ = c.r, og = c.g, ob = c.b;
     const float omin = std::min({or_, og, ob});
     const float omax = std::max({or_, og, ob});
@@ -88,32 +80,6 @@ namespace {
     return out;
   }
 
-  // ── ハッシュベースのグレインノイズ (0.0–1.0) ─────────────────────────────
-  // セルノイズ: 入力座標とseedから確定的ランダム値を返す
-  float grainNoise(int px, int py, int seed) noexcept {
-    std::uint32_t h = static_cast<std::uint32_t>(px * 1619 + py * 31337 + seed * 6271);
-    h ^= h >> 16;
-    h *= 0x45d9f3bU;
-    h ^= h >> 16;
-    return static_cast<float>(h & 0xFFFFU) / 65535.0f;
-  }
-
-  // テクスチャスケールに合わせて座標をダウンサンプリング
-  float grainAt(int px, int py, float scale, int seed) noexcept {
-    const int gx = static_cast<int>(std::floor(static_cast<float>(px) / scale));
-    const int gy = static_cast<int>(std::floor(static_cast<float>(py) / scale));
-    return grainNoise(gx, gy, seed);
-  }
-
-  // Color の線形補間
-  inline core::Color lerpColor(const core::Color& a, const core::Color& b, float t) noexcept {
-    const float s = 1.0f - t;
-    return core::Color {
-        static_cast<std::uint8_t>(std::lround(s * a.r + t * b.r)),
-        static_cast<std::uint8_t>(std::lround(s * a.g + t * b.g)),
-        static_cast<std::uint8_t>(std::lround(s * a.b + t * b.b)),
-        static_cast<std::uint8_t>(std::lround(s * a.a + t * b.a))};
-  }
 } // namespace
 
 namespace core {
@@ -132,14 +98,23 @@ Rect strokeDirtyRect(const FPoint& from, const FPoint& to, float size) {
 } // namespace
 
 // ---------------------------------------------------------------
-// 筆圧→サイズ変換（リニアカーブ）
+// 筆圧→サイズ変換（ガンマカーブ対応）
+// CSP/Krita の「入力/出力カーブ」に相当。
+// gamma < 1.0: 軽いタッチでほぼ最大サイズ（柔らかいブラシ向き）
+// gamma > 1.0: 強く押さないと大きくならない（硬いブラシ向き）
 // ---------------------------------------------------------------
+// BrushCurve (libmypaint-style) で筆圧をマッピング。
+// カーブがリニアの場合は evaluate() をスキップして高速パスを通る。
 float BrushTool::computePressureSize(float pressure) const {
   if (!m_settings.dynamics.pressureSize) {
     return 1.0f;
   }
   const float minRatio = m_settings.dynamics.pressureSizeMin;
-  return minRatio + (1.0f - minRatio) * pressure;
+  const auto& curve    = m_settings.dynamics.pressureSizeCurve;
+  const float p = curve.isLinear()
+      ? std::clamp(pressure, 0.0f, 1.0f)
+      : curve.evaluate(pressure);
+  return minRatio + (1.0f - minRatio) * p;
 }
 
 float BrushTool::computePressureOpacity(float pressure) const {
@@ -147,7 +122,11 @@ float BrushTool::computePressureOpacity(float pressure) const {
     return 1.0f;
   }
   const float minRatio = m_settings.dynamics.pressureOpacityMin;
-  return minRatio + (1.0f - minRatio) * pressure;
+  const auto& curve    = m_settings.dynamics.pressureOpacityCurve;
+  const float p = curve.isLinear()
+      ? std::clamp(pressure, 0.0f, 1.0f)
+      : curve.evaluate(pressure);
+  return minRatio + (1.0f - minRatio) * p;
 }
 
 // ---------------------------------------------------------------
@@ -174,28 +153,6 @@ float BrushTool::computeTaperStrength(float t, float taperStart, float taperEnd)
 }
 
 // ---------------------------------------------------------------
-// スタビライザー
-// ---------------------------------------------------------------
-FPoint BrushTool::applyStabilization(const FPoint& from, const FPoint& to) const {
-  const float stabilization = std::clamp(m_settings.stabilization, 0.0F, 1.0F);
-  if (stabilization <= 0.001f) {
-    return to;
-  }
-
-  float response = 1.0f - stabilization * 0.85f;
-  if (m_settings.velocityBasedCorrection) {
-    const float distance = from.lengthTo(to);
-    const float velocityFactor = std::clamp(1.0f - distance / 80.0f, 0.25f, 1.0f);
-    response *= velocityFactor;
-  }
-  response = std::clamp(response, 0.05f, 1.0f);
-
-  return FPoint {
-      from.x + (to.x - from.x) * response,
-      from.y + (to.y - from.y) * response};
-}
-
-// ---------------------------------------------------------------
 // ピクセルへの書き込み（ブレンドモード対応）
 // ---------------------------------------------------------------
 void BrushTool::blendPixel(
@@ -203,6 +160,13 @@ void BrushTool::blendPixel(
     const Color& src, float strength, bool lockAlpha) const {
   if (!buffer.inBounds(x, y)) {
     return;
+  }
+
+  // 選択マスクによる強度スケール
+  if (m_selectionMask != nullptr) {
+    const uint8_t mv = m_selectionMask->maskValue(x, y);
+    if (mv == 0) return;
+    if (mv < 255) strength *= static_cast<float>(mv) / 255.0f;
   }
 
   const Color dst = buffer.pixel(x, y);
@@ -215,11 +179,13 @@ void BrushTool::blendPixel(
   if (m_settings.eraseMode) {
     const float eraseStr = std::clamp((static_cast<float>(src.a) / 255.0f) * alphaScale, 0.0f, 1.0f);
     const float keep = 1.0f - eraseStr;
-    buffer.setPixel(x, y, Color {
+    const Color erased {
         static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.r) * keep)),
         static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.g) * keep)),
         static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.b) * keep)),
-        static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))});
+        static_cast<std::uint8_t>(std::lround(static_cast<float>(dst.a) * keep))};
+    buffer.setPixel(x, y, erased);
+    if (m_pixelWriteCb) m_pixelWriteCb(x, y, erased);
     return;
   }
 
@@ -399,16 +365,16 @@ void BrushTool::blendPixel(
     }
 
     case BlendMode::DarkerColor: {
-      const float lumD = hslLuminance(dR, dG, dB);
-      const float lumS = hslLuminance(sR, sG, sB);
+      const float lumD = core::luminanceBT601(dR, dG, dB);
+      const float lumS = core::luminanceBT601(sR, sG, sB);
       if (lumS < lumD) compositeResult(sR, sG, sB);
       else compositeResult(dR, dG, dB);
       break;
     }
 
     case BlendMode::LighterColor: {
-      const float lumD = hslLuminance(dR, dG, dB);
-      const float lumS = hslLuminance(sR, sG, sB);
+      const float lumD = core::luminanceBT601(dR, dG, dB);
+      const float lumS = core::luminanceBT601(sR, sG, sB);
       if (lumS > lumD) compositeResult(sR, sG, sB);
       else compositeResult(dR, dG, dB);
       break;
@@ -416,26 +382,26 @@ void BrushTool::blendPixel(
 
     case BlendMode::Hue: {
       const RGB3 res = setLuminance(setSaturation({sR, sG, sB}, hslSaturation(dR, dG, dB)),
-                                    hslLuminance(dR, dG, dB));
+                                    core::luminanceBT601(dR, dG, dB));
       compositeResult(res.r, res.g, res.b);
       break;
     }
 
     case BlendMode::HslSat: {
       const RGB3 res = setLuminance(setSaturation({dR, dG, dB}, hslSaturation(sR, sG, sB)),
-                                    hslLuminance(dR, dG, dB));
+                                    core::luminanceBT601(dR, dG, dB));
       compositeResult(res.r, res.g, res.b);
       break;
     }
 
     case BlendMode::HslColor: {
-      const RGB3 res = setLuminance({sR, sG, sB}, hslLuminance(dR, dG, dB));
+      const RGB3 res = setLuminance({sR, sG, sB}, core::luminanceBT601(dR, dG, dB));
       compositeResult(res.r, res.g, res.b);
       break;
     }
 
     case BlendMode::Luminosity: {
-      const RGB3 res = setLuminance({dR, dG, dB}, hslLuminance(sR, sG, sB));
+      const RGB3 res = setLuminance({dR, dG, dB}, core::luminanceBT601(sR, sG, sB));
       compositeResult(res.r, res.g, res.b);
       break;
     }
@@ -446,139 +412,58 @@ void BrushTool::blendPixel(
       break;
   }
 
-  buffer.setPixel(x, y, Color {
+  const Color blended {
       static_cast<std::uint8_t>(std::lround(std::clamp(outR, 0.0f, 1.0f) * 255.0f)),
       static_cast<std::uint8_t>(std::lround(std::clamp(outG, 0.0f, 1.0f) * 255.0f)),
       static_cast<std::uint8_t>(std::lround(std::clamp(outB, 0.0f, 1.0f) * 255.0f)),
-      static_cast<std::uint8_t>(std::lround(std::clamp(outA, 0.0f, 1.0f) * 255.0f))});
+      static_cast<std::uint8_t>(std::lround(std::clamp(outA, 0.0f, 1.0f) * 255.0f))};
+  buffer.setPixel(x, y, blended);
+  if (m_pixelWriteCb) m_pixelWriteCb(x, y, blended);
 }
 
 // ---------------------------------------------------------------
 // スタンプ：float座標で高精度描画
-// radius はブラシ半径、strength は opacity * flow
-// composited: ウェットミックス/スメアで参照する合成済みバッファ
+// angleDegrees: m_settings.angle に加算する追加回転（角度ジッター用）
+// pixel loop は DabRenderer に委譲。BrushTool はカウンタとコールバックのみ保持。
 // ---------------------------------------------------------------
 void BrushTool::stampAt(
     PixelBuffer& buffer, const PixelBuffer& composited,
     const FPoint& center, float radius,
-    float strength, bool lockAlpha) const {
+    float strength, bool lockAlpha,
+    float angleDegrees) const {
   if (radius <= 0.0f || strength <= 0.0f) {
     return;
   }
+  ++m_debugDabCount; // benchmark hook: algorithm に影響なし
 
+  m_dabRenderer.render(
+      buffer, composited, m_strokeAccum,
+      m_settings, m_maskEditMode, m_smearColor,
+      center, radius, strength, lockAlpha, angleDegrees,
+      [this, &buffer](int x, int y, const Color& color, float s, bool la) {
+        blendPixel(buffer, x, y, color, s, la);
+      });
+}
+
+// ---------------------------------------------------------------
+// scatter / angleJitter / dabCount を考慮してスタンプを配置する
+// CSP の「位置のばらし」「向きのばらし」「粒子数」に相当する機能
+// ---------------------------------------------------------------
+void BrushTool::stampDabsAt(
+    PixelBuffer& buffer, const PixelBuffer& composited,
+    const FPoint& center, float radius,
+    float strength, bool lockAlpha) const
+{
   const auto& dyn = m_settings.dynamics;
-  const float angleRad = m_settings.angle * (kPi / 180.0f);
-  const float cosA = std::cos(angleRad);
-  const float sinA = std::sin(angleRad);
-  const float invRoundness = (m_settings.roundness > 0.001f) ? (1.0f / m_settings.roundness) : 1.0f;
-
-  // AA=true かつ hardness≒1 のとき fringe が半径の外に出るので +1 px 余裕を持たせる
-  const float margin = (m_settings.antiAlias && m_settings.hardness >= 0.999f) ? 1.5f : 1.0f;
-  const int x0 = static_cast<int>(std::floor(center.x - radius - margin));
-  const int y0 = static_cast<int>(std::floor(center.y - radius - margin));
-  const int x1 = static_cast<int>(std::ceil(center.x + radius + margin));
-  const int y1 = static_cast<int>(std::ceil(center.y + radius + margin));
-
-  // スメア: stamp 中心でキャンバス色を採取して以降のピクセルに使用
-  if (dyn.smear) {
-    const int cx = static_cast<int>(center.x);
-    const int cy = static_cast<int>(center.y);
-    if (composited.inBounds(cx, cy)) {
-      m_smearColor = lerpColor(composited.pixel(cx, cy), m_smearColor, dyn.smearRate);
-    }
-  }
-
-  // グレインのフレームシード: stamp 位置から決定論的に決める
-  const int grainSeed = static_cast<int>(center.x * 7 + center.y * 13);
-
-  for (int py = y0; py <= y1; ++py) {
-    if (py < 0 || py >= buffer.height()) continue;
-    for (int px = x0; px <= x1; ++px) {
-      if (px < 0 || px >= buffer.width()) continue;
-
-      // ピクセル中心からブラシ中心への距離（float精度）
-      float dx = (static_cast<float>(px) + 0.5f) - center.x;
-      float dy = (static_cast<float>(py) + 0.5f) - center.y;
-
-      // 回転と楕円変換
-      float rdx = dx * cosA + dy * sinA;
-      float rdy = (-dx * sinA + dy * cosA) * invRoundness;
-
-      // 正規化距離（0=中心, 1=縁）
-      float dist = std::sqrt(rdx * rdx + rdy * rdy) / radius;
-
-      // スクエアブラシ
-      if (m_settings.shapeType == BrushShapeType::Square) {
-        dist = std::max(std::abs(rdx) / radius, std::abs(rdy) / radius);
-      }
-
-      float pixelStrength = brushCoverage(dist, m_settings.hardness, radius, m_settings.antiAlias) * strength;
-      if (pixelStrength <= 0.001f) continue;
-
-      // ── テクスチャグレイン ──────────────────────────────────────────────
-      if (dyn.textureGrain) {
-        const float g = grainAt(px, py, dyn.textureScale, grainSeed);
-        // グレインが低い部分ほど coverage を削る
-        pixelStrength *= std::clamp(g + (1.0f - dyn.textureStrength), 0.0f, 1.0f);
-      }
-
-      if (pixelStrength <= 0.001f) continue;
-
-      // ── ウェットミックス / スメア: 描画色を決定 ──────────────────────────
-      Color drawColor = m_settings.color;
-      if (m_maskEditMode) {
-        // マスク編集: 輝度でグレースケール化して alpha=255 にする
-        const std::uint8_t lum = static_cast<std::uint8_t>(std::lround(
-            0.299f * drawColor.r + 0.587f * drawColor.g + 0.114f * drawColor.b));
-        drawColor = Color {lum, lum, lum, 255};
-      } else if (dyn.smear) {
-        // スメア: キャンバス色を押し広げる（ブラシ色を使わない）
-        drawColor = m_smearColor;
-      } else if (dyn.wetMix && composited.inBounds(px, py)) {
-        // ウェットミックス: ブラシ色 と キャンバス色 を混ぜる
-        const Color canvasCol = composited.pixel(px, py);
-        drawColor = lerpColor(m_settings.color, canvasCol, dyn.wetMixRate);
-      }
-
-      // ── buildup=false のとき、ストロークバッファで積み重ねを制御 ───────────
-      if (!m_settings.buildupMode && !m_settings.eraseMode &&
-          m_strokeAccum.inBounds(px, py)) {
-        const float prevAccum = static_cast<float>(m_strokeAccum.pixel(px, py).r) / 255.0f;
-        if (pixelStrength <= prevAccum + 0.001f) continue;
-
-        // Porter-Duff 正確計算:
-        //   既存アルファ dstA から目標アルファ pixelStrength に達するために
-        //   必要な srcA を逆算 → srcA = (tgt - dstA) / (1 - dstA)
-        // こうすることで delta 近似ではなく正確に目標カバレッジに到達する
-        m_strokeAccum.setPixel(px, py, Color {
-            static_cast<std::uint8_t>(std::lround(pixelStrength * 255.0f)), 0, 0, 255});
-
-        if (lockAlpha) {
-          // アルファロック時はアルファを増やせないので単純に差分強度でブレンド
-          const float delta = pixelStrength - prevAccum;
-          blendPixel(buffer, px, py, drawColor, delta, lockAlpha);
-        } else {
-          const float dstA = static_cast<float>(buffer.pixel(px, py).a) / 255.0f;
-          const bool isTransparentMode = (drawColor.a == 0);
-          if (dstA >= 0.999f && !isTransparentMode) {
-            // Destination is fully opaque: use delta-based application so new
-            // strokes always paint over existing pixels (color replacement).
-            const float delta = pixelStrength - prevAccum;
-            if (delta > 0.001f) {
-              blendPixel(buffer, px, py, drawColor, delta, lockAlpha);
-            }
-          } else {
-            const float srcANeeded = std::clamp(
-                (pixelStrength - dstA) / (1.0f - dstA), 0.0f, 1.0f);
-            if (srcANeeded <= 0.001f) continue;
-            blendPixel(buffer, px, py, drawColor, srcANeeded, lockAlpha);
-          }
-        }
-      } else {
-        blendPixel(buffer, px, py, drawColor, pixelStrength, lockAlpha);
-      }
-    }
-  }
+  // ── DabGenerator に scatter / angleJitter / dabCount を委譲 ──────────────
+  m_dabGenerator.generate(
+      dyn.dabCount, radius,
+      dyn.scatter,      dyn.scatterAmount,
+      dyn.angleJitter,  dyn.angleJitterAmount,
+      [&](const DabPlacement& p) {
+        const FPoint pos {center.x + p.offset.x, center.y + p.offset.y};
+        stampAt(buffer, composited, pos, radius, strength, lockAlpha, p.angle);
+      });
 }
 
 // ---------------------------------------------------------------
@@ -597,73 +482,42 @@ void BrushTool::strokeSegment(
   const auto& dyn = m_settings.dynamics;
 
   const float baseRadius = static_cast<float>(std::max(1, m_settings.size)) * 0.5f;
-  const float dx = to.x - from.x;
-  const float dy = to.y - from.y;
-  const float segLen = std::sqrt(dx * dx + dy * dy);
 
   // ── 速度係数を更新（指数スムージング） ──────────────────────────────────
   const auto now = Clock::now();
   const float dtMs = static_cast<float>(
       std::chrono::duration_cast<std::chrono::microseconds>(now - m_lastMoveTime).count()) / 1000.0f;
   m_lastMoveTime = now;
-  if (dtMs > 0.5f) {
-    const float rawVel = segLen / dtMs; // px/ms
-    m_currentVelocityPxMs = m_currentVelocityPxMs * 0.7f + rawVel * 0.3f;
-  }
-  // 速度係数: refSpeed = brushDiameter * 2 px/ms を「高速」とみなす
-  const float refSpeed = static_cast<float>(std::max(1, m_settings.size)) * 2.0f; // px/ms
-  const float velFactor = std::clamp(m_currentVelocityPxMs / refSpeed, 0.0f, 1.0f);
-
-  // 速度→サイズ比率 (1=通常, velocitySizeMin=最高速時)
-  const float velSizeScale = dyn.velocitySize
-      ? (1.0f - velFactor * (1.0f - dyn.velocitySizeMin))
-      : 1.0f;
-  // 速度→opacity比率
-  const float velOpacityScale = dyn.velocityOpacity
-      ? (1.0f - velFactor * (1.0f - dyn.velocityOpacityMin))
-      : 1.0f;
-
-  // spacing はブラシ直径の比率
-  const float spacingPx = std::max(0.5f, m_settings.spacing * baseRadius * 2.0f);
-
-  if (segLen < 0.001f) {
-    const float radius   = baseRadius * computePressureSize(pressureFrom) * velSizeScale;
-    const float opScale  = computePressureOpacity(pressureFrom) * velOpacityScale;
-    const float strength = std::clamp(m_settings.opacity * m_settings.flow * opScale, 0.0f, 1.0f);
-    stampAt(buffer, composited, from, radius, strength, lockAlpha);
-    return;
-  }
-
-  float traveled = spacingPx - m_distanceAccum;
-  if (traveled < 0.0f) traveled = 0.0f;
-  if (traveled > segLen) {
-    m_distanceAccum += segLen;
-    return;
-  }
-
-  while (traveled <= segLen + 0.001f) {
-    const float t       = std::clamp(traveled / segLen, 0.0f, 1.0f);
-    const FPoint pos    {from.x + dx * t, from.y + dy * t};
-    const float pressure = pressureFrom + (pressureTo - pressureFrom) * t;
-    const float radius   = baseRadius * computePressureSize(pressure) * velSizeScale;
-    const float opScale  = computePressureOpacity(pressure) * velOpacityScale;
-
-    float taperScale = 1.0f;
-    if (strokeLen > 0.0f) {
-      const float globalT = std::clamp((strokeT + traveled) / strokeLen, 0.0f, 1.0f);
-      taperScale = computeTaperStrength(globalT, m_settings.taperStart, m_settings.taperEnd);
+  {
+    const float dx0 = to.x - from.x;
+    const float dy0 = to.y - from.y;
+    const float rawSegLen = std::sqrt(dx0*dx0 + dy0*dy0);
+    if (dtMs > 0.5f) {
+      const float rawVel = rawSegLen / dtMs;
+      m_currentVelocityPxMs = m_currentVelocityPxMs * 0.7f + rawVel * 0.3f;
     }
-
-    const float strength = std::clamp(m_settings.opacity * m_settings.flow * opScale * taperScale, 0.0f, 1.0f);
-    stampAt(buffer, composited, pos, radius, strength, lockAlpha);
-
-    traveled += spacingPx;
   }
+  const float refSpeed     = static_cast<float>(std::max(1, m_settings.size)) * 2.0f;
+  const float velFactor    = std::clamp(m_currentVelocityPxMs / refSpeed, 0.0f, 1.0f);
+  const float velSizeScale = dyn.velocitySize
+      ? (1.0f - velFactor * (1.0f - dyn.velocitySizeMin)) : 1.0f;
+  const float velOpacityScale = dyn.velocityOpacity
+      ? (1.0f - velFactor * (1.0f - dyn.velocityOpacityMin)) : 1.0f;
 
-  // traveled がループを抜けた時点で last stamp は (traveled - spacingPx) の位置にある。
-  // セグメント終端からその位置までの距離が次回の繰り越し量。
-  m_distanceAccum = segLen - (traveled - spacingPx);
-  if (m_distanceAccum < 0.0f) m_distanceAccum = 0.0f;
+  // ── StrokeProcessor に CR / spacing / distanceAccum を委譲 ─────────────
+  m_strokeProcessor.feedSegment(
+      from, to,
+      m_settings.spacing, baseRadius,
+      pressureFrom, pressureTo,
+      strokeT, strokeLen,
+      m_settings.taperStart, m_settings.taperEnd,
+      [&](const DabRequest& dab) {
+        const float radius  = baseRadius * computePressureSize(dab.pressure) * velSizeScale;
+        const float opScale = computePressureOpacity(dab.pressure) * velOpacityScale;
+        const float strength = std::clamp(
+            m_settings.opacity * m_settings.flow * opScale * dab.taperScale, 0.0f, 1.0f);
+        stampDabsAt(buffer, composited, dab.pos, radius, strength, lockAlpha);
+      });
 }
 
 // ---------------------------------------------------------------
@@ -679,13 +533,19 @@ ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEven
   if (m_maskEditMode && !active->hasMask()) {
     active->createMask();
   }
+  // ストローク中に使う選択マスクを取得
+  m_selectionMask = context.document.selection().hasSelection()
+                    ? &context.document.selection() : nullptr;
   m_drawing = true;
   m_lastPoint = event.fpoint;
   m_lastPressure = event.pressure;
-  m_distanceAccum = 0.0f;
+  m_strokeProcessor.beginStroke(event.fpoint);
   m_strokeLength = 0.0f;
   m_currentVelocityPxMs = 0.0f;
   m_lastMoveTime = Clock::now();
+  m_dabGenerator.beginStroke(
+      static_cast<uint32_t>(
+          static_cast<int>(event.fpoint.x * 17) + static_cast<int>(event.fpoint.y * 31)));
   // スメア: ストローク開始点でキャンバス色を採取
   {
     const int cx = static_cast<int>(event.fpoint.x);
@@ -716,7 +576,7 @@ ToolResult BrushTool::onPointerPress(ToolContext& context, const ToolPointerEven
   const float opacityScale = computePressureOpacity(event.pressure);
   const float strength = std::clamp(m_settings.opacity * m_settings.flow * opacityScale, 0.0f, 1.0f);
   const bool lockAlpha = m_settings.lockAlphaRespect || active->alphaLocked();
-  stampAt(active->buffer(), context.composited, m_lastPoint, radius, strength, lockAlpha);
+  stampDabsAt(active->buffer(), context.composited, m_lastPoint, radius, strength, lockAlpha);
 
   ToolResult result;
   result.pixelsChanged = true;
@@ -736,7 +596,9 @@ ToolResult BrushTool::onPointerMove(ToolContext& context, const ToolPointerEvent
     return {};
   }
 
-  const FPoint stabilized = applyStabilization(m_lastPoint, event.fpoint);
+  const FPoint stabilized = m_strokeProcessor.applyStabilization(
+      m_lastPoint, event.fpoint,
+      m_settings.stabilization, m_settings.velocityBasedCorrection);
 
   if (active->kind() == LayerKind::Vector) {
     const FPoint fpt = event.fpoint;
@@ -759,7 +621,12 @@ ToolResult BrushTool::onPointerMove(ToolContext& context, const ToolPointerEvent
                 m_lastPressure, event.pressure,
                 m_strokeLength - segLen, m_strokeLength);
 
-  const Rect dirty = strokeDirtyRect(m_lastPoint, stabilized, static_cast<float>(m_settings.size));
+  // scatter が有効な場合は dirty rect を散布半径分だけ拡張する
+  const float scatterExpand = m_settings.dynamics.scatter
+      ? m_settings.dynamics.scatterAmount : 0.0f;
+  const Rect dirty = strokeDirtyRect(
+      m_lastPoint, stabilized,
+      static_cast<float>(m_settings.size) * (1.0f + scatterExpand));
   m_lastPoint = stabilized;
   m_lastPressure = event.pressure;
 
@@ -775,13 +642,16 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
   }
 
   m_drawing = false;
+  m_selectionMask = nullptr;
   Layer* active = context.document.activeLayer();
   if (active == nullptr || active->kind() == LayerKind::Folder || active->locked()) {
     m_vectorPoints.clear();
     return {};
   }
 
-  const FPoint stabilized = applyStabilization(m_lastPoint, event.fpoint);
+  const FPoint stabilized = m_strokeProcessor.applyStabilization(
+      m_lastPoint, event.fpoint,
+      m_settings.stabilization, m_settings.velocityBasedCorrection);
 
   if (active->kind() == LayerKind::Vector) {
     const FPoint fpt = event.fpoint;
@@ -841,8 +711,9 @@ ToolResult BrushTool::onPointerRelease(ToolContext& context, const ToolPointerEv
 ToolResult BrushTool::onCancel(ToolContext& context) {
   static_cast<void>(context);
   m_drawing = false;
+  m_selectionMask = nullptr;
   m_vectorPoints.clear();
-  m_distanceAccum = 0.0f;
+  m_strokeProcessor.beginStroke({0.0f, 0.0f});
   m_strokeLength = 0.0f;
   return {};
 }

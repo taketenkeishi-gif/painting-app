@@ -9,11 +9,11 @@
 #include "core/selection/SelectionMask.h"
 #include "core/selection/SelectionRequest.h"
 #include "core/selection/SelectionResult.h"
+#include "core/selection/providers/ISelectionProvider.h"
 
 namespace core {
 
 class Document;
-class ISelectionProvider;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SelectionEngine

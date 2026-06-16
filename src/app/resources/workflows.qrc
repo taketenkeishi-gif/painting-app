@@ -1,0 +1,9 @@
+<RCC>
+  <qresource prefix="/workflows">
+    <file>workflows/paintapp_img2img.json</file>
+    <file>workflows/paintapp_inpaint.json</file>
+    <file>workflows/paintapp_scribble.json</file>
+    <file>workflows/paintapp_canny.json</file>
+    <file>workflows/paintapp_lineart.json</file>
+  </qresource>
+</RCC>

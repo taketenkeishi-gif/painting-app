@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
@@ -32,10 +35,14 @@
 #include <QStyle>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QDataStream>
+#include <QDropEvent>
 #include <QListWidgetItem>
+#include <QMimeData>
 
 #include "app/bridge/AppController.h"
 #include "app/ui/IconLoader.h"
+#include "app/ui/system/DesignSystem.h"
 
 namespace app::panels {
 
@@ -55,15 +62,24 @@ constexpr int kBlendModeRole = Qt::UserRole + 11;
 constexpr int kPaperRole = Qt::UserRole + 12;
 constexpr int kActiveRole = Qt::UserRole + 13;
 constexpr int kEditTargetRole = Qt::UserRole + 14;  ///< 0=Image, 1=Mask
+constexpr int kLayerIdRole     = Qt::UserRole + 15;  ///< レイヤーの安定ID
+constexpr int kParentIdRole    = Qt::UserRole + 16;  ///< 親フォルダの安定ID（0=ルート）
+constexpr int kDepthRole       = Qt::UserRole + 17;  ///< 階層の深さ（0=ルート）
+constexpr int kExpandedRole    = Qt::UserRole + 18;  ///< フォルダが展開中かどうか
+constexpr int kExpandToggleRole= Qt::UserRole + 19;  ///< デリゲート→パネルへ折りたたみトグル要求
+constexpr int kEffVisibleRole  = Qt::UserRole + 20;  ///< 親チェーン込みの effective visibility
+namespace DS = app::ui::system;
 
-constexpr int kLayerRowHeight = 36;
-constexpr int kLayerThumbWidth = 34;
-constexpr int kLayerThumbHeight = 26;
-constexpr int kMaskThumbWidth = 26;
-constexpr int kMaskThumbHeight = 26;
-constexpr int kThumbGap = 3;
-constexpr int kVisibilitySlotWidth = 20;
-constexpr int kActiveSlotWidth = 16;
+constexpr int kIndentWidth        = DS::layer::kIndentW;         ///< 深さ1段あたりのインデント幅（px）
+constexpr int kLayerRowHeight     = DS::layer::kRowHeight;
+constexpr int kLayerThumbWidth    = DS::layer::kThumbW;
+constexpr int kLayerThumbHeight   = DS::layer::kThumbH;
+constexpr int kMaskThumbWidth     = DS::layer::kMaskThumbW;
+constexpr int kMaskThumbHeight    = DS::layer::kMaskThumbH;
+constexpr int kThumbGap           = DS::layer::kThumbGap;
+constexpr int kVisibilitySlotWidth = DS::layer::kVisibilitySlotW;
+constexpr int kActiveSlotWidth    = DS::layer::kActiveSlotW;
+constexpr int kStatusAreaWidth    = DS::layer::kStatusAreaW;
 
 QString layerKindText(core::LayerKind kind) {
   switch (kind) {
@@ -170,8 +186,25 @@ QIcon layerThumbnailIcon(
       painter.drawLine(QPointF(3.0, thumbH - 4.0), QPointF(thumbW - 3.0, 3.5));
       painter.end();
     } else if (layer.kind() == core::LayerKind::Folder) {
+      // フォルダ形状アイコン（タブ付きファイルフォルダ）
       QPainter painter(&image);
-      painter.fillRect(QRect(1, 2, thumbW - 2, thumbH - 4), QColor(102, 118, 142, 80));
+      painter.setRenderHint(QPainter::Antialiasing, false);
+      // タブ部分（左上の小さな突起）
+      const QColor tabColor(120, 90, 32, 240);
+      const QColor bodyColor(96, 72, 24, 240);
+      const QColor shineColor(155, 120, 48, 200);
+      const QColor borderColor(48, 36, 10, 220);
+      painter.fillRect(QRect(2, 2, 13, 4), tabColor);
+      painter.fillRect(QRect(14, 4, thumbW - 5, 1), tabColor);  // タブと本体の継ぎ目
+      // 本体
+      painter.fillRect(QRect(2, 5, thumbW - 4, thumbH - 8), bodyColor);
+      // 内側ハイライトライン（立体感）
+      painter.fillRect(QRect(3, 6, thumbW - 6, 1), shineColor);
+      // 輪郭
+      painter.setPen(QPen(borderColor, 1));
+      painter.setBrush(Qt::NoBrush);
+      painter.drawRect(QRect(2, 5, thumbW - 5, thumbH - 9));
+      painter.drawRect(QRect(2, 2, 12, 3));
       painter.end();
     }
   }
@@ -372,11 +405,75 @@ QRect layerMaskThumbnailRect(const QRect& rect) {
 
 QRect layerNameRect(const QRect& rect, bool hasMask) {
   const int nameLeft = hasMask
-      ? layerMaskThumbnailRect(rect).right() + 5
-      : layerThumbnailRect(rect).right() + 5;
-  return QRect(nameLeft, rect.top(), rect.right() - nameLeft - 3, rect.height());
+      ? layerMaskThumbnailRect(rect).right() + 4
+      : layerThumbnailRect(rect).right() + 4;
+  const int nameRight = rect.right() - kStatusAreaWidth - 2;
+  return QRect(nameLeft, rect.top(), std::max(0, nameRight - nameLeft), rect.height());
 }
 
+QRect layerStatusRect(const QRect& rect) {
+  return QRect(rect.right() - kStatusAreaWidth, rect.top(), kStatusAreaWidth, rect.height());
+}
+
+// --- 行レイアウト構造体 ---------------------------------------------------------
+// CSP型左ゾーン(eye→expand→typeIcon)→thumb→mask→name→stateIcon 順序
+// paint() と editorEvent() の両方がこれを参照する。
+struct LayerRowRects {
+  QRect content;    // インデント後の全コンテンツ領域
+  QRect indent;     // 深さインデント帯 (depth=0 なら zero-width)
+  QRect expand;     // フォルダ展開/折りたたみ三角スロット（常に確保）
+  QRect eye;        // 表示アイコン（左ゾーン）
+  QRect thumb;      // サムネイル
+  QRect mask;       // マスクサムネイル（isNull() = マスクなし）
+  QRect name;       // 名前テキスト領域
+  QRect stateIcon;  // 右端ステータスアイコン帯（lock 系）
+};
+
+LayerRowRects computeRowRects(const QRect& itemRect, int depth, bool hasMask) {
+  LayerRowRects r;
+
+  // ── インデント ────────────────────────────────────────────────────────────
+  const int indentW = depth * kIndentWidth;
+  r.indent  = QRect(itemRect.left(), itemRect.top(), indentW, itemRect.height());
+  r.content = depth > 0 ? itemRect.adjusted(indentW, 0, 0, 0) : itemRect;
+
+  const int cy = itemRect.top() + itemRect.height() / 2;
+  int x = r.content.left() + 2;  // 2px left margin
+
+  // ── 左ゾーン: expand triangle（フォルダ展開/折りたたみ）─────────────────────
+  const int expandS = DS::layer::kExpandSlotW;          // 12px
+  r.expand = QRect(x, cy - expandS / 2, expandS, expandS);
+  x += expandS + 2;
+
+  // ── 左ゾーン: eye ───────────────────────────────────────────────────────────
+  const int eyeS  = DS::icon::kMedium;                 // 16px
+  r.eye    = QRect(x, cy - eyeS / 2, eyeS, eyeS);
+  x += kVisibilitySlotWidth;
+
+
+  // ── 中央: thumb → mask ────────────────────────────────────────────────────
+  r.thumb = QRect(x,
+                  itemRect.top() + (itemRect.height() - kLayerThumbHeight) / 2,
+                  kLayerThumbWidth, kLayerThumbHeight);
+  x = r.thumb.right() + kThumbGap;
+
+  if (hasMask) {
+    r.mask = QRect(x,
+                   itemRect.top() + (itemRect.height() - kMaskThumbHeight) / 2,
+                   kMaskThumbWidth, kMaskThumbHeight);
+    x = r.mask.right() + kThumbGap;
+  }
+
+  // ── 右ゾーン: stateIcon（右固定）──────────────────────────────────────────
+  r.stateIcon = QRect(r.content.right() - kStatusAreaWidth,
+                      itemRect.top(), kStatusAreaWidth, itemRect.height());
+
+  // ── name: thumb/mask 右 〜 stateIcon 左 ──────────────────────────────────
+  const int nameRight = r.stateIcon.left() - 2;
+  r.name = QRect(x, itemRect.top(), std::max(0, nameRight - x), itemRect.height());
+
+  return r;
+}
 QString layerPaintName(const QModelIndex& index) {
   if (index.data(kPaperRole).toBool()) {
     return QStringLiteral("用紙");
@@ -408,77 +505,147 @@ QString layerPaintName(const QModelIndex& index) {
 
     const QRect rect = option.rect;
     const bool selected = option.state.testFlag(QStyle::State_Selected);
-    const bool active = index.data(kActiveRole).toBool();
-    const bool visible = index.data(kVisibilityRole).toBool();
+    const bool active   = index.data(kActiveRole).toBool();
+    const bool visible  = index.data(kVisibilityRole).toBool();
+    const bool isPaper  = index.data(kPaperRole).toBool();
 
-    QColor background = QColor(Qt::transparent);
-    if (selected || active) {
-      background = QColor(0x1e, 0x5b, 0x94);
+    // ── 行全体ハイライト（active = 明青、selected = 暗青、alternate = 濃グレー）
+    QColor background(Qt::transparent);
+    if (active) {
+      background = QColor(DS::layer::kActiveBg);
+    } else if (selected) {
+      background = QColor(DS::layer::kSelectedBg);
     } else if (option.features.testFlag(QStyleOptionViewItem::Alternate)) {
-      background = QColor(0x22, 0x22, 0x22);
+      background = QColor(DS::layer::kAlternateBg);
     }
-
     if (background.alpha() > 0) {
       painter->fillRect(rect, background);
     }
 
-    painter->setPen(QPen(QColor(0x1e, 0x1e, 0x1e), 1));
+    // 行区切り線
+    painter->setPen(QPen(QColor(DS::layer::kRowDivider), 1));
     painter->drawLine(rect.left(), rect.bottom(), rect.right(), rect.bottom());
 
-    const QRect eyeRect = layerVisibilityRect(rect);
-    const QIcon eyeIcon = visible ? app::ui::icon(QStringLiteral("visibility"))
-                                  : app::ui::icon(QStringLiteral("visibility_off"));
-    eyeIcon.paint(painter, eyeRect, Qt::AlignCenter, QIcon::Normal);
-
-    const QRect activeRect = layerActiveRect(rect);
-    if (active) {
-      app::ui::icon(QStringLiteral("pen_active")).paint(painter, activeRect, Qt::AlignCenter, QIcon::Normal);
-    }
-
-    const QRect thumbRect = layerThumbnailRect(rect);
+    // ── 全 Rect を先頭で一括計算（paint / editorEvent 共通）─────────────────
+    const int depth    = index.data(kDepthRole).toInt();
     const bool hasMask = index.data(kHasMaskRole).toBool();
-    const int editTarget = index.data(kEditTargetRole).toInt();
-    const bool editingMask = hasMask && (editTarget == 1);
+    const auto kind    = static_cast<core::LayerKind>(index.data(kKindRole).toInt());
+    const LayerRowRects rr = computeRowRects(rect, depth, hasMask);
+
+    const int editTarget   = index.data(kEditTargetRole).toInt();
+    const bool editingMask  = hasMask && (editTarget == 1);
     const bool editingImage = !editingMask;
 
-    const QIcon thumbnail = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
-    thumbnail.paint(painter, thumbRect, Qt::AlignCenter, QIcon::Normal);
-
-    // Image thumbnail highlight border
-    if (editingImage && !index.data(kPaperRole).toBool()) {
-      painter->setPen(QPen(QColor(0x4e, 0x8e, 0xf7), 2));
-    } else {
-      painter->setPen(QColor(0x1e, 0x1e, 0x1e));
+    // ── クリッピングインジケーター（強化版）──────────────────────────────────
+    // 行左端から4px幅のオレンジ縦バーで前景に強調
+    if (index.data(kClippedRole).toBool() && !isPaper) {
+      QColor clipPrimary(DS::layer::kClipBar);
+      clipPrimary.setAlpha(230);
+      painter->fillRect(QRect(rr.content.left(), rect.top(), 4, rect.height()), clipPrimary);
+      // サムネイル直前にも細バーで二重強調
+      QColor clipSecondary(DS::layer::kClipBar);
+      clipSecondary.setAlpha(150);
+      painter->fillRect(QRect(rr.thumb.left() - 3, rr.thumb.top(), 2, rr.thumb.height()), clipSecondary);
     }
-    painter->setBrush(Qt::NoBrush);
-    painter->drawRect(thumbRect.adjusted(0, 0, -1, -1));
 
-    // Mask thumbnail
-    const QRect maskThumbRect = layerMaskThumbnailRect(rect);
+    // ── フォルダ行: 薄い背景色で区別 ─────────────────────────────────────────
+    if (kind == core::LayerKind::Folder && !active && !selected) {
+      QColor folderRowTint(60, 48, 20, 18);
+      painter->fillRect(rect, folderRowTint);
+    }
+
+    // ── 左ゾーン: expand triangle（フォルダのみ有効）────────────────────────
+    if (kind == core::LayerKind::Folder) {
+      const bool expanded = index.data(kExpandedRole).toBool();
+      QFont expandFont = painter->font();
+      expandFont.setPixelSize(10);
+      painter->setFont(expandFont);
+      painter->setPen(QColor(DS::layer::kChevron));
+      painter->drawText(rr.expand, Qt::AlignCenter,
+                        expanded ? QStringLiteral("▼") : QStringLiteral("▶"));
+    }
+
+    // ── 左ゾーン: 目玉アイコン（表示/非表示）─────────────────────────────────
+    const QIcon eyeIcon = visible ? app::ui::icon(QStringLiteral("visibility"))
+                                  : app::ui::icon(QStringLiteral("visibility_off"));
+    eyeIcon.paint(painter, rr.eye, Qt::AlignCenter, QIcon::Normal);
+
+    // ── 中央: メインサムネイル───────────────────────────────────────────────
+    const QIcon thumbnail = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
+    thumbnail.paint(painter, rr.thumb, Qt::AlignCenter, QIcon::Normal);
+    // サムネイル枠（編集中は青ハイライト）
+    painter->setBrush(Qt::NoBrush);
+    if (editingImage && !isPaper) {
+      painter->setPen(QPen(QColor(DS::layer::kFocusBorder), 2));
+    } else {
+      painter->setPen(QPen(QColor(DS::layer::kThumbBorder), 1));
+    }
+    painter->drawRect(rr.thumb.adjusted(0, 0, -1, -1));
+
+    // ── 中央: マスクサムネイル（横配置）────────────────────────────────────
     if (hasMask) {
       const QPixmap maskPm = qvariant_cast<QPixmap>(index.data(Qt::UserRole + 100));
-      painter->drawPixmap(maskThumbRect, maskPm);
+      painter->drawPixmap(rr.mask, maskPm);
+
+      painter->setBrush(Qt::NoBrush);
       if (editingMask) {
-        painter->setPen(QPen(QColor(0x4e, 0x8e, 0xf7), 2));
+        painter->setPen(QPen(QColor(DS::layer::kFocusBorder), 2));
       } else {
         const bool maskEnabled = index.data(kMaskEnabledRole).toBool();
-        painter->setPen(QPen(maskEnabled ? QColor(0x1e, 0x1e, 0x1e) : QColor(0xe0, 0x50, 0x50), 1));
+        painter->setPen(QPen(maskEnabled ? QColor(DS::layer::kThumbBorder)
+                                         : QColor(DS::layer::kMaskDisabled), 1));
       }
-      painter->setBrush(Qt::NoBrush);
-      painter->drawRect(maskThumbRect.adjusted(0, 0, -1, -1));
-      // Disabled mask: red X overlay
+      painter->drawRect(rr.mask.adjusted(0, 0, -1, -1));
+
       if (!index.data(kMaskEnabledRole).toBool()) {
-        painter->setPen(QPen(QColor(0xe0, 0x50, 0x50, 180), 1));
-        painter->drawLine(maskThumbRect.topLeft(), maskThumbRect.bottomRight());
-        painter->drawLine(maskThumbRect.topRight(), maskThumbRect.bottomLeft());
+        QColor maskX(DS::layer::kMaskDisabled);
+        maskX.setAlpha(180);
+        painter->setPen(QPen(maskX, 1));
+        painter->drawLine(rr.mask.topLeft(), rr.mask.bottomRight());
+        painter->drawLine(rr.mask.topRight(), rr.mask.bottomLeft());
       }
     }
 
+    // ── 中央: レイヤー名─────────────────────────────────────────────────────
     QFont nameFont = option.font;
     nameFont.setBold(active);
     painter->setFont(nameFont);
-    painter->setPen(visible ? QColor(0xd4, 0xd4, 0xd4) : QColor(0x78, 0x78, 0x78));
-    painter->drawText(layerNameRect(rect, hasMask), Qt::AlignVCenter | Qt::AlignLeft, layerPaintName(index));
+    painter->setPen(visible ? QColor(DS::layer::kNameVisible)
+                            : QColor(DS::layer::kNameHidden));
+    painter->drawText(rr.name, Qt::AlignVCenter | Qt::AlignLeft, layerPaintName(index));
+
+    // ── 右ゾーン: lock アイコン（右固定・右から左へ積む）───────────────────
+    {
+      const int iconS = DS::icon::kMedium;
+      const int iconY = rect.top() + (rect.height() - iconS) / 2;
+      int iconX = rr.stateIcon.right() - 2;
+
+      if (index.data(kLockedRole).toBool()) {
+        iconX -= iconS;
+        app::ui::icon(QStringLiteral("lock")).paint(painter,
+            QRect(iconX, iconY, iconS, iconS), Qt::AlignCenter, QIcon::Normal);
+        iconX -= 2;
+      }
+      if (index.data(kAlphaLockedRole).toBool()) {
+        iconX -= iconS;
+        app::ui::icon(QStringLiteral("lock_alpha")).paint(painter,
+            QRect(iconX, iconY, iconS, iconS), Qt::AlignCenter, QIcon::Normal);
+        iconX -= 2;
+      }
+      if (index.data(kPositionLockedRole).toBool()) {
+        iconX -= iconS;
+        app::ui::icon(QStringLiteral("lock_position")).paint(painter,
+            QRect(iconX, iconY, iconS, iconS), Qt::AlignCenter, QIcon::Normal);
+      }
+    }
+
+    // ── 親フォルダ非表示オーバーレイ（最前面）──────────────────────────────
+    const bool effVisible = index.data(kEffVisibleRole).toBool();
+    if (!effVisible && visible) {
+      QColor dimOverlay(DS::layer::kDimOverlay);
+      dimOverlay.setAlpha(70);
+      painter->fillRect(rr.content, dimOverlay);
+    }
 
     painter->restore();
   }
@@ -495,37 +662,204 @@ QString layerPaintName(const QModelIndex& index) {
     if (event->type() == QEvent::MouseButtonRelease) {
       auto* mouseEvent = static_cast<QMouseEvent*>(event);
       if (mouseEvent->button() == Qt::LeftButton) {
-        if (layerVisibilityRect(option.rect).contains(mouseEvent->pos())) {
-          const bool visible = index.data(kVisibilityRole).toBool();
-          model->setData(index, visible ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
+        // paint() と同一の rect 計算（hit test と描画位置をゼロオフセットで一致させる）
+        const int depth   = index.data(kDepthRole).toInt();
+        const bool hasMask = index.data(kHasMaskRole).toBool();
+        const LayerRowRects rr = computeRowRects(option.rect, depth, hasMask);
+        const QPoint pos = mouseEvent->pos();
+
+        // 表示切替
+        if (rr.eye.contains(pos)) {
+          const bool vis = index.data(kVisibilityRole).toBool();
+          model->setData(index, vis ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
           return true;
         }
-        // Mask thumbnail click → switch edit target
-        if (index.data(kHasMaskRole).toBool() &&
-            layerMaskThumbnailRect(option.rect).contains(mouseEvent->pos())) {
-          model->setData(index, 1, kEditTargetRole);
+
+        // フォルダ展開/折りたたみ（expand スロット または thumb クリック）
+        const auto ekind = static_cast<core::LayerKind>(index.data(kKindRole).toInt());
+        if (ekind == core::LayerKind::Folder &&
+            (rr.expand.contains(pos) || rr.thumb.contains(pos))) {
+          model->setData(index, true, kExpandToggleRole);
           return true;
         }
-        // Image thumbnail click → switch edit target to image
-        if (layerThumbnailRect(option.rect).contains(mouseEvent->pos())) {
+
+        // マスクサムネイルクリック（Shift=有効/無効トグル、通常=編集対象切替）
+        if (hasMask && rr.mask.contains(pos)) {
+          if (mouseEvent->modifiers().testFlag(Qt::ShiftModifier)) {
+            const bool enabled = index.data(kMaskEnabledRole).toBool();
+            model->setData(index, !enabled ? 2 : 3, kEditTargetRole);  // 2=enable, 3=disable
+          } else {
+            model->setData(index, 1, kEditTargetRole);  // switch to mask
+          }
+          return true;
+        }
+
+        // 画像サムネイルクリック → 編集対象を画像へ
+        if (rr.thumb.contains(pos)) {
           model->setData(index, 0, kEditTargetRole);
-          return true;
-        }
-      }
-      // Shift+click mask thumbnail → toggle mask enable
-      if (event->type() == QEvent::MouseButtonRelease) {
-        auto* me = static_cast<QMouseEvent*>(event);
-        if (me->button() == Qt::LeftButton && me->modifiers().testFlag(Qt::ShiftModifier) &&
-            index.data(kHasMaskRole).toBool() &&
-            layerMaskThumbnailRect(option.rect).contains(me->pos())) {
-          const bool enabled = index.data(kMaskEnabledRole).toBool();
-          model->setData(index, !enabled ? 2 : 3, kEditTargetRole);  // 2=enable, 3=disable
           return true;
         }
       }
     }
 
     return QStyledItemDelegate::editorEvent(event, model, option, index);
+  }
+
+  QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+    Q_UNUSED(option);
+    if (index.data(kPaperRole).toBool()) {
+      return nullptr;
+    }
+    auto* editor = new QLineEdit(parent);
+    editor->setFrame(false);
+    editor->setStyleSheet(
+        QStringLiteral("QLineEdit {"
+        "  background: %1;"
+        "  color: %2;"
+        "  border: 1px solid %3;"
+        "  border-radius: 2px;"
+        "  padding: 0px 2px;"
+        "}")
+        .arg(DS::layer::kEditorBg,
+             DS::layer::kEditorText,
+             DS::layer::kEditorBorder));
+    return editor;
+  }
+
+  void setEditorData(QWidget* editor, const QModelIndex& index) const override {
+    auto* lineEdit = qobject_cast<QLineEdit*>(editor);
+    if (lineEdit == nullptr) {
+      return;
+    }
+    lineEdit->setText(layerPaintName(index));
+    lineEdit->selectAll();
+  }
+
+  void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override {
+    auto* lineEdit = qobject_cast<QLineEdit*>(editor);
+    if (lineEdit == nullptr) {
+      return;
+    }
+    const QString text = lineEdit->text().trimmed();
+    if (!text.isEmpty()) {
+      model->setData(index, text, Qt::EditRole);
+    }
+  }
+
+  void updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+    const int depth    = index.data(kDepthRole).toInt();
+    const bool hasMask = index.data(kHasMaskRole).toBool();
+    const LayerRowRects rr = computeRowRects(option.rect, depth, hasMask);
+    editor->setGeometry(rr.name);
+  }
+};
+
+/// フォルダ行の中央にドロップしたとき reparent コールバックを呼ぶ QListWidget 派生クラス
+class CustomLayerList : public QListWidget {
+public:
+  explicit CustomLayerList(QWidget* parent = nullptr) : QListWidget(parent) {}
+  std::function<bool(int fromRow, uint32_t targetFolderId)> onFolderDrop;
+
+protected:
+  int m_dropFolderRow = -1;  // ドラッグ中にハイライトするフォルダ行（-1=なし）
+
+  // MIME データからドラッグ元の行番号を取得（InternalMove 時は常にこちらが信頼できる）
+  int sourceRowFromMime(const QMimeData* mime) const {
+    if (mime == nullptr) return -1;
+    const QString fmt = QStringLiteral("application/x-qabstractitemmodeldatalist");
+    if (!mime->hasFormat(fmt)) return -1;
+    QByteArray data = mime->data(fmt);
+    QDataStream stream(&data, QIODevice::ReadOnly);
+    if (stream.atEnd()) return -1;
+    int r = -1, c = -1;
+    QMap<int, QVariant> v;
+    stream >> r >> c >> v;
+    return r;
+  }
+
+  void dragMoveEvent(QDragMoveEvent* e) override {
+    const QPoint pos = e->position().toPoint();
+    QListWidgetItem* targetItem = itemAt(pos);
+    int newDropRow = -1;
+
+    if (targetItem != nullptr) {
+      const QRect itemRect = visualItemRect(targetItem);
+      const int margin = itemRect.height() / 5;
+      const bool onCenter = (pos.y() >= itemRect.top() + margin &&
+                             pos.y() <= itemRect.bottom() - margin);
+      if (onCenter) {
+        const auto kind = static_cast<core::LayerKind>(targetItem->data(kKindRole).toInt());
+        if (kind == core::LayerKind::Folder) {
+          newDropRow = row(targetItem);
+        }
+      }
+    }
+
+    if (newDropRow != m_dropFolderRow) {
+      m_dropFolderRow = newDropRow;
+      viewport()->update();
+    }
+    QListWidget::dragMoveEvent(e);
+  }
+
+  void dragLeaveEvent(QDragLeaveEvent* e) override {
+    m_dropFolderRow = -1;
+    viewport()->update();
+    QListWidget::dragLeaveEvent(e);
+  }
+
+  void paintEvent(QPaintEvent* e) override {
+    QListWidget::paintEvent(e);
+    // フォルダドロップターゲットを青枠でハイライト
+    if (m_dropFolderRow >= 0) {
+      QListWidgetItem* item = this->item(m_dropFolderRow);
+      if (item != nullptr) {
+        QPainter painter(viewport());
+        const QRect r = visualItemRect(item).adjusted(1, 1, -2, -2);
+        QColor fillColor(0x24, 0x31, 0x42);  // kListDropBg #243142
+        fillColor.setAlpha(50);
+        painter.fillRect(r, fillColor);
+        painter.setPen(QPen(QColor(0x7f, 0xb3, 0xff), 2));  // kListDropBorder #7fb3ff
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(r);
+      }
+    }
+  }
+
+  void dropEvent(QDropEvent* e) override {
+    const QPoint pos = e->position().toPoint();
+    m_dropFolderRow = -1;
+    viewport()->update();
+
+    QListWidgetItem* targetItem = itemAt(pos);
+    if (targetItem != nullptr && onFolderDrop) {
+      const QRect itemRect = visualItemRect(targetItem);
+      const int margin = itemRect.height() / 5;
+      const bool onItemCenter = (pos.y() >= itemRect.top() + margin &&
+                                 pos.y() <= itemRect.bottom() - margin);
+      if (onItemCenter) {
+        const auto kind = static_cast<core::LayerKind>(targetItem->data(kKindRole).toInt());
+        if (kind == core::LayerKind::Folder) {
+          // MIME データから取得（selectedItems() より信頼性が高い）
+          int fromRow = sourceRowFromMime(e->mimeData());
+          if (fromRow < 0) {
+            const QList<QListWidgetItem*> sel = selectedItems();
+            if (!sel.isEmpty()) fromRow = row(sel.first());
+          }
+          if (fromRow >= 0) {
+            const int toRow = row(targetItem);
+            if (fromRow != toRow) {
+              const uint32_t folderId = static_cast<uint32_t>(targetItem->data(kLayerIdRole).toUInt());
+              if (onFolderDrop(fromRow, folderId)) {
+                e->acceptProposedAction();
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+    QListWidget::dropEvent(e);
   }
 };
 
@@ -535,7 +869,7 @@ LayerPanel::LayerPanel(QWidget* parent)
     : QWidget(parent),
       m_headerLabel(nullptr), // removed: must not exist with text matching dock windowTitle "レイヤー"
       m_filterEdit(new QLineEdit(this)),
-      m_layerList(new QListWidget(this)),
+      m_layerList(new CustomLayerList(this)),
       m_opacityLabel(new QLabel(QStringLiteral("不透明度: 100%"), this)),
       m_opacitySlider(new AlphaSlider(Qt::Horizontal, this)),
       m_opacitySpin(new QSpinBox(this)),
@@ -565,7 +899,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_filterEdit->setClearButtonEnabled(true);
 
   m_layerList->setAlternatingRowColors(true);
-  m_layerList->setSelectionMode(QAbstractItemView::SingleSelection);
+  m_layerList->setSelectionMode(QAbstractItemView::ExtendedSelection);
   m_layerList->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::EditKeyPressed);
   m_layerList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
   m_layerList->setUniformItemSizes(true);
@@ -575,64 +909,80 @@ LayerPanel::LayerPanel(QWidget* parent)
   m_layerList->setDragDropMode(QAbstractItemView::InternalMove);
   m_layerList->setDefaultDropAction(Qt::MoveAction);
   m_layerList->setContextMenuPolicy(Qt::CustomContextMenu);
-  m_layerList->setSpacing(0);
+  m_layerList->setSpacing(1);
   m_layerList->setUniformItemSizes(true);
   m_layerList->setItemDelegate(new LayerItemDelegate(m_layerList));
-  m_layerList->setMinimumHeight(140);
+  m_layerList->setMinimumHeight(DS::layer::kMinListH);
   m_layerList->setStyleSheet(
-      "QListWidget { background: #13151c; border: none; border-top: 1px solid #2a2e3e; outline: none; }"
-      "QListWidget::item { min-height: 32px; padding: 2px 6px; border-bottom: 1px solid #1e2230; }"
-      "QListWidget::item:hover { background: #272c3c; }"
-      "QListWidget::item:selected { background: #1d3a7a; color: #edf0f9; border-left: 2px solid #4e8ef7; }"
-      "QListWidget::item:drop { border-top: 2px solid #4e8ef7; background: #1e2a4a; }"
-      "QListWidget::indicator { width: 14px; height: 14px; }"
-      "QListWidget::indicator:checked { image: url(:/icons/16/visibility.svg); }"
-      "QListWidget::indicator:unchecked { image: url(:/icons/16/visibility_off.svg); }");
+      QStringLiteral(
+          "QListWidget::item { min-height: %1px; padding: 0px; border-bottom: 1px solid %2; }"
+          "QListWidget::item:selected { background: %3; color: #ffffff; }"
+          "QListWidget::item:drop { border-top: 2px solid %4; background: %5; }"
+          "QListWidget::indicator { width: %6px; height: %6px; }"
+          "QListWidget::indicator:checked { image: url(:/icons/16/visibility.svg); }"
+          "QListWidget::indicator:unchecked { image: url(:/icons/16/visibility_off.svg); }")
+      .arg(DS::layer::kRowHeight)
+      .arg(DS::layer::kListItemBorder)
+      .arg(DS::layer::kListItemSelected)
+      .arg(DS::layer::kListDropBorder)
+      .arg(DS::layer::kListDropBg)
+      .arg(DS::icon::kSmall));
 
   m_opacitySlider->setRange(0, 100);
   m_opacitySlider->setValue(100);
   m_opacitySlider->setToolTip(QStringLiteral("アクティブレイヤーの不透明度を調整"));
-  m_opacitySlider->setFixedHeight(22);
+  m_opacitySlider->setFixedHeight(DS::layer::kOpacitySliderH);
+  m_opacitySlider->setStyleSheet(
+      "QSlider::groove:horizontal { height: 4px; background: #2a2e3e; border-radius: 2px; }"
+      "QSlider::sub-page:horizontal { background: #4e8ef7; border-radius: 2px; }"
+      "QSlider::handle:horizontal { width: 3px; height: 8px; margin: -2px 0;"
+      " background: #c8ccd6; border-radius: 1px; }");
   m_opacitySpin->setRange(0, 100);
   m_opacitySpin->setValue(100);
   m_opacitySpin->setSuffix(QStringLiteral("%"));
   m_opacitySpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
   m_opacitySpin->setAlignment(Qt::AlignRight);
-  m_opacitySpin->setFixedWidth(48);
+  m_opacitySpin->setFixedWidth(56);   // 48 was too narrow for '100%'
+  m_opacityLabel->hide();               // not in layout — must be hidden explicitly
 
   auto addBlend = [&](const QString& label, core::BlendMode mode) {
     m_blendModeCombo->addItem(label, static_cast<int>(mode));
   };
-  addBlend(QStringLiteral("通常"),              core::BlendMode::Normal);
-  addBlend(QStringLiteral("── 暗くする ──"),    core::BlendMode::Darken);
-  addBlend(QStringLiteral("乗算"),              core::BlendMode::Multiply);
-  addBlend(QStringLiteral("焼き込みカラー"),    core::BlendMode::ColorBurn);
-  addBlend(QStringLiteral("焼き込み（リニア）"),core::BlendMode::LinearBurn);
-  addBlend(QStringLiteral("── 明るくする ──"),  core::BlendMode::Lighten);
-  addBlend(QStringLiteral("スクリーン"),        core::BlendMode::Screen);
-  addBlend(QStringLiteral("覆い焼きカラー"),    core::BlendMode::ColorDodge);
-  addBlend(QStringLiteral("加算"),              core::BlendMode::LinearDodge);
-  addBlend(QStringLiteral("── コントラスト ──"),core::BlendMode::Overlay);
-  addBlend(QStringLiteral("ソフトライト"),      core::BlendMode::SoftLight);
-  addBlend(QStringLiteral("ハードライト"),      core::BlendMode::HardLight);
-  addBlend(QStringLiteral("ビビッドライト"),    core::BlendMode::VividLight);
-  addBlend(QStringLiteral("リニアライト"),      core::BlendMode::LinearLight);
-  addBlend(QStringLiteral("── 比較 ──"),        core::BlendMode::Difference);
-  addBlend(QStringLiteral("除外"),              core::BlendMode::Exclusion);
-  addBlend(QStringLiteral("減算"),              core::BlendMode::Subtract);
-  addBlend(QStringLiteral("除算"),              core::BlendMode::Divide);
-  addBlend(QStringLiteral("── HSL ──"),         core::BlendMode::Hue);
-  addBlend(QStringLiteral("彩度"),              core::BlendMode::HslSat);
-  addBlend(QStringLiteral("カラー"),            core::BlendMode::HslColor);
-  addBlend(QStringLiteral("輝度"),              core::BlendMode::Luminosity);
+  addBlend(QStringLiteral("通常"),               core::BlendMode::Normal);
+  m_blendModeCombo->insertSeparator(m_blendModeCombo->count());
+  addBlend(QStringLiteral("暗く"),               core::BlendMode::Darken);
+  addBlend(QStringLiteral("乗算"),               core::BlendMode::Multiply);
+  addBlend(QStringLiteral("焼き込みカラー"),     core::BlendMode::ColorBurn);
+  addBlend(QStringLiteral("焼き込み（リニア）"), core::BlendMode::LinearBurn);
+  m_blendModeCombo->insertSeparator(m_blendModeCombo->count());
+  addBlend(QStringLiteral("明るく"),             core::BlendMode::Lighten);
+  addBlend(QStringLiteral("スクリーン"),         core::BlendMode::Screen);
+  addBlend(QStringLiteral("覆い焼きカラー"),     core::BlendMode::ColorDodge);
+  addBlend(QStringLiteral("加算"),               core::BlendMode::LinearDodge);
+  m_blendModeCombo->insertSeparator(m_blendModeCombo->count());
+  addBlend(QStringLiteral("オーバーレイ"),       core::BlendMode::Overlay);
+  addBlend(QStringLiteral("ソフトライト"),       core::BlendMode::SoftLight);
+  addBlend(QStringLiteral("ハードライト"),       core::BlendMode::HardLight);
+  addBlend(QStringLiteral("ビビッドライト"),     core::BlendMode::VividLight);
+  addBlend(QStringLiteral("リニアライト"),       core::BlendMode::LinearLight);
+  m_blendModeCombo->insertSeparator(m_blendModeCombo->count());
+  addBlend(QStringLiteral("差の絶対値"),         core::BlendMode::Difference);
+  addBlend(QStringLiteral("除外"),               core::BlendMode::Exclusion);
+  addBlend(QStringLiteral("減算"),               core::BlendMode::Subtract);
+  addBlend(QStringLiteral("除算"),               core::BlendMode::Divide);
+  m_blendModeCombo->insertSeparator(m_blendModeCombo->count());
+  addBlend(QStringLiteral("色相"),               core::BlendMode::Hue);
+  addBlend(QStringLiteral("彩度"),               core::BlendMode::HslSat);
+  addBlend(QStringLiteral("カラー"),             core::BlendMode::HslColor);
+  addBlend(QStringLiteral("輝度"),               core::BlendMode::Luminosity);
 
   auto initButton = [](QPushButton* button, const QString& iconName, const QString& fullText) {
     button->setIcon(app::ui::icon(iconName));
     button->setProperty("fullText", fullText);
     button->setProperty("shortText", QString());
-    button->setIconSize(QSize(14, 14));
+    button->setIconSize(QSize(DS::icon::kSmall, DS::icon::kSmall));
     button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    button->setMinimumHeight(24);
+    button->setMinimumHeight(DS::button::kHeightM);
     button->setText(fullText);
   };
 
@@ -649,6 +999,11 @@ LayerPanel::LayerPanel(QWidget* parent)
   initButton(m_lockButton, QStringLiteral("lock"), QStringLiteral("ロック"));
   initButton(m_lockAlphaButton, QStringLiteral("lock_alpha"), QStringLiteral("透明保護"));
   initButton(m_lockPositionButton, QStringLiteral("lock_position"), QStringLiteral("位置固定"));
+  // トグルボタンは checkable にして ON/OFF 状態を視覚的に表示する
+  m_clipButton->setCheckable(true);
+  m_lockButton->setCheckable(true);
+  m_lockAlphaButton->setCheckable(true);
+  m_lockPositionButton->setCheckable(true);
   m_upButton->setToolTip(QStringLiteral("選択中レイヤーを上（前面）へ移動"));
   m_downButton->setToolTip(QStringLiteral("選択中レイヤーを下（背面）へ移動"));
 
@@ -663,22 +1018,34 @@ LayerPanel::LayerPanel(QWidget* parent)
     button->setProperty("fullText", label);
     button->setToolTip(label);
     button->setText(QString());
-    button->setFixedSize(28, 24);
-    button->setIconSize(QSize(17, 17));
+    button->setFixedSize(20, 20);
+    button->setIconSize(QSize(19, 19));
     button->setFocusPolicy(Qt::NoFocus);
     button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    button->setStyleSheet(QStringLiteral(
-        "QPushButton {"
-        " margin: 0px;"
-        " padding: 0px;"
-        " border: 1px solid #2a2e3e;"
-        " border-radius: 4px;"
-        " background: #272c3c;"
-        " color: #c5cde0;"
-        "}"
-        "QPushButton:hover { background: #2f3447; border-color: #4a5370; color: #edf0f9; }"
-        "QPushButton:pressed { background: #1d3a7a; border-color: #4e8ef7; color: #edf0f9; }"
-        "QPushButton:disabled { color: #4a5268; border-color: #252a38; background: #1a1d27; }"));
+    button->setStyleSheet(
+        QStringLiteral(
+            "QPushButton {"
+            " margin: 0px; padding: 0px;"
+            " border: 1px solid %1; border-radius: 0px;"
+            " background: %3; color: %4;"
+            "}"
+            "QPushButton:hover { background: %5; border-color: %6; }"
+            "QPushButton:pressed { background: %7; border-color: %8; }"
+            "QPushButton:checked { background: %9; border-color: %10; }"
+            "QPushButton:disabled { color: %11; border-color: %12; background: %13; }")
+        .arg(DS::layer::kIconBtnBorder)
+        .arg(2)
+        .arg(DS::layer::kIconBtnBg)
+        .arg(DS::theme::text::kLabel)
+        .arg(DS::layer::kIconBtnHoverBg)
+        .arg(DS::layer::kIconBtnHoverBorder)
+        .arg(DS::layer::kIconBtnPressedBg)
+        .arg(DS::layer::kIconBtnPressedBorder)
+        .arg(DS::layer::kIconBtnCheckedBg)
+        .arg(DS::layer::kIconBtnCheckedBorder)
+        .arg(DS::layer::kIconBtnDisabledText)
+        .arg(DS::layer::kIconBtnDisabledBorder)
+        .arg(DS::layer::kIconBtnDisabledBg));
   };
 
   for (QPushButton* button : QList<QPushButton*> {
@@ -707,27 +1074,17 @@ LayerPanel::LayerPanel(QWidget* parent)
     group->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
     group->setStyleSheet(QStringLiteral(
         "QGroupBox {"
-        " margin-top: 12px;"
-        " padding: 5px 4px 4px 4px;"
-        " border: 1px solid #2a2e3e;"
-        " border-radius: 4px;"
+        " margin-top: 0px;"
+        " padding: 0px 0px 0px 0px;"
+        " border: none;"
         " background: transparent;"
-        "}"
-        "QGroupBox::title {"
-        " subcontrol-origin: margin;"
-        " subcontrol-position: top left;"
-        " left: 6px;"
-        " padding: 0px 3px;"
-        " color: #5a6480;"
-        " font-size: 10px;"
-        " font-weight: 700;"
-        " letter-spacing: 0.5px;"
         "}"));
 
     grid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    grid->setContentsMargins(4, 3, 4, 4);
-    grid->setHorizontalSpacing(4);
-    grid->setVerticalSpacing(4);
+    grid->setContentsMargins(DS::margin::kNone, DS::margin::kNone,
+                              DS::margin::kNone, DS::margin::kNone);
+    grid->setHorizontalSpacing(DS::spacing::k1);
+    grid->setVerticalSpacing(DS::spacing::k1);
     for (int col = 0; col < 8; ++col) {
       grid->setColumnStretch(col, 0);
     }
@@ -739,39 +1096,51 @@ LayerPanel::LayerPanel(QWidget* parent)
   tuneLayerButtonGroup(m_primaryGroup, m_primaryGrid);
   tuneLayerButtonGroup(m_stateGroup, m_stateGrid);
 
-  m_primaryGrid->addWidget(m_addRasterButton, 0, 0, Qt::AlignLeft | Qt::AlignTop);
-  m_primaryGrid->addWidget(m_addVectorButton, 0, 1, Qt::AlignLeft | Qt::AlignTop);
-  m_primaryGrid->addWidget(m_addFolderButton, 0, 2, Qt::AlignLeft | Qt::AlignTop);
-  m_primaryGrid->addWidget(m_duplicateButton, 0, 3, Qt::AlignLeft | Qt::AlignTop);
-  m_primaryGrid->addWidget(m_upButton, 1, 0, Qt::AlignLeft | Qt::AlignTop);
-  m_primaryGrid->addWidget(m_downButton, 1, 1, Qt::AlignLeft | Qt::AlignTop);
-  m_primaryGrid->addWidget(m_deleteButton, 1, 2, Qt::AlignLeft | Qt::AlignTop);
+  // CSP order — Row 0: state/lock; Row 1: create/manage
+  // CSP order: clip → lockAlpha → lock → lockPosition → mask
+  m_primaryGrid->addWidget(m_clipButton,        0, 0, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_lockAlphaButton,   0, 1, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_lockButton,        0, 2, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_lockPositionButton,0, 3, Qt::AlignLeft | Qt::AlignTop);
+  m_primaryGrid->addWidget(m_maskButton,        0, 4, Qt::AlignLeft | Qt::AlignTop);
   m_primaryGroup->setLayout(m_primaryGrid);
 
-  m_stateGrid->addWidget(m_clipButton, 0, 0, Qt::AlignLeft | Qt::AlignTop);
-  m_stateGrid->addWidget(m_maskButton, 0, 1, Qt::AlignLeft | Qt::AlignTop);
-  m_stateGrid->addWidget(m_removeMaskButton, 0, 2, Qt::AlignLeft | Qt::AlignTop);
-  m_stateGrid->addWidget(m_lockButton, 1, 0, Qt::AlignLeft | Qt::AlignTop);
-  m_stateGrid->addWidget(m_lockAlphaButton, 1, 1, Qt::AlignLeft | Qt::AlignTop);
-  m_stateGrid->addWidget(m_lockPositionButton, 1, 2, Qt::AlignLeft | Qt::AlignTop);
+  // CSP: all state buttons in one row (raster→vector→folder→dup→delete→up→down→removeMask)
+  m_stateGrid->addWidget(m_addRasterButton, 0, 0, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_addVectorButton, 0, 1, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_addFolderButton, 0, 2, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_duplicateButton, 0, 3, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_deleteButton,    0, 4, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_upButton,        0, 5, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_downButton,      0, 6, Qt::AlignLeft | Qt::AlignTop);
+  m_stateGrid->addWidget(m_removeMaskButton,0, 7, Qt::AlignLeft | Qt::AlignTop);
   m_stateGroup->setLayout(m_stateGrid);
 
   auto* layout = new QVBoxLayout(this);
-  layout->setContentsMargins(4, 4, 4, 4);
-  layout->setSpacing(4);
+  layout->setContentsMargins(DS::margin::kNormal, DS::margin::kNormal,
+                              DS::margin::kNormal, DS::margin::kNormal);
+  layout->setSpacing(DS::spacing::kNarrow);
   auto* opacityRow = new QHBoxLayout();
-  opacityRow->setContentsMargins(0, 0, 0, 0);
-  opacityRow->setSpacing(4);
+  opacityRow->setContentsMargins(DS::margin::kNone, DS::margin::kNone,
+                                  DS::margin::kNone, DS::margin::kNone);
+  opacityRow->setSpacing(DS::spacing::kNarrow);
   opacityRow->addWidget(m_opacitySlider, 1);
   opacityRow->addWidget(m_opacitySpin, 0);
   // m_headerLabel deleted — never add to layout
+  // Bottom button container — zero gap between primaryGroup and stateGroup
+  auto* bottomButtons = new QWidget(this);
+  auto* bbl = new QVBoxLayout(bottomButtons);
+  bbl->setContentsMargins(0, 0, 0, 0);
+  bbl->setSpacing(0);
+  bbl->addWidget(m_primaryGroup);   // lock/alpha/clip/mask/position
+  bbl->addWidget(m_stateGroup);     // add/duplicate/delete/up/down
+
   layout->addWidget(m_filterEdit);
-  layout->addWidget(m_layerList, 1);
-  layout->addWidget(m_opacityLabel);
+  layout->addWidget(m_blendModeCombo);   // CSP: blend mode
   layout->addLayout(opacityRow);
-  layout->addWidget(m_blendModeCombo);
-  layout->addWidget(m_primaryGroup);
-  layout->addWidget(m_stateGroup);
+  layout->addWidget(bottomButtons);       // lock/clip + add/delete above list
+  layout->addWidget(m_layerList, 1);      // list at the very bottom
+
   setLayout(layout);
 
   connect(m_addRasterButton, &QPushButton::clicked, this, &LayerPanel::onAddRasterLayerClicked);
@@ -789,6 +1158,7 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_lockPositionButton, &QPushButton::clicked, this, &LayerPanel::onTogglePositionLockClicked);
   connect(m_layerList, &QListWidget::currentRowChanged, this, &LayerPanel::onCurrentLayerChanged);
   connect(m_layerList, &QListWidget::itemChanged, this, &LayerPanel::onLayerItemChanged);
+  connect(m_layerList, &QListWidget::itemSelectionChanged, this, &LayerPanel::onLayerItemSelectionChanged);
   auto* layerThumbnailRefreshTimer = new QTimer(this);
   layerThumbnailRefreshTimer->setObjectName(QStringLiteral("layerThumbnailRefreshTimer"));
   layerThumbnailRefreshTimer->setSingleShot(true);
@@ -802,6 +1172,19 @@ LayerPanel::LayerPanel(QWidget* parent)
   connect(m_layerList->model(), &QAbstractItemModel::dataChanged,
           this, [this](const QModelIndex& topLeft, const QModelIndex&, const QVector<int>& roles) {
     if (m_controller == nullptr || m_isRefreshing) return;
+    if (roles.contains(kExpandToggleRole)) {
+      const QListWidgetItem* item = m_layerList->item(topLeft.row());
+      if (item != nullptr) {
+        const uint32_t fid = static_cast<uint32_t>(item->data(kLayerIdRole).toUInt());
+        if (m_collapsedFolderIds.count(fid)) {
+          m_collapsedFolderIds.erase(fid);
+        } else {
+          m_collapsedFolderIds.insert(fid);
+        }
+        QTimer::singleShot(0, this, &LayerPanel::refreshLayers);
+      }
+      return;
+    }
     if (!roles.contains(kEditTargetRole)) return;
     const QListWidgetItem* item = m_layerList->item(topLeft.row());
     if (item == nullptr) return;
@@ -861,15 +1244,15 @@ void LayerPanel::applyButtonCompactMode(bool compact) {
     const QString full = button->property("fullText").toString();
     button->setText(QString());
     button->setToolTip(full);
-    button->setFixedSize(28, 24);
-    button->setIconSize(QSize(17, 17));
+    button->setFixedSize(20, 20);
+    button->setIconSize(QSize(19, 19));
     button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   }
 
   m_compactButtons = true;
 }void LayerPanel::applyResponsiveMode() {
-  const bool compactWidth = width() < 420;
-  const bool compactHeight = height() < 560;
+  const bool compactWidth  = width()  < DS::layerPanel::kCompactWidth;
+  const bool compactHeight = height() < DS::layerPanel::kCompactHeight;
 
   applyButtonCompactMode(compactWidth);
 
@@ -898,7 +1281,7 @@ void LayerPanel::applyButtonCompactMode(bool compact) {
   }
 
   if (m_layerList != nullptr) {
-    m_layerList->setMinimumHeight(compactHeight ? 90 : 140);
+    m_layerList->setMinimumHeight(compactHeight ? DS::layer::kMinListHCompact : DS::layer::kMinListH);
   }
 }void LayerPanel::setController(app::bridge::AppController* controller) {
   if (m_controller != nullptr) {
@@ -911,6 +1294,17 @@ void LayerPanel::applyButtonCompactMode(bool compact) {
   }
 
   connect(m_controller, &app::bridge::AppController::layersChanged, this, &LayerPanel::refreshLayers);
+
+  // フォルダへのドロップで reparent
+  if (auto* customList = static_cast<CustomLayerList*>(m_layerList)) {
+    customList->onFolderDrop = [this](int fromRow, uint32_t folderId) -> bool {
+      if (m_controller == nullptr) return false;
+      const std::size_t layerIdx = layerIndexFromRow(fromRow);
+      m_controller->setLayerParent(layerIdx, folderId);
+      return true;
+    };
+  }
+
   connect(m_controller, &app::bridge::AppController::documentChanged, this, [this]() {
     if (m_isRefreshing) {
       return;
@@ -954,6 +1348,110 @@ void LayerPanel::refreshLayers() {
       return;
     }
   }
+  // 各レイヤーの深さを計算（parentId チェーンを逆向きに辿る、順序非依存、循環安全）
+  //
+  // アルゴリズム:
+  //   1. parentId の高速ルックアップマップを構築
+  //   2. 各レイヤーについて root または計算済みノードに到達するまでチェーンを収集
+  //   3. チェーンの末尾（root 側）から深さを埋めてメモ化
+  //   4. 循環は「チェーン長が全レイヤー数を超えたら停止して 0 にフォールバック」で安全処理
+  //
+  // これにより Document 内のフォルダ/子の並び順に依存しない。
+  std::unordered_map<uint32_t, uint32_t> parentOf;  // layerId → parentId
+  parentOf.reserve(models.size());
+  for (const auto& m : models) {
+    if (!m.paperLayer && m.layerId != 0) {
+      parentOf[m.layerId] = m.parentId;
+    }
+  }
+
+  std::unordered_map<uint32_t, int> idToDepth;
+  idToDepth.reserve(models.size());
+
+  const int kCycleGuard = static_cast<int>(models.size()) + 1;
+
+  for (const auto& m : models) {
+    if (m.paperLayer || m.layerId == 0) {
+      continue;
+    }
+    if (idToDepth.count(m.layerId)) {
+      continue;  // 既に計算済み（別レイヤーのチェーン処理で埋まっている場合）
+    }
+
+    // root または計算済みノードに到達するまでチェーンを積む
+    std::vector<uint32_t> chain;
+    uint32_t cur = m.layerId;
+
+    while (cur != 0 && !idToDepth.count(cur)) {
+      if (static_cast<int>(chain.size()) >= kCycleGuard) {
+        // 循環ガード発動: チェーン内を全て depth=0 に設定してスキップ
+        for (const uint32_t cid : chain) {
+          idToDepth.emplace(cid, 0);
+        }
+        chain.clear();
+        break;
+      }
+      chain.push_back(cur);
+      const auto pit = parentOf.find(cur);
+      cur = (pit != parentOf.end()) ? pit->second : 0;
+    }
+
+    if (chain.empty()) {
+      continue;
+    }
+
+    // チェーンの末尾が接続するノードの深さを決定
+    // cur == 0 の場合は root に到達 → baseDepth = -1（chain.back() の深さは 0）
+    // cur が計算済みの場合 → chain.back() の深さは idToDepth[cur] + 1
+    const int baseDepth = idToDepth.count(cur) ? idToDepth.at(cur) : -1;
+
+    // chain[i] の深さ = baseDepth + 1 + (chain.size() - 1 - i)
+    for (int i = static_cast<int>(chain.size()) - 1; i >= 0; --i) {
+      idToDepth[chain[static_cast<std::size_t>(i)]] =
+          baseDepth + 1 + (static_cast<int>(chain.size()) - 1 - i);
+    }
+  }
+
+  // ── 折りたたみによる非表示セット ────────────────────────────────────────
+  std::unordered_set<uint32_t> hiddenByCollapse;
+  for (const auto& m : models) {
+    if (m.paperLayer || m.layerId == 0) continue;
+    uint32_t cur = m.parentId;
+    bool hidden = false;
+    const int kGuard = static_cast<int>(models.size()) + 1;
+    int guard = 0;
+    while (cur != 0 && !hidden && guard < kGuard) {
+      if (m_collapsedFolderIds.count(cur)) { hidden = true; }
+      const auto pit = parentOf.find(cur);
+      cur = (pit != parentOf.end()) ? pit->second : 0;
+      ++guard;
+    }
+    if (hidden) hiddenByCollapse.insert(m.layerId);
+  }
+
+  // ── 親チェーンを含む effective visibility マップ ──────────────────────
+  std::unordered_map<uint32_t, bool> effectivelyVisible;
+  effectivelyVisible.reserve(models.size());
+  for (const auto& m : models) {
+    if (m.paperLayer) continue;
+    effectivelyVisible[m.layerId] = m.visible;
+  }
+  for (const auto& m : models) {
+    if (m.paperLayer || m.layerId == 0) continue;
+    bool ev = effectivelyVisible[m.layerId];
+    uint32_t cur = m.parentId;
+    const int kGuard2 = static_cast<int>(models.size()) + 1;
+    int guard2 = 0;
+    while (cur != 0 && ev && guard2 < kGuard2) {
+      const auto it = effectivelyVisible.find(cur);
+      if (it != effectivelyVisible.end() && !it->second) ev = false;
+      const auto pit = parentOf.find(cur);
+      cur = (pit != parentOf.end()) ? pit->second : 0;
+      ++guard2;
+    }
+    effectivelyVisible[m.layerId] = ev;
+  }
+
   for (std::size_t layerIndex = models.size(); layerIndex-- > 0;) {
     const auto& model = models[layerIndex];
     if (hasFilter) {
@@ -961,6 +1459,10 @@ void LayerPanel::refreshLayers() {
       if (!layerName.contains(filterText, Qt::CaseInsensitive) && !(model.paperLayer && QStringLiteral("用紙").contains(filterText))) {
         continue;
       }
+    }
+    // 折りたたまれたフォルダ内のレイヤーはスキップ
+    if (!model.paperLayer && model.layerId != 0 && hiddenByCollapse.count(model.layerId)) {
+      continue;
     }
 
     auto* item = new QListWidgetItem(m_layerList);
@@ -1000,6 +1502,27 @@ void LayerPanel::refreshLayers() {
     item->setData(kPaperRole, model.paperLayer);
     item->setData(kActiveRole, model.active);
 
+    // 階層表示用ロール
+    const int itemDepth = (!model.paperLayer && model.layerId != 0)
+        ? [&]() -> int {
+            const auto it = idToDepth.find(model.layerId);
+            return it != idToDepth.end() ? it->second : 0;
+          }()
+        : 0;
+    item->setData(kLayerIdRole,  static_cast<uint>(model.layerId));
+    item->setData(kParentIdRole, static_cast<uint>(model.parentId));
+    item->setData(kDepthRole,    itemDepth);
+
+    // フォルダ展開状態（Folder 以外は常に true）
+    const bool isExpanded = (model.kind != core::LayerKind::Folder) ||
+                            !m_collapsedFolderIds.count(model.layerId);
+    item->setData(kExpandedRole, isExpanded);
+    // 親チェーンを含む effective visibility
+    const bool effVis = (!model.paperLayer && model.layerId != 0)
+        ? (effectivelyVisible.count(model.layerId) ? effectivelyVisible.at(model.layerId) : model.visible)
+        : model.visible;
+    item->setData(kEffVisibleRole, effVis);
+
     const QString stateSummary = QStringLiteral("表示:%1  クリップ:%2  マスク:%3  ロック:%4")
                                      .arg(model.visible ? QStringLiteral("ON") : QStringLiteral("OFF"))
                                      .arg(model.clippedToBelow ? QStringLiteral("ON") : QStringLiteral("OFF"))
@@ -1027,6 +1550,24 @@ void LayerPanel::refreshLayers() {
       const int blendIndex = m_blendModeCombo->findData(static_cast<int>(model.blendMode));
       if (blendIndex >= 0) {
         m_blendModeCombo->setCurrentIndex(blendIndex);
+      }
+    }
+  }
+
+  // QSignalBlocker はまだ有効 — setSelected はシグナルを発しない
+  // コントローラの選択セットに基づいてアイテムの選択状態を復元する
+  if (m_controller != nullptr) {
+    const auto& selectedIds = m_controller->selectedLayerIds();
+    if (!selectedIds.empty()) {
+      for (int r = 0; r < m_layerList->count(); ++r) {
+        QListWidgetItem* rowItem = m_layerList->item(r);
+        if (rowItem == nullptr) {
+          continue;
+        }
+        const auto lid = static_cast<uint32_t>(rowItem->data(kLayerIdRole).toUInt());
+        if (lid != 0 && selectedIds.count(lid) > 0) {
+          rowItem->setSelected(true);
+        }
       }
     }
   }
@@ -1075,6 +1616,29 @@ void LayerPanel::onDeleteLayerClicked() {
   if (m_controller == nullptr) {
     return;
   }
+
+  const QList<QListWidgetItem*> selectedItems = m_layerList->selectedItems();
+
+  // マルチ選択時: layerId を収集して一括削除（1回の rerender + layersChanged）
+  if (selectedItems.size() > 1) {
+    std::vector<uint32_t> idsToDelete;
+    idsToDelete.reserve(static_cast<std::size_t>(selectedItems.size()));
+    for (QListWidgetItem* selItem : selectedItems) {
+      if (selItem->data(kPaperRole).toBool()) {
+        continue;
+      }
+      const auto lid = static_cast<uint32_t>(selItem->data(kLayerIdRole).toUInt());
+      if (lid != 0) {
+        idsToDelete.push_back(lid);
+      }
+    }
+    if (!idsToDelete.empty()) {
+      m_controller->removeLayersByIds(idsToDelete);
+    }
+    return;
+  }
+
+  // シングル選択: 従来の動作を維持
   QListWidgetItem* currentItem = m_layerList->currentItem();
   if (currentItem == nullptr) {
     return;
@@ -1284,6 +1848,30 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
   QAction* toggleLockAction = menu.addAction(app::ui::icon(QStringLiteral("lock")), QStringLiteral("ロック切替"));
   QAction* mergeDownAction = menu.addAction(QStringLiteral("下のレイヤーと結合"));
   QAction* rasterizeAction = menu.addAction(QStringLiteral("ラスタライズ"));
+  menu.addSeparator();
+  // フォルダに移動サブメニュー（フォルダレイヤーが存在する場合のみ有効）
+  QMenu* moveToFolderMenu = menu.addMenu(app::ui::icon(QStringLiteral("folder")), QStringLiteral("フォルダに移動"));
+  {
+    const auto allModels = m_controller->layerViewModels();
+    bool hasFolders = false;
+    for (std::size_t mi = 0; mi < allModels.size(); ++mi) {
+      const auto& fm = allModels[mi];
+      if (!fm.paperLayer && fm.kind == core::LayerKind::Folder) {
+        hasFolders = true;
+        QAction* folderAction = moveToFolderMenu->addAction(
+            app::ui::icon(QStringLiteral("folder")),
+            QString::fromStdString(fm.name));
+        folderAction->setData(static_cast<uint>(fm.layerId));
+      }
+    }
+    if (hasFolders) {
+      moveToFolderMenu->addSeparator();
+    }
+    // 「フォルダから外す」選択肢（ルートに移動）
+    QAction* removeFromFolderAction = moveToFolderMenu->addAction(QStringLiteral("フォルダから外す（ルートへ）"));
+    removeFromFolderAction->setData(static_cast<uint>(0));
+    moveToFolderMenu->setEnabled(canEditLayer);
+  }
 
   renameAction->setEnabled(canEditLayer);
   duplicateAction->setEnabled(canEditLayer);
@@ -1337,9 +1925,21 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
     onMoveLayerDownClicked();
     return;
   }
-  if (selected == toggleVisibleAction && hasSelection && m_layerList->currentItem() != nullptr) {
-    QListWidgetItem* current = m_layerList->currentItem();
-    current->setCheckState(current->checkState() == Qt::Checked ? Qt::Unchecked : Qt::Checked);
+  if (selected == toggleVisibleAction && hasSelection) {
+    const QList<QListWidgetItem*> visItems = m_layerList->selectedItems();
+    if (visItems.size() > 1) {
+      // マルチ選択: 全選択アイテムの表示を切り替える
+      for (QListWidgetItem* vi : visItems) {
+        const int idx = vi->data(kLayerIndexRole).toInt();
+        if (idx >= 0) {
+          const bool nowVisible = vi->data(kVisibilityRole).toBool();
+          m_controller->setLayerVisible(static_cast<std::size_t>(idx), !nowVisible);
+        }
+      }
+    } else if (m_layerList->currentItem() != nullptr) {
+      QListWidgetItem* current = m_layerList->currentItem();
+      current->setCheckState(current->checkState() == Qt::Checked ? Qt::Unchecked : Qt::Checked);
+    }
     return;
   }
   if (selected == toggleClipAction) {
@@ -1361,6 +1961,15 @@ void LayerPanel::onLayerContextMenuRequested(const QPoint& pos) {
     const int layerIndex = m_layerList->currentItem()->data(kLayerIndexRole).toInt();
     if (layerIndex >= 0) {
       m_controller->rasterizeLayer(static_cast<std::size_t>(layerIndex));
+    }
+    return;
+  }
+  // フォルダに移動サブメニューのアクション
+  if (moveToFolderMenu->actions().contains(selected) && m_layerList->currentItem() != nullptr) {
+    const int layerIndex = m_layerList->currentItem()->data(kLayerIndexRole).toInt();
+    if (layerIndex >= 0) {
+      const uint32_t newParentId = static_cast<uint32_t>(selected->data().toUInt());
+      m_controller->setLayerParent(static_cast<std::size_t>(layerIndex), newParentId);
     }
     return;
   }
@@ -1437,6 +2046,22 @@ int LayerPanel::rowFromLayerIndex(std::size_t layerIndex) const {
   return static_cast<int>(count - 1 - clamped);
 }
 
+void LayerPanel::onLayerItemSelectionChanged() {
+  if (m_controller == nullptr || m_isRefreshing) {
+    return;
+  }
+  // 現在の視覚的選択セットを layerId に変換して AppController に同期する
+  std::unordered_set<uint32_t> ids;
+  for (QListWidgetItem* selItem : m_layerList->selectedItems()) {
+    const auto lid = static_cast<uint32_t>(selItem->data(kLayerIdRole).toUInt());
+    if (lid != 0) {
+      ids.insert(lid);
+    }
+  }
+  m_controller->setSelectedLayerIds(ids);
+  refreshButtonState();
+}
+
 void LayerPanel::refreshButtonState() {
   if (m_controller == nullptr) {
     m_deleteButton->setEnabled(false);
@@ -1455,11 +2080,11 @@ void LayerPanel::refreshButtonState() {
     return;
   }
 
-  const bool hasSelection = m_layerList->currentRow() >= 0;
-  const bool canDelete = m_controller->document().layerCount() > 1;
+  QListWidgetItem* currentItem = m_layerList->currentItem();
+  const bool hasSelection = currentItem != nullptr;
+  const bool canDelete = true;
   const int current = m_layerList->currentRow();
   const int lastRow = static_cast<int>(m_controller->document().layerCount()) - 1;
-  QListWidgetItem* currentItem = current >= 0 ? m_layerList->item(current) : nullptr;
   const bool paperSelected = currentItem != nullptr && currentItem->data(kPaperRole).toBool();
 
   const bool canMoveUp = current > 0;
@@ -1507,6 +2132,13 @@ void LayerPanel::refreshButtonState() {
         if (blendIndex >= 0) {
           m_blendModeCombo->setCurrentIndex(blendIndex);
         }
+        const int opacityPct = static_cast<int>(
+            std::lround(std::clamp(layer.opacity(), 0.0F, 1.0F) * 100.0F));
+        const QSignalBlocker sliderBlocker(m_opacitySlider);
+        const QSignalBlocker spinBlocker(m_opacitySpin);
+        m_opacitySlider->setValue(opacityPct);
+        m_opacitySpin->setValue(opacityPct);
+        m_opacityLabel->setText(QStringLiteral("不透明度: %1%").arg(opacityPct));
       }
     }
   }
@@ -1517,6 +2149,18 @@ void LayerPanel::refreshButtonState() {
   m_lockButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
   m_lockAlphaButton->setEnabled(hasSelection && kind == core::LayerKind::Raster);
   m_lockPositionButton->setEnabled(hasSelection && kind != core::LayerKind::Folder);
+
+  // トグル状態をボタンの checked 状態に反映（setChecked は clicked を emit しない）
+  {
+    const QSignalBlocker b1(m_clipButton);
+    const QSignalBlocker b2(m_lockButton);
+    const QSignalBlocker b3(m_lockAlphaButton);
+    const QSignalBlocker b4(m_lockPositionButton);
+    m_clipButton->setChecked(clipped);
+    m_lockButton->setChecked(locked);
+    m_lockAlphaButton->setChecked(alphaLocked);
+    m_lockPositionButton->setChecked(positionLocked);
+  }
 
 }
 

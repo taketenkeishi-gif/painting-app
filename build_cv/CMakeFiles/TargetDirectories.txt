@@ -1,0 +1,5 @@
+C:/Users/Keishi/Portfolio/Painting-app/build_cv/CMakeFiles/ALL_BUILD.dir
+C:/Users/Keishi/Portfolio/Painting-app/build_cv/CMakeFiles/ZERO_CHECK.dir
+C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_core.dir
+C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_qt_platform.dir
+C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app.dir

@@ -56,6 +56,7 @@ std::size_t Document::addLayer(const std::string& name, LayerKind kind) {
   m_layers.emplace_back(finalName, m_canvasSize.width, m_canvasSize.height, kind);
   m_layers.back().setPaperLayer(false);
   m_layers.back().setBlendMode(BlendMode::Normal);
+  m_layers.back().setId(m_nextLayerId++);  // 安定ID を採番
   m_activeLayerIndex = m_layers.size() - 1;
   return m_activeLayerIndex;
 }
@@ -85,6 +86,7 @@ std::size_t Document::duplicateLayer(std::size_t index) {
 
   Layer duplicated = m_layers[index];
   duplicated.setName(duplicated.name() + " Copy");
+  duplicated.setId(m_nextLayerId++);  // 複製レイヤーは新しい ID を得る（元と別物）
   const auto insertPos = m_layers.begin() + static_cast<std::ptrdiff_t>(index + 1);
   m_layers.insert(insertPos, duplicated);
   m_activeLayerIndex = index + 1;
@@ -92,12 +94,14 @@ std::size_t Document::duplicateLayer(std::size_t index) {
 }
 
 bool Document::removeLayer(std::size_t index) noexcept {
-  if (index >= m_layers.size() || m_layers.size() <= 1 || m_layers[index].isPaperLayer()) {
+  if (index >= m_layers.size()) {
     return false;
   }
 
   m_layers.erase(m_layers.begin() + static_cast<std::ptrdiff_t>(index));
-  if (m_activeLayerIndex == index) {
+  if (m_layers.empty()) {
+    m_activeLayerIndex = 0;
+  } else if (m_activeLayerIndex == index) {
     m_activeLayerIndex = index < m_layers.size() ? index : m_layers.size() - 1;
   } else if (m_activeLayerIndex > index) {
     --m_activeLayerIndex;
@@ -233,6 +237,28 @@ bool Document::resizeCanvas(int newWidth, int newHeight, int offsetX, int offset
   m_canvasSize = {newWidth, newHeight};
   m_selection = SelectionMask(newWidth, newHeight);
   return true;
+}
+
+void Document::clearLayersForLoad() noexcept {
+  m_layers.clear();
+  m_activeLayerIndex = 0;
+}
+
+std::size_t Document::insertLoadedLayer(Layer layer) {
+  m_layers.push_back(std::move(layer));
+  return m_layers.size() - 1;
+}
+
+void Document::insertLayerAt(std::size_t index, Layer layer) {
+  if (index > m_layers.size()) {
+    index = m_layers.size();
+  }
+  m_layers.insert(m_layers.begin() + static_cast<std::ptrdiff_t>(index), std::move(layer));
+  // activeLayerIndex をシフト（挿入位置以降にあるインデックスを +1）
+  if (m_activeLayerIndex >= index && m_layers.size() > 1) {
+    ++m_activeLayerIndex;
+  }
+  m_activeLayerIndex = std::min(m_activeLayerIndex, m_layers.size() - 1);
 }
 
 std::string Document::makeDefaultLayerName(std::size_t currentLayerCount) {

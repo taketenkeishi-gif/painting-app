@@ -1,0 +1,718 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{2003E766-B0E1-39F1-BEEF-77DE47B1549D}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <VcpkgEnabled>false</VcpkgEnabled>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>paint_app</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="do_not_import_user.props" Condition="exists('do_not_import_user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">paint_app.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">LayeredPaintApp</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">paint_app.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">LayeredPaintApp</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">paint_app.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">LayeredPaintApp</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</GenerateManifest>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">paint_app.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">LayeredPaintApp</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.exe</TargetExt>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</LinkIncremental>
+    <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</GenerateManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_Debug;C:\Users\Keishi\Portfolio\Painting-app\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/include/opencv4" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtCore" /external:I "C:/Qt/6.7.2/msvc2019_64/include" /external:I "C:/Qt/6.7.2/msvc2019_64/mkspecs/win32-msvc" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtGui" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtWidgets" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtNetwork" /utf-8 -Zc:__cplusplus -utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ConformanceMode>true</ConformanceMode>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;PAINT_USE_OPENCV;QT_CORE_LIB;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;QT_GUI_LIB;QT_WIDGETS_LIB;QT_NETWORK_LIB;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;PAINT_USE_OPENCV;QT_CORE_LIB;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;QT_GUI_LIB;QT_WIDGETS_LIB;QT_NETWORK_LIB;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_Debug;C:\Users\Keishi\Portfolio\Painting-app\src;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\include\opencv4;C:\Qt\6.7.2\msvc2019_64\include\QtCore;C:\Qt\6.7.2\msvc2019_64\include;C:\Qt\6.7.2\msvc2019_64\mkspecs\win32-msvc;C:\Qt\6.7.2\msvc2019_64\include\QtGui;C:\Qt\6.7.2\msvc2019_64\include\QtWidgets;C:\Qt\6.7.2\msvc2019_64\include\QtNetwork;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_Debug;C:\Users\Keishi\Portfolio\Painting-app\src;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\include\opencv4;C:\Qt\6.7.2\msvc2019_64\include\QtCore;C:\Qt\6.7.2\msvc2019_64\include;C:\Qt\6.7.2\msvc2019_64\mkspecs\win32-msvc;C:\Qt\6.7.2\msvc2019_64\include\QtGui;C:\Qt\6.7.2\msvc2019_64\include\QtWidgets;C:\Qt\6.7.2\msvc2019_64\include\QtNetwork;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message>Automatic MOC and UIC for target paint_app</Message>
+      <Command>setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autogen C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutogenInfo.json Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message></Message>
+      <Command>setlocal
+"C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.2.0_x64__8wekyb3d8bbwe\pwsh.exe" -noprofile -executionpolicy Bypass -file C:/vcpkg/scripts/buildsystems/msbuild/applocal.ps1 -targetBinary C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/Debug/LayeredPaintApp.exe -installedDir C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/debug/bin -OutVariable out
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>Debug\paint_core.lib;Debug\paint_qt_platform.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Widgetsd.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Networkd.lib;Debug\paint_core.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\debug\lib\opencv_photo4d.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\debug\lib\opencv_imgproc4d.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\debug\lib\opencv_core4d.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Guid.lib;d3d11.lib;dxgi.lib;dxguid.lib;d3d12.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Cored.lib;mpr.lib;userenv.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6EntryPointd.lib;shell32.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <ImportLibrary>C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/Debug/LayeredPaintApp.lib</ImportLibrary>
+      <LinkErrorReporting></LinkErrorReporting>
+      <ProgramDataBaseFile>C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/Debug/LayeredPaintApp.pdb</ProgramDataBaseFile>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_Release;C:\Users\Keishi\Portfolio\Painting-app\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/include/opencv4" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtCore" /external:I "C:/Qt/6.7.2/msvc2019_64/include" /external:I "C:/Qt/6.7.2/msvc2019_64/mkspecs/win32-msvc" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtGui" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtWidgets" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtNetwork" /utf-8 -Zc:__cplusplus -utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ConformanceMode>true</ConformanceMode>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PAINT_USE_OPENCV;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;QT_GUI_LIB;QT_WIDGETS_LIB;QT_NETWORK_LIB;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PAINT_USE_OPENCV;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;QT_GUI_LIB;QT_WIDGETS_LIB;QT_NETWORK_LIB;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_Release;C:\Users\Keishi\Portfolio\Painting-app\src;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\include\opencv4;C:\Qt\6.7.2\msvc2019_64\include\QtCore;C:\Qt\6.7.2\msvc2019_64\include;C:\Qt\6.7.2\msvc2019_64\mkspecs\win32-msvc;C:\Qt\6.7.2\msvc2019_64\include\QtGui;C:\Qt\6.7.2\msvc2019_64\include\QtWidgets;C:\Qt\6.7.2\msvc2019_64\include\QtNetwork;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_Release;C:\Users\Keishi\Portfolio\Painting-app\src;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\include\opencv4;C:\Qt\6.7.2\msvc2019_64\include\QtCore;C:\Qt\6.7.2\msvc2019_64\include;C:\Qt\6.7.2\msvc2019_64\mkspecs\win32-msvc;C:\Qt\6.7.2\msvc2019_64\include\QtGui;C:\Qt\6.7.2\msvc2019_64\include\QtWidgets;C:\Qt\6.7.2\msvc2019_64\include\QtNetwork;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message>Automatic MOC and UIC for target paint_app</Message>
+      <Command>setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autogen C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutogenInfo.json Release
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message></Message>
+      <Command>setlocal
+"C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.2.0_x64__8wekyb3d8bbwe\pwsh.exe" -noprofile -executionpolicy Bypass -file C:/vcpkg/scripts/buildsystems/msbuild/applocal.ps1 -targetBinary C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/Release/LayeredPaintApp.exe -installedDir C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/bin -OutVariable out
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>Release\paint_core.lib;Release\paint_qt_platform.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Widgets.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Network.lib;Release\paint_core.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_photo4.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_imgproc4.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_core4.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Gui.lib;d3d11.lib;dxgi.lib;dxguid.lib;d3d12.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Core.lib;mpr.lib;userenv.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6EntryPoint.lib;shell32.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <ImportLibrary>C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/Release/LayeredPaintApp.lib</ImportLibrary>
+      <LinkErrorReporting></LinkErrorReporting>
+      <ProgramDataBaseFile>C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/Release/LayeredPaintApp.pdb</ProgramDataBaseFile>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_MinSizeRel;C:\Users\Keishi\Portfolio\Painting-app\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/include/opencv4" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtCore" /external:I "C:/Qt/6.7.2/msvc2019_64/include" /external:I "C:/Qt/6.7.2/msvc2019_64/mkspecs/win32-msvc" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtGui" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtWidgets" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtNetwork" /utf-8 -Zc:__cplusplus -utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ConformanceMode>true</ConformanceMode>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PAINT_USE_OPENCV;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;QT_GUI_LIB;QT_WIDGETS_LIB;QT_NETWORK_LIB;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PAINT_USE_OPENCV;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;QT_GUI_LIB;QT_WIDGETS_LIB;QT_NETWORK_LIB;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_MinSizeRel;C:\Users\Keishi\Portfolio\Painting-app\src;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\include\opencv4;C:\Qt\6.7.2\msvc2019_64\include\QtCore;C:\Qt\6.7.2\msvc2019_64\include;C:\Qt\6.7.2\msvc2019_64\mkspecs\win32-msvc;C:\Qt\6.7.2\msvc2019_64\include\QtGui;C:\Qt\6.7.2\msvc2019_64\include\QtWidgets;C:\Qt\6.7.2\msvc2019_64\include\QtNetwork;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_MinSizeRel;C:\Users\Keishi\Portfolio\Painting-app\src;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\include\opencv4;C:\Qt\6.7.2\msvc2019_64\include\QtCore;C:\Qt\6.7.2\msvc2019_64\include;C:\Qt\6.7.2\msvc2019_64\mkspecs\win32-msvc;C:\Qt\6.7.2\msvc2019_64\include\QtGui;C:\Qt\6.7.2\msvc2019_64\include\QtWidgets;C:\Qt\6.7.2\msvc2019_64\include\QtNetwork;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message>Automatic MOC and UIC for target paint_app</Message>
+      <Command>setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autogen C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutogenInfo.json MinSizeRel
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message></Message>
+      <Command>setlocal
+"C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.2.0_x64__8wekyb3d8bbwe\pwsh.exe" -noprofile -executionpolicy Bypass -file C:/vcpkg/scripts/buildsystems/msbuild/applocal.ps1 -targetBinary C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/MinSizeRel/LayeredPaintApp.exe -installedDir C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/bin -OutVariable out
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>MinSizeRel\paint_core.lib;MinSizeRel\paint_qt_platform.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Widgets.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Network.lib;MinSizeRel\paint_core.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_photo4.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_imgproc4.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_core4.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Gui.lib;d3d11.lib;dxgi.lib;dxguid.lib;d3d12.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Core.lib;mpr.lib;userenv.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6EntryPoint.lib;shell32.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <ImportLibrary>C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/MinSizeRel/LayeredPaintApp.lib</ImportLibrary>
+      <LinkErrorReporting></LinkErrorReporting>
+      <ProgramDataBaseFile>C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/MinSizeRel/LayeredPaintApp.pdb</ProgramDataBaseFile>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_RelWithDebInfo;C:\Users\Keishi\Portfolio\Painting-app\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/include/opencv4" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtCore" /external:I "C:/Qt/6.7.2/msvc2019_64/include" /external:I "C:/Qt/6.7.2/msvc2019_64/mkspecs/win32-msvc" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtGui" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtWidgets" /external:I "C:/Qt/6.7.2/msvc2019_64/include/QtNetwork" /utf-8 -Zc:__cplusplus -utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck></BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ConformanceMode>true</ConformanceMode>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <UseFullPaths>false</UseFullPaths>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PAINT_USE_OPENCV;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;QT_GUI_LIB;QT_WIDGETS_LIB;QT_NETWORK_LIB;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;PAINT_USE_OPENCV;QT_CORE_LIB;QT_NO_DEBUG;_ENABLE_EXTENDED_ALIGNED_STORAGE;WIN64;_WIN64;UNICODE;_UNICODE;QT_GUI_LIB;QT_WIDGETS_LIB;QT_NETWORK_LIB;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_RelWithDebInfo;C:\Users\Keishi\Portfolio\Painting-app\src;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\include\opencv4;C:\Qt\6.7.2\msvc2019_64\include\QtCore;C:\Qt\6.7.2\msvc2019_64\include;C:\Qt\6.7.2\msvc2019_64\mkspecs\win32-msvc;C:\Qt\6.7.2\msvc2019_64\include\QtGui;C:\Qt\6.7.2\msvc2019_64\include\QtWidgets;C:\Qt\6.7.2\msvc2019_64\include\QtNetwork;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\include_RelWithDebInfo;C:\Users\Keishi\Portfolio\Painting-app\src;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\include\opencv4;C:\Qt\6.7.2\msvc2019_64\include\QtCore;C:\Qt\6.7.2\msvc2019_64\include;C:\Qt\6.7.2\msvc2019_64\mkspecs\win32-msvc;C:\Qt\6.7.2\msvc2019_64\include\QtGui;C:\Qt\6.7.2\msvc2019_64\include\QtWidgets;C:\Qt\6.7.2\msvc2019_64\include\QtNetwork;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <PreBuildEvent>
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message>Automatic MOC and UIC for target paint_app</Message>
+      <Command>setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autogen C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutogenInfo.json RelWithDebInfo
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Message></Message>
+      <Command>setlocal
+"C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.2.0_x64__8wekyb3d8bbwe\pwsh.exe" -noprofile -executionpolicy Bypass -file C:/vcpkg/scripts/buildsystems/msbuild/applocal.ps1 -targetBinary C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/RelWithDebInfo/LayeredPaintApp.exe -installedDir C:/Users/Keishi/Portfolio/Painting-app/vcpkg_installed/x64-windows/bin -OutVariable out
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>RelWithDebInfo\paint_core.lib;RelWithDebInfo\paint_qt_platform.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Widgets.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Network.lib;RelWithDebInfo\paint_core.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_photo4.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_imgproc4.lib;C:\Users\Keishi\Portfolio\Painting-app\vcpkg_installed\x64-windows\lib\opencv_core4.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Gui.lib;d3d11.lib;dxgi.lib;dxguid.lib;d3d12.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6Core.lib;mpr.lib;userenv.lib;C:\Qt\6.7.2\msvc2019_64\lib\Qt6EntryPoint.lib;shell32.lib;ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <DataExecutionPrevention></DataExecutionPrevention>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+      <ImageHasSafeExceptionHandlers></ImageHasSafeExceptionHandlers>
+      <ImportLibrary>C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/RelWithDebInfo/LayeredPaintApp.lib</ImportLibrary>
+      <LinkErrorReporting></LinkErrorReporting>
+      <ProgramDataBaseFile>C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/RelWithDebInfo/LayeredPaintApp.pdb</ProgramDataBaseFile>
+      <RandomizedBaseAddress></RandomizedBaseAddress>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\CMakeFiles\cd3872cf2d9ce6e09f9a401cd7e6f0cf\qrc_icons.cpp.rule">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Automatic RCC for app/resources/icons.qrc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_icons_5QDYQ3JZ3K_Info.json Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc;C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\paint_app_autogen.dir\AutoRcc_icons_5QDYQ3JZ3K_Info.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\app_icon.ico;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\pen_active.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock_alpha.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock_alpha.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock_alpha.svg;C:\Qt\6.7.2\msvc2019_64\.\bin\rcc.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_icons.cpp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Automatic RCC for app/resources/icons.qrc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_icons_5QDYQ3JZ3K_Info.json Release
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc;C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\paint_app_autogen.dir\AutoRcc_icons_5QDYQ3JZ3K_Info.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\app_icon.ico;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\pen_active.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock_alpha.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock_alpha.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock_alpha.svg;C:\Qt\6.7.2\msvc2019_64\.\bin\rcc.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_icons.cpp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Automatic RCC for app/resources/icons.qrc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_icons_5QDYQ3JZ3K_Info.json MinSizeRel
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc;C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\paint_app_autogen.dir\AutoRcc_icons_5QDYQ3JZ3K_Info.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\app_icon.ico;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\pen_active.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock_alpha.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock_alpha.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock_alpha.svg;C:\Qt\6.7.2\msvc2019_64\.\bin\rcc.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_icons.cpp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Automatic RCC for app/resources/icons.qrc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_icons_5QDYQ3JZ3K_Info.json RelWithDebInfo
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc;C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\paint_app_autogen.dir\AutoRcc_icons_5QDYQ3JZ3K_Info.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\app_icon.ico;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_reset.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\folder_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_out.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom_in.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\down.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\visibility_off.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\undo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\transparent.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\fill.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\select.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\redo.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\gradient.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\visibility.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\mask.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\up.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\folder.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\export.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\clip.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\line.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\settings.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\delete.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\pen_active.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\open.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\reset_bw.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\duplicate.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\brush.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\move.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\fit.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\swap.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\eyedropper.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\command_palette.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\new_file.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\zoom.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\eraser.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\hand.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\mask_remove.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\save.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\24\lock_alpha.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\20\lock_alpha.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_vector_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock_position.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\layer_raster_add.svg;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons\16\lock_alpha.svg;C:\Qt\6.7.2\msvc2019_64\.\bin\rcc.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_icons.cpp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\CMakeFiles\cd3872cf2d9ce6e09f9a401cd7e6f0cf\qrc_workflows.cpp.rule">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Automatic RCC for app/resources/workflows.qrc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Info.json Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc;C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\paint_app_autogen.dir\AutoRcc_workflows_5QDYQ3JZ3K_Info.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_inpaint.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_scribble.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_lineart.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_canny.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_img2img.json;C:\Qt\6.7.2\msvc2019_64\.\bin\rcc.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_workflows.cpp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Automatic RCC for app/resources/workflows.qrc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Info.json Release
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc;C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\paint_app_autogen.dir\AutoRcc_workflows_5QDYQ3JZ3K_Info.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_inpaint.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_scribble.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_lineart.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_canny.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_img2img.json;C:\Qt\6.7.2\msvc2019_64\.\bin\rcc.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_workflows.cpp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Automatic RCC for app/resources/workflows.qrc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Info.json MinSizeRel
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc;C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\paint_app_autogen.dir\AutoRcc_workflows_5QDYQ3JZ3K_Info.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_inpaint.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_scribble.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_lineart.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_canny.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_img2img.json;C:\Qt\6.7.2\msvc2019_64\.\bin\rcc.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_workflows.cpp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</BuildInParallel>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Automatic RCC for app/resources/workflows.qrc</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Info.json RelWithDebInfo
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc;C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\paint_app_autogen.dir\AutoRcc_workflows_5QDYQ3JZ3K_Info.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_inpaint.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_scribble.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_lineart.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_canny.json;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows\paintapp_img2img.json;C:\Qt\6.7.2\msvc2019_64\.\bin\rcc.exe;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_workflows.cpp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Keishi\Portfolio\Painting-app\src\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/Users/Keishi/Portfolio/Painting-app/src/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Keishi/Portfolio/Painting-app -BC:/Users/Keishi/Portfolio/Painting-app/build_cv --check-stamp-file C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/Users/Keishi/Portfolio/Painting-app/src/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Keishi/Portfolio/Painting-app -BC:/Users/Keishi/Portfolio/Painting-app/build_cv --check-stamp-file C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule C:/Users/Keishi/Portfolio/Painting-app/src/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Keishi/Portfolio/Painting-app -BC:/Users/Keishi/Portfolio/Painting-app/build_cv --check-stamp-file C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule C:/Users/Keishi/Portfolio/Painting-app/src/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Keishi/Portfolio/Painting-app -BC:/Users/Keishi/Portfolio/Painting-app/build_cv --check-stamp-file C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc;C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\mocs_compilation_Debug.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\main.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\bridge\AppController.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\ui\ToolDescriptor.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\ui\UiState.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\ui\IconLoader.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\mainwindow\MainWindow.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\canvasview\CanvasWidget.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\canvasview\SelectionOverlayRenderer.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\panels\AiPanel.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\panels\LayerPanel.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\panels\ToolPanel.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\panels\SubToolPanel.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\panels\ToolPropertyPanel.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\panels\ColorWheelWidget.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\panels\GenerativeFillDialog.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\panels\AiGenerateDialog.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\bridge\ComfyUiClient.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\bridge\MinimalWebSocket.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\bridge\PsdExporter.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\bridge\PsdImporter.cpp" />
+    <None Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\icons.qrc">
+    </None>
+    <None Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\workflows.qrc">
+    </None>
+    <ResourceCompile Include="C:\Users\Keishi\Portfolio\Painting-app\src\app\resources\app.rc" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_icons.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\5QDYQ3JZ3K\qrc_workflows.cpp" />
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\mocs_compilation_Release.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\mocs_compilation_MinSizeRel.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_app_autogen\mocs_compilation_RelWithDebInfo.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\ZERO_CHECK.vcxproj">
+      <Project>{86E1C94B-9357-30B1-9AFA-49D9F41BFD75}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_core.vcxproj">
+      <Project>{B1FEB31F-D9C8-3416-84F8-713EAA4146E4}</Project>
+      <Name>paint_core</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Keishi\Portfolio\Painting-app\build_cv\src\paint_qt_platform.vcxproj">
+      <Project>{9965D031-896B-3425-BAFA-F32993AA25E0}</Project>
+      <Name>paint_qt_platform</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

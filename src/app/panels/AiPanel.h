@@ -3,8 +3,11 @@
 #include <QElapsedTimer>
 #include <QJsonObject>
 #include <QList>
+#include <QMap>
 #include <QPixmap>
 #include <QWidget>
+
+#include "app/panels/WorkflowBindingDialog.h"
 
 class QButtonGroup;
 class QComboBox;
@@ -55,6 +58,7 @@ private slots:
   void onInpaintClicked();
   void onCancelClicked();
   void onBrowseWorkflow();
+  void onBindingClicked();
   void onWorkflowSelected(int index);
   void onApplyCandidate();
   void onComfyStateChanged(bool connected);
@@ -91,8 +95,17 @@ private:
   // ── Workflow ──────────────────────────────────────────────────────────────
   QComboBox*   m_workflowCombo    {nullptr};
   QPushButton* m_workflowBrowse   {nullptr};
+  QPushButton* m_bindingButton    {nullptr};
   QJsonObject  m_loadedWorkflow;              ///< {} = use built-in
   QStringList  m_recentWorkflows;
+  // ノードバインド設定: workflowPath → config
+  QMap<QString, WorkflowBindingConfig> m_bindingConfigs;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  void saveBindingConfig(const QString& path, const WorkflowBindingConfig& cfg);
+  WorkflowBindingConfig loadBindingConfig(const QString& path) const;
+  WorkflowBindingConfig currentBindingConfig() const;
+  QString currentWorkflowPath() const;
 
   // ── Shared params ─────────────────────────────────────────────────────────
   QTextEdit*      m_promptEdit       {nullptr};

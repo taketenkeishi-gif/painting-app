@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -55,6 +56,17 @@ public:
   Color paperColor() const noexcept { return m_paperColor; }
   void setPaperColor(Color color) noexcept { m_paperColor = color; }
 
+  // ── プロジェクトロード専用 API ──────────────────────────────────────────
+  uint32_t nextLayerId() const noexcept { return m_nextLayerId; }
+  void setNextLayerId(uint32_t id) noexcept { m_nextLayerId = id; }
+  /// デフォルトレイヤーを消去してロード受け入れ状態にする
+  void clearLayersForLoad() noexcept;
+  /// ID を変更せずにレイヤーを末尾に追加（ロード専用）
+  std::size_t insertLoadedLayer(Layer layer);
+  /// 指定インデックスにレイヤーを挿入（アンドゥ専用）。
+  /// index > layerCount() の場合は末尾に追加する。activeLayerIndex は変更しない。
+  void insertLayerAt(std::size_t index, Layer layer);
+
 private:
   static std::string makeDefaultLayerName(std::size_t currentLayerCount);
 
@@ -62,6 +74,7 @@ private:
   int  m_dpi {72};
   std::vector<Layer> m_layers;
   std::size_t m_activeLayerIndex {0};
+  uint32_t m_nextLayerId {1};  ///< 次に採番するレイヤー ID（1始まり、0 = 未採番の番兵値）
   SelectionMask m_selection;
   bool m_paperVisible {true};
   Color m_paperColor {255, 255, 255, 255};

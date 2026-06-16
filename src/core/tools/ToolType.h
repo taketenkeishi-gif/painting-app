@@ -8,12 +8,15 @@ enum class ToolKind {
   Eyedropper,
   Hand,
   Zoom,
-  Line,
+  Shape,         ///< 図形ツール（直線・曲線・矩形・円など）
   RectSelection,
   MoveLayer,
   Fill,
-  AiSelect,   ///< AI オブジェクト選択（SAM2 / スマートフラッドフィル）
-  Gradient,   ///< グラデーション塗りつぶし
+  AiSelect,      ///< AI オブジェクト選択（SAM2 / スマートフラッドフィル）
+  Gradient,      ///< グラデーション塗りつぶし
+  FreeTransform, ///< 自由変形（Ctrl+T モーダルセッション）
+  VectorEdit,    ///< ベクター制御点編集（選択・移動・削除）
+  Text,          ///< テキストツール（クリックで文字入力）
 };
 
 const char* toolKindDisplayName(ToolKind kind) noexcept;

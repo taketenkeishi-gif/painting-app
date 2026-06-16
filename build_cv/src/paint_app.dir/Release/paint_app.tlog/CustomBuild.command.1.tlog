@@ -1,0 +1,38 @@
+^C:\USERS\KEISHI\PORTFOLIO\PAINTING-APP\BUILD_CV\CMAKEFILES\CD3872CF2D9CE6E09F9A401CD7E6F0CF\QRC_ICONS.CPP.RULE
+setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_icons_5QDYQ3JZ3K_Info.json Release
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\KEISHI\PORTFOLIO\PAINTING-APP\BUILD_CV\CMAKEFILES\CD3872CF2D9CE6E09F9A401CD7E6F0CF\QRC_WORKFLOWS.CPP.RULE
+setlocal
+cd C:\Users\Keishi\Portfolio\Painting-app\build_cv\src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E cmake_autorcc C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/paint_app_autogen.dir/AutoRcc_workflows_5QDYQ3JZ3K_Info.json Release
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\KEISHI\PORTFOLIO\PAINTING-APP\SRC\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Keishi/Portfolio/Painting-app -BC:/Users/Keishi/Portfolio/Painting-app/build_cv --check-stamp-file C:/Users/Keishi/Portfolio/Painting-app/build_cv/src/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

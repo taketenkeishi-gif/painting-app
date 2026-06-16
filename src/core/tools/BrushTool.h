@@ -2,13 +2,18 @@
 
 #include <algorithm>
 #include <chrono>
+#include <functional>
 #include <string_view>
 #include <vector>
 
+#include "core/brush/DabGenerator.h"
+#include "core/brush/DabRenderer.h"
+#include "core/brush/StrokeProcessor.h"
 #include "core/buffer/PixelBuffer.h"
 #include "core/common/FPoint.h"
 #include "core/common/Point.h"
 #include "core/layer/Layer.h"
+#include "core/selection/SelectionMask.h"
 #include "core/tools/ITool.h"
 #include "core/tools/ToolTypes.h"
 
@@ -57,7 +62,32 @@ public:
   void setSmearEnabled(bool v)   noexcept { m_settings.dynamics.smear     = v; }
   void setSmearRate(float v)     noexcept { m_settings.dynamics.smearRate  = std::clamp(v, 0.0F, 1.0F); }
 
+  // 筆圧カーブ (libmypaint BrushCurve)
+  // 例: brush.setPressureSizeCurve(BrushCurve::soft())
+  void setPressureSizeCurve(const BrushCurve& c)    noexcept { m_settings.dynamics.pressureSizeCurve    = c; }
+  void setPressureOpacityCurve(const BrushCurve& c) noexcept { m_settings.dynamics.pressureOpacityCurve = c; }
+  // 後方互換: γ 値で設定するショートカット
+  void setPressureSizeGamma(float gamma)    noexcept { m_settings.dynamics.pressureSizeCurve    = BrushCurve::fromGamma(gamma); }
+  void setPressureOpacityGamma(float gamma) noexcept { m_settings.dynamics.pressureOpacityCurve = BrushCurve::fromGamma(gamma); }
+
+  // Dab 散布
+  void setScatterEnabled(bool v)   noexcept { m_settings.dynamics.scatter       = v; }
+  void setScatterAmount(float v)   noexcept { m_settings.dynamics.scatterAmount = std::clamp(v, 0.0F, 4.0F); }
+
+  // 角度ジッター
+  void setAngleJitterEnabled(bool v)  noexcept { m_settings.dynamics.angleJitter       = v; }
+  void setAngleJitterAmount(float v)  noexcept { m_settings.dynamics.angleJitterAmount = std::clamp(v, 0.0F, 180.0F); }
+
+  // 1 スタンプあたりの Dab 数（スプレー）
+  void setDabCount(int v) noexcept { m_settings.dynamics.dabCount = std::clamp(v, 1, 64); }
+
   const BrushSettings& settings() const noexcept { return m_settings; }
+
+  // Called after every blendPixel write with the final pixel color.
+  // Platform code wires this to SkiaLayerCache::patchPixel().
+  using PixelWriteCb = std::function<void(int x, int y, const Color& c)>;
+  void setPixelWriteCallback(PixelWriteCb cb) noexcept { m_pixelWriteCb = std::move(cb); }
+  void clearPixelWriteCallback() noexcept { m_pixelWriteCb = nullptr; }
 
   ToolKind kind() const noexcept override { return ToolKind::Brush; }
   std::string_view displayName() const noexcept override { return "Brush"; }
@@ -70,8 +100,7 @@ public:
   ToolOverlayState overlay() const override;
 
 protected:
-  FPoint applyStabilization(const FPoint& from, const FPoint& to) const;
-  float computeTaperStrength(float t, float taperStart, float taperEnd) const;
+  float computeTaperStrength(float t, float taperStart, float taperEnd) const; // kept for EraserTool
   float computePressureSize(float pressure) const;
   float computePressureOpacity(float pressure) const;
   float computeVelocityFactor(float segLenPx) const noexcept;
@@ -81,9 +110,16 @@ protected:
                      float pressureFrom, float pressureTo,
                      float strokeT, float strokeLen);
 
+  // angleDegrees: m_settings.angle に加算するジッター角度（通常は 0）
   void stampAt(PixelBuffer& buffer, const PixelBuffer& composited,
                const FPoint& center, float radius,
-               float strength, bool lockAlpha) const;
+               float strength, bool lockAlpha,
+               float angleDegrees) const;
+
+  // scatter / dabCount を考慮して stampAt を 1〜N 回呼ぶ
+  void stampDabsAt(PixelBuffer& buffer, const PixelBuffer& composited,
+                   const FPoint& center, float radius,
+                   float strength, bool lockAlpha) const;
 
   void blendPixel(PixelBuffer& buffer, int x, int y,
                   const Color& src, float strength, bool lockAlpha) const;
@@ -97,7 +133,6 @@ protected:
   bool m_maskEditMode {false};
   FPoint m_lastPoint {0.0f, 0.0f};
   float m_lastPressure {1.0f};
-  mutable float m_distanceAccum {0.0f};
   float m_strokeLength {0.0f};
   std::vector<FPoint> m_vectorPoints;
 
@@ -108,6 +143,32 @@ protected:
 
   // スメア用: 前回の stamp 中心で採取した色
   mutable Color m_smearColor {0, 0, 0, 255};
+
+  // ── DabGenerator ────────────────────────────────────────────────────────────
+  // scatter / angleJitter / dabCount ループを管理する。
+  mutable DabGenerator m_dabGenerator;
+
+  // ── DabRenderer ─────────────────────────────────────────────────────────────
+  // coverage計算・テクスチャ・wetMix/smear・buildup制御・dab pixel loop を担当。
+  mutable DabRenderer m_dabRenderer;
+
+  // ── StrokeProcessor ────────────────────────────────────────────────────────
+  // Catmull-Rom / spacing / distanceAccum / prevPoint を管理する。
+  StrokeProcessor m_strokeProcessor;
+
+  /// ストローク中の選択マスク参照（hasSelection == false のとき nullptr）
+  mutable const SelectionMask* m_selectionMask {nullptr};
+
+  mutable PixelWriteCb m_pixelWriteCb;
+
+  // ── Dev_Bridge benchmark フック ────────────────────────────────────────────
+  // stampAt() 呼び出し回数のカウンター。brush-benchmark action が使用する。
+  // アルゴリズム・品質への影響ゼロ。
+public:
+  void resetDebugCounters() noexcept { m_debugDabCount = 0; }
+  int  debugDabCount()      const noexcept { return m_debugDabCount; }
+private:
+  mutable int m_debugDabCount {0};
 };
 
 } // namespace core

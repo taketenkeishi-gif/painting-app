@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <unordered_map>
 
 #include <QApplication>
@@ -10,6 +11,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QTabletEvent>
 #include <QWheelEvent>
 
@@ -75,6 +77,41 @@ void drawCheckerboard(QPainter& painter, const QRect& rect, int cellSize) {
   }
 }
 
+// 回転カーソル: 3/4 円弧（キャッシュして再利用）
+static const QCursor& rotateCursor() {
+  static QCursor cursor = []() {
+    const int sz = 20;
+    QPixmap pm(sz, sz);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QRectF arc(2.5, 2.5, sz - 5.0, sz - 5.0);
+    p.setPen(QPen(Qt::white, 3.5, Qt::SolidLine, Qt::RoundCap));
+    p.drawArc(arc, 45 * 16, 270 * 16);
+    p.setPen(QPen(Qt::black, 2.0, Qt::SolidLine, Qt::RoundCap));
+    p.drawArc(arc, 45 * 16, 270 * 16);
+    p.end();
+    return QCursor(pm, sz / 2, sz / 2);
+  }();
+  return cursor;
+}
+
+// FreeTransform ハンドル用カーソル（回転角を考慮）
+// handle: 0-7=スケールハンドル, -2=ボックス内部, -1=外部
+static Qt::CursorShape transformHandleCursor(int handle, float rotDeg) {
+  if (handle == -2) return Qt::SizeAllCursor;  // 内部: 移動
+  if (handle < 0)   return Qt::ArrowCursor;    // 外部
+  // ハンドルごとの基準軸角度 (度): 0=水平, 45=斜め(\), 90=垂直, 135=斜め(/)
+  // 0=TL 1=TC 2=TR 3=ML 4=MR 5=BL 6=BC 7=BR
+  static constexpr float kBaseAngle[8] = {45.f, 90.f, 135.f, 0.f, 0.f, 135.f, 90.f, 45.f};
+  float a = std::fmod(kBaseAngle[handle] + rotDeg, 180.f);
+  if (a < 0.f) a += 180.f;
+  if (a < 22.5f || a >= 157.5f) return Qt::SizeHorCursor;
+  if (a <  67.5f)                return Qt::SizeFDiagCursor;
+  if (a < 112.5f)                return Qt::SizeVerCursor;
+  return Qt::SizeBDiagCursor;
+}
+
 Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
   switch (tool) {
     case core::ToolKind::Brush:
@@ -84,7 +121,7 @@ Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
       return Qt::CrossCursor;
     case core::ToolKind::Fill:
       return Qt::PointingHandCursor;
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
     case core::ToolKind::RectSelection:
       return Qt::CrossCursor;
     case core::ToolKind::MoveLayer:
@@ -93,6 +130,8 @@ Qt::CursorShape cursorForTool(core::ToolKind tool, bool dragging) {
       return dragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor;
     case core::ToolKind::Zoom:
       return Qt::SizeVerCursor;
+    case core::ToolKind::VectorEdit:
+      return dragging ? Qt::SizeAllCursor : Qt::ArrowCursor;
     default:
       return Qt::ArrowCursor;
   }
@@ -265,7 +304,7 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
 
   drawCheckerboard(painter, target, static_cast<int>(std::lround(std::clamp(state.zoom * 10.0, 8.0, 24.0))));
 
-  // ズーム倍率 1x未満 or 8x未満はバイリニア補間; 8x以上はニアレストネイバー
+  // ズーム倍率 8x未満はバイリニア補間; 8x以上はニアレストネイバー（ピクセルパーフェクト）
   const bool smooth = (state.zoom < 8.0);
   painter.setRenderHint(QPainter::SmoothPixmapTransform, smooth);
   painter.drawImage(target, m_image);
@@ -279,9 +318,53 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
   }
 
   if (m_controller != nullptr && m_showOverlay) {
+    m_controller->setCanvasZoom(state.zoom);
     const app::bridge::CanvasOverlayViewModel overlay = m_controller->canvasOverlay();
     const core::ToolKind activeTool = m_controller->currentTool();
     painter.setRenderHint(QPainter::Antialiasing, true);
+
+    // ── FreeTransform フローティング画像プレビュー ───────────────────────────
+    if (overlay.hasTransformPreview && !overlay.transformFloatingImage.isNull()) {
+      if (overlay.transformIsDistort) {
+        // Distort（透視変換）モード: quadToQuad でリアルタイムプレビュー
+        const double imgW = static_cast<double>(overlay.transformFloatingImage.width());
+        const double imgH = static_cast<double>(overlay.transformFloatingImage.height());
+        QPolygonF srcPoly;
+        srcPoly << QPointF(0, 0) << QPointF(imgW, 0)
+                << QPointF(imgW, imgH) << QPointF(0, imgH);
+        QPolygonF dstPoly;
+        for (int i = 0; i < 4; ++i) {
+          dstPoly << QPointF(
+              target.x() + static_cast<double>(overlay.transformDistortCorners[i].x) * state.zoom,
+              target.y() + static_cast<double>(overlay.transformDistortCorners[i].y) * state.zoom);
+        }
+        QTransform perspTransform;
+        if (QTransform::quadToQuad(srcPoly, dstPoly, perspTransform)) {
+          painter.save();
+          painter.setClipRect(target);
+          painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 8.0);
+          painter.setWorldTransform(perspTransform, true);
+          painter.drawImage(QPointF(0, 0), overlay.transformFloatingImage);
+          painter.restore();
+          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        }
+      } else {
+        // 通常アフィン変換プレビュー
+        const double screenCX = target.x() + static_cast<double>(overlay.transformCenterX) * state.zoom;
+        const double screenCY = target.y() + static_cast<double>(overlay.transformCenterY) * state.zoom;
+        const double fw = static_cast<double>(overlay.transformHalfW) * state.zoom;
+        const double fh = static_cast<double>(overlay.transformHalfH) * state.zoom;
+        painter.save();
+        painter.setClipRect(target);
+        painter.translate(screenCX, screenCY);
+        painter.rotate(static_cast<double>(overlay.transformRot) * (180.0 / 3.14159265358979323846));
+        painter.scale(static_cast<double>(overlay.transformSx), static_cast<double>(overlay.transformSy));
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 8.0);
+        painter.drawImage(QRectF(-fw, -fh, fw * 2.0, fh * 2.0), overlay.transformFloatingImage);
+        painter.restore();
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+      }
+    }
 
     // ── Tool line overlay (LineTool / MoveLayer) ────────────────────────────
     if (overlay.toolOverlay.hasLine) {
@@ -358,54 +441,140 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       painter.drawEllipse(poly.first(), 4.0, 4.0);
     }
 
-    // ── Polygon lasso in-progress overlay ───────────────────────────────────
-    if (overlay.toolOverlay.hasPolyLasso && !overlay.toolOverlay.polyLassoVertices.empty()) {
-      const auto& verts = overlay.toolOverlay.polyLassoVertices;
-      const core::Point& mouse = overlay.toolOverlay.polyLassoMouse;
+    // ── Polygon lasso in-progress overlay (ベジェ対応) ──────────────────────
+    if (overlay.toolOverlay.hasPolyLasso && !overlay.toolOverlay.polyLassoNodes.empty()) {
+      const auto& nodes   = overlay.toolOverlay.polyLassoNodes;
+      const core::FPoint& mouse = overlay.toolOverlay.polyLassoMouse;
+      const int N = static_cast<int>(nodes.size());
 
-      QPolygonF poly;
-      poly.reserve(static_cast<int>(verts.size()) + 1);
-      for (const auto& pt : verts) {
-        poly.append(QPointF(
-            target.x() + (static_cast<double>(pt.x) + 0.5) * state.zoom,
-            target.y() + (static_cast<double>(pt.y) + 0.5) * state.zoom));
+      // canvas → screen 変換ラムダ
+      auto toScreen = [&](const core::FPoint& p) -> QPointF {
+        return QPointF(target.x() + (static_cast<double>(p.x) + 0.5) * state.zoom,
+                       target.y() + (static_cast<double>(p.y) + 0.5) * state.zoom);
+      };
+
+      const QPointF mousePt = toScreen(mouse);
+
+      // ── 確定セグメントのパス構築 ─────────────────────────────────────────
+      QPainterPath segPath;
+      if (N >= 1) {
+        segPath.moveTo(toScreen(nodes[0].anchor));
+        for (int i = 0; i < N - 1; ++i) {
+          const auto& A = nodes[i];
+          const auto& B = nodes[i + 1];
+          const QPointF p0 = toScreen(A.anchor);
+          const QPointF p3 = toScreen(B.anchor);
+          const bool aSmooth = (A.handleOut.x != 0.f || A.handleOut.y != 0.f);
+          const bool bSmooth = (B.handleOut.x != 0.f || B.handleOut.y != 0.f);
+          if (aSmooth || bSmooth) {
+            const QPointF p1 = aSmooth
+                ? toScreen({A.anchor.x + A.handleOut.x, A.anchor.y + A.handleOut.y})
+                : p0;
+            const QPointF p2 = bSmooth
+                ? toScreen({B.anchor.x - B.handleOut.x, B.anchor.y - B.handleOut.y})
+                : p3;
+            segPath.cubicTo(p1, p2, p3);
+          } else {
+            segPath.lineTo(p3);
+          }
+        }
       }
-      const QPointF mousePt(
-          target.x() + (static_cast<double>(mouse.x) + 0.5) * state.zoom,
-          target.y() + (static_cast<double>(mouse.y) + 0.5) * state.zoom);
 
+      // ── 末尾ノードからマウスへの先行線 ───────────────────────────────────
+      QPainterPath tailPath;
+      if (N >= 1) {
+        const auto& last = nodes[N - 1];
+        const bool lastSmooth = (last.handleOut.x != 0.f || last.handleOut.y != 0.f);
+        tailPath.moveTo(toScreen(last.anchor));
+        if (overlay.toolOverlay.polyLassoIsDragging) {
+          // ドラッグ中: ドラッグ中のアンカーからマウスへの直線
+          tailPath.lineTo(toScreen(overlay.toolOverlay.polyLassoDragAnchor));
+        } else if (lastSmooth) {
+          // スムースノードのアウトハンドル方向を使った予測曲線
+          const QPointF p0 = toScreen(last.anchor);
+          const QPointF p1 = toScreen({last.anchor.x + last.handleOut.x,
+                                        last.anchor.y + last.handleOut.y});
+          tailPath.cubicTo(p1, mousePt, mousePt);
+        } else {
+          tailPath.lineTo(mousePt);
+        }
+      }
+
+      // ── クローズヒント（マウス→始点の破線） ─────────────────────────────
+      QPainterPath closePath;
+      if (N >= 3) {
+        closePath.moveTo(mousePt);
+        closePath.lineTo(toScreen(nodes[0].anchor));
+      }
+
+      // 描画: Shadow
       painter.setBrush(Qt::NoBrush);
-      // Shadow
       painter.setPen(QPen(QColor(0, 0, 0, 160), 2.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-      painter.drawPolyline(poly);
-      if (!poly.isEmpty()) {
-        painter.drawLine(poly.last(), mousePt);
-        // 始点への閉じ線ヒント
-        QPen closePen(QColor(0, 0, 0, 100), 2.0, Qt::DashLine, Qt::RoundCap);
-        painter.setPen(closePen);
-        painter.drawLine(mousePt, poly.first());
+      painter.drawPath(segPath);
+      painter.drawPath(tailPath);
+      if (!closePath.isEmpty()) {
+        painter.setPen(QPen(QColor(0, 0, 0, 100), 2.0, Qt::DashLine, Qt::RoundCap));
+        painter.drawPath(closePath);
       }
-      // Foreground dashed
+      // 描画: Foreground dashed
       QPen fgPen(QColor(255, 255, 255, 230), 1.4, Qt::DashLine, Qt::RoundCap, Qt::RoundJoin);
       fgPen.setDashOffset(m_marchingOffset);
       painter.setPen(fgPen);
-      painter.drawPolyline(poly);
-      if (!poly.isEmpty()) {
-        painter.drawLine(poly.last(), mousePt);
+      painter.drawPath(segPath);
+      painter.drawPath(tailPath);
+      if (!closePath.isEmpty()) {
         QPen closeFg(QColor(200, 200, 255, 140), 1.2, Qt::DashLine, Qt::RoundCap);
         closeFg.setDashOffset(m_marchingOffset);
         painter.setPen(closeFg);
-        painter.drawLine(mousePt, poly.first());
+        painter.drawPath(closePath);
       }
-      // 各頂点ドット
+
+      // ── スムースノードのハンドルビジュアル（オレンジ） ───────────────────
+      painter.setBrush(Qt::NoBrush);
+      painter.setPen(QPen(QColor(255, 160, 0, 200), 1.0));
+      for (const auto& n : nodes) {
+        if (n.handleOut.x != 0.f || n.handleOut.y != 0.f) {
+          const QPointF a  = toScreen(n.anchor);
+          const QPointF ho = toScreen({n.anchor.x + n.handleOut.x,
+                                        n.anchor.y + n.handleOut.y});
+          const QPointF hi = toScreen({n.anchor.x - n.handleOut.x,
+                                        n.anchor.y - n.handleOut.y});
+          painter.drawLine(hi, ho);
+          painter.setBrush(QColor(255, 160, 0, 220));
+          painter.drawEllipse(ho, 3.0, 3.0);
+          painter.drawEllipse(hi, 3.0, 3.0);
+          painter.setBrush(Qt::NoBrush);
+          (void)a;
+        }
+      }
+
+      // ── ドラッグ中ハンドルビジュアル（ブルー） ───────────────────────────
+      if (overlay.toolOverlay.polyLassoIsDragging) {
+        const QPointF da  = toScreen(overlay.toolOverlay.polyLassoDragAnchor);
+        const core::FPoint& dh = overlay.toolOverlay.polyLassoDragHandle;
+        const QPointF dho = toScreen({overlay.toolOverlay.polyLassoDragAnchor.x + dh.x,
+                                       overlay.toolOverlay.polyLassoDragAnchor.y + dh.y});
+        const QPointF dhi = toScreen({overlay.toolOverlay.polyLassoDragAnchor.x - dh.x,
+                                       overlay.toolOverlay.polyLassoDragAnchor.y - dh.y});
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(QColor(60, 140, 255, 220), 1.0));
+        painter.drawLine(dhi, dho);
+        painter.setBrush(QColor(60, 140, 255, 230));
+        painter.drawEllipse(da, 4.0, 4.0);
+        painter.drawEllipse(dho, 3.0, 3.0);
+        painter.drawEllipse(dhi, 3.0, 3.0);
+      }
+
+      // ── 頂点ドット ────────────────────────────────────────────────────────
       painter.setBrush(QColor(255, 255, 255, 220));
       painter.setPen(QPen(QColor(0, 0, 0, 180), 1.0));
-      for (const QPointF& v : poly) {
-        painter.drawEllipse(v, 3.0, 3.0);
-      }
-      // 始点は大きめのドット（閉じインジケータ）
-      if (!poly.isEmpty()) {
-        painter.drawEllipse(poly.first(), 5.0, 5.0);
+      for (int i = 0; i < N; ++i) {
+        const QPointF v = toScreen(nodes[i].anchor);
+        if (i == 0) {
+          painter.drawEllipse(v, 5.0, 5.0);  // 始点は大きめ
+        } else {
+          painter.drawEllipse(v, 3.0, 3.0);
+        }
       }
     }
 
@@ -418,9 +587,11 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
       QPolygonF poly;
       poly.reserve(static_cast<int>(pts.size()));
       for (const auto& fp : pts) {
+        // fp.x/y はキャンバス連続座標（mapToCanvasF由来）のため +0.5 不要。
+        // 整数ピクセルインデックス用の +0.5 を加えると確定後ラスタと 0.5*zoom ずれる。
         poly.append(QPointF(
-            target.x() + (static_cast<double>(fp.x) + 0.5) * state.zoom,
-            target.y() + (static_cast<double>(fp.y) + 0.5) * state.zoom));
+            target.x() + static_cast<double>(fp.x) * state.zoom,
+            target.y() + static_cast<double>(fp.y) * state.zoom));
       }
 
       const double penW = std::max(1.0, static_cast<double>(vw) * state.zoom);
@@ -439,13 +610,250 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
     }
 
     // ── Committed selection — marching ants ─────────────────────────────────
-    if (overlay.selectionMask != nullptr) {
-      SelectionOverlayRenderer::render(
-          painter,
-          *overlay.selectionMask,
-          state.zoom,
-          QPointF(target.x(), target.y()),
-          m_marchingOffset);
+    SelectionOverlayRenderer::render(
+        painter,
+        overlay.selectionMask,
+        state.zoom,
+        QPointF(target.x(), target.y()),
+        m_marchingOffset);
+
+    // ── FreeTransform 変形ボックス ───────────────────────────────────────────
+    if (overlay.toolOverlay.hasTransformBox) {
+      auto toScreen = [&](const core::FPoint& fp) -> QPointF {
+        return QPointF(target.x() + static_cast<double>(fp.x) * state.zoom,
+                       target.y() + static_cast<double>(fp.y) * state.zoom);
+      };
+      // [OBSERVE LOG] ハンドル描画位置（widget論理座標）
+      {
+        const QPointF tcW = toScreen(overlay.toolOverlay.transformHandles[1]);
+        const QPointF brW = toScreen(overlay.toolOverlay.transformHandles[7]);
+        const QPoint globalOrigin = mapToGlobal(QPoint(0, 0));
+        qDebug() << "[HANDLE_WIDGET] target=" << target.x() << target.y()
+                 << "zoom=" << state.zoom
+                 << "TC_widget=" << tcW.x() << tcW.y()
+                 << "BR_widget=" << brW.x() << brW.y()
+                 << "widgetSize=" << width() << height()
+                 << "dpr=" << devicePixelRatio()
+                 << "widgetGlobal=" << globalOrigin.x() << globalOrigin.y()
+                 << "TC_global=" << (globalOrigin.x()+(int)tcW.x()) << (globalOrigin.y()+(int)tcW.y());
+      }
+
+      // 外枠（4コーナーを繋ぐ破線）
+      QPolygonF box;
+      for (int i = 0; i < 4; ++i) {
+        box << toScreen(overlay.toolOverlay.transformCorners[i]);
+      }
+      box << toScreen(overlay.toolOverlay.transformCorners[0]);
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      painter.setPen(QPen(QColor(0, 0, 0, 160), 2.0, Qt::DashLine));
+      painter.drawPolyline(box);
+      painter.setPen(QPen(QColor(255, 255, 255, 220), 1.0, Qt::SolidLine));
+      painter.drawPolyline(box);
+
+      // 回転ハンドルへの線（handle[1] TC → handle[8] Rotate）
+      const QPointF tcPt = toScreen(overlay.toolOverlay.transformHandles[1]);
+      const QPointF rotPt = toScreen(overlay.toolOverlay.transformHandles[8]);
+      painter.setPen(QPen(QColor(255, 255, 255, 180), 1.0, Qt::DotLine));
+      painter.drawLine(tcPt, rotPt);
+
+      // スケールハンドル (0-7): 白い正方形
+      painter.setPen(QPen(QColor(0, 0, 0, 220), 1.5));
+      painter.setBrush(overlay.toolOverlay.transformActiveHandle >= 0 &&
+                       overlay.toolOverlay.transformActiveHandle <= 7
+                       ? QBrush(QColor(72, 195, 255)) : QBrush(Qt::white));
+      for (int i = 0; i < 8; ++i) {
+        const QPointF pt = toScreen(overlay.toolOverlay.transformHandles[i]);
+        painter.drawRect(QRectF(pt.x() - 4.5, pt.y() - 4.5, 9.0, 9.0));
+      }
+
+      // 回転ハンドル (8): 青い円
+      const bool rotActive = (overlay.toolOverlay.transformActiveHandle == 8);
+      painter.setPen(QPen(QColor(0, 0, 0, 220), 1.5));
+      painter.setBrush(rotActive ? QColor(72, 195, 255) : QColor(200, 230, 255));
+      painter.drawEllipse(rotPt, 5.5, 5.5);
+    }
+
+    // ── VectorEdit 制御点オーバーレイ ────────────────────────────────────────
+    if (overlay.toolOverlay.hasVectorEdit && !overlay.toolOverlay.vectorEditPoints.empty()) {
+      const auto& pts   = overlay.toolOverlay.vectorEditPoints;
+      const auto& paths = overlay.toolOverlay.vectorEditPointPath;
+      const auto& sel   = overlay.toolOverlay.vectorEditPointSelected;
+      const int   n     = static_cast<int>(pts.size());
+
+      auto toScreen = [&](const core::FPoint& fp) -> QPointF {
+        return QPointF(target.x() + static_cast<double>(fp.x) * state.zoom,
+                       target.y() + static_cast<double>(fp.y) * state.zoom);
+      };
+
+      // パスごとにポリラインを描画（接続線）
+      int pathCount = 0;
+      for (int i = 0; i < n; ++i) {
+        if (paths[i] > pathCount) { pathCount = paths[i]; }
+      }
+      ++pathCount;
+
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      for (int pi = 0; pi < pathCount; ++pi) {
+        QPolygonF poly;
+        for (int i = 0; i < n; ++i) {
+          if (paths[i] == pi) {
+            poly << toScreen(pts[i]);
+          }
+        }
+        if (poly.size() < 2) { continue; }
+        // 影
+        painter.setPen(QPen(QColor(0, 0, 0, 80), 2.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawPolyline(poly);
+        // 前景
+        painter.setPen(QPen(QColor(100, 200, 255, 180), 1.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawPolyline(poly);
+      }
+
+      // 制御点ハンドル（正方形）
+      painter.setRenderHint(QPainter::Antialiasing, false);
+      for (int i = 0; i < n; ++i) {
+        const QPointF pt = toScreen(pts[i]);
+        const bool selected = (i < static_cast<int>(sel.size())) && sel[i];
+        // 影枠
+        painter.setPen(QPen(QColor(0, 0, 0, 200), 1.5));
+        painter.setBrush(selected ? QColor(72, 195, 255) : QColor(240, 240, 255));
+        painter.drawRect(QRectF(pt.x() - 4.0, pt.y() - 4.0, 8.0, 8.0));
+      }
+    }
+
+    // ── Rotoブラシ FG/BG ストロークオーバーレイ ─────────────────────────────────
+    if (overlay.toolOverlay.hasRotoStrokes) {
+      auto toS = [&](const core::FPoint& p) -> QPointF {
+        return QPointF(target.x() + static_cast<double>(p.x) * state.zoom,
+                       target.y() + static_cast<double>(p.y) * state.zoom);
+      };
+      const double radius = static_cast<double>(overlay.toolOverlay.rotoBrushRadius) * state.zoom;
+
+      auto drawStroke = [&](const std::vector<core::FPoint>& pts, bool fg) {
+        if (pts.size() < 2) return;
+        // alpha を 140 にしてストローク半透明を表現
+        const QColor col = fg ? QColor(60, 220, 60, 140) : QColor(220, 50, 50, 140);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        QPen pen(col, std::max(radius * 2.0, 2.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+        QPainterPath path;
+        path.moveTo(toS(pts[0]));
+        for (std::size_t i = 1; i < pts.size(); ++i)
+          path.lineTo(toS(pts[i]));
+        painter.drawPath(path);
+        // 始点マーカー
+        const QPointF s0 = toS(pts[0]);
+        painter.setPen(QPen(col.lighter(130), 1.5));
+        painter.setBrush(col);
+        painter.drawEllipse(s0, radius, radius);
+      };
+
+      // FG (緑) を先に描き、BG (赤) を後から描くことで赤が緑に重なる
+      for (const auto& stroke : overlay.toolOverlay.rotoStrokes)
+        if (stroke.isForeground) drawStroke(stroke.points, true);
+      for (const auto& stroke : overlay.toolOverlay.rotoStrokes)
+        if (!stroke.isForeground) drawStroke(stroke.points, false);
+      if (!overlay.toolOverlay.rotoActiveStroke.empty())
+        drawStroke(overlay.toolOverlay.rotoActiveStroke,
+                   overlay.toolOverlay.rotoActiveFg);
+    }
+
+    // ── AiSelect / Roto Brush — 青いマスクプレビュー ────────────────────────────
+    if (activeTool == core::ToolKind::AiSelect &&
+        overlay.hasAiMaskPreview &&
+        !overlay.aiMaskPreview.isNull()) {
+      const double px = target.x();
+      const double py = target.y();
+      const double pw = overlay.aiMaskPreview.width()  * state.zoom;
+      const double ph = overlay.aiMaskPreview.height() * state.zoom;
+      painter.save();
+      painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 4.0);
+      painter.setOpacity(1.0);
+      painter.drawImage(QRectF(px, py, pw, ph), overlay.aiMaskPreview);
+      painter.restore();
+    }
+
+    // ── Mesh Deform プレビュー・ワイヤーフレーム・ピン ─────────────────────────
+    if (overlay.hasMeshDeformPreview && !overlay.meshDeformPreviewImage.isNull()) {
+      // プレビュー画像（変形済みレイヤー）をキャンバス上に描画
+      const double px = target.x() + static_cast<double>(overlay.meshDeformPreviewOffX) * state.zoom;
+      const double py = target.y() + static_cast<double>(overlay.meshDeformPreviewOffY) * state.zoom;
+      const double pw = overlay.meshDeformPreviewImage.width()  * state.zoom;
+      const double ph = overlay.meshDeformPreviewImage.height() * state.zoom;
+      painter.save();
+      painter.setClipRect(target);
+      painter.setRenderHint(QPainter::SmoothPixmapTransform, state.zoom < 4.0);
+      painter.drawImage(QRectF(px, py, pw, ph), overlay.meshDeformPreviewImage);
+      painter.restore();
+      painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+
+      // ワイヤーフレーム（半透明シアン細線）
+      if (!overlay.meshDeformDeformedVerts.empty() && !overlay.meshDeformTriangles.empty()) {
+        auto toS = [&](const core::FPoint& p) -> QPointF {
+          return QPointF(target.x() + static_cast<double>(p.x) * state.zoom,
+                         target.y() + static_cast<double>(p.y) * state.zoom);
+        };
+        painter.setRenderHint(QPainter::Antialiasing, false);
+        painter.setPen(QPen(QColor(0, 200, 255, 60), 0.8));
+        for (const auto& tri : overlay.meshDeformTriangles) {
+          const QPointF a = toS(overlay.meshDeformDeformedVerts[tri[0]]);
+          const QPointF b = toS(overlay.meshDeformDeformedVerts[tri[1]]);
+          const QPointF c = toS(overlay.meshDeformDeformedVerts[tri[2]]);
+          painter.drawLine(a, b);
+          painter.drawLine(b, c);
+          painter.drawLine(c, a);
+        }
+      }
+
+      // ピン描画
+      if (!overlay.meshDeformPinCurrents.empty()) {
+        auto toS = [&](const core::FPoint& p) -> QPointF {
+          return QPointF(target.x() + static_cast<double>(p.x) * state.zoom,
+                         target.y() + static_cast<double>(p.y) * state.zoom);
+        };
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        const int n = static_cast<int>(overlay.meshDeformPinCurrents.size());
+        for (int i = 0; i < n; ++i) {
+          const QPointF cur  = toS(overlay.meshDeformPinCurrents[i]);
+          const QPointF orig = toS(overlay.meshDeformPinOriginals[i]);
+          // ピンの移動ベクトル線（暗い影 + 白）
+          if (std::hypot(cur.x() - orig.x(), cur.y() - orig.y()) > 1.5) {
+            painter.setPen(QPen(QColor(0, 0, 0, 120), 2.0, Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(orig, cur);
+            painter.setPen(QPen(QColor(255, 255, 100, 180), 1.2, Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(orig, cur);
+          }
+          // 元位置: 白抜き小円
+          painter.setPen(QPen(QColor(0, 0, 0, 180), 1.0));
+          painter.setBrush(QColor(255, 255, 255, 160));
+          painter.drawEllipse(orig, 4.0, 4.0);
+          // 現在位置: 塗り円（ドラッグ中は青、それ以外は橙）
+          const bool dragging = (m_meshDeformDragPinId == i);
+          painter.setPen(QPen(QColor(0, 0, 0, 200), 1.5));
+          painter.setBrush(dragging ? QColor(72, 195, 255) : QColor(255, 120, 40));
+          painter.drawEllipse(cur, 6.0, 6.0);
+        }
+      }
+    }
+
+    // ── テキストツール 入力中オーバーレイ ──────────────────────────────────────
+    if (overlay.toolOverlay.hasTextEdit) {
+      const core::Point& orig = overlay.toolOverlay.textEditOrigin;
+      const QPointF screenOrig(
+          target.x() + static_cast<double>(orig.x) * state.zoom,
+          target.y() + static_cast<double>(orig.y) * state.zoom);
+
+      const QString displayText = QString::fromStdString(overlay.toolOverlay.textEditContent) + QStringLiteral("|");
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      QFont font;
+      font.setPointSizeF(std::max(8.0, 14.0 * state.zoom / 2.0));
+      painter.setFont(font);
+      painter.setPen(QColor(0, 0, 0, 160));
+      painter.drawText(screenOrig + QPointF(1.5, 1.5), displayText);
+      painter.setPen(QColor(255, 255, 255, 240));
+      painter.drawText(screenOrig, displayText);
     }
 
   }
@@ -483,11 +891,19 @@ void CanvasWidget::paintEvent(QPaintEvent* event) {
 }
 
 void CanvasWidget::mousePressEvent(QMouseEvent* event) {
+  // --- OBSERVE LOG ---
+  qDebug() << "[MOUSE_PRESS] pos=" << event->position().toPoint()
+           << "btn=" << event->button()
+           << "tabletActive=" << m_tabletActive
+           << "hasController=" << (m_controller != nullptr);
   if (m_tabletActive) {
     event->accept();
     return;
   }
   if (m_controller == nullptr) {
+    // controller disconnected mid-stroke: reset stale drawing state
+    m_mouseDrawing = false;
+    stateFor(this).hasLastStrokeDispatchPos = false;
     return;
   }
   m_controller->setInputModifiers(
@@ -498,6 +914,26 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   auto& state = stateFor(this);
   state.lastMousePos = event->position().toPoint();
   state.hasMousePos = true;
+
+  // ── Mesh deform モード ──────────────────────────────────────────────────────
+  if (m_controller->isInMeshDeformMode()) {
+    const auto fpt = mapToCanvasF(event->position());
+    if (!fpt.has_value()) return;
+    if (event->button() == Qt::RightButton) {
+      // 右クリック: ピン削除
+      const int id = m_controller->meshDeformHitTestPin(fpt->x, fpt->y);
+      if (id >= 0) m_controller->meshDeformRemovePin(id);
+    } else if (event->button() == Qt::LeftButton) {
+      const int id = m_controller->meshDeformHitTestPin(fpt->x, fpt->y);
+      if (id >= 0) {
+        m_meshDeformDragPinId = id;   // 既存ピンをドラッグ開始
+      } else {
+        m_meshDeformDragPinId = m_controller->meshDeformAddPin(fpt->x, fpt->y);
+      }
+    }
+    update();
+    return;
+  }
 
   if (event->button() == Qt::RightButton) {
     const auto point = mapToCanvas(event->position().toPoint());
@@ -515,8 +951,10 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
     state.panDragging = false;
     state.temporaryMiddlePan = true;
     state.lastPanPos = event->position().toPoint();
+    m_isPanning = true;
+    m_panStartPos = event->position().toPoint();
     m_mouseDrawing = false;
-    updateCursorForState(std::nullopt);
+    setCursor(Qt::ClosedHandCursor);
     update();
     return;
   }
@@ -551,6 +989,10 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   }
 
   const auto point = mapToCanvas(event->position().toPoint());
+  // --- OBSERVE LOG ---
+  qDebug() << "[MOUSE_PRESS_CANVAS] point=" << (point.has_value() ? QPoint(point->x,point->y) : QPoint(-9999,-9999))
+           << "widgetPos=" << event->position().toPoint()
+           << "hasValue=" << point.has_value();
   if (!point.has_value()) {
     return;
   }
@@ -562,6 +1004,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
   {
     const auto fpt = mapToCanvasF(event->position());
     if (fpt.has_value()) {
+      qDebug() << "[MOUSE_PRESS_BEGIN] beginStrokeF canvas=(" << fpt->x << fpt->y << ")";
       m_controller->beginStrokeF(fpt->x, fpt->y, 1.0f, 0.0f, 0.0f);
     } else {
       m_controller->beginStroke(point->x, point->y);
@@ -572,6 +1015,9 @@ void CanvasWidget::mousePressEvent(QMouseEvent* event) {
 
 void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   if (m_controller == nullptr) {
+    // controller disconnected mid-stroke: reset stale drawing state
+    m_mouseDrawing = false;
+    stateFor(this).hasLastStrokeDispatchPos = false;
     return;
   }
   m_controller->setInputModifiers(
@@ -585,6 +1031,22 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
   state.hasMousePos = true;
   const auto canvasPoint = mapToCanvas(state.lastMousePos);
   updateCursorForState(canvasPoint);
+  if (canvasPoint.has_value()) {
+    emit canvasPositionChanged(canvasPoint->x, canvasPoint->y);
+  } else {
+    emit canvasPositionChanged(-1, -1);
+  }
+
+  // ── Mesh deform ピンドラッグ ────────────────────────────────────────────────
+  if (m_controller->isInMeshDeformMode() && m_meshDeformDragPinId >= 0
+      && (event->buttons() & Qt::LeftButton)) {
+    const auto fpt = mapToCanvasF(event->position());
+    if (fpt.has_value()) {
+      m_controller->meshDeformMovePin(m_meshDeformDragPinId, fpt->x, fpt->y);
+      update();
+    }
+    return;
+  }
 
   // Ctrl+Space drag → zoom
   if (m_ctrlSpaceZoom && (event->buttons() & Qt::LeftButton)) {
@@ -696,6 +1158,9 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* event) {
 
 void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
   if (m_controller == nullptr) {
+    // controller disconnected mid-stroke: reset stale drawing state
+    m_mouseDrawing = false;
+    stateFor(this).hasLastStrokeDispatchPos = false;
     return;
   }
   m_controller->setInputModifiers(
@@ -711,7 +1176,15 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* event) {
     state.panning = false;
     state.panDragging = false;
     state.temporaryMiddlePan = false;
+    m_isPanning = false;
     updateCursorForState(mapToCanvas(state.lastMousePos));
+    update();
+    return;
+  }
+
+  // Mesh deform ピンドラッグ終了
+  if (event->button() == Qt::LeftButton && m_meshDeformDragPinId >= 0) {
+    m_meshDeformDragPinId = -1;
     update();
     return;
   }
@@ -755,6 +1228,21 @@ void CanvasWidget::mouseDoubleClickEvent(QMouseEvent* event) {
   auto& state = stateFor(this);
   state.hasLastStrokeDispatchPos = false;
   update();
+}
+
+void CanvasWidget::leaveEvent(QEvent* event) {
+  auto& state = stateFor(this);
+  state.hasMousePos = false;
+
+  if (m_mouseDrawing && m_controller != nullptr) {
+    m_controller->endStroke();
+    m_mouseDrawing = false;
+    state.hasLastStrokeDispatchPos = false;
+    update();
+  }
+
+  emit canvasPositionChanged(-1, -1);
+  QWidget::leaveEvent(event);
 }
 
 void CanvasWidget::wheelEvent(QWheelEvent* event) {
@@ -802,6 +1290,8 @@ void CanvasWidget::wheelEvent(QWheelEvent* event) {
 }
 
 void CanvasWidget::keyPressEvent(QKeyEvent* event) {
+  qDebug() << "[KPE]" << event->key() << "autoRepeat=" << event->isAutoRepeat()
+           << "transformMode=" << (m_controller ? (int)m_controller->isInTransformMode() : -1);
   if (m_controller != nullptr) {
     const Qt::KeyboardModifiers modifiers = QApplication::keyboardModifiers();
     m_controller->setInputModifiers(
@@ -812,6 +1302,76 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
   if (event->isAutoRepeat()) {
     QWidget::keyPressEvent(event);
     return;
+  }
+  // 多角形ラッソ進行中: Enter → 現在のノード列で選択確定
+  if (m_controller != nullptr && m_controller->isPolyLassoInProgress()) {
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+      m_controller->commitPolyLasso();
+      update();
+      event->accept();
+      return;
+    }
+  }
+
+  // AiSelect / Roto Brush: Alt → Add ↔ Subtract モードトグル
+  if (m_controller != nullptr &&
+      m_controller->currentTool() == core::ToolKind::AiSelect &&
+      event->key() == Qt::Key_Alt) {
+    const auto op = m_controller->currentSelectionOp();
+    if (op == core::SelectionOp::Add) {
+      m_controller->setSelectionOp(core::SelectionOp::Subtract);
+      event->accept();
+      return;
+    } else if (op == core::SelectionOp::Subtract) {
+      m_controller->setSelectionOp(core::SelectionOp::Add);
+      event->accept();
+      return;
+    }
+  }
+
+  // AiSelect / Roto Brush: Enter → 青いプレビューを選択として確定
+  if (m_controller != nullptr &&
+      m_controller->currentTool() == core::ToolKind::AiSelect &&
+      m_controller->hasPendingAiMask()) {
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+      m_controller->confirmAiSelectMask();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Escape) {
+      m_controller->clearRotoStrokes();
+      event->accept();
+      return;
+    }
+  }
+
+  // Mesh deform セッション: Enter → コミット, Escape → キャンセル
+  if (m_controller != nullptr && m_controller->isInMeshDeformMode()) {
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+      m_meshDeformDragPinId = -1;
+      m_controller->commitMeshDeformSession();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Escape) {
+      m_meshDeformDragPinId = -1;
+      m_controller->cancelMeshDeformSession();
+      event->accept();
+      return;
+    }
+  }
+  // 変形セッション: Enter → コミット, Escape → キャンセル
+  if (m_controller != nullptr && m_controller->isInTransformMode()) {
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+      m_controller->commitTransformSession();
+      event->accept();
+      return;
+    }
+    if (event->key() == Qt::Key_Escape) {
+      m_controller->cancelTransformSession();
+      event->accept();
+      return;
+    }
   }
   if (event->key() == Qt::Key_Space) {
     // Ctrl+Space → zoom drag mode; plain Space → pan
@@ -826,6 +1386,51 @@ void CanvasWidget::keyPressEvent(QKeyEvent* event) {
       m_spacePressed = true;
       updateCursorForState(stateFor(this).hasMousePos ? mapToCanvas(stateFor(this).lastMousePos) : std::optional<core::Point> {});
     }
+    update();
+    event->accept();
+    return;
+  }
+  // TextTool: テキスト入力中のキーイベントを転送
+  if (m_controller != nullptr && m_controller->isInTextEditMode()) {
+    const int key = event->key();
+    // Ctrl+Enter / Escape → 確定
+    if (key == Qt::Key_Escape
+        || (key == Qt::Key_Return && event->modifiers().testFlag(Qt::ControlModifier))
+        || (key == Qt::Key_Enter && event->modifiers().testFlag(Qt::ControlModifier))) {
+      m_controller->commitTextEdit();
+      update();
+      event->accept();
+      return;
+    }
+    // Enter → 改行
+    if (key == Qt::Key_Return || key == Qt::Key_Enter) {
+      m_controller->dispatchTextNewline();
+      update();
+      event->accept();
+      return;
+    }
+    // Backspace → 1文字削除
+    if (key == Qt::Key_Backspace) {
+      m_controller->dispatchTextBackspace();
+      update();
+      event->accept();
+      return;
+    }
+    // 印字可能文字 → 入力
+    const QString text = event->text();
+    if (!text.isEmpty() && text[0].isPrint()) {
+      m_controller->dispatchTextInput(text.toStdString());
+      update();
+      event->accept();
+      return;
+    }
+    // その他キーは通常フローへ
+  }
+  // VectorEdit: Delete/Backspace で選択制御点を削除
+  if (m_controller != nullptr
+      && m_controller->currentTool() == core::ToolKind::VectorEdit
+      && (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace)) {
+    m_controller->deleteSelectedVectorPoints();
     update();
     event->accept();
     return;
@@ -878,33 +1483,67 @@ void CanvasWidget::refreshFromController() {
   if (m_controller == nullptr) {
     return;
   }
-  const core::PixelBuffer& composited = m_controller->compositedBuffer();
+
   const std::optional<core::Rect> dirtyRect = m_controller->consumeDirtyCompositeRect();
-  const bool canPatchRegion =
-      dirtyRect.has_value() &&
-      !m_image.isNull() &&
-      m_image.width() == composited.width() &&
-      m_image.height() == composited.height();
-  if (!canPatchRegion) {
-    m_image = platform::qt::QtImageConverter::toQImage(composited);
-  } else {
-    const core::Rect dirty = *dirtyRect;
-    const int x0 = std::clamp(dirty.x, 0, composited.width());
-    const int y0 = std::clamp(dirty.y, 0, composited.height());
-    const int x1 = std::clamp(dirty.x + dirty.width, 0, composited.width());
-    const int y1 = std::clamp(dirty.y + dirty.height, 0, composited.height());
-    for (int y = y0; y < y1; ++y) {
-      auto* scanLine = m_image.scanLine(y);
-      for (int x = x0; x < x1; ++x) {
-        const core::Color color = composited.pixel(x, y);
-        const int offset = x * 4;
-        scanLine[offset + 0] = color.r;
-        scanLine[offset + 1] = color.g;
-        scanLine[offset + 2] = color.b;
-        scanLine[offset + 3] = color.a;
+  bool patchedRegion = false;
+
+  // ── Image update ──────────────────────────────────────────────────────────
+#ifdef PAINT_USE_SKIA
+  {
+    // Fast path: read QImage directly (no PixelBuffer readback)
+    const QImage& skiaImg = m_controller->compositedQImage();
+    if (!skiaImg.isNull()) {
+      const bool canPatch = dirtyRect.has_value() &&
+                            !m_image.isNull() &&
+                            m_image.size() == skiaImg.size();
+      if (!canPatch) {
+        m_image = skiaImg.copy();
+      } else {
+        const core::Rect d = *dirtyRect;
+        const int x0 = std::clamp(d.x, 0, skiaImg.width());
+        const int y0 = std::clamp(d.y, 0, skiaImg.height());
+        const int x1 = std::clamp(d.x + d.width,  0, skiaImg.width());
+        const int y1 = std::clamp(d.y + d.height, 0, skiaImg.height());
+        for (int y = y0; y < y1; ++y)
+          std::memcpy(m_image.scanLine(y)           + x0 * 4,
+                      skiaImg.constScanLine(y) + x0 * 4,
+                      static_cast<std::size_t>(x1 - x0) * 4);
+        patchedRegion = true;
+      }
+      goto shared_tail;
+    }
+  }
+#endif
+  {
+    // Original PixelBuffer path (PAINT_USE_SKIA=OFF, or QImage not yet ready)
+    const core::PixelBuffer& composited = m_controller->compositedBuffer();
+    const bool canPatch = dirtyRect.has_value() &&
+                          !m_image.isNull() &&
+                          m_image.width() == composited.width() &&
+                          m_image.height() == composited.height();
+    if (!canPatch) {
+      m_image = platform::qt::QtImageConverter::toQImage(composited);
+    } else {
+      patchedRegion = true;
+      const core::Rect dirty = *dirtyRect;
+      const int x0 = std::clamp(dirty.x, 0, composited.width());
+      const int y0 = std::clamp(dirty.y, 0, composited.height());
+      const int x1 = std::clamp(dirty.x + dirty.width,  0, composited.width());
+      const int y1 = std::clamp(dirty.y + dirty.height, 0, composited.height());
+      for (int y = y0; y < y1; ++y) {
+        auto* sl = m_image.scanLine(y);
+        for (int x = x0; x < x1; ++x) {
+          const core::Color c = composited.pixel(x, y);
+          sl[x*4+0] = c.r; sl[x*4+1] = c.g; sl[x*4+2] = c.b; sl[x*4+3] = c.a;
+        }
       }
     }
   }
+#ifdef PAINT_USE_SKIA
+shared_tail:;
+#endif
+
+  // ── Shared tail ───────────────────────────────────────────────────────────
   updateZoomStatusLabel(this);
   const auto& state = stateFor(this);
   updateCursorForState(state.hasMousePos ? mapToCanvas(state.lastMousePos) : std::optional<core::Point> {});
@@ -918,7 +1557,7 @@ void CanvasWidget::refreshFromController() {
       m_marchingTimer->stop();
     }
   }
-  if (canPatchRegion) {
+  if (patchedRegion && dirtyRect.has_value()) {
     const core::Rect dirty = *dirtyRect;
     const QRect target = canvasRect();
     const int x = static_cast<int>(std::floor(target.x() + static_cast<double>(dirty.x) * state.zoom)) - 2;
@@ -961,21 +1600,17 @@ std::optional<core::Point> CanvasWidget::mapToCanvas(const QPoint& widgetPos) co
   if (m_image.isNull()) {
     return std::nullopt;
   }
-  const QRect targetRect = canvasRect();
-  if (!targetRect.contains(widgetPos)) {
-    return std::nullopt;
-  }
-
   const auto& state = stateFor(this);
   if (state.zoom <= 0.0) {
     return std::nullopt;
   }
-
+  const QRect targetRect = canvasRect();
+  // キャンバス外の座標も返す。オフセットレイヤーのハンドル操作など、
+  // キャンバス範囲外のイベントが必要なツールが存在するため、
+  // 範囲制限はツール側に委ねる。
   const int cx = static_cast<int>(std::floor((widgetPos.x() - targetRect.x()) / state.zoom));
   const int cy = static_cast<int>(std::floor((widgetPos.y() - targetRect.y()) / state.zoom));
-  const int clampedX = std::clamp(cx, 0, m_image.width() - 1);
-  const int clampedY = std::clamp(cy, 0, m_image.height() - 1);
-  return core::Point {clampedX, clampedY};
+  return core::Point {cx, cy};
 }
 
 std::optional<core::FPoint> CanvasWidget::mapToCanvasF(const QPointF& widgetPos) const {
@@ -987,12 +1622,11 @@ std::optional<core::FPoint> CanvasWidget::mapToCanvasF(const QPointF& widgetPos)
     return std::nullopt;
   }
   const QRect targetRect = canvasRect();
+  // キャンバス外の浮動小数点座標も返す。クランプはせず生のキャンバス座標を返す。
+  // 各ツール（FreeTransformTool 等）が必要に応じて境界チェックを行う。
   const float fx = static_cast<float>((widgetPos.x() - targetRect.x()) / state.zoom);
   const float fy = static_cast<float>((widgetPos.y() - targetRect.y()) / state.zoom);
-  // キャンバス外でも float は返す（ストロークが縁で止まらないように）
-  const float clampedX = std::clamp(fx, 0.0f, static_cast<float>(m_image.width() - 1));
-  const float clampedY = std::clamp(fy, 0.0f, static_cast<float>(m_image.height() - 1));
-  return core::FPoint {clampedX, clampedY};
+  return core::FPoint {fx, fy};
 }
 
 void CanvasWidget::tabletEvent(QTabletEvent* event) {
@@ -1091,14 +1725,15 @@ void CanvasWidget::tabletEvent(QTabletEvent* event) {
 void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvasPoint) {
   const auto& state = stateFor(this);
   if (state.panning) {
-    setCursor(state.panDragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
+    const bool grab = state.temporaryMiddlePan || state.panDragging;
+    setCursor(grab ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
     return;
   }
   if (m_spacePressed) {
     setCursor(Qt::OpenHandCursor);
     return;
   }
-  if (!canvasPoint.has_value() || m_controller == nullptr) {
+  if (m_controller == nullptr) {
     unsetCursor();
     return;
   }
@@ -1108,18 +1743,46 @@ void CanvasWidget::updateCursorForState(const std::optional<core::Point>& canvas
 
   // 選択ツール: 選択範囲内ではSizeAllCursor（移動カーソル）
   if (activeTool == core::ToolKind::RectSelection) {
-    const core::ToolOverlayState toolOverlay = m_controller->canvasOverlay().toolOverlay;
-    if (toolOverlay.cursorHint == core::OverlayCursorHint::Move) {
-      setCursor(Qt::SizeAllCursor);
-      return;
-    }
-    // 選択範囲内にホバー中 → 移動カーソルを先出し
-    const auto& sel = m_controller->documentSelection();
-    if (sel.hasSelection() && sel.contains(canvasPoint->x, canvasPoint->y)) {
-      setCursor(Qt::SizeAllCursor);
-      return;
+    if (canvasPoint.has_value()) {
+      const core::ToolOverlayState toolOverlay = m_controller->canvasOverlay().toolOverlay;
+      if (toolOverlay.cursorHint == core::OverlayCursorHint::Move) {
+        setCursor(Qt::SizeAllCursor);
+        return;
+      }
+      // 選択範囲内にホバー中 → 移動カーソルを先出し
+      const auto& sel = m_controller->documentSelection();
+      if (sel.hasSelection() && sel.contains(canvasPoint->x, canvasPoint->y)) {
+        setCursor(Qt::SizeAllCursor);
+        return;
+      }
     }
     setCursor(Qt::CrossCursor);
+    return;
+  }
+
+  // FreeTransform: ハンドル位置に応じてリサイズ/回転カーソルを表示
+  if (activeTool == core::ToolKind::FreeTransform && m_controller->isInTransformMode()) {
+    if (canvasPoint.has_value()) {
+      const float zoom = static_cast<float>(stateFor(this).zoom);
+      const int h = m_controller->freeTransformHitTestScreen(
+          static_cast<float>(canvasPoint->x) * zoom,
+          static_cast<float>(canvasPoint->y) * zoom);
+      if (h == 8) {
+        setCursor(rotateCursor());
+      } else {
+        const float rotDeg = m_controller->canvasOverlay().transformRot * (180.f / 3.14159265f);
+        setCursor(transformHandleCursor(h, rotDeg));
+      }
+    } else {
+      setCursor(Qt::ArrowCursor);
+    }
+    return;
+  }
+
+  if (!canvasPoint.has_value()) {
+    // キャンバス矩形外: Brush/Eraser の BlankCursor は使わず ArrowCursor、他はツール対応カーソルを維持
+    const bool blankOnCanvas = (activeTool == core::ToolKind::Brush || activeTool == core::ToolKind::Eraser);
+    setCursor(blankOnCanvas ? Qt::ArrowCursor : cursorForTool(activeTool, false));
     return;
   }
 

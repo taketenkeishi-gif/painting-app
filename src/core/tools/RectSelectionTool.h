@@ -5,6 +5,7 @@
 #include <vector>
 #include <string_view>
 
+#include "core/common/FPoint.h"
 #include "core/common/Point.h"
 #include "core/selection/SelectionMask.h"
 #include "core/tools/ITool.h"
@@ -13,6 +14,13 @@ namespace core {
 
 class RectSelectionTool : public ITool {
 public:
+  /// 多角形ラッソの1頂点。ベジェ曲線かコーナーかを保持。
+  struct PolyLassoNode {
+    FPoint anchor;
+    FPoint handleOut;  ///< アウト方向ハンドル（anchor相対）。smooth=false なら未使用。
+    bool   smooth {false};
+  };
+
   enum class Mode {
     Rectangle,
     Lasso,
@@ -38,6 +46,9 @@ public:
     m_mode = mode;
   }
   Mode mode() const noexcept { return m_mode; }
+  bool isPolyInProgress() const noexcept { return m_polyInProgress; }
+  /// Enter キー確定: 現在のノード列でそのまま選択を確定する
+  ToolResult confirmPolygonLasso(ToolContext& context);
 
   void setAutoSelectThreshold   (int v)  noexcept { m_autoSelectThreshold    = std::clamp(v, 0, 255); }
   void setAutoSelectContiguous  (bool v) noexcept { m_autoSelectContiguous   = v; }
@@ -66,6 +77,11 @@ private:
 
   static bool isInsideSelection(const SelectionMask& sel, const Point& pt) noexcept;
 
+  // ハンドルヒットテスト（8方向: 0-7 = TL/TC/TR/ML/MR/BL/BC/BR, -1 = なし）
+  int hitTestHandle(const SelectionMask& sel, const Point& pt, int tolerance = 4) const noexcept;
+  // 矩形リサイズ: ハンドルindex → 新矩形を計算
+  Rect resizeRectByHandle(const Rect& origRect, int handleIdx, const Point& delta, bool constrainAspect) const noexcept;
+
   // ── モード ────────────────────────────────────────────────────────────────
   Mode         m_mode {Mode::Rectangle};
 
@@ -85,10 +101,19 @@ private:
   int   m_savedMaskW {0};
   int   m_savedMaskH {0};
 
+  // ── 選択範囲ハンドル（コーナー + エッジ中央） ────────────────────────────────
+  bool  m_resizingHandle {false};
+  int   m_activeHandle {-1};  // 0-7: TL/TC/TR/ML/MR/BL/BC/BR
+  Rect  m_savedHandleRect;    // ドラッグ開始時の矩形
+
   // ── 多角形ラッソ ───────────────────────────────────────────────────────────
-  bool m_polyInProgress {false};
-  std::vector<Point> m_polyPoints;  // 確定頂点
-  Point m_polyMouse {0, 0};         // マウス追従用
+  bool  m_polyInProgress  {false};
+  std::vector<PolyLassoNode> m_polyNodes;   ///< 確定ノード
+  FPoint m_polyMouse      {0, 0};           ///< マウス追従用
+  bool   m_polyPressing   {false};          ///< プレス中（未確定ノードを設置中）
+  FPoint m_polyPressAnchor{0, 0};           ///< プレス位置（アンカー候補）
+  FPoint m_polyDragHandle {0, 0};           ///< ドラッグ量（アンカー相対）
+  bool   m_polyHasDrag    {false};          ///< ドラッグ閾値を超えたか
 
   // ── 自動選択 ──────────────────────────────────────────────────────────────
   int  m_autoSelectThreshold      {16};

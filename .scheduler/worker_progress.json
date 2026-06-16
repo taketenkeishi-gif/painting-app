@@ -1,0 +1,14 @@
+﻿{
+    "last_message":  "You\u0027ve hit your session limit · resets 11pm (Asia/Tokyo)",
+    "updated_at":  "2026-06-08T20:31:26.5749660+09:00",
+    "started_at":  "2026-06-08T20:31:03.0622396+09:00",
+    "last_file_changed":  "TASK_QUEUE.md",
+    "current_action":  "",
+    "phase":  "completed",
+    "git_deleted_lines":  149,
+    "task":  "task-37",
+    "git_added_lines":  164,
+    "worker":  "worker-b-sonnet",
+    "status":  "completed",
+    "git_changed_files":  9
+}

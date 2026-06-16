@@ -15,8 +15,9 @@ Legend: `DONE` / `WIP` / `PARTIAL` / `TODO` / `BLOCKED`
 
 ## Fill System
 - `DONE`: contiguous fill (raster) and undo/redo
-- `PARTIAL`: selection-limited behavior
-- `TODO`: gap close, refer-layer modes, tolerance expansion/shrink
+- `DONE`: selection-limited behavior (contiguous + non-contiguous both respect SelectionMask)
+- `DONE`: gap close, refer-layer modes, tolerance threshold
+- `DONE`: erase mode (flood-fill transparent, bypasses alphaLock)
 
 ## Selection System
 - `DONE`: rect selection, clear/invert, undo/redo

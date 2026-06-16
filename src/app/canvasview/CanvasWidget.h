@@ -24,6 +24,7 @@ class CanvasWidget : public QWidget {
 
 signals:
   void viewTransformChanged();
+  void canvasPositionChanged(int x, int y);
 
 public:
   explicit CanvasWidget(QWidget* parent = nullptr);
@@ -52,6 +53,7 @@ protected:
   void keyPressEvent(QKeyEvent* event) override;
   void keyReleaseEvent(QKeyEvent* event) override;
   void tabletEvent(QTabletEvent* event) override;
+  void leaveEvent(QEvent* event) override;
 
 private slots:
   void refreshFromController();
@@ -70,11 +72,15 @@ private:
   bool m_showGrid {false};
   bool m_showOverlay {true};
   bool m_spacePressed {false};
+  bool m_transformConfirmPending {false};
+  int  m_meshDeformDragPinId {-1};  // -1 = not dragging
   bool m_tabletActive {false};
   double m_canvasRotationDeg {0.0};
   bool m_rotateKeyHeld {false};
   bool m_ctrlSpaceZoom {false};
   bool m_mirrorView {false};
+  bool m_isPanning {false};
+  QPoint m_panStartPos;
   QPoint m_ctrlSpaceStartPos;
   double m_ctrlSpaceStartZoom {1.0};
 };

@@ -4,6 +4,7 @@
 #include <functional>
 #include <vector>
 
+#include "core/common/FPoint.h"
 #include "core/selection/SelectionMask.h"
 #include "core/tools/ITool.h"
 
@@ -23,12 +24,20 @@ namespace core {
 // ─────────────────────────────────────────────────────────────────────────────
 class AiSelectTool : public ITool {
 public:
+  /// 入力モード — Click (点選択) / RotoBrush (FG/BGストローク)
+  enum class InputMode { Click, RotoBrush };
+
   struct Settings {
-    int  threshold       {24};   ///< 色許容範囲 0–255
+    int  threshold       {24};   ///< 色許容範囲 0–255（スタブ使用時）
+    int  aiThreshold     {60};   ///< Rotoブラシ用閾値（複数シード対応の高め設定）
+    int  vectorApprox    {2};    ///< 選択境界の平滑化半径（0=なし）
+    int  expandPixels    {0};    ///< マスク拡張(+)/縮小(-)ピクセル数
     bool referAllLayers  {true}; ///< 合成レイヤーを参照
     bool antiAlias       {true}; ///< エッジをぼかして滑らかに
     bool addMode         {false};///< 既存選択に追加（OR）
     bool subtractMode    {false};///< 既存選択から削除（AND NOT）
+    // SAM2 granularity: 0=最小領域(髪など) 1=中 2=オブジェクト 3=被写体全体
+    int  granularity     {1};
   };
 
   /// AppController から ComfyUI 推論コールバックを注入するための型
@@ -50,11 +59,22 @@ public:
 
   // ── 設定 ──────────────────────────────────────────────────────────────────
   void setThreshold      (int v)  noexcept { m_settings.threshold      = std::clamp(v, 0, 255); }
+  void setAiThreshold    (int v)  noexcept { m_settings.aiThreshold    = std::clamp(v, 0, 255); }
+  void setVectorApprox   (int v)  noexcept { m_settings.vectorApprox   = std::clamp(v, 0, 20); }
+  void setExpandPixels   (int v)  noexcept { m_settings.expandPixels   = std::clamp(v, -20, 20); }
   void setReferAllLayers (bool v) noexcept { m_settings.referAllLayers = v; }
   void setAntiAlias      (bool v) noexcept { m_settings.antiAlias      = v; }
   void setAddMode        (bool v) noexcept { m_settings.addMode        = v; }
   void setSubtractMode   (bool v) noexcept { m_settings.subtractMode   = v; }
+  void setGranularity    (int v)  noexcept { m_settings.granularity    = std::clamp(v, 0, 3); }
   const Settings& settings() const noexcept { return m_settings; }
+
+  // ── RotoBrush モード ──────────────────────────────────────────────────────
+  void      setInputMode  (InputMode m)  noexcept { m_inputMode    = m; }
+  InputMode inputMode()   const noexcept           { return m_inputMode; }
+  void      setBrushRadius(float r)      noexcept { m_brushRadius  = r; }
+  float     brushRadius() const noexcept           { return m_brushRadius; }
+  void      clearRotoStrokes() noexcept;
 
   /// ComfyUI 推論コールバックを注入（nullptr = stub only）
   void setInferenceCallback(InferenceCallback cb) { m_inferenceCallback = std::move(cb); }
@@ -70,12 +90,20 @@ public:
   const std::vector<Point>& positivePoints() const noexcept { return m_positivePoints; }
   const std::vector<Point>& negativePoints() const noexcept { return m_negativePoints; }
 
+  /// SelectionMask を pixels ピクセル拡張(+)または縮小(-)
+  static SelectionMask expandMask(const SelectionMask& src, int pixels);
+
 private:
   /// スタブ推論: エッジ検出 + 分散適応フラッドフィル
+  /// thresholdOverride < 0 のとき m_settings.threshold を使用
   SelectionMask runStubSegmentation(const PixelBuffer& source,
                                     const SelectionMask& currentSelection,
                                     const std::vector<Point>& positivePoints,
-                                    const std::vector<Point>& negativePoints) const;
+                                    const std::vector<Point>& negativePoints,
+                                    int thresholdOverride = -1) const;
+
+  /// SelectionMask の境界に morphological close を適用して平滑化
+  static SelectionMask smoothMask(const SelectionMask& src, int radius);
 
   /// ピクセルのソーベル勾配大きさを計算
   static float sobelMagnitude(const PixelBuffer& buf, int x, int y) noexcept;
@@ -91,6 +119,14 @@ private:
 
   std::vector<Point> m_positivePoints;
   std::vector<Point> m_negativePoints;
+
+  // ── RotoBrush 専用状態 ───────────────────────────────────────────────────
+  InputMode          m_inputMode     {InputMode::RotoBrush};
+  std::vector<ToolOverlayState::RotoStroke> m_rotoStrokes;  ///< 確定済みストローク
+  std::vector<FPoint> m_activeStroke;                       ///< 描画中ストローク
+  bool               m_paintFg      {true};   ///< 前景(true) / 背景(false)
+  bool               m_strokeActive {false};
+  float              m_brushRadius  {8.f};
 };
 
 } // namespace core

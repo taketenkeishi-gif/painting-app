@@ -27,6 +27,17 @@ MSVC: Visual Studio 2022 Community (v14.44)
 
 ## 完了済み
 
+### task-32: MainWindow Ctrl+0=fitToScreen, Ctrl+1=resetZoom(100%) ショートカット確認
+- `MainWindow.cpp` 行1246-1247: `m_resetZoomAction->setShortcut(Qt::CTRL | Qt::Key_1)` / `m_fitToScreenAction->setShortcut(Qt::CTRL | Qt::Key_0)` を確認
+- CanvasWidget の `resetZoom()` / `fitToScreen()` に正しく接続されていることを確認
+- cmake --build Release エラー 0 件
+- UIの変更あり（ショートカット割り当て変更） → `.\launch.bat` 起動して Ctrl+0/Ctrl+1 を目視確認すること
+
+### task-23: LayerPanel opacity スライダー同期修正（commit 4a4beba）
+- `LayerPanel::refreshButtonState()` にレイヤーの `opacity()` を直接読んでスライダー・スピン・ラベルを同期する処理を追加
+- `AppController::setLayerOpacity()` / `setLayerBlendMode()` に `emit canvasChanged()` を追加してキャンバス再描画を保証
+- UIの変更あり（カーソル挙動なし、スライダー値変化） → `.\launch.bat` 起動して opacity スライダーの値同期を目視確認すること
+
 ### Phase 0-1: Skia バックエンド整備（commit ff2b231）
 - `src/platform/skia/` — SkiaPixelBuffer / SkiaRenderer / SkiaIntegration
 - `PAINT_USE_SKIA=OFF` デフォルト、ON 時は vcpkg 必要
@@ -43,6 +54,21 @@ MSVC: Visual Studio 2022 Community (v14.44)
 
 ### VectorPath float 化
 - 全ツールの VectorPath::points を FPoint に移行
+
+### SAM2 ONNX AI選択ツール基盤（2026-06）
+- `src/core/ai/OnnxSegEngine.h/.cpp` — SAM2 ONNX ラッパー（Qt フリー PIMPL）
+- `PAINT_USE_ONNX=OFF` 時はスタブ（既存ビルド互換）、ON 時に実推論
+- `AiSelectTool::Settings::granularity` (0〜3) — 細部→被写体全体を制御
+- `AppController::initOnnxEngine` — `<exe>/models/*.onnx` を自動検出
+- `AppController::setupOnnxInferenceCallback` — ONNX > ComfyUI > スタブの優先順
+- `ToolPropertyPanel` に「AI 選択粒度」コンボボックスを追加
+- セットアップ手順: `scripts\download_sam2.ps1` → vcpkg onnxruntime → cmake -DPAINT_USE_ONNX=ON
+
+### task-002: FillTool SelectionMask 対応（2026-06）
+- SelectionMask がアクティブなとき塗りつぶしを選択範囲内のみに限定
+- 選択なし時は従来どおり contiguous/non-contiguous fill が動作
+- undo/redo 正常動作確認済み
+- system_status: Fill System 全項目 DONE
 
 ### ベクターレイヤー対応（2026-06）
 - BrushTool: ベクターレイヤーへのストローク記録 + `overlay()` でライブプレビュー
@@ -65,6 +91,13 @@ MSVC: Visual Studio 2022 Community (v14.44)
 ---
 
 ## 次のタスク（優先順）
+
+### SAM2 ONNX モデルのセットアップ（AI選択ツール実用化）
+- [ ] `scripts\download_sam2.ps1` を実行してモデルをエクスポート
+- [ ] vcpkg で `onnxruntime:x64-windows` をインストール
+- [ ] `cmake -DPAINT_USE_ONNX=ON -DCMAKE_TOOLCHAIN_FILE=...` でリビルド
+- モデル配置先: `build\Release\models\sam2_encoder.onnx` + `sam2_decoder.onnx`
+- 自動検出: アプリ起動時に `<exe>/models/` にモデルがあれば自動ロード
 
 ### ベクター編集（CSP レベルへ）
 - [ ] ストローク選択ツール（描いたストロークをクリックで選択）

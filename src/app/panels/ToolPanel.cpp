@@ -40,8 +40,8 @@ QString toolNameJa(core::ToolKind kind) {
       return QStringLiteral("スポイト");
     case core::ToolKind::Fill:
       return QStringLiteral("塗りつぶし");
-    case core::ToolKind::Line:
-      return QStringLiteral("直線");
+    case core::ToolKind::Shape:
+      return QStringLiteral("図形");
     case core::ToolKind::RectSelection:
       return QStringLiteral("選択");
     case core::ToolKind::MoveLayer:
@@ -67,7 +67,7 @@ QString toolShortcut(core::ToolKind kind) {
       return "I";
     case core::ToolKind::Fill:
       return "G";
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
       return "U";
     case core::ToolKind::RectSelection:
       return "R";
@@ -94,7 +94,7 @@ QString iconName(core::ToolKind kind) {
       return "eyedropper";
     case core::ToolKind::Fill:
       return "fill";
-    case core::ToolKind::Line:
+    case core::ToolKind::Shape:
       return "line";
     case core::ToolKind::RectSelection:
       return "select";
@@ -332,9 +332,9 @@ QWidget* makeQuickSliderBlock(
   sliderOut->setRange(min, max);
   sliderOut->setInvertedAppearance(false);
   sliderOut->setInvertedControls(false);
-  sliderOut->setFixedWidth(12);
+  sliderOut->setMinimumWidth(48);
   sliderOut->setMinimumHeight(120);
-  sliderOut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+  sliderOut->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Expanding);
   sliderOut->setFocusPolicy(Qt::StrongFocus);
   sliderOut->setStyleSheet(sliderStyle(QColor(120, 166, 235), opacityMode));
 
@@ -492,12 +492,13 @@ void ToolPanel::refreshFromController() {
     return;
   }
 
-  const core::ToolKind current = m_controller->currentTool();
+  const core::ToolKind current = m_controller->currentToolCategoryKind();
   const QString layerKind = QString::fromStdString(m_controller->activeLayerKindDisplayName());
   for (const auto& [kind, button] : m_buttons) {
     const QSignalBlocker blocker(button);
     const bool enabled = m_controller->canUseToolOnActiveLayer(kind);
-    QString tip = QString("%1 [%2]").arg(toolNameJa(kind), toolShortcut(kind));
+    const QString sc = toolShortcut(kind);
+    QString tip = sc.isEmpty() ? toolNameJa(kind) : QString("%1 (%2)").arg(toolNameJa(kind), sc);
     if (!enabled) {
       tip = QString("%1（%2では使用不可）").arg(toolNameJa(kind), layerKind);
     }
@@ -636,10 +637,9 @@ void ToolPanel::rebuildButtons() {
       core::ToolKind::Eyedropper,
       core::ToolKind::Fill,
       core::ToolKind::Gradient,
-      core::ToolKind::Line,
+      core::ToolKind::Shape,
       core::ToolKind::RectSelection,
       core::ToolKind::MoveLayer,
-      core::ToolKind::Hand,
       core::ToolKind::Zoom};
   const auto available = m_controller->availableTools();
 

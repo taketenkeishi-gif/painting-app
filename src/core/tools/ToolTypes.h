@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/color/Color.h"
+#include "core/tools/BrushCurve.h"
 
 namespace core {
 
@@ -88,6 +89,27 @@ struct BrushDynamics {
   /// キャンバス色をそのまま押し広げる（スマッジ）
   bool  smear     {false};
   float smearRate {0.9f};   ///< スメア強度 0.0–1.0
+
+  // ── 筆圧カーブ (libmypaint BrushCurve 吸収) ────────────────────────────
+  // CSP の「感度カーブ」/ libmypaint の mypaint-mapping と同等。
+  // デフォルト: リニア (BrushCurve::linear())
+  // BrushCurve::soft() / hard() / sCurve() / fromGamma(γ) で変更可能。
+  BrushCurve pressureSizeCurve;
+  BrushCurve pressureOpacityCurve;
+
+  // ── Dab 散布 (CSP の「位置のばらし」相当) ────────────────────────────
+  // デフォルト OFF（ユーザーが必要に応じてスプレー効果として有効化）
+  bool  scatter       {false};
+  float scatterAmount {0.3f};    ///< 程よい散布（0.3 = ブラシ半径の 30%）
+
+  // ── 角度ジッター (CSP の「向きのばらし」相当) ────────────────────────
+  // デフォルト OFF（ユーザーが必要に応じて有効化）
+  bool  angleJitter       {false};
+  float angleJitterAmount {45.0f}; ///< 自然な回転量（度）
+
+  // ── 1 スタンプあたりの Dab 数 ────────────────────────────────────────
+  // scatter と組み合わせることでスプレー/パーティクルブラシになる
+  int   dabCount {1};             // 単一粒子（scatter で分散される）
 };
 
 struct BrushSettings {

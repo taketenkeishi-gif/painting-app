@@ -5,6 +5,7 @@
 #include "core/common/FPoint.h"
 #include "core/common/Point.h"
 #include "core/tools/ITool.h"
+#include "core/tools/ToolType.h"
 
 namespace core {
 
@@ -12,7 +13,7 @@ class LineTool : public ITool {
 public:
   void setSnapAngleDegrees(int snapAngleDegrees) noexcept { m_snapAngleDegrees = snapAngleDegrees < 0 ? 0 : snapAngleDegrees; }
 
-  ToolKind kind() const noexcept override { return ToolKind::Line; }
+  ToolKind kind() const noexcept override { return ToolKind::Shape; }
   std::string_view displayName() const noexcept override { return "Line"; }
 
   ToolResult onPointerPress(ToolContext& context, const ToolPointerEvent& event) override;

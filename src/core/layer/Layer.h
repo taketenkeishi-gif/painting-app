@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -15,7 +16,8 @@ enum class LayerKind {
   Raster,
   Vector,
   Folder,
-  Adjustment  ///< 非破壊調整レイヤー（Photoshop Adjustment Layer）
+  Adjustment,  ///< 非破壊調整レイヤー（Photoshop Adjustment Layer）
+  Text         ///< 編集可能テキストレイヤー
 };
 
 // ── Adjustment Layer ──────────────────────────────────────────────────────
@@ -53,6 +55,21 @@ struct AdjustmentParams {
   float threshold         {0.5f};   ///< 0.0 〜 1.0
 };
 
+/// テキストレイヤーに保持するデータ。フォント・文字列など編集可能。
+struct TextData {
+  std::string text;
+  std::string fontFamily {"Arial"};
+  int         fontSize   {24};
+  bool        bold       {false};
+  bool        italic     {false};
+  int         colorR     {0};
+  int         colorG     {0};
+  int         colorB     {0};
+  int         colorA     {255};
+  int         originX    {0};   ///< キャンバス上の配置原点 X
+  int         originY    {0};   ///< キャンバス上の配置原点 Y
+};
+
 struct VectorPath {
   std::vector<FPoint> points;
   Color color {0, 0, 0, 255};
@@ -71,6 +88,7 @@ public:
   bool isRaster() const noexcept { return m_kind == LayerKind::Raster; }
   bool isVector() const noexcept { return m_kind == LayerKind::Vector; }
   bool isFolder() const noexcept { return m_kind == LayerKind::Folder; }
+  bool isText()   const noexcept { return m_kind == LayerKind::Text; }
   void setKind(LayerKind kind) noexcept { m_kind = kind; }
 
   bool visible() const noexcept { return m_visible; }
@@ -117,6 +135,29 @@ public:
   const AdjustmentParams& adjustmentParams() const noexcept { return m_adjParams; }
   void setAdjustmentParams(const AdjustmentParams& p) noexcept { m_adjParams = p; }
 
+  // Text Layer
+  const TextData& textData() const noexcept { return m_textData; }
+  void setTextData(const TextData& d) noexcept { m_textData = d; }
+
+  // ── レイヤーオフセット ────────────────────────────────────────────────────
+  /// キャンバス原点に対するレイヤーバッファの描画オフセット（ピクセル単位）。
+  /// Phase 0: データ保持のみ。Renderer はまだ参照しない。デフォルト = (0, 0)。
+  int offsetX() const noexcept { return m_offsetX; }
+  int offsetY() const noexcept { return m_offsetY; }
+  void setOffsetX(int x) noexcept { m_offsetX = x; }
+  void setOffsetY(int y) noexcept { m_offsetY = y; }
+  void setOffset(int x, int y) noexcept { m_offsetX = x; m_offsetY = y; }
+
+  // ── 安定ID / 階層 ─────────────────────────────────────────────────────────
+  /// レイヤー固有の安定ID。Document が採番し、生存中は不変。0 = 未採番。
+  uint32_t id() const noexcept { return m_id; }
+  void setId(uint32_t id) noexcept { m_id = id; }
+
+  /// 親フォルダレイヤーの ID。0 = ルート（親なし）。
+  /// フォルダ階層実装まで使用しないが、フィールドとして確保しておく。
+  uint32_t parentId() const noexcept { return m_parentId; }
+  void setParentId(uint32_t parentId) noexcept { m_parentId = parentId; }
+
 private:
   std::string m_name;
   LayerKind m_kind {LayerKind::Raster};
@@ -134,6 +175,11 @@ private:
   PixelBuffer m_maskBuffer;
   std::vector<VectorPath> m_vectorPaths;
   AdjustmentParams m_adjParams;
+  TextData         m_textData;
+  int      m_offsetX  {0}; ///< レイヤーオフセット X（ピクセル）
+  int      m_offsetY  {0}; ///< レイヤーオフセット Y（ピクセル）
+  uint32_t m_id     {0};  ///< 安定ID（Document::addLayer が採番）
+  uint32_t m_parentId {0}; ///< 親フォルダ ID（0 = ルート）
 };
 
 } // namespace core

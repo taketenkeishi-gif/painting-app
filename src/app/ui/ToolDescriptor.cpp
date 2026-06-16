@@ -75,25 +75,25 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   "brush_normal",
                   "Normal",
                   BrushPreset {8, 100, 100, 100, 25, true, 35, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Brush},
-                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::Angle, ToolPropertyKey::Roundness, ToolPropertyKey::TaperStart, ToolPropertyKey::TaperEnd, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
                   "LMB drag to paint. Wheel or [ ] adjusts size."),
               makeSubTool(
                   "brush_hard",
                   "Hard",
                   BrushPreset {6, 100, 100, 100, 18, false, 20, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Brush},
-                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::Angle, ToolPropertyKey::Roundness, ToolPropertyKey::TaperStart, ToolPropertyKey::TaperEnd, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
                   "Crisp edge stroke with tighter spacing."),
               makeSubTool(
                   "brush_soft",
                   "Soft",
                   BrushPreset {12, 65, 35, 80, 35, true, 50, true, true, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Brush},
-                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::Angle, ToolPropertyKey::Roundness, ToolPropertyKey::TaperStart, ToolPropertyKey::TaperEnd, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
                   "Soft edge brush for blending."),
               makeSubTool(
                   "brush_airbrush",
                   "Airbrush",
                   BrushPreset {24, 28, 10, 35, 12, true, 60, true, true, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Brush},
-                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
+                  {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::Angle, ToolPropertyKey::Roundness, ToolPropertyKey::TaperStart, ToolPropertyKey::TaperEnd, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
                   "Low-flow brush for gradual buildup."),
               // ── ベクターレイヤー用ブラシ ──────────────────────────────────
               makeSubTool(
@@ -114,8 +114,9 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   BrushPreset {8, 80, 100, 60, 25, true, 50, true, true, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Brush},
                   {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection},
                   "ベクターレイヤーにソフトなストロークを描きます。")},
-          {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
-          "Draw on active layer."},
+          {ToolPropertyKey::Color, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::Angle, ToolPropertyKey::Roundness, ToolPropertyKey::TaperStart, ToolPropertyKey::TaperEnd, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode, ToolPropertyKey::LockAlphaRespect},
+          "Draw on active layer.",
+          "B"},
       ToolDescriptor {
           core::ToolKind::Eraser,
           "eraser",
@@ -178,14 +179,16 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   {ToolPropertyKey::Size, ToolPropertyKey::Spacing, ToolPropertyKey::Stabilization, ToolPropertyKey::VectorEraseMode, ToolPropertyKey::VectorTrimOutside},
                   "Legacy vector eraser preset.")},
           {ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::Flow, ToolPropertyKey::Spacing, ToolPropertyKey::AntiAlias, ToolPropertyKey::Stabilization, ToolPropertyKey::PostCorrection, ToolPropertyKey::VelocityCorrection, ToolPropertyKey::ShapeType, ToolPropertyKey::EraseMode},
-          "Erase pixels on active layer."},
+          "Erase pixels on active layer.",
+          "E"},
       ToolDescriptor {
           core::ToolKind::Eyedropper,
           "eyedropper",
           "Eyedropper",
           {makeSubTool("eyedropper_default", "Sample Composite", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross}, {}, "Click canvas to sample color.")},
           {ToolPropertyKey::Color},
-          "Pick a color from composited result."},
+          "Pick a color from composited result.",
+          "I"},
       ToolDescriptor {
           core::ToolKind::Fill,
           "fill",
@@ -245,44 +248,58 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   {ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::EraseMode},
                   "クリックで隣接する有色ピクセルを透明化（消去）。")},
           {ToolPropertyKey::FillThreshold, ToolPropertyKey::FillContiguous, ToolPropertyKey::FillReferAllLayers, ToolPropertyKey::FillGapClose, ToolPropertyKey::EraseMode},
-          "クリックでピクセルを塗りつぶし。"},
+          "クリックでピクセルを塗りつぶし。",
+          "G"},
       ToolDescriptor {
-          core::ToolKind::Line,
-          "line",
-          "Line",
+          core::ToolKind::Shape,
+          "shape",
+          "図形",
           {
               makeSubTool(
-                  "line_raster",
-                  "Raster Line",
-                  BrushPreset {8, 100, 100, 100, 25, true, 10, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Raster, CursorStyle::Cross, 0, 0, 8},
-                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::ShapeType, ToolPropertyKey::AntiAlias, ToolPropertyKey::BlendMode, ToolPropertyKey::Angle},
-                  "Drag to draw straight raster line."),
-              makeSubTool(
                   "line_vector",
-                  "Vector Basic",
+                  "直線",
                   BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 8},
                   {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
-                  "Drag to create vector line path."),
+                  "ドラッグして直線を描画。"),
               makeSubTool(
                   "line_vector_snap",
-                  "Vector Snap",
+                  "直線（スナップ）",
                   BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 15, 0, 8},
                   {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
-                  "Drag to create snapped vector line."),
+                  "角度スナップで直線を描画。"),
               makeSubTool(
                   "line_vector_thick",
-                  "Vector Thick",
+                  "直線（太）",
                   BrushPreset {16, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 16},
                   {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
-                  "Drag to create thick vector line."),
+                  "太い直線を描画。"),
               makeSubTool(
                   "line_vector_thin",
-                  "Vector Thin",
+                  "直線（細）",
                   BrushPreset {3, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 3},
                   {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
-                  "Drag to create thin vector line.")},
-          {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::Hardness, ToolPropertyKey::ShapeType, ToolPropertyKey::AntiAlias, ToolPropertyKey::BlendMode, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel, ToolPropertyKey::Angle},
-          "Draw straight lines."},
+                  "細い直線を描画。"),
+              makeSubTool(
+                  "curve_vector_basic",
+                  "曲線",
+                  BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 8},
+                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
+                  "ドラッグしてベジェ曲線を描画。"),
+              makeSubTool(
+                  "curve_vector_thin",
+                  "曲線（細）",
+                  BrushPreset {3, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 3},
+                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
+                  "細いベジェ曲線を描画。"),
+              makeSubTool(
+                  "curve_vector_thick",
+                  "曲線（太）",
+                  BrushPreset {16, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Vector, CursorStyle::Cross, 0, 0, 16},
+                  {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
+                  "太いベジェ曲線を描画。")},
+          {ToolPropertyKey::Color, ToolPropertyKey::StrokeWidth, ToolPropertyKey::Size, ToolPropertyKey::Opacity, ToolPropertyKey::AntiAlias, ToolPropertyKey::SnapAngle, ToolPropertyKey::SimplifyLevel},
+          "直線・曲線などの図形を描画。",
+          "U"},
       ToolDescriptor {
           core::ToolKind::RectSelection,
           "rect_selection",
@@ -334,43 +351,58 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   }(),
                   {ToolPropertyKey::SelectionOp, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionEdgeSnap, ToolPropertyKey::SelectionGapClose},
                   "クリック点と類似した連続した色域を選択。Shift=追加、Alt=減算。"),
-              makeSubTool(
-                  "object_select",
-                  "オブジェクト選択",
-                  []() {
-                    BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
-                    p.selectionMode = SelectionMode::ObjectSelect;
-                    p.autoSelectThreshold = 24;
-                    p.autoSelectContiguous = false;
-                    p.autoSelectReferAllLayers = true;
-                    return p;
-                  }(),
-                  {ToolPropertyKey::SelectionOp, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionEdgeSnap, ToolPropertyKey::SelectionGapClose},
-                  "クリックで全レイヤーの類似色をまとめて選択。ComfyUI 接続時は SAM2 で高精度化。Shift=追加、Alt=減算。"),
+              [&]() {
+                auto sub = makeSubTool(
+                    "object_select",
+                    "オブジェクト選択",
+                    []() {
+                      BrushPreset p {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Cross};
+                      p.selectionMode = SelectionMode::ObjectSelect;
+                      p.autoSelectThreshold = 24;
+                      p.autoSelectContiguous = false;
+                      p.autoSelectReferAllLayers = true;
+                      return p;
+                    }(),
+                    {ToolPropertyKey::SelectionOp, ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectReferAllLayers, ToolPropertyKey::SelectionFeather, ToolPropertyKey::SelectionAntiAlias, ToolPropertyKey::SelectionEdgeSnap, ToolPropertyKey::SelectionGapClose},
+                    u8"左ドラッグ=前景 / Alt+ドラッグ=背景 でストロークを塗り SAM2 でマスク生成。Ctrl=クリア。");
+                sub.targetToolKind = core::ToolKind::AiSelect;
+                return sub;
+              }(),
           },
           {ToolPropertyKey::AutoSelectThreshold, ToolPropertyKey::AutoSelectContiguous, ToolPropertyKey::AutoSelectReferAllLayers},
-          "選択範囲を作成します。"},
-      ToolDescriptor {
-          core::ToolKind::MoveLayer,
-          "move_layer",
-          "Move Layer",
-          {makeSubTool("move_layer_default", "Pixel/Vector Offset", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Hand}, {}, "Drag to offset active layer content.")},
-          {},
-          "Move active layer pixels or vector paths."},
-      ToolDescriptor {
-          core::ToolKind::Hand,
-          "hand",
-          "Hand",
-          {makeSubTool("hand_default", "Pan View", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Hand}, {}, "Drag to pan viewport.")},
-          {},
-          "Pan viewport."},
+          "選択範囲を作成します。",
+          "R"},
+      // ── 移動カテゴリ: レイヤー移動 + 手のひら（CSP 互換） ──────────────────
+      [&]() {
+        ToolDescriptor moveDesc;
+        moveDesc.kind = core::ToolKind::MoveLayer;
+        moveDesc.id = "move";
+        moveDesc.displayName = "移動";
+        moveDesc.guide = "Move active layer pixels or pan viewport.";
+        moveDesc.shortcut = "M";
+
+        SubToolDescriptor moveSub = makeSubTool(
+            "move_layer_default", "レイヤー移動",
+            BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Hand},
+            {}, "Drag to offset active layer content.");
+
+        SubToolDescriptor handSub = makeSubTool(
+            "hand_default", "手のひら移動",
+            BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Hand},
+            {}, "Drag to pan viewport.");
+        handSub.targetToolKind = core::ToolKind::Hand;
+
+        moveDesc.subTools = {std::move(moveSub), std::move(handSub)};
+        return moveDesc;
+      }(),
       ToolDescriptor {
           core::ToolKind::Zoom,
           "zoom",
           "Zoom",
           {makeSubTool("zoom_default", "Wheel Zoom", BrushPreset {8, 100, 100, 100, 25, true, 0, false, false, core::BrushShapeType::Circle, core::BlendMode::Normal, false, false, 0, 100, 0, 0, TargetLayerKind::Both, CursorStyle::Zoom}, {}, "Use Ctrl+Wheel to zoom.")},
           {},
-          "Zoom viewport."},
+          "Zoom viewport.",
+          "Z"},
       ToolDescriptor {
           core::ToolKind::Gradient,
           "gradient",
@@ -441,7 +473,43 @@ std::vector<ToolDescriptor> buildDefaultToolCatalog() {
                   {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
                   "ドラッグで放射グラデーションを描画色→透明で適用。")},
           {ToolPropertyKey::Opacity, ToolPropertyKey::BlendMode, ToolPropertyKey::EraseMode},
-          "ドラッグでグラデーションをアクティブレイヤーに適用。"}};
+          "ドラッグでグラデーションをアクティブレイヤーに適用。"},
+      ToolDescriptor {
+          core::ToolKind::VectorEdit,
+          "vector_edit",
+          "ベクター編集",
+          {makeSubTool(
+              "vector_edit_default",
+              "制御点編集",
+              []() {
+                BrushPreset p {};
+                p.targetLayerKind = TargetLayerKind::Vector;
+                p.cursorStyle     = CursorStyle::Default;
+                return p;
+              }(),
+              {},
+              "制御点をクリックして選択し、ドラッグで移動。Shift+クリックで複数選択。Delete で削除。")},
+          {},
+          "ベクターレイヤーの制御点を選択・移動・削除します。",
+          "A"},
+      ToolDescriptor {
+          core::ToolKind::Text,
+          "text",
+          "テキスト",
+          {makeSubTool(
+              "text_default",
+              "テキスト入力",
+              []() {
+                BrushPreset p {};
+                p.targetLayerKind = TargetLayerKind::Both;  // 任意レイヤー上で使用可（テキストは独自レイヤーを作成）
+                p.cursorStyle     = CursorStyle::Default;
+                return p;
+              }(),
+              {},
+              "キャンバスをクリックして文字を入力。Enter で改行、Ctrl+Enter / Escape で確定。")},
+          {},
+          "テキストをキャンバスに配置します。",
+          "T"}};
 
 }
 

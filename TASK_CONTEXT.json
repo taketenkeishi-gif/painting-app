@@ -1,0 +1,331 @@
+﻿{
+    "task":  "task-37",
+    "task_title":  "LayerPanel.cpp にレイヤー個別の不透明度スライダー（QSlider 0〜100）を追加する。選択レイヤー変更時に値を同期し、スライダー操作でレイヤーの opacity が変わること。",
+    "keywords":  [
+                     "LayerPanel",
+                     "app",
+                     "opacity",
+                     "cpp",
+                     "src",
+                     "panels",
+                     "heavy",
+                     "category",
+                     "role",
+                     "status",
+                     "config",
+                     "powershell",
+                     "Release",
+                     "pending",
+                     "feature",
+                     "complexity",
+                     "priority",
+                     "QSlider",
+                     "high",
+                     "developer",
+                     "attempt"
+                 ],
+    "likely_files":  [
+                         "src/app/panels/LayerPanel.cpp",
+                         "src/app/panels/LayerPanel.h",
+                         "src/core/tools/BrushTool.h",
+                         "src/app/bridge/AppController.h",
+                         "src/core/tools/RectSelectionTool.h",
+                         "src/app/panels/ToolPropertyPanel.h",
+                         "src/app/panels/ToolPropertyPanel.cpp",
+                         "src/core/tools/EraserTool.h",
+                         "src/app/mainwindow/MainWindow.h",
+                         "src/app/panels/ToolPanel.h"
+                     ],
+    "related_symbols":  [
+                            "qt_meta_stringdata_CLASSappSCOPEpanelsSCOPEAiPanelENDCLASS_t",
+                            "applyUiStateToTools",
+                            "setLayerOpacity",
+                            "AppController",
+                            "setActiveLayerOpacity",
+                            "activeLayerOpacity",
+                            "updateZoomStatusLabel",
+                            "mouseReleaseEvent",
+                            "keyReleaseEvent",
+                            "app",
+                            "applyTabStyle",
+                            "m_layerPanel",
+                            "QSlider",
+                            "LayerPanel",
+                            "updateConnectionStatus",
+                            "onApplyCandidate",
+                            "onOpacityChanged",
+                            "applyResponsiveMode",
+                            "applyButtonCompactMode",
+                            "applyResponsiveLayout",
+                            "onOpacitySliderChanged",
+                            "m_pinConfigButton",
+                            "m_opacityLabel",
+                            "m_opacitySlider",
+                            "m_opacitySpin",
+                            "onOpacitySpinChanged",
+                            "opacity",
+                            "setOpacity",
+                            "applyHSLAdjust",
+                            "applyAdjustment",
+                            "applyLayerMask",
+                            "applyPixels",
+                            "applyRect",
+                            "applyRefinement",
+                            "src",
+                            "applyEdgeSnap",
+                            "apply",
+                            "onPointerRelease",
+                            "applyInferenceResult",
+                            "hasPendingResult",
+                            "takePendingResult",
+                            "setPressureOpacityEnabled",
+                            "setPressureOpacityMin",
+                            "setVelocityOpacityEnabled",
+                            "setVelocityOpacityMin",
+                            "appendSlice",
+                            "applyStabilization",
+                            "applyBlend",
+                            "applyGradient",
+                            "snappedPoint",
+                            "applyAutoSelect",
+                            "applyObjectSelect",
+                            "applyLasso",
+                            "applyPolygon",
+                            "applyFeather",
+                            "pointerRelease",
+                            "opacityLayer",
+                            "fullOpacityLayer",
+                            "AnnotateRWLockReleased",
+                            "IteratorCategory",
+                            "Cpp20ForwardZipIterator",
+                            "ABSL_HAVE_FEATURE",
+                            "UnscaledCycleClockWrapperForGetCurrentTime",
+                            "UnscaledCycleClockWrapperForInitializeFrequency",
+                            "FlatHashMapPolicy",
+                            "ApplyWithoutDefaultSuffix",
+                            "mapped",
+                            "SetHashtablezConfigListener",
+                            "HeapPtrs",
+                            "SwapPropagatingCountingAlloc",
+                            "Wrapped",
+                            "NodeHashMapPolicy",
+                            "RegisterFileMappingHint",
+                            "GetFileMappingHint",
+                            "AbslInternalGetFileMappingHint",
+                            "ABSL_FLAG_IMPL_DECLARE_DEF_VAL_WRAPPER",
+                            "ABSL_FLAG_IMPL_DECLARE_HELP_WRAPPER",
+                            "FlagDefaultSrc",
+                            "ApplyMask",
+                            "FlagsUsageConfig",
+                            "SetFlagsUsageConfig",
+                            "GetUsageConfig",
+                            "UnwrapStdReferenceWrapperImpl",
+                            "Apply",
+                            "Uint128High64",
+                            "AppendTruncated",
+                            "Status",
+                            "StatusOr",
+                            "UnprintableWrapper",
+                            "StringifyToStreamWrapper",
+                            "AsStatus",
+                            "Append",
+                            "IsSwappable",
+                            "IsNothrowSwappable",
+                            "Int128High64",
+                            "MappingProto",
+                            "AddCurrentMappings",
+                            "AddMapping",
+                            "UniformDistributionWrapper",
+                            "StatusRep"
+                        ],
+    "recent_commits":  [
+                           "3fbc021 task-30: LayerPanel 繧､繝ｳ繝ｩ繧､繝ｳ蜷榊燕邱ｨ髮・螳御ｺ・｢ｺ隱阪・TASK_QUEUE譖ｴ譁ｰ (worker: worker-b-sonnet)",
+                           "a68c7c0 task-28: LayerPanel (+)(-) 繝懊ち繝ｳ霑ｽ蜉 (worker: worker-b-sonnet)",
+                           "171bbf8 task-33: LayerPanel refreshButtonState() hasSelection蛻､螳壹ｒcurrentItem()!=nullptr縺ｫ菫ｮ豁｣ (worker: worker-b)",
+                           "54b353b task-32: MainWindow Ctrl+0=fitToScreen, Ctrl+1=resetZoom(100%) 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ螟画峩 (worker: worker-b-sonnet)",
+                           "51e1334 task-29: ToolPropertyPanel Flow 繧ｹ繝ｩ繧､繝繝ｼ繧・BrushTool 驕ｸ謚樊凾縺ｮ縺ｿ陦ｨ遉ｺ (worker: worker-b-sonnet)",
+                           "f8a86fe task-27: CanvasWidget 繝代せ繝・・繝ｼ繝臥ｧｻ蜍墓凾縺ｮ canvasPositionChanged emit 貍上ｌ菫ｮ豁｣ (worker: worker-b-sonnet)",
+                           "4a4beba task-23: LayerPanel opacity slider sync - refreshButtonState()縺ｫopacity蜷梧悄霑ｽ蜉縲《etLayerOpacity/setLayerBlendMode縺ｫcanvasChanged逋ｺ陦瑚ｿｽ蜉",
+                           "300ffdd UI: polish layer panel delegate, opacity slider, and controls",
+                           "b9034f1 UI: stabilize layer delegate and opacity slider",
+                           "db3a4e8 task-26: ColorWheelWidget 縺ｫ #RRGGBB hex蜈･蜉・QLineEdit 霑ｽ蜉 (worker: worker-b-sonnet)"
+                       ],
+    "previous_changes":  [
+                             {
+                                 "task_id":  "task-18",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-20",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-21",
+                                 "files_changed":  [
+                                                       3
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-23",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-24",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-25",
+                                 "files_changed":  [
+                                                       7
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-26",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-23",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-24",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-25",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-26",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-27",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-28",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-29",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-30",
+                                 "files_changed":  [
+                                                       10
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-31",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-32",
+                                 "files_changed":  [
+                                                       4
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-27",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-28",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-29",
+                                 "files_changed":  [
+                                                       9
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-36",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-38",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-39",
+                                 "files_changed":  [
+                                                       9
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-40",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-32",
+                                 "files_changed":  [
+                                                       9
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-35",
+                                 "files_changed":  [
+                                                       8
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-36",
+                                 "files_changed":  [
+                                                       2
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-42",
+                                 "files_changed":  [
+                                                       9
+                                                   ]
+                             },
+                             {
+                                 "task_id":  "task-36",
+                                 "files_changed":  [
+                                                       9
+                                                   ]
+                             }
+                         ],
+    "brain_ready":  true,
+    "generated_at":  "2026-06-08T20:31:02.5609732+09:00"
+}

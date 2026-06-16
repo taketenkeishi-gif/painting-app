@@ -1,0 +1,24 @@
+Detecting compiler hash for triplet x64-windows...
+Compiler found: C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe
+The following packages are already installed:
+  * abseil:x64-windows@20260107.1#3
+  * flatbuffers:x64-windows@25.12.19
+  * libjpeg-turbo:x64-windows@3.1.4.1
+  * liblzma:x64-windows@5.8.3
+  * libpng:x64-windows@1.6.58
+  * libwebp[core,unicode,simd,nearlossless,libwebpmux]:x64-windows@1.6.0#2
+    opencv4[core,win32ui,webp,tiff,thread,quirc,png,msmf,jpeg,intrinsics,highgui,gapi,fs,dshow,dnn,directml,calib3d]:x64-windows@4.12.0#3
+  * protobuf:x64-windows@6.33.4#2
+  * quirc:x64-windows@1.2
+  * tiff[core,zip,lzma,jpeg]:x64-windows@4.7.1
+  * utf8-range:x64-windows@6.33.4
+  * vcpkg-cmake:x64-windows@2024-04-23
+  * vcpkg-cmake-config:x64-windows@2024-05-23
+  * vcpkg-get-python-packages:x64-windows@2025-04-05
+  * zlib:x64-windows@1.3.2#1
+opencv4 is compatible with built-in CMake variables. In case of multiple OpenCV version installed, set OpenCV_ROOT *before* the find_package call:
+
+    set(OpenCV_ROOT "${VCPKG_INSTALLED_DIR}/x64-windows/share/opencv4")
+    find_package(OpenCV REQUIRED)
+
+All requested installations completed successfully in: 528 us
